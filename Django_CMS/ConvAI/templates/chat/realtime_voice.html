@@ -1,0 +1,488 @@
+{% extends "blank.html" %}
+{% load i18n static %}
+
+{% block title %}{% trans "Voice chat" %}{% endblock %}
+
+{% block extra_head %}
+{# Tailwind is inherited from blank.html (built locally). #}
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<style>
+  /* Classes are prefixed `rtc-` to stay isolated from global chat styles. */
+  :root {
+    --rtc-header: #006877;
+    --rtc-header-dark: #084e59;
+    --rtc-bg: #e7ecef;
+    --rtc-text: #1f2937;
+    --rtc-meta: #6b7b80;
+    --rtc-live: #4ade80;
+    --rtc-danger: #e11d48;
+    --rtc-shadow: rgba(8, 78, 89, 0.10);
+    --amp: 0;   /* live audio level 0..1, set from JS */
+  }
+
+  html, body { height: 100%; }
+  body {
+    padding: 0 !important; margin: 0;
+    background: var(--rtc-bg) !important;
+    font-family: 'DM Sans', sans-serif;
+    display: block !important;
+  }
+
+  .rtc-page {
+    display: flex; flex-direction: column;
+    height: 100vh; height: 100dvh;
+    max-width: 900px; margin: 0 auto;
+    background:
+      radial-gradient(rgba(0,54,62,0.035) 1px, transparent 1px) 0 0 / 22px 22px,
+      var(--rtc-bg);
+    box-shadow: 0 0 40px rgba(0,0,0,0.06);
+  }
+
+  /* ---------- Header ---------- */
+  .rtc-topbar {
+    background: linear-gradient(135deg, var(--rtc-header), var(--rtc-header-dark));
+    color: #fff; padding: .7rem 1rem;
+    display: flex; align-items: center; gap: .8rem;
+    flex-shrink: 0; z-index: 5;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+  }
+  .rtc-avatar {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: rgba(255,255,255,0.18);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .rtc-avatar .material-icons-round { font-size: 26px; }
+  .rtc-headinfo { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+  .rtc-headinfo .rtc-title { font-size: 1.02rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rtc-headinfo .rtc-substatus { font-size: .76rem; opacity: .85; display: flex; align-items: center; gap: .3rem; }
+  .rtc-dot { width: 7px; height: 7px; border-radius: 50%; background: #9fb4b9; display: inline-block; transition: background .25s; }
+  .rtc-page.is-live .rtc-dot { background: var(--rtc-live); }
+
+  /* ---------- Stage ---------- */
+  .rtc-stage {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1.4rem; padding: 1.5rem 1rem;
+  }
+
+  .rtc-warn {
+    background: #fff7ed; border: 1px solid #fdba74; color: #9a3412;
+    border-radius: 12px; padding: .7rem 1rem; font-size: .85rem;
+    max-width: 30rem; text-align: center;
+  }
+
+  /* Voice orb: breathes when idle-live, swells with the actual audio level. */
+  .rtc-orb {
+    position: relative; width: 190px; height: 190px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .rtc-orb::before, .rtc-orb::after {
+    content: ""; position: absolute; inset: 0; border-radius: 50%;
+    border: 2px solid rgba(0,104,119,0.18);
+    opacity: 0; transform: scale(.8);
+  }
+  .rtc-page.is-live .rtc-orb::before,
+  .rtc-page.is-live .rtc-orb::after {
+    animation: rtcRipple 3.2s ease-out infinite;
+  }
+  .rtc-page.is-live .rtc-orb::after { animation-delay: 1.6s; }
+  @keyframes rtcRipple {
+    0% { opacity: .55; transform: scale(.82); }
+    100% { opacity: 0; transform: scale(1.25); }
+  }
+  .rtc-orb-core {
+    width: 150px; height: 150px; border-radius: 50%;
+    background: radial-gradient(circle at 32% 28%, #2d99a8, var(--rtc-header) 55%, var(--rtc-header-dark));
+    box-shadow:
+      0 10px 34px rgba(0,84,96,.35),
+      0 0 0 calc(6px + var(--amp) * 26px) rgba(0,104,119, calc(.10 + var(--amp) * .16));
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    transform: scale(calc(1 + var(--amp) * .14));
+    transition: box-shadow .08s linear;
+  }
+  .rtc-page:not(.is-live) .rtc-orb-core { filter: saturate(.45) brightness(1.05); }
+  .rtc-page.is-live .rtc-orb-core { animation: rtcBreathe 3.2s ease-in-out infinite; }
+  @keyframes rtcBreathe {
+    0%, 100% { box-shadow: 0 10px 34px rgba(0,84,96,.35), 0 0 0 calc(6px + var(--amp) * 26px) rgba(0,104,119, calc(.10 + var(--amp) * .16)); }
+  }
+  .rtc-orb-core .material-icons-round { font-size: 56px; opacity: .92; }
+
+  .rtc-state { font-size: 1.02rem; font-weight: 600; color: var(--rtc-text); text-align: center; }
+  .rtc-timer {
+    font-variant-numeric: tabular-nums; font-size: .82rem; color: var(--rtc-meta);
+    min-height: 1.1rem; text-align: center;
+  }
+  .rtc-page.is-muted .rtc-state { color: var(--rtc-danger); }
+
+  /* Live captions of what the assistant says. */
+  .rtc-captions {
+    min-height: 3.4rem; max-height: 7.5rem; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: flex-end; gap: .3rem;
+    max-width: 34rem; width: 100%; text-align: center;
+  }
+  .rtc-cap {
+    font-size: .92rem; color: var(--rtc-text); line-height: 1.45;
+    background: rgba(255,255,255,.85); border-radius: 14px; padding: .45rem .9rem;
+    box-shadow: 0 1px 3px var(--rtc-shadow);
+  }
+  .rtc-cap.rtc-cap-old { opacity: .45; font-size: .8rem; }
+  .rtc-cap.rtc-cap-sys { background: transparent; box-shadow: none; color: var(--rtc-meta); font-size: .78rem; }
+
+  /* ---------- Controls ---------- */
+  .rtc-controls {
+    flex-shrink: 0; padding: 1.1rem 1rem calc(1.3rem + env(safe-area-inset-bottom));
+    display: flex; align-items: center; justify-content: center; gap: 2.2rem;
+  }
+  .rtc-btn {
+    border: none; border-radius: 50%; cursor: pointer; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .15s, opacity .2s, background .2s;
+  }
+  .rtc-btn:hover { transform: scale(1.06); }
+  .rtc-btn:active { transform: scale(.95); }
+  .rtc-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+  .rtc-mute {
+    width: 56px; height: 56px; background: #fff; color: var(--rtc-header);
+    box-shadow: 0 2px 8px var(--rtc-shadow);
+  }
+  .rtc-mute .material-icons-round { font-size: 26px; }
+  .rtc-page.is-muted .rtc-mute { background: var(--rtc-danger); color: #fff; }
+
+  .rtc-call {
+    width: 76px; height: 76px;
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    box-shadow: 0 6px 18px rgba(22,163,74,.35);
+  }
+  .rtc-call .material-icons-round { font-size: 34px; }
+  .rtc-page.is-live .rtc-call,
+  .rtc-page.is-connecting .rtc-call {
+    background: linear-gradient(135deg, #f43f5e, var(--rtc-danger));
+    box-shadow: 0 6px 18px rgba(225,29,72,.35);
+  }
+  .rtc-page.is-connecting .rtc-call .material-icons-round { animation: rtcSpin 1.1s linear infinite; }
+  @keyframes rtcSpin { to { transform: rotate(360deg); } }
+
+  /* Symmetric spacer so the call button stays centred next to the mute button. */
+  .rtc-spacer { width: 56px; height: 56px; visibility: hidden; }
+
+  @media (max-width: 768px) {
+    .rtc-page { max-width: 100%; box-shadow: none; }
+    .rtc-orb { width: 165px; height: 165px; }
+    .rtc-orb-core { width: 130px; height: 130px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="rtcPage" class="rtc-page">
+  <!-- Header -->
+  <header class="rtc-topbar">
+    <div class="rtc-avatar"><span class="material-icons-round">graphic_eq</span></div>
+    <div class="rtc-headinfo">
+      <span class="rtc-title">{{ chat_title }}</span>
+      <span class="rtc-substatus"><span class="rtc-dot"></span><span id="rtcSub">{% trans "voice agent" %}</span></span>
+    </div>
+  </header>
+
+  <!-- Stage -->
+  <main class="rtc-stage">
+    {% if not realtime_ready %}
+      <div class="rtc-warn">
+        <span class="material-icons-round" style="font-size:18px;vertical-align:-4px;">warning_amber</span>
+        {% trans "Real-time voice is not configured yet. Set the Azure Realtime endpoint, key and deployment under Settings → Agents." %}
+      </div>
+    {% endif %}
+
+    <div class="rtc-orb">
+      <div class="rtc-orb-core"><span class="material-icons-round" id="rtcOrbIcon">graphic_eq</span></div>
+    </div>
+
+    <div>
+      <div id="rtcState" class="rtc-state">{% trans "Tap the button to start talking" %}</div>
+      <div id="rtcTimer" class="rtc-timer"></div>
+    </div>
+
+    <div id="rtcCaptions" class="rtc-captions"></div>
+  </main>
+
+  <!-- Controls -->
+  <footer class="rtc-controls">
+    <button id="rtcMuteBtn" class="rtc-btn rtc-mute" type="button" disabled
+            title="{% trans 'Mute microphone' %}">
+      <span class="material-icons-round">mic</span>
+    </button>
+    <button id="rtcCallBtn" class="rtc-btn rtc-call" type="button"
+            {% if not realtime_ready %}disabled{% endif %}
+            title="{% trans 'Start conversation' %}">
+      <span class="material-icons-round">call</span>
+    </button>
+    <span class="rtc-spacer" aria-hidden="true"></span>
+  </footer>
+</div>
+
+<audio id="rtcRemoteAudio" autoplay></audio>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const CSRF_TOKEN  = "{{ csrf_token }}";
+  const SESSION_URL = "{{ session_url }}";
+
+  // The Realtime API bills per connected minute, so the session only exists
+  // between Start and Stop, and calls are cut after a stretch of silence.
+  const IDLE_LIMIT_MS = 120000;
+
+  const page     = document.getElementById('rtcPage');
+  const callBtn  = document.getElementById('rtcCallBtn');
+  const callIcon = callBtn.querySelector('.material-icons-round');
+  const muteBtn  = document.getElementById('rtcMuteBtn');
+  const muteIcon = muteBtn.querySelector('.material-icons-round');
+  const stateEl  = document.getElementById('rtcState');
+  const subEl    = document.getElementById('rtcSub');
+  const timerEl  = document.getElementById('rtcTimer');
+  const capsEl   = document.getElementById('rtcCaptions');
+  const remoteEl = document.getElementById('rtcRemoteAudio');
+
+  const T = {
+    idle:        "{% trans 'Tap the button to start talking' %}",
+    connecting:  "{% trans 'Connecting…' %}",
+    listening:   "{% trans 'Listening…' %}",
+    speaking:    "{% trans 'Speaking…' %}",
+    muted:       "{% trans 'Microphone muted' %}",
+    ended:       "{% trans 'Conversation ended' %}",
+    endedIdle:   "{% trans 'Ended after inactivity — tap to resume' %}",
+    voiceAgent:  "{% trans 'voice agent' %}",
+    live:        "{% trans 'live' %}",
+    errSession:  "{% trans 'Could not start the voice session.' %}",
+    errMicPerm:  "{% trans 'Microphone permission denied. Allow it in the browser to talk.' %}",
+    errMic:      "{% trans 'Could not access the microphone.' %}",
+    errSecure:   "{% trans 'Voice needs a secure connection (HTTPS) or localhost.' %}",
+    titleStart:  "{% trans 'Start conversation' %}",
+    titleStop:   "{% trans 'End conversation' %}",
+    titleMute:   "{% trans 'Mute microphone' %}",
+    titleUnmute: "{% trans 'Unmute microphone' %}",
+  };
+
+  let pc = null, dc = null, localStream = null;
+  let phase = 'idle';           // idle | connecting | live
+  let muted = false, speaking = false;
+  let callTimer = null, callSeconds = 0;
+  let idleTimer = null;
+  let audioCtx = null, rafId = null;
+  let currentCap = null;
+
+  // ---------- UI helpers ----------
+  function setState(txt){ stateEl.textContent = txt; }
+
+  function setPhase(p){
+    phase = p;
+    page.classList.toggle('is-live', p === 'live');
+    page.classList.toggle('is-connecting', p === 'connecting');
+    callIcon.textContent = p === 'idle' ? 'call' : (p === 'connecting' ? 'progress_activity' : 'call_end');
+    callBtn.title = p === 'idle' ? T.titleStart : T.titleStop;
+    muteBtn.disabled = p !== 'live';
+    subEl.textContent = p === 'live' ? T.live : T.voiceAgent;
+  }
+
+  function refreshLiveState(){
+    if (phase !== 'live') return;
+    if (muted) setState(T.muted);
+    else setState(speaking ? T.speaking : T.listening);
+  }
+
+  function addCaption(txt, cls){
+    const d = document.createElement('div');
+    d.className = 'rtc-cap' + (cls ? ' ' + cls : '');
+    d.textContent = txt;
+    capsEl.appendChild(d);
+    trimCaptions();
+    return d;
+  }
+  function addSysCaption(txt){ addCaption(txt, 'rtc-cap-sys'); }
+  function trimCaptions(){
+    const caps = capsEl.querySelectorAll('.rtc-cap');
+    caps.forEach((c, i) => {
+      if (i < caps.length - 1) c.classList.add('rtc-cap-old');
+    });
+    while (capsEl.children.length > 3) capsEl.removeChild(capsEl.firstChild);
+  }
+
+  function startCallTimer(){
+    callSeconds = 0; timerEl.textContent = '0:00';
+    callTimer = setInterval(() => {
+      callSeconds++;
+      const m = Math.floor(callSeconds / 60), s = callSeconds % 60;
+      timerEl.textContent = m + ':' + String(s).padStart(2, '0');
+    }, 1000);
+  }
+  function stopCallTimer(){ if (callTimer){ clearInterval(callTimer); callTimer = null; } }
+
+  function bumpIdle(){
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => endCall(T.endedIdle), IDLE_LIMIT_MS);
+  }
+
+  // ---------- Orb level animation ----------
+  function startMeter(remoteStream){
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new Ctx();
+      const mk = (stream) => {
+        const an = audioCtx.createAnalyser();
+        an.fftSize = 512;
+        audioCtx.createMediaStreamSource(stream).connect(an);
+        return { an, buf: new Uint8Array(an.frequencyBinCount) };
+      };
+      const remote = mk(remoteStream);
+      const local  = localStream ? mk(localStream) : null;
+      const level = (m) => {
+        m.an.getByteTimeDomainData(m.buf);
+        let sum = 0;
+        for (let i = 0; i < m.buf.length; i++){ const v = (m.buf[i] - 128) / 128; sum += v * v; }
+        return Math.min(1, Math.sqrt(sum / m.buf.length) * 3.5);
+      };
+      const tick = () => {
+        let amp = level(remote);
+        if (local && !muted) amp = Math.max(amp, level(local) * 0.65);
+        page.style.setProperty('--amp', amp.toFixed(3));
+        rafId = requestAnimationFrame(tick);
+      };
+      tick();
+    } catch (e) { /* purely cosmetic — ignore */ }
+  }
+  function stopMeter(){
+    if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
+    if (audioCtx){ try { audioCtx.close(); } catch(e){} audioCtx = null; }
+    page.style.setProperty('--amp', 0);
+  }
+
+  // ---------- Realtime events (data channel) ----------
+  function onServerEvent(ev){
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch (e) { return; }
+    switch (msg.type){
+      case 'input_audio_buffer.speech_started':
+        bumpIdle(); break;
+      case 'output_audio_buffer.started':
+        speaking = true; refreshLiveState(); bumpIdle(); break;
+      case 'output_audio_buffer.stopped':
+      case 'response.done':
+        speaking = false; refreshLiveState(); bumpIdle(); break;
+      case 'response.output_audio_transcript.delta':
+        if (!currentCap) currentCap = addCaption('');
+        currentCap.textContent += msg.delta || '';
+        bumpIdle(); break;
+      case 'response.output_audio_transcript.done':
+        if (currentCap && msg.transcript) currentCap.textContent = msg.transcript;
+        currentCap = null; break;
+      case 'error':
+        console.error('realtime error', msg);
+        break;
+    }
+  }
+
+  // ---------- Call lifecycle ----------
+  async function startCall(){
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      addSysCaption(T.errSecure); return;
+    }
+    setPhase('connecting'); setState(T.connecting);
+    try {
+      // 1) Ephemeral session key — minted server-side only now, on Start.
+      const sres = await fetch(SESSION_URL, {
+        method: 'POST', headers: { 'X-CSRFToken': CSRF_TOKEN },
+      });
+      if (!sres.ok){
+        let detail = '';
+        try { detail = (await sres.json()).error || ''; } catch(e){}
+        throw new Error(detail || T.errSession);
+      }
+      const session = await sres.json();
+
+      // 2) Microphone.
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err){
+        const denied = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
+        throw new Error(denied ? T.errMicPerm : T.errMic);
+      }
+
+      // 3) WebRTC peer connection to Azure.
+      pc = new RTCPeerConnection();
+      localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+      pc.ontrack = (e) => {
+        remoteEl.srcObject = e.streams[0];
+        remoteEl.play().catch(() => {});
+        startMeter(e.streams[0]);
+      };
+      pc.onconnectionstatechange = () => {
+        if (pc && ['failed', 'disconnected', 'closed'].includes(pc.connectionState) && phase === 'live'){
+          endCall(T.ended);
+        }
+      };
+      dc = pc.createDataChannel('oai-events');
+      dc.onmessage = onServerEvent;
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      const ares = await fetch(session.webrtc_url, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + session.client_secret,
+                   'Content-Type': 'application/sdp' },
+        body: offer.sdp,
+      });
+      if (!ares.ok) throw new Error(T.errSession);
+      await pc.setRemoteDescription({ type: 'answer', sdp: await ares.text() });
+
+      setPhase('live');
+      speaking = false; refreshLiveState();
+      startCallTimer(); bumpIdle();
+    } catch (err){
+      teardown();
+      setPhase('idle'); setState(T.idle);
+      addSysCaption(err && err.message ? err.message : T.errSession);
+    }
+  }
+
+  function teardown(){
+    if (idleTimer){ clearTimeout(idleTimer); idleTimer = null; }
+    stopCallTimer(); stopMeter();
+    if (dc){ try { dc.close(); } catch(e){} dc = null; }
+    if (pc){ try { pc.close(); } catch(e){} pc = null; }
+    if (localStream){ localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+    remoteEl.srcObject = null;
+    muted = false; speaking = false; currentCap = null;
+    page.classList.remove('is-muted');
+    muteIcon.textContent = 'mic'; muteBtn.title = T.titleMute;
+  }
+
+  function endCall(finalState){
+    teardown();
+    setPhase('idle');
+    setState(finalState || T.ended);
+    timerEl.textContent = '';
+  }
+
+  callBtn.addEventListener('click', () => {
+    if (phase === 'idle') startCall();
+    else endCall(T.ended);
+  });
+
+  muteBtn.addEventListener('click', () => {
+    if (!localStream) return;
+    muted = !muted;
+    localStream.getAudioTracks().forEach(t => { t.enabled = !muted; });
+    page.classList.toggle('is-muted', muted);
+    muteIcon.textContent = muted ? 'mic_off' : 'mic';
+    muteBtn.title = muted ? T.titleUnmute : T.titleMute;
+    refreshLiveState();
+  });
+
+  // Never leave a session running behind a closed/abandoned page.
+  window.addEventListener('pagehide', () => { if (phase !== 'idle') endCall(); });
+
+  setPhase('idle');
+</script>
+{% endblock %}

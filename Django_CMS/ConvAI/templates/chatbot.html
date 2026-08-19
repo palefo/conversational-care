@@ -1,0 +1,177 @@
+{# templates/includes/chatbot.html #}
+{% load i18n %}
+
+<!-- chatbot bubble -->
+<div id="chatbot-bubble" class="chatbot-bubble">
+  <span class="material-icons-outlined text-3xl">chat</span>
+</div>
+
+<!-- chatbot window -->
+<div id="chatbot-window" class="chatbot-window hidden">
+  <div class="chatbot-header">
+    <h3>{% trans "Virtual Assistant" %}</h3>
+    <div class="chatbot-header-actions">
+      <button id="chatbot-restart" class="text-white" title="{% trans 'End conversation' %}">
+        <span class="material-icons-outlined">restart_alt</span>
+      </button>
+      <button id="chatbot-close" class="text-white">
+        <span class="material-icons-outlined">close</span>
+      </button>
+    </div>
+  </div>
+  <div id="chatbot-messages" class="chatbot-messages"></div>
+  <div class="chatbot-input">
+    <input id="chatbot-input" type="text" placeholder="{% trans "Type your message..." %}" />
+    <button id="chatbot-send">
+      <span class="material-icons-outlined">send</span>
+    </button>
+  </div>
+  <div class="chatbot-hint">{% blocktrans %}Type a message, or <code>/quit</code> to end the conversation.{% endblocktrans %}</div>
+</div>
+
+<style>
+  .chatbot-header-actions { display: inline-flex; align-items: center; gap: .25rem; }
+  #chatbot-restart { opacity: .85; }
+  #chatbot-restart:hover { opacity: 1; }
+  .chatbot-hint { text-align: center; color: #94a3b8; font-size: .66rem; padding: .2rem .5rem .4rem; }
+  .chatbot-hint code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .chatbot-messages .message.system {
+    align-self: center; background: transparent; color: #94a3b8;
+    font-size: .72rem; text-align: center; box-shadow: none;
+  }
+</style>
+
+<script>
+(function(){
+  // The csrftoken cookie is HttpOnly (CSRF_COOKIE_HTTPONLY=True), so JS cannot
+  // read it — use the token rendered by Django instead.
+  const CSRF_TOKEN = "{{ csrf_token }}";
+
+  // Elements
+  const bubble    = document.getElementById('chatbot-bubble');
+  const win       = document.getElementById('chatbot-window');
+  const closeBtn  = document.getElementById('chatbot-close');
+  const msgBox    = document.getElementById('chatbot-messages');
+  const input     = document.getElementById('chatbot-input');
+  const sendBtn   = document.getElementById('chatbot-send');
+  const restartBtn= document.getElementById('chatbot-restart');
+
+  // Conversation id. Base is the user's identity; a suffix is added on /quit so
+  // the server derives a fresh thread and the conversation starts over.
+  const BASE_CONV = '{{ request.user.email|default:request.user.username }}';
+  let convId = BASE_CONV;
+  const SEND_URL = "{% url 'send_chat_message' %}";
+  const QUIT_CMDS = ['/quit', '/restart'];
+
+  // Drag variables
+  let dragging = false, offsetX = 0, offsetY = 0, clickPossible = true;
+
+  // Mousedown on bubble
+  bubble.addEventListener('mousedown', e => {
+    dragging = true;
+    clickPossible = true;
+    offsetX = e.clientX - bubble.getBoundingClientRect().left;
+    offsetY = e.clientY - bubble.getBoundingClientRect().top;
+    bubble.style.cursor = 'grabbing';
+  });
+
+  // Mousemove
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    clickPossible = false;
+    let x = e.clientX - offsetX;
+    let y = e.clientY - offsetY;
+    const br = bubble.getBoundingClientRect();
+    const bw = bubble.offsetWidth, bh = bubble.offsetHeight;
+    const W = window.innerWidth, H = window.innerHeight;
+    x = Math.max(0, Math.min(x, W - bw));
+    y = Math.max(0, Math.min(y, H - bh));
+    bubble.style.left = x + 'px';
+    bubble.style.top  = y + 'px';
+    // clear bottom/right so that CSS won't override later
+    bubble.style.bottom = 'auto';
+    bubble.style.right  = 'auto';
+  });
+
+  // Mouseup
+  document.addEventListener('mouseup', () => {
+    if (dragging) {
+      dragging = false;
+      bubble.style.cursor = 'grab';
+    }
+  });
+
+  // Toggle window on click
+  bubble.addEventListener('click', () => {
+    if (!clickPossible) return;
+    win.classList.toggle('hidden');
+    if (!win.classList.contains('hidden')) {
+      // position window above bubble
+      const br = bubble.getBoundingClientRect();
+      let wx = br.left - win.offsetWidth + br.width + 20;
+      let wy = br.top - win.offsetHeight - 10;
+      wx = Math.max(10, Math.min(wx, window.innerWidth - win.offsetWidth - 10));
+      wy = Math.max(10, Math.min(wy, window.innerHeight - win.offsetHeight - 10));
+      win.style.left = wx + 'px';
+      win.style.top  = wy + 'px';
+      win.style.bottom = 'auto'; win.style.right = 'auto';
+      input.focus();
+    }
+  });
+
+  // Close button
+  closeBtn.addEventListener('click', () => win.classList.add('hidden'));
+
+  // Helper to append a chat bubble
+  function addMessage(text, cls){
+    const d = document.createElement('div');
+    d.className = 'message ' + cls;
+    d.textContent = text;
+    msgBox.appendChild(d);
+    msgBox.scrollTop = msgBox.scrollHeight;
+  }
+
+  // End the current conversation and roll over to a fresh thread.
+  async function resetConversation(showUserQuit){
+    if (showUserQuit) addMessage('/quit', 'user');
+    try {
+      await fetch(SEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ message: '/quit', conversation_id: convId })
+      });
+    } catch (err) { /* best-effort: still reset locally */ }
+    convId = BASE_CONV + ':' + Date.now();   // fresh thread on the next message
+    addMessage("{% trans 'Conversation ended. Send a message to start a new one.' %}", 'system');
+  }
+
+  // Send / receive
+  async function sendMessage(){
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    if (QUIT_CMDS.includes(text.toLowerCase())){ resetConversation(true); return; }
+    addMessage(text, 'user');
+    try {
+      const res = await fetch(SEND_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF_TOKEN
+        },
+        body: JSON.stringify({ message: text, conversation_id: convId })
+      });
+      const data = await res.json();
+      addMessage(data.bot_message, 'bot');
+    } catch (err) {
+      addMessage('Error conectando al servidor.', 'bot');
+    }
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  restartBtn.addEventListener('click', () => resetConversation(false));
+  input.addEventListener('keypress', e => {
+    if (e.key === 'Enter') sendMessage();
+  });
+})();
+</script>

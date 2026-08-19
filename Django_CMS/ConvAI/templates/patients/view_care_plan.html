@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}{% trans "Care plan" %} — {{ patient }}{% endblock %}
+
+{% block content %}
+  <!-- Encabezado -->
+  <header class="mb-6">
+    <h1 class="text-3xl font-semibold text-gray-800">{% trans "Care plan" %}: {{ patient }}</h1>
+    <a
+      href="{% url 'patient_detail' patient.pk %}"
+      class="flex items-center text-sky-600 hover:text-sky-700 hover:underline mt-2 text-sm"
+    >
+      <span class="material-icons-outlined mr-1">arrow_back</span>
+      {% trans "Back to client" %}
+    </a>
+  </header>
+
+  {% if patient.care_plan %}
+    <!-- Botón para actualizar -->
+    <div class="mb-4">
+      <a
+        href="{% url 'edit_care_plan' patient.pk %}"
+        class="button-secondary py-2 px-4 rounded-lg text-sm flex items-center"
+      >
+        <span class="material-icons-outlined mr-2 text-base">upload_file</span>
+        {% trans "Update Care Plan" %}
+      </a>
+    </div>
+
+    <!-- Iframe con el PDF -->
+    <div class="card overflow-hidden" style="height: 80vh;">
+      <iframe
+        src="{% url 'download_care_plan' patient.pk %}"
+        class="w-full h-full border-0"
+      ></iframe>
+    </div>
+  {% else %}
+    <!-- Mensaje si no existe plan -->
+    <p class="text-gray-500 mb-4">{% trans "No Care Plan uploaded for this client." %}</p>
+    <a
+      href="{% url 'edit_care_plan' patient.pk %}"
+      class="button-primary py-2 px-4 rounded-lg flex items-center"
+    >
+      <span class="material-icons-outlined mr-2 text-base">upload_file</span>
+      {% trans "Upload Care Plan" %}
+    </a>
+  {% endif %}
+{% endblock %}

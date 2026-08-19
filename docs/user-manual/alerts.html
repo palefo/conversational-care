@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Triage what the AI escalated: review, act, note, and feed back.">
+<title>Alerts · Conversational Care User Manual</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230e7c6b%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 font-family=%22sans-serif%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>CC</text></svg>">
+</head>
+<body>
+<input type="checkbox" id="menu-toggle" aria-hidden="true">
+<div class="topbar">
+  <label for="menu-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></label>
+  <span class="t-title">Conversational Care — User Manual</span>
+</div>
+<div class="wrap">
+<aside class="sidebar">
+  <a class="brand" href="index.html">
+    <span class="brand-mark">CC</span>
+    <span><span class="brand-name">Conversational Care</span><br><span class="brand-sub">User Manual</span></span>
+  </a>
+  <nav class="nav">
+<div class="nav-group">Start here</div>
+<a href="index.html">Welcome</a>
+<a href="getting-started.html">Getting started</a>
+<div class="nav-group">Everyday work</div>
+<a href="dashboard.html">Dashboard</a>
+<a href="clients.html">Clients</a>
+<a href="calls.html">Calls</a>
+<a href="communications.html">Communications</a>
+<a href="calendar.html">Calendar</a>
+<a href="conversations.html">Conversations</a>
+<a href="alerts.html" class="active">Alerts</a>
+<div class="nav-group">Design & configuration</div>
+<a href="protocols.html">Protocols</a>
+<a href="agents.html">Agents</a>
+<a href="users.html">Users</a>
+<a href="settings.html">Settings</a>
+  </nav>
+</aside>
+<main class="content">
+<h1>Alerts</h1>
+<p class="lede">Triage what the AI escalated: review, act, note, and feed back.</p>
+<p>When an agent's conversation suggests risk — or an automated check trips —
+the platform raises an <strong>alert</strong> for a human to review. Alerts is
+where your team triages, acts, and closes the loop.</p>
+
+<div class="callout"><div class="c-title">Where alerts live now</div>
+There is no separate Alerts page. Alerts appear in
+<a href="communications.html">Communications</a> and on the
+<a href="dashboard.html">dashboard</a>, and open in the right-hand detail panel
+alongside calls, meetings and conversations. Unread alerts are shown in bold;
+opening one marks it read, for you only. Old links to the alerts page still
+work — they redirect. The description below is of the panel.</div>
+
+<h2>What an alert shows</h2>
+<ul>
+<li><strong>Active alerts</strong> — cards showing the client, a summary, when
+it was detected, its <em>priority</em> (urgent/high, medium, low) and
+<em>status</em> (new, in progress, resolved). Alerts from the same client are
+grouped.</li>
+<li><strong>Filters</strong> — by client, priority and status; sort by date;
+active filters are listed so you can clear them individually or all at once.</li>
+<li><strong>Resolved alerts archive</strong> — resolved alerts and false alarms
+move out of the active panel but stay searchable.</li>
+</ul>
+
+<h2>Reviewing an alert</h2>
+<ol class="steps">
+<li>Open the alert. Read the summary and, when linked, jump to the exact
+<strong>conversation</strong> it came from.</li>
+<li>Choose an <strong>action</strong> from the panel footer:
+<kbd class="ui">Resolve</kbd>, <kbd class="ui">Reopen</kbd>, mark a false alarm
+(which resolves it into the false-alarms archive), or turn the client's agent
+off while you investigate and back on afterwards. The chosen action is saved to
+the alert log.</li>
+<li>Add an <strong>internal note</strong> — what was reviewed or decided, and
+optionally what changed for the client. Notes are saved to the alert log for
+the whole team.</li>
+</ol>
+
+<h2>Raising an alert yourself</h2>
+<p>Not every alert comes from the agent. While reading a conversation you can
+press <kbd class="ui">Raise an alert</kbd> and record what you saw — a short
+title, a level, and what the agent missed or what worried you. Alerts you raise
+are marked as raised by a navigator, so they are never confused with the ones
+the classifier produced.</p>
+
+<div class="callout warn"><div class="c-title">Important</div>
+Turning the agent off is <strong>per client</strong>, not per alert — two alerts
+about the same person can't disagree about whether their agent is running. While
+it is off, the caregiver's messages still arrive and are still recorded; what
+stops is the agent answering them. You are asked for a reason, and who turned it
+off and when is kept with the client.</div>
+<div class="pager"><a href="conversations.html"><span class="dir">&larr; Previous</span>Conversations</a><a href="protocols.html" style="text-align:right"><span class="dir">Next &rarr;</span>Protocols</a></div>
+<p class="footer-note">Conversational Care · Wellbeing Technologies Lab, Dyson School of Design Engineering, Imperial College London · AGPL-3.0.<br>
+Developers and operators: see the <a href="../technical-manual.md">technical manual</a>.</p>
+</main>
+</div>
+</body>
+</html>

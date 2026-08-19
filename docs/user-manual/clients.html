@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Add and manage the people you support — care plans, details, and their full communication timeline.">
+<title>Clients · Conversational Care User Manual</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230e7c6b%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 font-family=%22sans-serif%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>CC</text></svg>">
+</head>
+<body>
+<input type="checkbox" id="menu-toggle" aria-hidden="true">
+<div class="topbar">
+  <label for="menu-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></label>
+  <span class="t-title">Conversational Care — User Manual</span>
+</div>
+<div class="wrap">
+<aside class="sidebar">
+  <a class="brand" href="index.html">
+    <span class="brand-mark">CC</span>
+    <span><span class="brand-name">Conversational Care</span><br><span class="brand-sub">User Manual</span></span>
+  </a>
+  <nav class="nav">
+<div class="nav-group">Start here</div>
+<a href="index.html">Welcome</a>
+<a href="getting-started.html">Getting started</a>
+<div class="nav-group">Everyday work</div>
+<a href="dashboard.html">Dashboard</a>
+<a href="clients.html" class="active">Clients</a>
+<a href="calls.html">Calls</a>
+<a href="communications.html">Communications</a>
+<a href="calendar.html">Calendar</a>
+<a href="conversations.html">Conversations</a>
+<a href="alerts.html">Alerts</a>
+<div class="nav-group">Design & configuration</div>
+<a href="protocols.html">Protocols</a>
+<a href="agents.html">Agents</a>
+<a href="users.html">Users</a>
+<a href="settings.html">Settings</a>
+  </nav>
+</aside>
+<main class="content">
+<h1>Clients</h1>
+<p class="lede">Add and manage the people you support — care plans, details, and their full communication timeline.</p>
+<p>The <strong>Clients</strong> page lists the people you support: ID, name,
+caregiver, counsellor, and their next scheduled call. Search by ID, client,
+caregiver or counsellor, and filter by whether a next call is scheduled.</p>
+
+<h2>Adding a client</h2>
+<ol class="steps">
+<li>Click <kbd class="ui">Add client</kbd>.</li>
+<li>Enter the client's name and phone, and the caregiver's name and phone.
+The <strong>caregiver's phone</strong> is the number dialled when you start a
+call, and the number WhatsApp messages go to — enter it in international
+format (e.g. <code>+447700900000</code>).</li>
+<li>Pick the <strong>agent</strong> that should handle this client's chat.
+Without an agent the chatbot cannot respond.</li>
+<li>Save with <kbd class="ui">Create</kbd>.</li>
+</ol>
+
+<h2>The client page</h2>
+<p>Open any client to see everything about them in one place:</p>
+<ul>
+<li><strong>Detailed information</strong> — contact details, the assigned
+navigator (CTN), and the caregiver, with their <strong>relationship</strong> to
+the client (daughter, neighbour, paid carer…) and how involved they usually
+are.</li>
+<li><strong>The agent</strong> — which agent answers this client's chats, and a
+switch to turn answering off. While it is off, messages still arrive and are
+recorded; what stops is the agent replying. You give a reason, and the platform
+keeps who turned it off and when.</li>
+<li><strong>How they want to be contacted</strong> — contact preferences chosen
+from a standard set, so they mean the same thing across the team, plus any you
+add yourself.</li>
+<li><strong>Next call</strong> — when the next appointment is, with shortcuts
+to reschedule.</li>
+<li><strong>Care plan</strong> — upload a PDF care plan, view the current one,
+or send it to the caregiver via WhatsApp (if enabled for your platform).
+PDFs up to 5&nbsp;MB.</li>
+<li><strong>Background</strong> — free-text notes in Markdown: who they live
+with, how they get about, what to avoid.</li>
+<li><strong>Handover note</strong> — what the next person should know to make
+their first call feel like continuity rather than a fresh start.</li>
+<li><strong>Executed protocols</strong> — the question sets completed in past
+calls, with their answers.</li>
+<li><strong>Communication timeline</strong> — every alert, call, meeting and
+chat with this client, grouped by month and week. Collapse sections or filter
+by type; <kbd class="ui">Now</kbd> jumps to the present.</li>
+</ul>
+
+<h2>Conversation history</h2>
+<p>From the timeline (or the client page) open a specific day to read the full
+conversation between the client/caregiver and the agent — including
+<strong>voice messages</strong>, which you can play right there. See
+<a href="conversations.html">Conversations</a> for reviewing and giving
+feedback.</p>
+
+<div class="callout"><div class="c-title">Privacy</div>
+Care plans, recordings and voice notes are private. Only admins and the
+client's own navigator can open them — links alone are never enough.</div>
+<div class="pager"><a href="dashboard.html"><span class="dir">&larr; Previous</span>Dashboard</a><a href="calls.html" style="text-align:right"><span class="dir">Next &rarr;</span>Calls</a></div>
+<p class="footer-note">Conversational Care · Wellbeing Technologies Lab, Dyson School of Design Engineering, Imperial College London · AGPL-3.0.<br>
+Developers and operators: see the <a href="../technical-manual.md">technical manual</a>.</p>
+</main>
+</div>
+</body>
+</html>

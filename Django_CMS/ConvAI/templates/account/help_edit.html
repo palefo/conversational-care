@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Edit help page" %}{% endblock %}
+
+{% block content %}
+  <header class="mb-6">
+    <h1 class="text-3xl font-semibold text-gray-800">{% trans "Edit help page" %}</h1>
+    <a href="{% url 'help' %}"
+       class="flex items-center text-sky-600 hover:text-sky-700 hover:underline mt-2 text-sm">
+      <span class="material-icons-outlined mr-1">arrow_back</span>
+      {% trans "Back to help" %}
+    </a>
+  </header>
+
+  <div class="card p-6 mb-6">
+    <form method="post">
+      {% csrf_token %}
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="id_help_markdown">
+          {{ form.help_markdown.label }}
+        </label>
+        {{ form.help_markdown }}
+        {% if form.help_markdown.help_text %}
+          <p class="text-xs text-gray-500 mt-1">{{ form.help_markdown.help_text }}</p>
+        {% endif %}
+        {% for error in form.help_markdown.errors %}
+          <p class="text-red-600 text-xs mt-1">{{ error }}</p>
+        {% endfor %}
+      </div>
+
+      <div class="mt-6 flex space-x-3">
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">
+          {% trans "Save" %}
+        </button>
+        <a href="{% url 'help' %}" class="button-secondary py-2 px-4 rounded-lg font-medium text-sm">
+          {% trans "Cancel" %}
+        </a>
+      </div>
+    </form>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+  <!-- SimpleMDE Markdown Editor (same editor used for client details) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <script src="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      new SimpleMDE({
+        element: document.querySelector('#id_help_markdown'),
+        spellChecker: false,
+        toolbar: ["bold", "italic", "heading", "|", "quote", "unordered-list", "ordered-list", "link", "|", "preview", "guide"]
+      });
+    });
+  </script>
+{% endblock %}

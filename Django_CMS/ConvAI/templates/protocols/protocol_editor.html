@@ -1,0 +1,390 @@
+{# templates/app/protocol_editor.html #}
+{% extends "base.html" %}
+{% load i18n static markdownify custom_filters %}
+
+{% block title %}{% trans "Protocol editor" %} {{ protocol.number }}{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+<style>
+  .pe-card {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: .75rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    transition: box-shadow .15s, border-color .15s;
+  }
+  .pe-card:focus-within { border-color: var(--brand-primary); box-shadow: 0 0 0 2px #bae6fd; }
+  .pe-card.pe-dragging { opacity:.5; }
+  .pe-card.pe-drop-target { border-color: var(--brand-primary); border-style: dashed; }
+  .pe-handle { cursor: grab; }
+  .pe-handle:active { cursor: grabbing; }
+  .pe-textarea {
+    width:100%; resize:vertical; min-height:5rem;
+    border:1px solid var(--border-color); border-radius:.5rem;
+    padding:.625rem .75rem; font-size:.875rem; line-height:1.5;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .pe-textarea:focus { outline:none; border-color: var(--brand-primary); box-shadow:0 0 0 2px #bae6fd; }
+  .pe-iconbtn {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:2rem; height:2rem; border-radius:.5rem; color: var(--text-muted);
+    transition: background .15s, color .15s;
+  }
+  .pe-iconbtn:hover { background:#f1f5f9; color: var(--text-secondary); }
+  .pe-iconbtn:disabled { opacity:.3; cursor:not-allowed; }
+  .pe-preview { font-size:.875rem; color: var(--text-secondary); }
+  .pe-toolbar {
+    display:flex; flex-wrap:wrap; gap:.125rem; margin-bottom:.375rem;
+    border:1px solid var(--border-color); border-radius:.5rem;
+    padding:.25rem; background:#f8fafc;
+  }
+  .pe-tool {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:1.85rem; height:1.85rem; border-radius:.375rem;
+    color: var(--text-secondary); font-size:.8rem;
+  }
+  .pe-tool:hover { background:#e0f2fe; color: var(--brand-secondary); }
+  .pe-tool .material-icons-outlined { font-size:1.1rem; }
+  .pe-tool-sep { width:1px; background:var(--border-color); margin:.2rem .15rem; }
+  .beta-badge {
+    font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+    line-height:1; padding:.15rem .4rem; border-radius:9999px;
+    background:#e0f2fe; color:#0369a1;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto" data-protocol="{{ protocol.number }}">
+  {% csrf_token %}
+
+  {# ── Header ── #}
+  <header class="mb-6">
+    <div class="flex items-center gap-3 mb-2">
+      <a href="{% url 'config' %}" class="pe-iconbtn" title="{% trans 'Back' %}">
+        <span class="material-icons-outlined">arrow_back</span>
+      </a>
+      <h1 class="text-2xl font-semibold text-gray-800">
+        {% trans "Protocol editor" %}
+      </h1>
+      <span class="beta-badge">{% trans "Beta" %}</span>
+    </div>
+    <p class="text-sm text-gray-500">
+      {% blocktrans with n=protocol.number %}Protocol #{{ n }} — design its questions as in a form.{% endblocktrans %}
+    </p>
+  </header>
+
+  {# ── Locked notice ── #}
+  {% if locked %}
+    <div class="mb-6 px-4 py-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 text-sm flex items-start gap-2">
+      <span class="material-icons-outlined text-base">lock</span>
+      <div>
+        {% if not may_edit %}
+          {% trans "Read-only. Protocols are edited in Settings by an administrator." %}
+        {% else %}
+          {% trans "This protocol already has recorded answers, so its structure cannot be modified. It is shown in read-only mode." %}
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  {# ── Toast ── #}
+  <div id="pe-toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 hidden px-4 py-2 rounded-lg shadow text-sm"></div>
+
+  {# ── Protocol meta card ── #}
+  <div class="pe-card p-5 mb-6">
+    <label class="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+      {% trans "Protocol title" %}
+    </label>
+    <input id="pe-title" type="text" maxlength="120"
+           value="{{ protocol.title }}"
+           {% if locked %}disabled{% endif %}
+           class="w-full text-lg font-semibold text-gray-800 border-0 border-b-2 border-transparent focus:border-sky-500 focus:ring-0 px-0 py-1 bg-transparent"
+           placeholder="{% trans 'Protocol name' %}">
+
+    <label class="block text-xs font-semibold uppercase tracking-wide text-gray-400 mt-4 mb-1">
+      {% trans "Description (Markdown, optional)" %}
+    </label>
+    <textarea id="pe-description" rows="3"
+              {% if locked %}disabled{% endif %}
+              class="pe-textarea"
+              placeholder="{% trans 'Describe the goal of this protocol…' %}">{{ protocol.description }}</textarea>
+  </div>
+
+  {# ── Questions ── #}
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400">{% trans "Questions" %}</h2>
+    <span id="pe-count" class="text-sm text-gray-400"></span>
+  </div>
+
+  <div id="pe-questions" class="space-y-4"></div>
+
+  <div id="pe-empty" class="hidden text-center text-gray-400 py-10 border-2 border-dashed border-[var(--border-color)] rounded-xl">
+    {% trans "No questions yet. Add the first one." %}
+  </div>
+
+  {% if not locked %}
+  <button id="pe-add" type="button"
+          class="mt-4 w-full button-secondary py-2.5 rounded-lg inline-flex items-center justify-center gap-2">
+    <span class="material-icons-outlined text-base">add</span>
+    <span>{% trans "Add question" %}</span>
+  </button>
+
+  {# Floating save button #}
+  <button id="pe-save" type="button" class="save-button" title="{% trans 'Save' %}">
+    <span class="material-icons">save</span>
+  </button>
+  {% endif %}
+</div>
+
+{# Initial data #}
+{{ questions_json|json_script:"pe-initial" }}
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+(function () {
+  const LOCKED = {{ locked|yesno:"true,false" }};
+  const PROTOCOL = {{ protocol.number }};
+  const SAVE_URL = "{% url 'protocol_editor_save' protocol.number %}";
+
+  const initial = JSON.parse(document.getElementById('pe-initial').textContent || '[]');
+
+  const $questions = document.getElementById('pe-questions');
+  const $count = document.getElementById('pe-count');
+  const $empty = document.getElementById('pe-empty');
+  const csrftoken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+
+  function renderMd(text) {
+    try { return window.marked ? marked.parse(text || '') : (text || ''); }
+    catch (e) { return text || ''; }
+  }
+
+  // Lightweight markdown insertion against a textarea selection.
+  function applyMarkdown(ta, type, after) {
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    const val = ta.value;
+    const sel = val.slice(start, end);
+
+    const wrap = (token, placeholder) => {
+      const text = sel || placeholder;
+      ta.value = val.slice(0, start) + token + text + token + val.slice(end);
+      ta.selectionStart = start + token.length;
+      ta.selectionEnd = start + token.length + text.length;
+    };
+
+    // Apply a prefix to each line of the selection (lists, quotes, headings).
+    const linePrefix = (makePrefix) => {
+      const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+      const block = val.slice(lineStart, end);
+      const lines = (block || '').split('\n');
+      const out = lines.map((ln, i) => makePrefix(i) + ln).join('\n');
+      ta.value = val.slice(0, lineStart) + out + val.slice(end);
+      ta.selectionStart = lineStart;
+      ta.selectionEnd = lineStart + out.length;
+    };
+
+    switch (type) {
+      case 'bold':   wrap('**', '{% trans "bold text" %}'); break;
+      case 'italic': wrap('*',  '{% trans "italic text" %}'); break;
+      case 'code':   wrap('`',  '{% trans "code" %}'); break;
+      case 'h2':     linePrefix(() => '## '); break;
+      case 'ul':     linePrefix(() => '- '); break;
+      case 'ol':     linePrefix((i) => (i + 1) + '. '); break;
+      case 'quote':  linePrefix(() => '> '); break;
+      case 'link': {
+        const text = sel || '{% trans "text" %}';
+        const md = '[' + text + '](https://)';
+        ta.value = val.slice(0, start) + md + val.slice(end);
+        ta.selectionStart = start + text.length + 3;
+        ta.selectionEnd = start + text.length + 11; // selects "https://"
+        break;
+      }
+    }
+    ta.focus();
+    if (after) after();
+  }
+
+  function makeCard(q) {
+    const card = document.createElement('div');
+    card.className = 'pe-card p-4';
+    card.dataset.id = q.id || '';
+    if (!LOCKED) card.setAttribute('draggable', 'false');
+
+    card.innerHTML = `
+      <div class="flex items-start gap-3">
+        <div class="pe-handle pt-1 ${LOCKED ? 'invisible' : ''}" title="{% trans 'Drag to reorder' %}">
+          <span class="material-icons-outlined text-gray-300">drag_indicator</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between mb-1">
+            <span class="pe-num text-xs font-semibold text-sky-600"></span>
+          </div>
+          <div class="pe-toolbar ${LOCKED ? 'hidden' : ''}">
+            <button type="button" class="pe-tool" data-md="bold" title="{% trans 'Bold' %} (Ctrl+B)"><span class="material-icons-outlined">format_bold</span></button>
+            <button type="button" class="pe-tool" data-md="italic" title="{% trans 'Italic' %} (Ctrl+I)"><span class="material-icons-outlined">format_italic</span></button>
+            <span class="pe-tool-sep"></span>
+            <button type="button" class="pe-tool" data-md="h2" title="{% trans 'Title' %}"><span class="material-icons-outlined">title</span></button>
+            <button type="button" class="pe-tool" data-md="ul" title="{% trans 'List' %}"><span class="material-icons-outlined">format_list_bulleted</span></button>
+            <button type="button" class="pe-tool" data-md="ol" title="{% trans 'Numbered list' %}"><span class="material-icons-outlined">format_list_numbered</span></button>
+            <button type="button" class="pe-tool" data-md="quote" title="{% trans 'Appointment' %}"><span class="material-icons-outlined">format_quote</span></button>
+            <span class="pe-tool-sep"></span>
+            <button type="button" class="pe-tool" data-md="link" title="{% trans 'Link' %}"><span class="material-icons-outlined">link</span></button>
+            <button type="button" class="pe-tool" data-md="code" title="{% trans 'Code' %}"><span class="material-icons-outlined">code</span></button>
+          </div>
+          <textarea class="pe-textarea pe-prompt" rows="3" ${LOCKED ? 'disabled' : ''}
+            placeholder="{% trans 'Write the question or guide in Markdown…' %}"></textarea>
+          <div class="mt-2">
+            <div class="text-[10px] uppercase tracking-wide text-gray-400 mb-1">{% trans 'Preview' %}</div>
+            <div class="pe-preview markdown-content"></div>
+          </div>
+        </div>
+        <div class="flex flex-col items-center ${LOCKED ? 'hidden' : ''}">
+          <button type="button" class="pe-iconbtn pe-up" title="{% trans 'Upload' %}"><span class="material-icons-outlined text-base">arrow_upward</span></button>
+          <button type="button" class="pe-iconbtn pe-down" title="{% trans 'Move down' %}"><span class="material-icons-outlined text-base">arrow_downward</span></button>
+          <button type="button" class="pe-iconbtn pe-dup" title="{% trans 'Duplicate' %}"><span class="material-icons-outlined text-base">content_copy</span></button>
+          <button type="button" class="pe-iconbtn pe-del" title="{% trans 'Delete' %}"><span class="material-icons-outlined text-base">delete_outline</span></button>
+        </div>
+      </div>`;
+
+    const ta = card.querySelector('.pe-prompt');
+    const preview = card.querySelector('.pe-preview');
+    ta.value = q.prompt_md || '';
+    const updatePreview = () => { preview.innerHTML = renderMd(ta.value); };
+    ta.addEventListener('input', updatePreview);
+    updatePreview();
+
+    if (!LOCKED) {
+      card.querySelectorAll('.pe-tool').forEach(btn => {
+        // preventDefault on mousedown so the textarea keeps its selection
+        btn.addEventListener('mousedown', e => e.preventDefault());
+        btn.addEventListener('click', () => applyMarkdown(ta, btn.dataset.md, updatePreview));
+      });
+      ta.addEventListener('keydown', (e) => {
+        if (!(e.ctrlKey || e.metaKey)) return;
+        const k = e.key.toLowerCase();
+        if (k === 'b') { e.preventDefault(); applyMarkdown(ta, 'bold', updatePreview); }
+        else if (k === 'i') { e.preventDefault(); applyMarkdown(ta, 'italic', updatePreview); }
+      });
+      card.querySelector('.pe-del').addEventListener('click', () => { card.remove(); refresh(); });
+      card.querySelector('.pe-dup').addEventListener('click', () => {
+        const clone = makeCard({ id: '', prompt_md: ta.value });
+        card.after(clone); refresh();
+      });
+      card.querySelector('.pe-up').addEventListener('click', () => {
+        const prev = card.previousElementSibling;
+        if (prev) { $questions.insertBefore(card, prev); refresh(); }
+      });
+      card.querySelector('.pe-down').addEventListener('click', () => {
+        const next = card.nextElementSibling;
+        if (next) { $questions.insertBefore(next, card); refresh(); }
+      });
+      enableDrag(card);
+    }
+    return card;
+  }
+
+  // ── Drag & drop reordering ──
+  let dragging = null;
+  function enableDrag(card) {
+    const handle = card.querySelector('.pe-handle');
+    handle.addEventListener('mousedown', () => card.setAttribute('draggable', 'true'));
+    card.addEventListener('mouseup', () => card.setAttribute('draggable', 'false'));
+    card.addEventListener('dragstart', (e) => {
+      dragging = card; card.classList.add('pe-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', () => {
+      if (dragging) dragging.classList.remove('pe-dragging');
+      dragging = null;
+      $questions.querySelectorAll('.pe-drop-target').forEach(c => c.classList.remove('pe-drop-target'));
+      card.setAttribute('draggable', 'false');
+      refresh();
+    });
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!dragging || dragging === card) return;
+      const rect = card.getBoundingClientRect();
+      const after = e.clientY > rect.top + rect.height / 2;
+      if (after) card.after(dragging); else card.before(dragging);
+    });
+  }
+
+  function refresh() {
+    const cards = Array.from($questions.children);
+    cards.forEach((c, i) => {
+      const num = c.querySelector('.pe-num');
+      if (num) num.textContent = '{% trans "Question" %} ' + (i + 1);
+      const up = c.querySelector('.pe-up');
+      const down = c.querySelector('.pe-down');
+      if (up) up.disabled = (i === 0);
+      if (down) down.disabled = (i === cards.length - 1);
+    });
+    $count.textContent = cards.length + ' {% trans "question(s)" %}';
+    $empty.classList.toggle('hidden', cards.length > 0);
+  }
+
+  function showToast(msg, ok) {
+    const t = document.getElementById('pe-toast');
+    t.textContent = msg;
+    t.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg shadow text-sm ' +
+      (ok ? 'bg-green-100 border border-green-300 text-green-800'
+          : 'bg-red-100 border border-red-300 text-red-800');
+    setTimeout(() => t.classList.add('hidden'), 4000);
+  }
+
+  // ── Initial render ──
+  initial.forEach(q => $questions.appendChild(makeCard(q)));
+  refresh();
+
+  if (!LOCKED) {
+    document.getElementById('pe-add').addEventListener('click', () => {
+      const card = makeCard({ id: '', prompt_md: '' });
+      $questions.appendChild(card);
+      refresh();
+      card.querySelector('.pe-prompt').focus();
+    });
+
+    document.getElementById('pe-save').addEventListener('click', async () => {
+      const title = document.getElementById('pe-title').value.trim();
+      if (!title) { showToast('{% trans "The title is required." %}', false); return; }
+
+      const questions = Array.from($questions.children).map(c => ({
+        id: c.dataset.id ? parseInt(c.dataset.id, 10) : null,
+        prompt_md: c.querySelector('.pe-prompt').value
+      })).filter(q => q.prompt_md.trim() !== '');
+
+      const payload = {
+        title: title,
+        description: document.getElementById('pe-description').value,
+        questions: questions
+      };
+
+      const btn = document.getElementById('pe-save');
+      btn.disabled = true;
+      try {
+        const resp = await fetch(SAVE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+          body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        if (resp.ok && data.ok) {
+          showToast('{% trans "Protocol saved." %}', true);
+          setTimeout(() => { window.location = data.redirect || '{% url "config" %}'; }, 700);
+        } else {
+          showToast(data.message || '{% trans "Could not save." %}', false);
+          btn.disabled = false;
+        }
+      } catch (e) {
+        showToast('{% trans "Network error while saving." %}', false);
+        btn.disabled = false;
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

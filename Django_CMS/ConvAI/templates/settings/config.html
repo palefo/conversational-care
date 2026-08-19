@@ -1,0 +1,763 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load static custom_filters %}
+
+{% block title %}{% trans "Settings" %}{% endblock %}
+
+{% block content %}
+<style>
+  .settings-layout { display: flex; gap: 1.5rem; align-items: flex-start; }
+  .settings-nav { position: sticky; top: 1rem; width: 15rem; flex-shrink: 0; }
+  .settings-content { flex: 1; min-width: 0; }
+  @media (max-width: 900px) {
+    .settings-layout { flex-direction: column; }
+    .settings-nav { position: static; width: 100%; }
+    .settings-nav ul { display: flex; overflow-x: auto; gap: .25rem; padding-bottom: .25rem; }
+  }
+  .stg-navitem { display: flex; align-items: center; gap: .6rem; width: 100%; padding: .5rem .75rem;
+    border-radius: .5rem; color: #475569; font-size: .875rem; font-weight: 500; white-space: nowrap; cursor: pointer; }
+  .stg-navitem:hover { background: #f1f5f9; color: #0f172a; }
+  .stg-navitem.active { background: #e0f2fe; color: #0369a1; }
+  .stg-navitem .material-icons-outlined { font-size: 1.15rem; }
+
+  .stg-field { margin-bottom: 1rem; }
+  .settings-panel input:not([type=checkbox]):not([type=radio]):not([type=file]),
+  .settings-panel select,
+  .settings-panel textarea {
+    width: 100%; border-radius: .5rem; border: 1px solid #d1d5db;
+    padding: .5rem .75rem; font-size: .875rem; background: #fff; color: #111827;
+  }
+  .settings-panel input:focus, .settings-panel select:focus, .settings-panel textarea:focus {
+    outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.15);
+  }
+  .stg-group { border-top: 1px solid #f1f5f9; padding-top: 1.25rem; margin-top: 1.25rem; }
+  .stg-group-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: #94a3b8; margin-bottom: .85rem; }
+  .stg-grid2 { display: grid; grid-template-columns: 1fr; gap: 0 1rem; }
+  @media (min-width: 640px) { .stg-grid2 { grid-template-columns: 1fr 1fr; } }
+
+  .api-code { position: relative; }
+  .api-code pre { background: #0f172a; color: #e2e8f0; border-radius: .5rem; padding: .85rem 1rem;
+    font-size: .8rem; line-height: 1.5; overflow-x: auto; margin: 0; }
+  .api-code code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
+  .api-copy { position: absolute; top: .5rem; right: .5rem; display: inline-flex; align-items: center;
+    background: rgba(255,255,255,.08); color: #cbd5e1; border: 0; border-radius: .4rem; padding: .25rem .4rem; cursor: pointer; }
+  .api-copy:hover { background: rgba(255,255,255,.18); color: #fff; }
+</style>
+
+<header class="flex justify-between items-start gap-4 flex-wrap mb-6">
+  <div>
+    <h1 class="text-3xl font-semibold text-gray-800">{% trans "Settings" %}</h1>
+    <p class="text-gray-500">{% trans "Configure how the platform behaves, connects, and looks." %}</p>
+  </div>
+  <a href="{% url 'users' %}" class="button-secondary py-2 px-4 rounded-lg inline-flex items-center gap-2">
+    <span class="material-icons-outlined text-base">group</span>{% trans "Users" %}
+  </a>
+</header>
+
+<div class="settings-layout">
+  {# ── Sidebar nav ── #}
+  <aside class="settings-nav">
+    <ul class="space-y-1" id="settingsTabs">
+      {% for id, label, icon in tabs %}
+        <li>
+          <button type="button" data-tab="{{ id }}" class="stg-navitem">
+            <span class="material-icons-outlined">{{ icon }}</span>{{ label }}
+          </button>
+        </li>
+      {% endfor %}
+    </ul>
+  </aside>
+
+  <div class="settings-content">
+
+  {# ═════════ General ═════════ #}
+  <section class="settings-panel" data-tab="general">
+    <div class="card p-6 mb-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">tune</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Behaviour" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Feature flags and defaults that take effect immediately." %}</p>
+        </div>
+      </div>
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="general">
+        {% for field in general_form %}{% include "settings/_field.html" with field=field %}{% endfor %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+    </div>
+
+    {# Boot-only, read-only system values #}
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-1">
+        <span class="material-icons-outlined bg-amber-50 text-amber-600 rounded-lg p-2">dns</span>
+        <div class="flex-1">
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-semibold text-gray-800">{% trans "System" %}</h2>
+            <span class="text-[10px] font-bold uppercase tracking-wide leading-none px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">{% trans "Restart required" %}</span>
+          </div>
+          <p class="text-sm text-gray-500">{% trans "These are read at server start and managed in .env." %}</p>
+        </div>
+      </div>
+      <dl class="text-sm divide-y divide-gray-100 mt-4">
+        <div class="flex justify-between py-2"><dt class="text-gray-500">{% trans "Language" %}</dt><dd class="font-medium text-gray-800">{{ boot_info.language }}</dd></div>
+        <div class="flex justify-between py-2"><dt class="text-gray-500">{% trans "Timezone" %}</dt><dd class="font-medium text-gray-800">{{ boot_info.timezone }}</dd></div>
+        <div class="flex justify-between py-2"><dt class="text-gray-500">{% trans "Async WhatsApp reply" %}</dt><dd class="font-medium text-gray-800">{{ boot_info.async_whatsapp_reply|yesno:_("On,Off") }}</dd></div>
+        <div class="flex justify-between py-2"><dt class="text-gray-500">{% trans "Debug mode" %}</dt><dd class="font-medium text-gray-800">{{ boot_info.debug|yesno:_("On,Off") }}</dd></div>
+      </dl>
+      <div class="mt-4">
+        <span class="block text-sm text-gray-500 mb-1">{% trans "Twilio webhook URL" %}</span>
+        <code class="block text-xs bg-gray-50 border border-gray-200 rounded p-2 break-all select-all">{{ boot_info.webhook_url }}</code>
+        <p class="text-xs text-gray-500 mt-1">{% trans "Configure this URL in the Twilio console. Change the path with TWILIO_WEBHOOK_PATH in .env." %}</p>
+      </div>
+    </div>
+  </section>
+
+  {# ═════════ Integrations ═════════ #}
+  <section class="settings-panel hidden" data-tab="integrations">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">key</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Integration credentials" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Secrets are stored securely and never shown again after saving. Leave blank to keep the current value." %}</p>
+        </div>
+      </div>
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="integrations">
+        {% for field in integrations_form %}{% include "settings/_field.html" with field=field %}{% endfor %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+    </div>
+  </section>
+
+  {# ═════════ Messaging ═════════ #}
+  <section class="settings-panel hidden" data-tab="messaging">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">forum</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Messaging templates" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "SMS/WhatsApp sender numbers and template identifiers." %}</p>
+        </div>
+      </div>
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="messaging">
+        {% for field in messaging_form %}{% include "settings/_field.html" with field=field %}{% endfor %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+    </div>
+  </section>
+
+  {# ═════════ Branding ═════════ #}
+  <section class="settings-panel hidden" data-tab="branding">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">palette</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Branding" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "The name and logo shown across the app and on the login page." %}</p>
+        </div>
+      </div>
+      <form method="post" action="{% url 'config_save' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="branding">
+        <div class="stg-field">
+          <span class="block text-sm font-medium text-gray-700 mb-1">{% trans "Current logo" %}</span>
+          <img src="{% brand_logo_url %}" alt="{% brand_name %}" class="h-12 w-auto bg-gray-50 border border-gray-200 rounded p-1" />
+        </div>
+        {% for field in branding_form %}{% include "settings/_field.html" with field=field %}{% endfor %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+    </div>
+  </section>
+
+  {# ═════════ Agents ═════════ #}
+  <section class="settings-panel hidden" data-tab="agents">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">smart_toy</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Agents" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "The model behind in-process agents, provider keys, and Azure routing. These override .env." %}</p>
+        </div>
+      </div>
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="agents">
+
+        <div class="stg-group-title" style="margin-top:0;">{% trans "Default model" %}</div>
+        {% include "settings/_field.html" with field=agents_form.default_agent_model %}
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Provider API keys" %}</div>
+          <div class="stg-grid2">
+            {% include "settings/_field.html" with field=agents_form.anthropic_api_key %}
+            {% include "settings/_field.html" with field=agents_form.google_api_key %}
+            {% include "settings/_field.html" with field=agents_form.mistral_api_key %}
+            {% include "settings/_field.html" with field=agents_form.deepseek_api_key %}
+          </div>
+        </div>
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Security" %}</div>
+          {% include "settings/_field.html" with field=agents_form.agent_allowed_hosts %}
+        </div>
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Azure" %}</div>
+          {% include "settings/_field.html" with field=agents_form.use_azure %}
+          <div class="stg-grid2">
+            {% include "settings/_field.html" with field=agents_form.azure_openai_endpoint %}
+            {% include "settings/_field.html" with field=agents_form.azure_openai_api_key %}
+            {% include "settings/_field.html" with field=agents_form.azure_openai_api_version %}
+            {% include "settings/_field.html" with field=agents_form.azure_anthropic_endpoint %}
+            {% include "settings/_field.html" with field=agents_form.azure_anthropic_api_key %}
+            {% include "settings/_field.html" with field=agents_form.azure_mistral_endpoint %}
+            {% include "settings/_field.html" with field=agents_form.azure_mistral_api_key %}
+            {% include "settings/_field.html" with field=agents_form.azure_deepseek_endpoint %}
+            {% include "settings/_field.html" with field=agents_form.azure_deepseek_api_key %}
+          </div>
+        </div>
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Azure OpenAI Realtime (voice agents)" %}</div>
+          <p class="text-xs text-gray-500 mb-3">{% trans "Used by prompt-based agents with real-time voice enabled. Speech goes straight between the browser and this deployment; a short-lived key is minted per conversation." %}</p>
+          <div class="stg-grid2">
+            {% include "settings/_field.html" with field=agents_form.azure_realtime_endpoint %}
+            {% include "settings/_field.html" with field=agents_form.azure_realtime_api_key %}
+            {% include "settings/_field.html" with field=agents_form.azure_realtime_deployment %}
+            {% include "settings/_field.html" with field=agents_form.azure_realtime_voice %}
+            {% include "settings/_field.html" with field=agents_form.azure_realtime_webrtc_region %}
+          </div>
+        </div>
+
+        <div class="mt-5">
+          <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+        </div>
+      </form>
+    </div>
+    <datalist id="model-suggestions">
+      <option value="openai/gpt-4.1-mini"></option>
+      <option value="openai/gpt-4.1"></option>
+      <option value="openai/gpt-4o"></option>
+      <option value="anthropic/claude-sonnet-4-6"></option>
+      <option value="anthropic/claude-opus-4-8"></option>
+      <option value="google/gemini-2.0-flash"></option>
+      <option value="mistral/mistral-large-latest"></option>
+      <option value="deepseek/deepseek-chat"></option>
+    </datalist>
+  </section>
+
+  {# ═════════ Prompts ═════════ #}
+  <section class="settings-panel hidden" data-tab="prompts">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">auto_awesome</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Summarization prompts" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Base prompts used to summarize meeting protocols and call transcripts. Leave a field blank to use the built-in default. The relevant protocol answers or transcript are appended automatically." %}</p>
+        </div>
+      </div>
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="prompts">
+        {% for field in prompts_form %}{% include "settings/_field.html" with field=field %}{% endfor %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+    </div>
+  </section>
+
+  {# ═════════ API client ═════════ #}
+  <section class="settings-panel hidden" data-tab="api">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">terminal</span>
+        <div class="flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-lg font-semibold text-gray-800">{% trans "Python API client" %}</h2>
+            {% if api_enabled %}
+              <span class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700" title="{% trans 'The REST API is exposed, so the client can connect.' %}">
+                <span class="material-icons-outlined text-sm">check_circle</span>{% trans "API enabled" %}
+              </span>
+            {% else %}
+              <span class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700" title="{% trans 'Set ENABLE_API=1 in .env and restart to expose the REST API.' %}">
+                <span class="material-icons-outlined text-sm">cancel</span>{% trans "API disabled" %}
+              </span>
+            {% endif %}
+          </div>
+          <p class="text-sm text-gray-500">{% trans "Install the client package to script the platform — list clients and schedule meetings — using your personal API token. Permissions match the web app." %}</p>
+        </div>
+      </div>
+
+      {% if not api_enabled %}
+        <div class="mb-5 px-4 py-3 rounded-lg bg-red-50 border border-red-300 text-red-800 text-sm">
+          {% blocktrans %}The REST API is currently <b>disabled</b>, so the client cannot connect. Set <code>ENABLE_API=1</code> in <code>.env</code> and restart the server to turn it on.{% endblocktrans %}
+        </div>
+      {% endif %}
+
+      {# Step 1 — token #}
+      <div class="mb-6">
+        <h3 class="font-medium text-gray-800 mb-1 flex items-center gap-2">
+          <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-sky-100 text-sky-700 text-xs font-bold">1</span>
+          {% trans "Get your API token" %}
+        </h3>
+        <p class="text-sm text-gray-600 mb-2">
+          {% blocktrans %}Open your <b>Profile</b> page and click <b>Generate API token</b>. Copy it immediately — it is shown only once, and generating a new one revokes the old one.{% endblocktrans %}
+        </p>
+        <a href="{% url 'profile' %}" class="button-secondary py-1.5 px-3 rounded-lg text-sm inline-flex items-center gap-1">
+          <span class="material-icons-outlined text-base">key</span>{% trans "Go to Profile → API token" %}
+        </a>
+      </div>
+
+      {# Step 2 — download + install #}
+      <div class="mb-6">
+        <h3 class="font-medium text-gray-800 mb-1 flex items-center gap-2">
+          <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-sky-100 text-sky-700 text-xs font-bold">2</span>
+          {% trans "Download & install with pip" %}
+        </h3>
+        <p class="text-sm text-gray-600 mb-2">{% trans "Download the package and install it into your Python environment:" %}</p>
+        <div class="api-code">
+          <button type="button" class="api-copy" onclick="apiCopy(this)"><span class="material-icons-outlined text-sm">content_copy</span></button>
+<pre><code>wget {{ client_download_url }} -O conversationalcare_api.zip
+pip install ./conversationalcare_api.zip</code></pre>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">
+          {% blocktrans %}No <code>wget</code>? Use the button below or <code>curl -L -o conversationalcare_api.zip "URL"</code>. The zip installs directly — no need to unzip.{% endblocktrans %}
+        </p>
+        <a href="{% url 'download_client_sdk' %}" class="button-primary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1 mt-2">
+          <span class="material-icons-outlined text-base">download</span>{% trans "Download client (.zip)" %}
+        </a>
+      </div>
+
+      {# Step 3 — use it #}
+      <div>
+        <h3 class="font-medium text-gray-800 mb-1 flex items-center gap-2">
+          <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-sky-100 text-sky-700 text-xs font-bold">3</span>
+          {% trans "Use it in Python" %}
+        </h3>
+        <div class="api-code">
+          <button type="button" class="api-copy" onclick="apiCopy(this)"><span class="material-icons-outlined text-sm">content_copy</span></button>
+<pre><code>from conversationalcare_api import Client
+
+client = Client(base_url="{{ api_base_url }}", token="YOUR_API_TOKEN")
+
+# List the clients you can see (admins: everyone; navigators: your own)
+for p in client.list_patients():
+    print(p["id"], p["name"], p["lastname"], p["phone_number"])
+
+# Schedule a meeting for a client
+result = client.schedule_meeting(
+    patient_id=10,
+    scheduled_time_iso="2026-08-01T15:30:00Z",
+    type=1,                # 0 Onboarding, 1 Regular, 2 Final, 3 Initial
+    scheduled_protocol=2,  # optional protocol number
+)
+print(result)</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ═════════ Protocols ═════════ #}
+  <section class="settings-panel hidden" data-tab="protocols">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-4">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">checklist</span>
+        <div class="flex-1">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <h2 class="text-lg font-semibold text-gray-800">{% trans "Protocols" %}</h2>
+              <span class="text-[10px] font-bold uppercase tracking-wide leading-none px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700">{% trans "Beta" %}</span>
+            </div>
+            <form method="post" action="{% url 'protocol_create' %}">
+              {% csrf_token %}
+              <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+                <span class="material-icons-outlined text-sm">add</span>{% trans "New protocol" %}
+              </button>
+            </form>
+          </div>
+          <p class="text-sm text-gray-500">{% trans "A new protocol stays fully editable until answers are recorded against it, after which it locks to protect collected data." %}</p>
+        </div>
+      </div>
+      {% if protocols %}
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead>
+              <tr class="text-left text-gray-500 border-b">
+                <th class="py-2 pr-4">#</th>
+                <th class="py-2 pr-4">{% trans "Title" %}</th>
+                <th class="py-2 pr-4">{% trans "Questions" %}</th>
+                <th class="py-2 pr-4">{% trans "Status" %}</th>
+                <th class="py-2">{% trans "Actions" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in protocols %}
+                <tr class="border-b">
+                  <td class="py-2 pr-4 font-medium text-gray-700">{{ p.number }}</td>
+                  <td class="py-2 pr-4">{{ p.title }}</td>
+                  <td class="py-2 pr-4">{{ p.num_questions }}</td>
+                  <td class="py-2 pr-4">
+                    {% if p.locked %}
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">
+                        <span class="material-icons-outlined text-xs">lock</span>{% trans "With answers" %}
+                      </span>
+                    {% else %}
+                      <span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">{% trans "Editable" %}</span>
+                    {% endif %}
+                  </td>
+                  <td class="py-2">
+                    <div class="flex items-center gap-2">
+                      <a href="{% url 'protocol_editor' p.number %}"
+                         class="button-secondary py-1.5 px-3 rounded-lg text-xs inline-flex items-center gap-1">
+                        <span class="material-icons-outlined text-sm">{% if p.locked %}visibility{% else %}edit{% endif %}</span>
+                        {% if p.locked %}{% trans "View" %}{% else %}{% trans "Edit" %}{% endif %}
+                      </a>
+                      {% if not p.locked %}
+                        <form method="post" action="{% url 'protocol_delete' p.number %}"
+                              onsubmit="return confirm('{% trans "Delete this protocol? This cannot be undone." %}');">
+                          {% csrf_token %}
+                          <button type="submit"
+                                  class="py-1.5 px-3 rounded-lg text-xs inline-flex items-center gap-1 text-red-600 border border-red-200 hover:bg-red-50">
+                            <span class="material-icons-outlined text-sm">delete</span>{% trans "Delete" %}
+                          </button>
+                        </form>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-gray-500">{% trans "No protocols yet." %}</p>
+      {% endif %}
+    </div>
+  </section>
+
+  {# ═════════ Registrations ═════════ #}
+  <section class="settings-panel hidden" data-tab="registrations">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-4">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">how_to_reg</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Pre-registrations (Self Registration)" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "People who self-registered and are waiting to be approved and assigned an agent." %}</p>
+        </div>
+      </div>
+      {% if self_regs %}
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead>
+              <tr class="text-left text-gray-500 border-b">
+                <th class="py-2 pr-4">{% trans "Name" %}</th>
+                <th class="py-2 pr-4">{% trans "Phone" %}</th>
+                <th class="py-2 pr-4">{% trans "E-mail" %}</th>
+                <th class="py-2 pr-4">{% trans "Status" %}</th>
+                <th class="py-2 pr-4">{% trans "Created" %}</th>
+                <th class="py-2">{% trans "Actions" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for sr in self_regs %}
+                <tr class="border-b">
+                  <td class="py-2 pr-4">{{ sr.name }} {{ sr.lastname }}</td>
+                  <td class="py-2 pr-4">{{ sr.phone_number|default:"—" }}</td>
+                  <td class="py-2 pr-4">{{ sr.email|default:"—" }}</td>
+                  <td class="py-2 pr-4">
+                    {% if sr.state == 0 %}
+                      <span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">{% trans "Registered" %}</span>
+                    {% else %}
+                      <span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">{% trans "Approved" %}</span>
+                    {% endif %}
+                  </td>
+                  <td class="py-2 pr-4">{{ sr.created_at|date:"d/m/Y H:i" }}</td>
+                  <td class="py-2">
+                  {% if sr.state == 0 %}
+                    <form method="post" action="{% url 'approve_self_registration' sr.pk %}" class="flex items-center gap-2">
+                      {% csrf_token %}
+                      <select name="agent_id" class="border border-gray-300 rounded-md text-xs px-2 py-1">
+                        <option value="">{% trans "— No agent —" %}</option>
+                        {% for ag in agents %}
+                          <option value="{{ ag.id }}">{{ ag.name }}</option>
+                        {% endfor %}
+                      </select>
+                      <button type="submit" class="button-primary py-1.5 px-3 rounded-lg text-xs">{% trans "Approve" %}</button>
+                    </form>
+                  {% else %}
+                    <span class="text-gray-400 text-xs">{% trans "Already approved" %}</span>
+                  {% endif %}
+                </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-gray-500">{% trans "No pre-registrations yet." %}</p>
+      {% endif %}
+    </div>
+  </section>
+
+  {# ═════════ Self registration (QR) ═════════ #}
+  <section class="settings-panel hidden" data-tab="selfreg">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">qr_code_2</span>
+        <div class="flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-lg font-semibold text-gray-800">{% trans "Self registration" %}</h2>
+            {% if selfreg.enabled %}
+              <span class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                <span class="material-icons-outlined text-sm">check_circle</span>{% trans "Active" %}
+              </span>
+            {% else %}
+              <span class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                <span class="material-icons-outlined text-sm">pause_circle</span>{% trans "Inactive" %}
+              </span>
+            {% endif %}
+          </div>
+          <p class="text-sm text-gray-500">{% trans "Share this QR in demos so people can start a WhatsApp chat that registers them. Scanning opens WhatsApp with a pre-filled message in the platform language." %}</p>
+        </div>
+      </div>
+
+      {% if not selfreg.enabled %}
+        <div class="mb-5 px-4 py-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">info</span>
+          <div>
+            {% blocktrans %}Self-registration is currently <b>off</b>, so scans won't be answered automatically. Turn it on and pick the <b>Self Registration Agent</b> under{% endblocktrans %}
+            <button type="button" class="underline font-medium" data-goto-tab="general">{% trans "General settings" %}</button>.
+          </div>
+        </div>
+      {% endif %}
+
+      {% if selfreg.url %}
+        <div class="flex flex-col md:flex-row gap-6 items-start">
+          {# QR #}
+          <div class="flex-shrink-0">
+            <div class="border border-gray-200 rounded-xl p-3 bg-white" style="width:220px;">
+              {{ selfreg.qr_svg|safe }}
+            </div>
+            <div class="flex items-center gap-2 mt-3">
+              <button type="button" onclick="srDownloadPng()" class="button-primary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+                <span class="material-icons-outlined text-base">download</span>{% trans "Download" %}
+              </button>
+              <button type="button" onclick="srCopyImage()" class="button-secondary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+                <span class="material-icons-outlined text-base">content_copy</span>{% trans "Copy image" %}
+              </button>
+            </div>
+          </div>
+
+          {# Details #}
+          <div class="flex-1 min-w-0 w-full">
+            <div class="mb-4">
+              <span class="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">{% trans "Pre-filled message" %}</span>
+              <p class="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">“{{ selfreg.message }}”</p>
+            </div>
+
+            <div class="mb-4">
+              <span class="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">{% trans "WhatsApp link" %}</span>
+              <div class="flex items-center gap-2">
+                <code id="srLink" class="flex-1 min-w-0 text-xs bg-gray-50 border border-gray-200 rounded-lg p-2 break-all select-all">{{ selfreg.url }}</code>
+                <button type="button" onclick="srCopyLink(this)" class="button-secondary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1 flex-shrink-0">
+                  <span class="material-icons-outlined text-base">link</span>{% trans "Copy" %}
+                </button>
+              </div>
+            </div>
+
+            <dl class="text-sm divide-y divide-gray-100">
+              <div class="flex justify-between py-2">
+                <dt class="text-gray-500">{% trans "Platform number" %}</dt>
+                <dd class="font-medium text-gray-800">{{ selfreg.phone }}</dd>
+              </div>
+              <div class="flex justify-between py-2">
+                <dt class="text-gray-500">{% trans "Handled by" %}</dt>
+                <dd class="font-medium text-gray-800">{{ selfreg.agent_name|default:_("— not selected —") }}</dd>
+              </div>
+            </dl>
+            <a href="{{ selfreg.url }}" target="_blank" rel="noopener"
+               class="button-secondary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1 mt-4">
+              <span class="material-icons-outlined text-base">open_in_new</span>{% trans "Test the link" %}
+            </a>
+          </div>
+        </div>
+      {% else %}
+        <div class="px-4 py-3 rounded-lg bg-red-50 border border-red-300 text-red-800 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">error_outline</span>
+          <div>
+            {% blocktrans %}No <b>platform phone number</b> is configured, so a WhatsApp link can't be built. Add it under{% endblocktrans %}
+            <button type="button" class="underline font-medium" data-goto-tab="integrations">{% trans "Integrations" %}</button>.
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  {# ═════════ Maintenance ═════════ #}
+  <section class="settings-panel hidden" data-tab="maintenance">
+    <div class="card p-6 mb-6">
+      <div class="flex items-start gap-3">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">build</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Maintenance" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "One-off background jobs you can trigger by hand." %}</p>
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="card p-6">
+        <h3 class="font-medium text-gray-800 mb-1">{% trans "Update recordings" %}</h3>
+        <p class="text-sm text-gray-500 mb-4">{% trans "Fetch new call recordings from Twilio." %}</p>
+        <form id="actionForm" method="post" action="{% url 'update_twilio' %}">
+          {% csrf_token %}
+          <button type="submit" id="submitBtn" class="button-primary py-2 px-4 rounded-lg flex items-center font-medium text-sm">
+            <span id="btnLabel">{% trans "Update recordings" %}</span>
+            <svg id="btnSpinner" class="ml-2 h-4 w-4 text-white animate-spin hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+          </button>
+        </form>
+      </div>
+      <div class="card p-6">
+        <h3 class="font-medium text-gray-800 mb-1">{% trans "Classify conversations" %}</h3>
+        <p class="text-sm text-gray-500 mb-4">{% trans "Processes only conversations that have not yet been analysed." %}</p>
+        <form id="classifyForm" method="post" action="{% url 'run_conversation_classification' %}">
+          {% csrf_token %}
+          <button type="submit" id="classifyBtn" class="button-primary py-2 px-4 rounded-lg flex items-center font-medium text-sm">
+            <span id="classifyLabel">{% trans "Classify conversations" %}</span>
+            <svg id="classifySpinner" class="ml-2 h-4 w-4 text-white animate-spin hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  </div>{# /settings-content #}
+</div>{# /settings-layout #}
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+  (function () {
+    const validTabs = ['general','integrations','messaging','branding','agents','prompts','protocols','registrations','selfreg','api','maintenance'];
+    const buttons = document.querySelectorAll('.stg-navitem');
+    const panels  = document.querySelectorAll('.settings-panel');
+
+    function activate(tab) {
+      if (!validTabs.includes(tab)) tab = 'general';
+      panels.forEach(p => p.classList.toggle('hidden', p.dataset.tab !== tab));
+      buttons.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      try { history.replaceState(null, '', '#' + tab); } catch (e) {}
+    }
+
+    buttons.forEach(b => b.addEventListener('click', () => activate(b.dataset.tab)));
+
+    // In-page links that jump to another settings tab (e.g. from the Self
+    // registration panel over to General / Integrations).
+    document.querySelectorAll('[data-goto-tab]').forEach(el =>
+      el.addEventListener('click', () => activate(el.dataset.gotoTab)));
+
+    const initial = (location.hash || '').replace('#', '') || '{{ active_tab|escapejs }}' || 'general';
+    activate(initial);
+  })();
+
+  // ── Self-registration QR helpers ──
+  function srFlash(btn) {
+    const icon = btn.querySelector('.material-icons-outlined');
+    if (!icon) return;
+    const prev = icon.textContent;
+    icon.textContent = 'check';
+    setTimeout(() => { icon.textContent = prev; }, 1500);
+  }
+  function srCopyLink(btn) {
+    const link = document.getElementById('srLink');
+    const text = link ? link.textContent.trim() : '';
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => srFlash(btn), () => {});
+    }
+  }
+  function srRasterize(cb, size) {
+    const svg = document.getElementById('srQrSvg');
+    if (!svg) return;
+    const xml = new XMLSerializer().serializeToString(svg);
+    const src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
+    const img = new Image();
+    img.onload = function () {
+      const c = document.createElement('canvas');
+      c.width = size; c.height = size;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size, size);
+      ctx.drawImage(img, 0, 0, size, size);
+      c.toBlob(cb, 'image/png');
+    };
+    img.src = src;
+  }
+  function srDownloadPng() {
+    srRasterize(function (blob) {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'whatsapp-registration-qr.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }, 1024);
+  }
+  function srCopyImage() {
+    if (!(navigator.clipboard && window.ClipboardItem)) {
+      alert('{% trans "This browser cannot copy images. Use Download instead." %}');
+      return;
+    }
+    srRasterize(function (blob) {
+      if (!blob) return;
+      navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).catch(function () {
+        alert('{% trans "Could not copy the image. Use Download instead." %}');
+      });
+    }, 1024);
+  }
+
+  document.getElementById('actionForm')?.addEventListener('submit', function(){
+    const btn=document.getElementById('submitBtn'); const sp=document.getElementById('btnSpinner');
+    btn.disabled=true; sp.classList.remove('hidden');
+  });
+  document.getElementById('classifyForm')?.addEventListener('submit', function(){
+    const btn=document.getElementById('classifyBtn'); const sp=document.getElementById('classifySpinner');
+    btn.disabled=true; sp.classList.remove('hidden');
+  });
+
+  // Copy a code block's text to the clipboard.
+  function apiCopy(btn){
+    const code = btn.parentElement.querySelector('code');
+    const text = code ? code.innerText : '';
+    const done = function(){
+      const icon = btn.querySelector('.material-icons-outlined');
+      const prev = icon.textContent;
+      icon.textContent = 'check';
+      setTimeout(function(){ icon.textContent = prev; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, done);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch(e) {}
+      document.body.removeChild(ta); done();
+    }
+  }
+</script>
+{% endblock %}

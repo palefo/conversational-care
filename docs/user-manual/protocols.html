@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Design the structured question sets your team follows during calls.">
+<title>Protocols · Conversational Care User Manual</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230e7c6b%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 font-family=%22sans-serif%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>CC</text></svg>">
+</head>
+<body>
+<input type="checkbox" id="menu-toggle" aria-hidden="true">
+<div class="topbar">
+  <label for="menu-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></label>
+  <span class="t-title">Conversational Care — User Manual</span>
+</div>
+<div class="wrap">
+<aside class="sidebar">
+  <a class="brand" href="index.html">
+    <span class="brand-mark">CC</span>
+    <span><span class="brand-name">Conversational Care</span><br><span class="brand-sub">User Manual</span></span>
+  </a>
+  <nav class="nav">
+<div class="nav-group">Start here</div>
+<a href="index.html">Welcome</a>
+<a href="getting-started.html">Getting started</a>
+<div class="nav-group">Everyday work</div>
+<a href="dashboard.html">Dashboard</a>
+<a href="clients.html">Clients</a>
+<a href="calls.html">Calls</a>
+<a href="communications.html">Communications</a>
+<a href="calendar.html">Calendar</a>
+<a href="conversations.html">Conversations</a>
+<a href="alerts.html">Alerts</a>
+<div class="nav-group">Design & configuration</div>
+<a href="protocols.html" class="active">Protocols</a>
+<a href="agents.html">Agents</a>
+<a href="users.html">Users</a>
+<a href="settings.html">Settings</a>
+  </nav>
+</aside>
+<main class="content">
+<h1>Protocols</h1>
+<p class="lede">Design the structured question sets your team follows during calls.</p>
+<p><strong>Protocols</strong> are the structured question sets navigators
+follow during calls — onboarding interviews, follow-ups, assessments. Admins
+and navigators design them in a form-style editor; answers recorded during
+meetings are stored per client.</p>
+
+<h2>The protocol list</h2>
+<p>Under <kbd class="ui">Settings → Protocols</kbd> (or the protocol pages)
+each protocol shows its title and whether it is still <em>editable</em> or
+already has <em>answers</em>. A new protocol stays fully editable until answers
+are recorded against it — then it locks to protect collected data (it opens
+read-only).</p>
+
+<h2>Designing a protocol</h2>
+<ol class="steps">
+<li>Click <kbd class="ui">New protocol</kbd> and give it a title (required) and
+an optional Markdown description of its goal.</li>
+<li>Add <strong>questions</strong> one by one. Each question is written in
+Markdown with a formatting toolbar (bold, italic, headings, lists, links,
+code) and a live <kbd class="ui">Preview</kbd>.</li>
+<li>Reorder by dragging, duplicate a question, or move it down; delete what you
+don't need.</li>
+<li><kbd class="ui">Save</kbd>. The protocol can now be attached to meetings
+when <a href="calls.html">scheduling calls</a>.</li>
+</ol>
+
+<div class="callout"><div class="c-title">Tip</div>
+Because locked protocols cannot change, duplicate an existing protocol into a
+new one when you need a revised version — past answers stay attached to the
+original.</div>
+<div class="pager"><a href="alerts.html"><span class="dir">&larr; Previous</span>Alerts</a><a href="agents.html" style="text-align:right"><span class="dir">Next &rarr;</span>Agents</a></div>
+<p class="footer-note">Conversational Care · Wellbeing Technologies Lab, Dyson School of Design Engineering, Imperial College London · AGPL-3.0.<br>
+Developers and operators: see the <a href="../technical-manual.md">technical manual</a>.</p>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="One queue across all your clients: what still needs doing, and what already happened.">
+<title>Communications · Conversational Care User Manual</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230e7c6b%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 font-family=%22sans-serif%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>CC</text></svg>">
+</head>
+<body>
+<input type="checkbox" id="menu-toggle" aria-hidden="true">
+<div class="topbar">
+  <label for="menu-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></label>
+  <span class="t-title">Conversational Care — User Manual</span>
+</div>
+<div class="wrap">
+<aside class="sidebar">
+  <a class="brand" href="index.html">
+    <span class="brand-mark">CC</span>
+    <span><span class="brand-name">Conversational Care</span><br><span class="brand-sub">User Manual</span></span>
+  </a>
+  <nav class="nav">
+<div class="nav-group">Start here</div>
+<a href="index.html">Welcome</a>
+<a href="getting-started.html">Getting started</a>
+<div class="nav-group">Everyday work</div>
+<a href="dashboard.html">Dashboard</a>
+<a href="clients.html">Clients</a>
+<a href="calls.html">Calls</a>
+<a href="communications.html" class="active">Communications</a>
+<a href="calendar.html">Calendar</a>
+<a href="conversations.html">Conversations</a>
+<a href="alerts.html">Alerts</a>
+<div class="nav-group">Design &amp; configuration</div>
+<a href="protocols.html">Protocols</a>
+<a href="agents.html">Agents</a>
+<a href="users.html">Users</a>
+<a href="settings.html">Settings</a>
+  </nav>
+</aside>
+<main class="content">
+<h1>Communications</h1>
+<p class="lede">One queue across all your clients: what still needs doing, and what already happened.</p>
+
+<p><strong>Communications</strong> is the page you work from. Instead of a
+separate list for calls, another for alerts and another for conversations, it
+puts everything that passed between your team and your clients into two lists,
+and lets you open any of it without leaving the page.</p>
+
+<h2>The two lists</h2>
+<ul>
+<li><strong>Coming up</strong> — what still needs doing, soonest first:
+scheduled calls, in-person meetings, and anything waiting on you.</li>
+<li><strong>Happened</strong> — what already did, newest first: finished calls,
+chatbot conversations, alerts and recordings.</li>
+</ul>
+<p>Search filters both lists at once — by client, protocol or place. Navigators
+see only their own clients; admins can tick <kbd class="ui">Show all
+clients</kbd>.</p>
+
+<h2>The detail panel</h2>
+<p>Clicking any row opens it in a panel on the right, with the list still
+visible beside it. This is the single biggest change in the redesign: reading
+an item no longer takes you to a different page and back.</p>
+<p>Every kind of item uses the same frame, so the shape never changes:</p>
+<ul>
+<li>a <strong>header</strong> that stays put — what this is, who it concerns,
+and its status;</li>
+<li>a <strong>tab strip</strong> — Overview / Technical for an alert, Summary /
+Conversation for a chat, Protocols / Notes (and Recording, once it has ended)
+for a call;</li>
+<li>the <strong>body</strong>, which is the only part that scrolls;</li>
+<li>a <strong>footer</strong> holding the actions, always in the same place.</li>
+</ul>
+<p>Actions either settle the item where it is or open a small dialog. Nothing
+navigates you away, so you never lose your place in the list.</p>
+
+<div class="callout"><div class="c-title">Tip</div>
+The open item is part of the web address. You can bookmark a panel, reload the
+page and still be looking at it, open it in a new tab, or paste the link to a
+colleague — they will land on the same item, provided it is one of their
+clients.</div>
+
+<h2>Read and unread</h2>
+<p>Alerts and chatbot conversations arrive <strong>unread</strong>, shown in
+bold. Opening one marks it read. Read marks are yours alone, so a supervisor
+looking through the queue does not clear them for the navigator who owns
+the client.</p>
+<p>Calls and meetings have no read state — a call you scheduled yourself was
+never news to you.</p>
+
+<h2>Scheduling</h2>
+<p>Use <kbd class="ui">Schedule</kbd> to book a call or an in-person meeting.
+Pick the client, whether it is a phone call or in person (and if in person,
+where), the meeting type and optionally the protocol to run. The platform warns
+you if it clashes with something already in the diary.</p>
+
+<h2>Cancelling and reinstating</h2>
+<p>A scheduled call can be cancelled from its panel, with a reason. It leaves
+the queue but <strong>stays in the history</strong>, struck through and greyed
+out — because "arranged and then called off" is a different fact from "never
+arranged", and the record should show which happened. <kbd class="ui">Put it
+back</kbd> reinstates it.</p>
+<p>Only a call that is still pending can be cancelled. A call that already
+happened keeps its outcome; that is never overwritten.</p>
+
+<div class="callout warn"><div class="c-title">Heads-up</div>
+The old <em>Calls</em> list page and the standalone <em>Alerts</em> list page no
+longer exist — Communications replaces both. Old links still work: they redirect
+here and open the right item in the panel.</div>
+
+<div class="pager"><a href="calls.html"><span class="dir">&larr; Previous</span>Calls</a><a href="calendar.html" style="text-align:right"><span class="dir">Next &rarr;</span>Calendar</a></div>
+<p class="footer-note">Conversational Care · Wellbeing Technologies Lab, Dyson School of Design Engineering, Imperial College London · AGPL-3.0.<br>
+Developers and operators: see the <a href="../technical-manual.md">technical manual</a>.</p>
+</main>
+</div>
+</body>
+</html>

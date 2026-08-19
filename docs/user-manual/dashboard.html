@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Your day at a glance: today's summary, pending calls, and what needs review.">
+<title>Dashboard · Conversational Care User Manual</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230e7c6b%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 font-family=%22sans-serif%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>CC</text></svg>">
+</head>
+<body>
+<input type="checkbox" id="menu-toggle" aria-hidden="true">
+<div class="topbar">
+  <label for="menu-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></label>
+  <span class="t-title">Conversational Care — User Manual</span>
+</div>
+<div class="wrap">
+<aside class="sidebar">
+  <a class="brand" href="index.html">
+    <span class="brand-mark">CC</span>
+    <span><span class="brand-name">Conversational Care</span><br><span class="brand-sub">User Manual</span></span>
+  </a>
+  <nav class="nav">
+<div class="nav-group">Start here</div>
+<a href="index.html">Welcome</a>
+<a href="getting-started.html">Getting started</a>
+<div class="nav-group">Everyday work</div>
+<a href="dashboard.html" class="active">Dashboard</a>
+<a href="clients.html">Clients</a>
+<a href="calls.html">Calls</a>
+<a href="communications.html">Communications</a>
+<a href="calendar.html">Calendar</a>
+<a href="conversations.html">Conversations</a>
+<a href="alerts.html">Alerts</a>
+<div class="nav-group">Design & configuration</div>
+<a href="protocols.html">Protocols</a>
+<a href="agents.html">Agents</a>
+<a href="users.html">Users</a>
+<a href="settings.html">Settings</a>
+  </nav>
+</aside>
+<main class="content">
+<h1>The dashboard</h1>
+<p class="lede">Your day at a glance: what is pending, what needs review, and the call to make next.</p>
+<p>The dashboard opens with a welcome and a one-line summary of your day: how
+many meetings are pending, how many of those are today, how many you have still
+to make, and how many chats are waiting to be reviewed.</p>
+<p>It is a plain sentence, not a generated one. Every number in it is read from
+the same data as the box it describes, so the summary and the lists below can
+never disagree with each other.</p>
+
+<h2>What's on it</h2>
+<ul>
+<li><strong>Next call</strong> — a card at the top showing the one call that
+most wants your attention: the oldest overdue one, or else the soonest due
+within the week. <kbd class="ui">Open call</kbd> opens it in the detail panel.
+The ✕ puts it away — you choose between <em>just this call</em> (the card
+returns with the next one, once this one is done or moved) and turning the card
+off for good, which you can undo under <strong>Profile → Home</strong>.</li>
+<li><strong>Chats to review</strong> — conversations the agent flagged as
+needing attention, each with the client and topic. Unread ones are in bold;
+opening one marks it read. Sort by priority, newest or oldest.</li>
+<li><strong>Pending meetings</strong> — what is still to be done, with the
+client, caregiver and scheduled time. Open one to
+<a href="calls.html">run the call</a>.</li>
+<li><strong>What changed this week</strong> — recent activity across your
+caseload, so handovers between colleagues are easy.</li>
+</ul>
+
+<div class="callout"><div class="c-title">Tip</div>
+Everything on the dashboard opens in the same right-hand panel used on
+<a href="communications.html">Communications</a> — you never leave the
+dashboard to read something, and you come back to your place in the list.</div>
+
+<div class="callout"><div class="c-title">Tip</div>
+Navigators see only their own clients everywhere — dashboard, calls, alerts.
+Admins see the whole organisation. If a client you expect is missing, check
+with your admin that you are set as that client's navigator.</div>
+<div class="pager"><a href="getting-started.html"><span class="dir">&larr; Previous</span>Getting started</a><a href="clients.html" style="text-align:right"><span class="dir">Next &rarr;</span>Clients</a></div>
+<p class="footer-note">Conversational Care · Wellbeing Technologies Lab, Dyson School of Design Engineering, Imperial College London · AGPL-3.0.<br>
+Developers and operators: see the <a href="../technical-manual.md">technical manual</a>.</p>
+</main>
+</div>
+</body>
+</html>

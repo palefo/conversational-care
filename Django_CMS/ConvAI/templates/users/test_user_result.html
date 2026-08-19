@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Test user created" %}{% endblock %}
+
+{% block content %}
+<div class="flex items-start gap-3 mb-6">
+  <span class="bg-emerald-50 text-emerald-600" style="width:2.75rem;height:2.75rem;border-radius:.6rem;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+    <span class="material-icons-outlined">check_circle</span>
+  </span>
+  <div>
+    <h1 class="text-2xl font-semibold text-gray-800">{% trans "Test user created" %}</h1>
+    <p class="text-sm text-gray-500">
+      {% if patient %}{% blocktrans with name=patient.name last=patient.lastname %}Account for {{ name }} {{ last }}.{% endblocktrans %}{% endif %}
+    </p>
+  </div>
+</div>
+
+<div class="mb-6 px-4 py-3 rounded-md bg-amber-50 border border-amber-300 text-amber-800 text-sm">
+  {% trans "Copy these credentials now — the password is shown only once and cannot be recovered. You can reset it later by editing the user." %}
+</div>
+
+<div class="card p-6 mb-6 max-w-xl">
+  <div class="space-y-4">
+    <div>
+      <label class="block text-xs font-medium uppercase text-gray-500 mb-1">{% trans "Username" %}</label>
+      <div class="flex items-center gap-2">
+        <input id="f-username" readonly value="{{ username }}"
+               class="form-control flex-1 font-mono text-sm bg-gray-50" />
+        <button type="button" class="button-secondary py-2 px-3 rounded-lg text-sm inline-flex items-center gap-1"
+                onclick="copyField('f-username', this)">
+          <span class="material-icons-outlined text-base">content_copy</span>{% trans "Copy" %}
+        </button>
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs font-medium uppercase text-gray-500 mb-1">{% trans "Password" %}</label>
+      <div class="flex items-center gap-2">
+        <input id="f-password" readonly value="{{ password }}"
+               class="form-control flex-1 font-mono text-sm bg-gray-50" />
+        <button type="button" class="button-secondary py-2 px-3 rounded-lg text-sm inline-flex items-center gap-1"
+                onclick="copyField('f-password', this)">
+          <span class="material-icons-outlined text-base">content_copy</span>{% trans "Copy" %}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% comment %} ---------- Agent configured for the client ---------- {% endcomment %}
+{% if patient %}
+<div class="card p-6 mb-6 max-w-xl">
+  <h2 class="text-lg font-semibold text-gray-800 mb-1">{% trans "Agent for this client" %}</h2>
+  {% if agent %}
+    <p class="text-gray-700">
+      {% trans "This client's chat is handled by:" %}
+      <span class="font-medium">{{ agent.name }}</span>
+    </p>
+    <p class="text-xs text-gray-500 mt-1">{% trans "To change it, edit the client and pick a different agent." %}</p>
+  {% else %}
+    <p class="text-amber-700">
+      {% trans "No agent is configured for this client yet — the test chat will not work until one is set." %}
+    </p>
+    <p class="text-xs text-gray-500 mt-1">{% trans "Edit the client to choose the agent that should handle their chat." %}</p>
+  {% endif %}
+
+  <div class="mt-4 flex flex-wrap gap-2">
+    <a href="{% url 'edit_patient' patient.pk %}"
+       class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+      <span class="material-icons-outlined text-base">edit</span>{% trans "Edit client" %}
+    </a>
+    <a href="{% url 'patient_detail' patient.pk %}"
+       class="button-secondary py-2 px-4 rounded-lg text-sm font-medium">{% trans "View client" %}</a>
+  </div>
+</div>
+{% endif %}
+
+<div>
+  <a href="{% url 'users' %}?tab=testers" class="text-sky-600 hover:text-sky-700 hover:underline text-sm inline-flex items-center gap-1">
+    <span class="material-icons-outlined text-base">arrow_back</span>{% trans "Back to users" %}
+  </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+  function copyField(id, btn){
+    var el = document.getElementById(id);
+    var done = function(){
+      var label = btn.querySelector('span:last-child') || btn;
+      var prev = btn.innerHTML;
+      btn.innerHTML = '<span class="material-icons-outlined text-base">check</span>{% trans "Copied" %}';
+      setTimeout(function(){ btn.innerHTML = prev; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(el.value).then(done, function(){ el.select(); document.execCommand('copy'); done(); });
+    } else {
+      el.select(); document.execCommand('copy'); done();
+    }
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+{% load i18n static custom_filters tz %}
+
+{% block title %}
+  {% localtime on %}
+    {% trans "Conversation with" %} {{ patient.name }} {{ patient.lastname }} – {{ day|date:"d/m/Y" }}
+  {% endlocaltime %}
+{% endblock %}
+
+{% block head %}
+<style>
+  /* ───────── Header / day pager ───────── */
+  .pcv-back { display:inline-flex; align-items:center; gap:.3rem; font-size:.85rem; font-weight:500;
+    color:#64748b; margin-bottom:.5rem; }
+  .pcv-back:hover { color:#0369a1; }
+  .pcv-avatar { width:2.75rem; height:2.75rem; border-radius:9999px; background:#e0f2fe; color:#0369a1;
+    font-size:.95rem; font-weight:700; display:inline-flex; align-items:center; justify-content:center;
+    flex-shrink:0; text-transform:uppercase; }
+  .pcv-daynav { display:inline-flex; align-items:center; gap:.35rem; }
+  .pcv-daybtn { display:inline-flex; align-items:center; justify-content:center; width:2.1rem; height:2.1rem;
+    border-radius:.5rem; border:1px solid #e2e8f0; background:#fff; color:#475569; }
+  .pcv-daybtn:hover { background:#f1f5f9; color:#0f172a; }
+  .pcv-daybtn.disabled { opacity:.4; pointer-events:none; }
+  .pcv-daylabel { font-size:.9rem; font-weight:600; color:#334155; padding:0 .5rem; white-space:nowrap; }
+
+  /* ───────── Thread card ───────── */
+  .pcv-chip { display:inline-flex; align-items:center; gap:.35rem; padding:.2rem .6rem; border-radius:9999px;
+    font-size:.72rem; font-weight:600; white-space:nowrap; }
+  .pcv-chip .d { width:.5rem; height:.5rem; border-radius:9999px; flex-shrink:0; }
+  .pcv-urgent { background:#fee2e2; color:#991b1b; } .pcv-urgent .d { background:#ef4444; }
+  .pcv-review { background:#fef3c7; color:#92400e; } .pcv-review .d { background:#f59e0b; }
+  .pcv-pending { background:#f1f5f9; color:#64748b; } .pcv-pending .d { background:#94a3b8; }
+  .pcv-topic { background:#e0f2fe; color:#075985; }
+  .pcv-meta { font-size:.75rem; color:#94a3b8; white-space:nowrap; }
+  .pcv-summary { background:#f8fafc; border-left:3px solid #7dd3fc; border-radius:.5rem;
+    padding:.7rem .9rem; font-size:.875rem; color:#475569; line-height:1.55; }
+
+  /* ───────── Chat panel ───────── */
+  .pcv-chat { background:#f8fafc; border:1px solid #f1f5f9; border-radius:.75rem; padding:1.25rem;
+    display:flex; flex-direction:column; gap:1rem; }
+  .pcv-row { display:flex; align-items:flex-end; gap:.6rem; max-width:78%; }
+  .pcv-row.user { align-self:flex-end; flex-direction:row-reverse; }
+  .pcv-msg-avatar { width:2rem; height:2rem; border-radius:9999px; display:inline-flex; align-items:center;
+    justify-content:center; font-size:.68rem; font-weight:700; flex-shrink:0; text-transform:uppercase; }
+  .pcv-row.user .pcv-msg-avatar { background:#0ea5e9; color:#fff; }
+  .pcv-row.bot .pcv-msg-avatar { background:#fff; color:#64748b; border:1px solid #e2e8f0; }
+  .pcv-bubble { padding:.6rem .85rem; border-radius:.9rem; font-size:.9rem; line-height:1.5;
+    word-wrap:break-word; min-width:0; }
+  .pcv-row.user .pcv-bubble { background:#0ea5e9; color:#fff; border-bottom-right-radius:.25rem; }
+  .pcv-row.bot .pcv-bubble { background:#fff; color:#334155; border:1px solid #e8edf3;
+    border-bottom-left-radius:.25rem; }
+  .pcv-time { font-size:.68rem; color:#94a3b8; margin-top:.25rem; }
+  .pcv-row.user .pcv-time { text-align:right; }
+  .pcv-audio { width:240px; max-width:100%; height:2.1rem; display:block; margin-bottom:.3rem; }
+  .pcv-transcript { font-size:.8rem; opacity:.85; font-style:italic; }
+  .pcv-voice-tag { display:inline-flex; align-items:center; gap:.25rem; font-size:.65rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:.04em; opacity:.75; margin-bottom:.15rem; }
+  .pcv-voice-tag .material-icons-outlined { font-size:.85rem; }
+
+  /* Message feedback icons — subtle until hover */
+  .pcv-actions { display:flex; align-items:center; gap:.15rem; opacity:.45; transition:opacity .15s; }
+  .pcv-row:hover .pcv-actions { opacity:1; }
+  .pcv-actions .feedback-icon { margin-right:0; padding:.15rem; border-radius:.35rem; font-size:1rem; }
+  .pcv-actions .feedback-icon:hover { background:#e0f2fe; }
+
+  /* ───────── Feedback panel ───────── */
+  .pcv-feedback-title { display:flex; align-items:center; gap:.5rem; font-size:.72rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:.06em; color:#94a3b8; margin-bottom:.85rem; }
+  .pcv-saved { display:inline-flex; align-items:center; gap:.25rem; font-size:.72rem; font-weight:600;
+    color:#16a34a; opacity:0; transition:opacity .25s; text-transform:none; letter-spacing:0; }
+  .pcv-saved.show { opacity:1; }
+  .pcv-notes { width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.6rem .75rem;
+    font-size:.875rem; color:#111827; resize:vertical; }
+  .pcv-notes:focus { outline:none; border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.15); }
+  .pcv-flag { display:flex; align-items:center; justify-content:space-between; gap:.5rem;
+    padding:.5rem .75rem; border:1px solid #e2e8f0; border-radius:.5rem; font-size:.85rem; color:#475569;
+    cursor:pointer; transition:border-color .12s, background .12s; }
+  .pcv-flag:hover { border-color:#bae6fd; }
+  .pcv-flag.on { background:#f0f9ff; border-color:#7dd3fc; color:#075985; }
+  .pcv-flag input { accent-color:#0284c7; width:1.1rem; height:1.1rem; flex-shrink:0; }
+
+  .pcv-empty { padding:3.5rem 1.5rem; text-align:center; color:#94a3b8; }
+  .pcv-empty .material-icons-outlined { font-size:2.75rem; color:#cbd5e1; }
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="mb-6">
+  <a href="{% url 'patient_detail' patient.pk %}" class="pcv-back">
+    <span class="material-icons-outlined text-base">arrow_back</span>{% trans "Back to client" %}
+  </a>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <span class="pcv-avatar">{{ patient.name|first }}{{ patient.lastname|first }}</span>
+      <div>
+        <h1 class="text-2xl font-semibold text-gray-800">{{ patient.name }} {{ patient.lastname }}</h1>
+        <p class="text-sm text-gray-500">
+          {% trans "Conversation history" %}{% if patient.agent %} · {{ patient.agent.name }}{% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="pcv-daynav">
+      <a href="{% url 'patient_conversation_detail' patient.pk prev_day %}" class="pcv-daybtn" aria-label="{% trans 'Previous day' %}">
+        <span class="material-icons-outlined">chevron_left</span>
+      </a>
+      <span class="pcv-daylabel">{% localtime on %}{{ day|date:"D, d M Y" }}{% endlocaltime %}</span>
+      <a href="{% url 'patient_conversation_detail' patient.pk next_day %}" class="pcv-daybtn {% if is_today %}disabled{% endif %}" aria-label="{% trans 'Next day' %}">
+        <span class="material-icons-outlined">chevron_right</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+{% regroup messages by conversation_id as threads %}
+
+{% if threads %}
+  {% for thread in threads %}
+    {% with conv_id=thread.grouper idx=forloop.counter conv=conv_map|get_item:thread.grouper %}
+    <div class="card p-6 mb-6">
+      {# ---------- Thread header: status + topic + meta ---------- #}
+      <div class="flex flex-wrap items-center gap-2 mb-4">
+        {% if conv and conv.analyzed %}
+          {% if conv.is_important %}
+            <span class="pcv-chip pcv-urgent"><span class="d"></span>{% trans "Urgent" %}</span>
+          {% else %}
+            <span class="pcv-chip pcv-review"><span class="d"></span>{% trans "Review" %}</span>
+          {% endif %}
+          {% if conv.topic %}
+            <span class="pcv-chip pcv-topic">{{ conv.topic }}</span>
+          {% endif %}
+        {% else %}
+          <span class="pcv-chip pcv-pending" title="{% trans 'This conversation has not been analysed yet. It may take a few moments.' %}">
+            <span class="d"></span>{% trans "Analysis pending" %}
+          </span>
+        {% endif %}
+        <span class="pcv-meta ml-auto">
+          {% blocktrans count counter=thread.list|length %}{{ counter }} message{% plural %}{{ counter }} messages{% endblocktrans %}
+          · {% localtime on %}{{ thread.list.0.timestamp|date:"H:i" }}{% with last_msg=thread.list|last %} – {{ last_msg.timestamp|date:"H:i" }}{% endwith %}{% endlocaltime %}
+        </span>
+      </div>
+
+      {% if conv and conv.analyzed and conv.summary %}
+        <div class="pcv-summary mb-5">{{ conv.summary }}</div>
+      {% endif %}
+
+      {# ---------- Chat ---------- #}
+      <div class="pcv-chat">
+        {% for msg in thread.list %}
+          {% if msg.user_message or msg.input_audio_file %}
+            <div class="pcv-row user">
+              <span class="pcv-msg-avatar">{{ patient.name|first }}{{ patient.lastname|first }}</span>
+              <div class="min-w-0">
+                <div class="pcv-bubble">
+                  {% if msg.input_audio_file %}
+                    <span class="pcv-voice-tag"><span class="material-icons-outlined">mic</span>{% trans "Voice message" %}</span>
+                    <audio class="pcv-audio" controls preload="none" src="{% url 'serve_audio_file' msg.id 'input' %}"></audio>
+                    {% if msg.user_message %}<p class="pcv-transcript">{{ msg.user_message }}</p>{% endif %}
+                  {% else %}
+                    <p>{{ msg.user_message }}</p>
+                  {% endif %}
+                </div>
+                <p class="pcv-time">{% localtime on %}{{ msg.timestamp|date:"H:i" }}{% endlocaltime %}</p>
+              </div>
+            </div>
+          {% endif %}
+
+          {% if msg.response_message or msg.response_audio_file %}
+            <div class="pcv-row bot">
+              <span class="pcv-msg-avatar"><span class="material-icons-outlined text-base">smart_toy</span></span>
+              <div class="min-w-0">
+                <div class="pcv-bubble">
+                  {% if msg.response_audio_file %}
+                    <span class="pcv-voice-tag"><span class="material-icons-outlined">volume_up</span>{% trans "Voice reply" %}</span>
+                    <audio class="pcv-audio" controls preload="none" src="{% url 'serve_audio_file' msg.id 'output' %}"></audio>
+                    {% if msg.response_message %}<p class="pcv-transcript">{{ msg.response_message }}</p>{% endif %}
+                  {% else %}
+                    <p>{{ msg.response_message }}</p>
+                  {% endif %}
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                  <div class="pcv-actions">
+                    <span class="material-icons-outlined feedback-icon like{% if msg.liked %} active{% endif %}"
+                          data-message-id="{{ msg.id }}" data-action="like"
+                          title="{% trans 'Like' %}">thumb_up</span>
+                    <span class="material-icons-outlined feedback-icon dislike{% if msg.disliked %} active{% endif %}"
+                          data-message-id="{{ msg.id }}" data-action="dislike"
+                          title="{% trans 'Dislike' %}">thumb_down</span>
+                    <span class="material-icons-outlined feedback-icon warning{% if msg.warning %} active{% endif %}"
+                          data-message-id="{{ msg.id }}" data-action="warning"
+                          title="{% trans 'Flag as warning' %}">error_outline</span>
+                    <span class="material-icons-outlined feedback-icon dangerous{% if msg.dangerous %} active{% endif %}"
+                          data-message-id="{{ msg.id }}" data-action="dangerous"
+                          title="{% trans 'Flag as dangerous' %}">dangerous</span>
+                  </div>
+                  <p class="pcv-time">{% localtime on %}{{ msg.timestamp|date:"H:i" }}{% endlocaltime %}</p>
+                </div>
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      {# ---- Conversation-level feedback ---- #}
+      {% if conv_id %}
+      <div class="mt-6 pt-5 border-t border-gray-100" data-conv-feedback data-conv-id="{{ conv_id }}">
+        <div class="pcv-feedback-title">
+          {% trans "Conversation feedback" %}
+          <span class="pcv-saved" data-saved-indicator><span class="material-icons-outlined text-sm">check_circle</span>{% trans "Saved" %}</span>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-4 items-start">
+          {# 5 → 1 so sibling selectors color all lower stars (using :has()) #}
+          <div class="rating-group space-x-1 flex-shrink-0 pt-1" role="radiogroup" aria-label="{% trans 'Conversation rating' %}">
+            {% for star in "54321" %}
+              <label class="rating-star" aria-label="{{ star }}">
+                <input class="sr-only rating-input" type="radio" name="rating-{{ conv_id }}" value="{{ star }}"
+                       {% if conv and conv.rating|stringformat:"s" == star %}checked{% endif %}>
+                <span class="material-icons-outlined text-3xl" aria-hidden="true">star</span>
+              </label>
+            {% endfor %}
+          </div>
+
+          <div class="flex-1 w-full min-w-0">
+            <label class="sr-only" for="feedback-{{ idx }}">{% trans "Feedback" %}</label>
+            <textarea class="pcv-notes" id="feedback-{{ idx }}" rows="3"
+              placeholder="{% trans 'Enter your feedback here...' %}">{% if conv and conv.feedback %}{{ conv.feedback }}{% endif %}</textarea>
+          </div>
+        </div>
+
+        {# ---- Human validation toggles (no auto flags shown) ---- #}
+        {% if detector_labels %}
+          <div class="pcv-feedback-title mt-5">{% trans "Human validation" %}</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"
+               data-conv-flags data-conv-id="{{ conv_id }}">
+            {% for lbl in detector_labels %}
+              {% with human=conv.human_flags|get_item:lbl auto=conv.auto_flags|get_item:lbl %}
+                {% with checked=human|default:auto %}
+                  <label class="pcv-flag{% if checked %} on{% endif %}">
+                    <span>{{ lbl }}</span>
+                    <input type="checkbox" class="toggle-flag" data-label="{{ lbl }}" {% if checked %}checked{% endif %}>
+                  </label>
+                {% endwith %}
+              {% endwith %}
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endwith %}
+  {% endfor %}
+{% else %}
+  <div class="card pcv-empty">
+    <span class="material-icons-outlined">forum</span>
+    <p class="mt-2">{% trans "No messages recorded on this day." %}</p>
+    <p class="text-sm mt-1">{% trans "Use the arrows above to browse other days." %}</p>
+  </div>
+{% endif %}
+{% endblock %}
+
+
+{% block scripts %}
+{{ block.super }}
+<script>
+  // csrftoken cookie is HttpOnly (CSRF_COOKIE_HTTPONLY=True) — use the rendered token.
+  const CSRF_TOKEN = "{{ csrf_token }}";
+
+  // Briefly show the "Saved ✓" indicator of the feedback section.
+  function pcvFlashSaved(section){
+    const el = section.querySelector('[data-saved-indicator]');
+    if (!el) return;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 1800);
+  }
+
+  // Message-level feedback (per message)
+  document.querySelectorAll('.feedback-icon').forEach(icon => {
+    icon.addEventListener('click', () => {
+      const msgId   = icon.dataset.messageId;
+      const action  = icon.dataset.action;
+      const isActive= icon.classList.contains('active');
+      fetch("{% url 'message_feedback' 0 %}".replace('/0/','/'+msgId+'/'), {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken': CSRF_TOKEN},
+        body: JSON.stringify({ action, value: !isActive })
+      }).then(r=>r.json()).then(data=>{
+        document.querySelectorAll(`[data-message-id="${msgId}"]`).forEach(el=>{
+          if(el.dataset.action==='like')    el.classList.toggle('active', data.liked);
+          if(el.dataset.action==='dislike') el.classList.toggle('active', data.disliked);
+          if(el.dataset.action==='warning') el.classList.toggle('active', data.warning);
+          if(el.dataset.action==='dangerous') el.classList.toggle('active', data.dangerous);
+        });
+      }).catch(console.error);
+    });
+  });
+
+  // Conversation-level feedback (rating + notes)
+  document.querySelectorAll('[data-conv-feedback]').forEach(section=>{
+    const convId = section.dataset.convId;
+    if(!convId) return;
+
+    const radios = section.querySelectorAll(`input[type="radio"][name="rating-${convId}"]`);
+    const notes  = section.querySelector('textarea');
+
+    radios.forEach(r=>{
+      r.addEventListener('change', ()=>{
+        fetch("{% url 'conversation_feedback' 'CID' %}".replace('CID', convId), {
+          method: 'POST',
+          headers: {'Content-Type':'application/json','X-CSRFToken': CSRF_TOKEN},
+          body: JSON.stringify({ rating: parseInt(r.value,10) })
+        }).then(()=>pcvFlashSaved(section)).catch(console.error);
+      });
+    });
+
+    if (notes){
+      notes.addEventListener('blur', ()=>{
+        fetch("{% url 'conversation_feedback' 'CID' %}".replace('CID', convId), {
+          method: 'POST',
+          headers: {'Content-Type':'application/json','X-CSRFToken': CSRF_TOKEN},
+          body: JSON.stringify({ feedback: notes.value })
+        }).then(()=>pcvFlashSaved(section)).catch(console.error);
+      });
+    }
+  });
+
+  // Human flags: yes/no per detector label, per conversation (no auto flags displayed)
+  document.querySelectorAll('[data-conv-flags]').forEach(section => {
+    const convId = section.dataset.convId;
+    const feedbackSection = section.closest('[data-conv-feedback]');
+    section.querySelectorAll('.toggle-flag').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const label = cb.dataset.label;
+        const value = !!cb.checked;
+        cb.closest('.pcv-flag').classList.toggle('on', value);
+        fetch("{% url 'conversation_feedback' 'CID' %}".replace('CID', convId), {
+          method: 'POST',
+          headers: {'Content-Type':'application/json','X-CSRFToken': CSRF_TOKEN},
+          body: JSON.stringify({ label, value })
+        }).then(()=>{ if(feedbackSection) pcvFlashSaved(feedbackSection); }).catch(console.error);
+      });
+    });
+  });
+</script>
+{% endblock %}

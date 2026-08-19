@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Read what clients and agents said — on WhatsApp, SMS or web chat — and improve it with feedback.">
+<title>Conversations · Conversational Care User Manual</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230e7c6b%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 font-family=%22sans-serif%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>CC</text></svg>">
+</head>
+<body>
+<input type="checkbox" id="menu-toggle" aria-hidden="true">
+<div class="topbar">
+  <label for="menu-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></label>
+  <span class="t-title">Conversational Care — User Manual</span>
+</div>
+<div class="wrap">
+<aside class="sidebar">
+  <a class="brand" href="index.html">
+    <span class="brand-mark">CC</span>
+    <span><span class="brand-name">Conversational Care</span><br><span class="brand-sub">User Manual</span></span>
+  </a>
+  <nav class="nav">
+<div class="nav-group">Start here</div>
+<a href="index.html">Welcome</a>
+<a href="getting-started.html">Getting started</a>
+<div class="nav-group">Everyday work</div>
+<a href="dashboard.html">Dashboard</a>
+<a href="clients.html">Clients</a>
+<a href="calls.html">Calls</a>
+<a href="communications.html">Communications</a>
+<a href="calendar.html">Calendar</a>
+<a href="conversations.html" class="active">Conversations</a>
+<a href="alerts.html">Alerts</a>
+<div class="nav-group">Design & configuration</div>
+<a href="protocols.html">Protocols</a>
+<a href="agents.html">Agents</a>
+<a href="users.html">Users</a>
+<a href="settings.html">Settings</a>
+  </nav>
+</aside>
+<main class="content">
+<h1>Conversations & chat</h1>
+<p class="lede">Read what clients and agents said — on WhatsApp, SMS or web chat — and improve it with feedback.</p>
+<p>Clients and caregivers talk to their agent over WhatsApp, SMS, or a web
+chat with voice. Your team can read every conversation, listen to voice
+messages, and teach the system with feedback.</p>
+
+<h2>Reading a conversation</h2>
+<p>Conversations are grouped by day — a day's chat is one item. Open one from
+<a href="communications.html">Communications</a>, from the
+<a href="dashboard.html">dashboard</a>, or from a chat entry in the client's
+timeline. It opens in the detail panel, with <strong>Summary</strong> and
+<strong>Conversation</strong> tabs: the summary is what you read first, the
+transcript is there when you need it. Voice messages appear with a player;
+agent voice replies too.</p>
+<p>Unread conversations are shown in bold, and opening one marks it read for
+you. From the client's timeline you can still step through days one at a
+time.</p>
+<p>Each day's conversation is analysed automatically (a note shows if the
+analysis is still pending) and can be summarised for quick review.</p>
+
+<h2>Giving feedback</h2>
+<p>Feedback improves both the agents and the alerting. On any conversation you
+can:</p>
+<ul>
+<li><strong>Rate the conversation</strong> — a score out of five for how the
+agent handled it as a whole.</li>
+<li><strong>Say what was good or wrong</strong> — a written note, for the
+things a score cannot carry.</li>
+<li><strong>Confirm what actually came up</strong> — the agent flags topics
+automatically; your yes/no on each is what it gets measured against. An agent
+with no detectors configured shows no flags here.</li>
+</ul>
+
+<h2>The test chat</h2>
+<p>Every client can have one <strong>test user</strong> (created by an admin on
+the Users page). Signing in as the test user opens the same chat experience the
+client gets — including voice — wired to that client's agent. Use it to try a
+new agent or prompt before real people rely on it.</p>
+<p>Recording voice in the browser needs a secure (HTTPS) connection and
+microphone permission — the chat will guide you if either is missing.</p>
+
+<h2>WhatsApp specifics</h2>
+<ul>
+<li>Messages are answered by the client's agent automatically; if the reply
+takes time (transcription, text-to-speech), the platform acknowledges Twilio
+immediately and sends the answer as soon as it is ready.</li>
+<li>Voice-note replies can be enabled platform-wide by an admin
+(<em>Enable WhatsApp audio</em> in Settings).</li>
+</ul>
+<div class="pager"><a href="calendar.html"><span class="dir">&larr; Previous</span>Calendar</a><a href="alerts.html" style="text-align:right"><span class="dir">Next &rarr;</span>Alerts</a></div>
+<p class="footer-note">Conversational Care · Wellbeing Technologies Lab, Dyson School of Design Engineering, Imperial College London · AGPL-3.0.<br>
+Developers and operators: see the <a href="../technical-manual.md">technical manual</a>.</p>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{% load i18n %}
+<th
+  class="px-6 py-3 mtg-sortable{% if current_sort == col %} mtg-sorted{% endif %}"
+  scope="col"
+  onclick="location.href='?{% if sort_base %}{{ sort_base }}&{% endif %}sort={{ col }}&dir={% if current_sort == col and current_dir == 'asc' %}desc{% else %}asc{% endif %}'"
+>
+  <span class="inline-flex items-center">
+    {{ label }}
+    <span class="mtg-sort-arrow">{% if current_sort == col %}{% if current_dir == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+  </span>
+</th>

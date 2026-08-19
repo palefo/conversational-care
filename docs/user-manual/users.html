@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Create and manage navigator and test-user accounts.">
+<title>Users · Conversational Care User Manual</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230e7c6b%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 font-family=%22sans-serif%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>CC</text></svg>">
+</head>
+<body>
+<input type="checkbox" id="menu-toggle" aria-hidden="true">
+<div class="topbar">
+  <label for="menu-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></label>
+  <span class="t-title">Conversational Care — User Manual</span>
+</div>
+<div class="wrap">
+<aside class="sidebar">
+  <a class="brand" href="index.html">
+    <span class="brand-mark">CC</span>
+    <span><span class="brand-name">Conversational Care</span><br><span class="brand-sub">User Manual</span></span>
+  </a>
+  <nav class="nav">
+<div class="nav-group">Start here</div>
+<a href="index.html">Welcome</a>
+<a href="getting-started.html">Getting started</a>
+<div class="nav-group">Everyday work</div>
+<a href="dashboard.html">Dashboard</a>
+<a href="clients.html">Clients</a>
+<a href="calls.html">Calls</a>
+<a href="communications.html">Communications</a>
+<a href="calendar.html">Calendar</a>
+<a href="conversations.html">Conversations</a>
+<a href="alerts.html">Alerts</a>
+<div class="nav-group">Design & configuration</div>
+<a href="protocols.html">Protocols</a>
+<a href="agents.html">Agents</a>
+<a href="users.html" class="active">Users</a>
+<a href="settings.html">Settings</a>
+  </nav>
+</aside>
+<main class="content">
+<h1>Users</h1>
+<p class="lede">Create and manage navigator and test-user accounts.</p>
+<p class="lede-inline"><span class="badge admin">Admin</span></p>
+<p>The <strong>Users</strong> page manages the accounts of your team. It is
+visible to admins only.</p>
+
+<h2>Account types you can create here</h2>
+<ul>
+<li><strong>Navigator</strong> — a full account for a care team navigator.
+They see and manage <em>their own</em> clients only.</li>
+<li><strong>Test user</strong> — an account linked to one client, restricted to
+that client's audio chat. Only one test user per client. The generated username
+and password are shown <em>once</em> — copy them immediately (you can reset the
+password later by editing the user).</li>
+</ul>
+<p>Admin accounts are created from the command line by the platform operator
+(see the technical manual).</p>
+
+<h2>Editing users</h2>
+<p>Open a user to change their name, e-mail, active status, preferred language,
+or password. Deactivating an account blocks sign-in without deleting history.</p>
+<div class="pager"><a href="agents.html"><span class="dir">&larr; Previous</span>Agents</a><a href="settings.html" style="text-align:right"><span class="dir">Next &rarr;</span>Settings</a></div>
+<p class="footer-note">Conversational Care · Wellbeing Technologies Lab, Dyson School of Design Engineering, Imperial College London · AGPL-3.0.<br>
+Developers and operators: see the <a href="../technical-manual.md">technical manual</a>.</p>
+</main>
+</div>
+</body>
+</html>

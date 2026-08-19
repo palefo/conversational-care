@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Branding, integrations, models, prompts, self-registration and maintenance.">
+<title>Settings · Conversational Care User Manual</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230e7c6b%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 font-family=%22sans-serif%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>CC</text></svg>">
+</head>
+<body>
+<input type="checkbox" id="menu-toggle" aria-hidden="true">
+<div class="topbar">
+  <label for="menu-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></label>
+  <span class="t-title">Conversational Care — User Manual</span>
+</div>
+<div class="wrap">
+<aside class="sidebar">
+  <a class="brand" href="index.html">
+    <span class="brand-mark">CC</span>
+    <span><span class="brand-name">Conversational Care</span><br><span class="brand-sub">User Manual</span></span>
+  </a>
+  <nav class="nav">
+<div class="nav-group">Start here</div>
+<a href="index.html">Welcome</a>
+<a href="getting-started.html">Getting started</a>
+<div class="nav-group">Everyday work</div>
+<a href="dashboard.html">Dashboard</a>
+<a href="clients.html">Clients</a>
+<a href="calls.html">Calls</a>
+<a href="communications.html">Communications</a>
+<a href="calendar.html">Calendar</a>
+<a href="conversations.html">Conversations</a>
+<a href="alerts.html">Alerts</a>
+<div class="nav-group">Design & configuration</div>
+<a href="protocols.html">Protocols</a>
+<a href="agents.html">Agents</a>
+<a href="users.html">Users</a>
+<a href="settings.html" class="active">Settings</a>
+  </nav>
+</aside>
+<main class="content">
+<h1>Settings</h1>
+<p class="lede">Branding, integrations, models, prompts, self-registration and maintenance.</p>
+<p class="lede-inline"><span class="badge admin">Admin</span></p>
+<p><strong>Settings</strong> configures how the platform behaves, connects and
+looks. Most values take effect immediately; a few marked <em>Restart
+required</em> are read from the server environment.</p>
+
+<h2 id="general">General &amp; behaviour</h2>
+<ul>
+<li>Feature toggles that apply immediately: hide meeting steps, enable
+automations, enable self-registration, send care plans over WhatsApp, enable
+WhatsApp audio replies.</li>
+<li><strong>System</strong> values (timezone, async replies, debug mode, the
+Twilio webhook URL) are managed in the server's <code>.env</code> and shown
+here for reference.</li>
+</ul>
+
+<h2 id="integrations">Integrations &amp; messaging</h2>
+<ul>
+<li><strong>Integration credentials</strong> — Twilio account, platform phone
+number, OpenAI and ElevenLabs keys. Secrets are write-only: they are stored
+securely and never shown again; leave a field blank to keep the current
+value.</li>
+<li><strong>Messaging templates</strong> — SMS/WhatsApp sender numbers and the
+approved template identifiers used for reminders and alerts.</li>
+</ul>
+
+<h2 id="branding">Branding</h2>
+<p>The name and logo shown across the app and on the login page. Upload a PNG,
+JPG or SVG (max 2&nbsp;MB), or point at a static path.</p>
+
+<h2 id="agents-settings">Agents (models)</h2>
+<p>The default model behind in-process agents, per-provider API keys, and
+optional Azure routing. Values set here override the server's
+<code>.env</code>, so you can switch models or providers without redeploying.</p>
+
+<h2 id="prompts">Prompts</h2>
+<p>The base prompts used to summarise meeting protocols and call transcripts.
+Leave a field blank to use the built-in default — the relevant answers or
+transcript are appended automatically.</p>
+
+<h2 id="registrations">Registrations (self-registration)</h2>
+<p>Let people register themselves by scanning a QR code that opens WhatsApp
+with a pre-filled message:</p>
+<ol class="steps">
+<li>Turn <strong>self-registration</strong> on and pick the
+<strong>Self Registration Agent</strong> under General settings.</li>
+<li>Share the QR from this page (download it or copy the image); test the
+link yourself first.</li>
+<li>New registrants appear under <strong>Pre-registrations</strong>, waiting to
+be approved and assigned an agent — approve them to create the client.</li>
+</ol>
+<p>A platform phone number must be configured for the WhatsApp link to be
+built.</p>
+
+<h2 id="api-client">API client</h2>
+<p>For teams that script the platform: this page shows whether the REST API is
+enabled, how to get a personal API token (Profile → API token), and download +
+install commands for the Python client package, pre-filled with your platform's
+address. Permissions through the API match the web app.</p>
+
+<h2 id="maintenance">Maintenance</h2>
+<p>One-off background jobs you can trigger by hand: fetch new call recordings
+from Twilio, and classify conversations that have not been analysed yet.</p>
+<div class="pager"><a href="users.html"><span class="dir">&larr; Previous</span>Users</a><span></span></div>
+<p class="footer-note">Conversational Care · Wellbeing Technologies Lab, Dyson School of Design Engineering, Imperial College London · AGPL-3.0.<br>
+Developers and operators: see the <a href="../technical-manual.md">technical manual</a>.</p>
+</main>
+</div>
+</body>
+</html>

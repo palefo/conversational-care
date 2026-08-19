@@ -1,0 +1,1823 @@
+/* Base styles */
+body {
+  font-family: 'DM Sans', sans-serif;
+  background-color: #f0f9ff;
+}
+
+/* Sidebar */
+.sidebar {
+  background-color: #e0f2fe;
+  transition: width 0.2s ease;
+}
+.sidebar-item.active {
+  background-color: #bae6fd;
+  color: #0c4a6e;
+  font-weight: 600;
+}
+.sidebar-item:hover {
+  background-color: #bfdbfe;
+}
+
+/* Collapsible sidebar */
+.sidebar-toggle {
+  flex: 0 0 auto;
+}
+.sidebar.collapsed {
+  width: 5rem;
+}
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+}
+.sidebar.collapsed .sidebar-logo,
+.sidebar.collapsed .sidebar-label,
+.sidebar.collapsed .sidebar-badge,
+.sidebar.collapsed .sidebar-caret {
+  display: none;
+}
+.sidebar.collapsed .sidebar-item {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+.sidebar.collapsed .sidebar-item .material-icons-outlined {
+  margin-right: 0 !important;
+}
+
+/* Card */
+.card {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Primary button */
+.button-primary {
+  background-color: #0ea5e9;
+  color: white;
+}
+.button-primary:hover {
+  background-color: #0284c7;
+}
+
+/* Secondary button */
+.button-secondary {
+  background-color: #e0f2fe;
+  color: #0c4a6e;
+}
+.button-secondary:hover {
+  background-color: #bae6fd;
+}
+
+/* Tag / Badge */
+.tag {
+  background-color: #34d399;
+  color: #065f46;
+}
+
+/* Dropdown menu */
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  min-width: 10rem;
+  z-index: 10;
+}
+.dropdown:hover .dropdown-menu {
+  display: block;
+}
+
+/* Calendar-specific styles */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background-color: #e5e7eb;
+  border: 1px solid #e5e7eb;
+}
+.calendar-header {
+  background-color: #f3f4f6;
+  font-weight: 500;
+  color: #374151;
+}
+.calendar-day {
+  background-color: white;
+  min-height: 120px;
+  padding: 0.5rem;
+}
+.calendar-day.today {
+  background-color: #bfdbfe;
+  border: 2px solid #3b82f6;
+}
+.calendar-day.empty {
+  background-color: #f9fafb;
+}
+
+/* Pasos de la llamada */
+.step-unchecked {
+  /* fondo rojo pálido */
+  background-color: #fecaca; /* equivalente a bg-red-200 en Tailwind */
+}
+
+.step-checked {
+  /* fondo verde claro */
+  background-color: #bbf7d0; /* equivalente a bg-green-200 en Tailwind */
+}
+
+/* app_new_design.css */
+
+.checkbox-checked {
+  background-color: #bbf7d0; /* light green */
+}
+
+.checkbox-unchecked {
+  background-color: #fecaca; /* light red */
+}
+
+/* (Optional) If you also want to style the checkbox border/change when it’s checked/unchecked,
+   you can add something like this: */
+
+.checkbox-checked input[type="checkbox"] {
+  /* make sure the cell stays green even around the checkbox itself */
+  background-color: #bbf7d0;
+}
+
+.checkbox-unchecked input[type="checkbox"] {
+  background-color: #fecaca;
+}
+
+ .tag-pending {
+      background-color: #fef9c3;
+      color: #a16207;
+    }
+    .tag-completed {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+    .tag-interrupted {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+    .tag-not-answered {
+      background-color: #f3f4f6;
+      color: #4b5563;
+    }
+    .table th {
+      background-color: #f3f4f6;
+    }
+
+    /* ——— Chatbot Bubble ——— */
+#chatbot-bubble {
+  position: fixed;
+  /* initial corner placement */
+  bottom: 1rem;
+  right: 1rem;
+  /* allow JS to take over left/top once dragged */
+  left: auto;
+  top: auto;
+  width: 3.5rem;
+  height: 3.5rem;
+  background-color: #0ea5e9;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;              /* prevent text selection while dragging */
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  transition: transform 0.2s ease;
+  z-index: 1001;
+}
+#chatbot-bubble:hover {
+  transform: scale(1.1);
+}
+#chatbot-bubble:active {
+  cursor: grabbing;
+}
+
+/* ——— Chatbot Window ——— */
+#chatbot-window {
+  position: fixed;
+  /* initial placement relative to bubble */
+  bottom: 5.5rem;
+  right: 1rem;
+  left: auto;
+  top: auto;
+  width: 20rem;
+  height: 30rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 1000;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+#chatbot-window.hidden {
+  opacity: 0;
+  transform: translateY(1rem) scale(0.95);
+  pointer-events: none;
+}
+
+/* ——— Header ——— */
+.chatbot-header {
+  background-color: #0ea5e9;
+  color: white;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.chatbot-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+/* ——— Messages Container ——— */
+.chatbot-messages {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background-color: #f9fafb;
+}
+
+/* ——— Individual Messages ——— */
+.message {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  max-width: 80%;
+  word-wrap: break-word;
+}
+.message.user {
+  background-color: #0ea5e9;
+  color: white;
+  align-self: flex-end;
+}
+.message.bot {
+  background-color: #e0f2fe;
+  color: #0c4a6e;
+  align-self: flex-start;
+}
+
+/* ——— Input Area ——— */
+.chatbot-input {
+  display: flex;
+  padding: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+}
+.chatbot-input input {
+  flex: 1;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem 0 0 0.375rem;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+}
+.chatbot-input input:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 2px rgba(14,165,233,0.2);
+}
+.chatbot-input button {
+  background-color: #0ea5e9;
+  color: white;
+  border: none;
+  padding: 0 0.75rem;
+  border-radius: 0 0.375rem 0.375rem 0;
+  cursor: pointer;
+}
+.chatbot-input button:hover {
+  background-color: #0284c7;
+}
+/* Chat bubbles */
+.chat-bubble {
+  padding: .75rem;
+  border-radius: .75rem;
+  max-width: 70%;
+  word-wrap: break-word;
+}
+.user-bubble {
+  background-color: #0ea5e9;
+  color: white;
+  border-bottom-right-radius: 0;
+}
+.chatbot-bubble {
+  background-color: #e0f2fe;
+  color: #0c4a6e;
+  border-bottom-left-radius: 0;
+}
+
+/* Avatars */
+.avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: white;
+  flex-shrink: 0;
+}
+.user-avatar {
+  background-color: #0ea5e9;
+}
+.chatbot-avatar {
+  background-color: #64748b;
+}
+
+/* Feedback icons */
+.feedback-row {
+  display: flex;
+  align-items: center;
+}
+.feedback-icon {
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 1rem;
+  margin-right: 0.5rem;
+}
+.feedback-icon:hover {
+  color: #0ea5e9;
+}
+.feedback-icon.active {
+  color: #0ea5e9;
+}
+.feedback-icon.warning.active {
+  color: #dc2626;
+}
+/* ───────── CSS Variables (shared colour palette) ───────── */
+:root{
+  --brand-primary:   #0ea5e9;   /* sky-500  */
+  --brand-secondary: #0284c7;   /* sky-600  */
+  --brand-light:     #f0f9ff;   /* sky-50   */
+  --surface-background:#f8fafc; /* slate-50 */
+  --card-background: #ffffff;
+  --text-primary:    #1e293b;   /* slate-800*/
+  --text-secondary:  #475569;   /* slate-600*/
+  --text-muted:      #94a3b8;   /* slate-400*/
+  --border-color:    #e2e8f0;   /* slate-200*/
+}
+
+/* ───────── Floating “Guardar” button — icon-only ───────── */
+.save-button{
+  position:fixed;
+  top:1rem;
+  right:1rem;
+  z-index:50;
+
+  /* size & shape */
+  width:3rem;               /* 48 px icon button */
+  height:3rem;
+  border-radius:.5rem;
+
+  /* colours */
+  background:#e0f2fe;
+  color:#0c4a6e;
+
+  /* flex centering for the <span class="material-icons"> */
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  /* elevation & motion */
+  box-shadow:0 4px 8px rgba(0,0,0,.2);
+  transition:background .2s,transform .2s;
+}
+
+.save-button:hover{
+  background:#bae6fd;
+  transform:scale(1.05);
+}
+
+.save-button .material-icons{
+  font-size:1.5rem;
+}
+
+/* ───────── Floating “Start automation” button — icon-only ───────── */
+.automation-button{
+  position:fixed;
+  top:1rem;
+  right:1rem;
+  z-index:50;
+
+  /* size & shape */
+  width:3rem;               /* 48 px icon button */
+  height:3rem;
+  border-radius:.5rem;
+
+  /* colours */
+  background:var(--brand-primary);
+  color:#fff;
+
+  /* flex centering for the <span class="material-icons"> */
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  /* elevation & motion */
+  box-shadow:0 4px 8px rgba(0,0,0,.2);
+  transition:background .2s,transform .2s;
+}
+
+.automation-button:hover{
+  background:var(--brand-secondary);
+  transform:scale(1.05);
+}
+
+.automation-button .material-icons{
+  font-size:1.5rem;
+}
+
+/* ───────── Form sections (protocol pages) ───────── */
+.form-section{
+  background:var(--card-background);
+  border:1px solid var(--border-color);
+  border-radius:.75rem;
+  padding:1.5rem;
+  margin-bottom:2rem;
+  box-shadow:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
+}
+.form-section:focus-within{
+  border-color:var(--brand-primary);
+  box-shadow:0 0 0 3px rgba(14,165,233,.2),
+             0 4px 12px rgba(14,165,233,.1);
+}
+
+/* prompts & markdown */
+.prompt,
+.markdown-content{
+  color:var(--text-secondary);
+  line-height:1.6;
+  font-size:.95rem;
+}
+.markdown-content ul{
+  list-style:disc;
+  margin-left:1.5rem;
+  margin-bottom:.75rem;
+}
+.markdown-content strong{
+  color:var(--text-primary);
+  font-weight:600;
+}
+
+/* textareas */
+.form-section textarea{
+  width:100%;
+  min-height:150px;
+  background:#f9fafb;
+  border:1px solid var(--border-color);
+  border-radius:.5rem;
+  padding:1rem;
+  font-size:1rem;
+  resize:vertical;
+  transition:border-color .2s,box-shadow .2s;
+}
+.form-section textarea:focus{
+  background:#fff;
+  border-color:var(--brand-primary);
+  box-shadow:0 0 0 2px rgba(14,165,233,.2);
+  outline:none;
+}
+
+.character-count{
+  font-size:.8rem;
+  color:var(--text-muted);
+  text-align:right;
+  margin-top:.5rem;
+}
+
+/* ────────── Markdown heading colours / sizes ────────── */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  color: var(--brand-secondary);   /* same blue you use for section titles   */
+  font-weight: 600;
+  line-height: 1.25;
+  margin-bottom: .75rem;
+}
+
+/* mobile-first sizes */
+.markdown-content h1 { font-size: 1.5rem; }   /* ≈ 24 px */
+.markdown-content h2 { font-size: 1.375rem; } /* ≈ 22 px */
+.markdown-content h3 { font-size: 1.25rem; }  /* ≈ 20 px */
+
+/* bump sizes on ≥ 640 px screens */
+@media (min-width: 640px) {
+  .markdown-content h1 { font-size: 1.875rem; }  /* ≈ 30 px */
+  .markdown-content h2 { font-size: 1.5rem;   }  /* ≈ 24 px */
+  .markdown-content h3 { font-size: 1.375rem; }  /* ≈ 22 px */
+}
+
+/* ─── External Chat ─── */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: #ffffff;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  border-radius: 1.25rem;
+  overflow: hidden;
+}
+
+.chat-header {
+  background: linear-gradient(135deg, var(--primary-start,#4f46e5) 0%, var(--primary-end,#3b82f6) 100%);
+  color: white;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--header-border,#e5e7eb);
+}
+
+.chat-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  background-color: transparent;
+}
+
+.message {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  max-width: 80%;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message.user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 500;
+}
+
+.bot-avatar {
+  background-color: var(--primary-end,#3b82f6);
+}
+
+.user-avatar {
+  background-color: var(--primary-start,#4f46e5);
+}
+
+.message-bubble {
+  padding: 1rem 1.25rem;
+  border-radius: 1.25rem;
+  line-height: 1.6;
+  background: transparent; /* container is white */
+}
+
+.message.bot .message-bubble {
+  background-color: var(--bot-bubble-bg,#eef2ff);
+  color: var(--bot-bubble-text,#3730a3);
+  border-bottom-left-radius: 0.3125rem;
+}
+
+.message.user .message-bubble {
+  background: linear-gradient(135deg, var(--primary-start,#4f46e5) 0%, var(--primary-end,#3b82f6) 100%);
+  color: white;
+  border-bottom-right-radius: 0.3125rem;
+}
+
+/* three-dot typing indicator */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.typing-indicator span {
+  width: 8px;
+  height: 8px;
+  background-color: #a5b4fc;
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+.typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+.typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1.0); }
+}
+
+/* fixed footer input */
+.chat-input {
+  padding: 1.5rem;
+  border-top: 1px solid var(--header-border,#e5e7eb);
+  background-color: var(--input-bg,#f9fafb);
+}
+
+.input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: white;
+  border: 1px solid var(--input-border,#d1d5db);
+  border-radius: 9999px;
+  padding: 0.5rem 1.5rem;
+  transition: box-shadow 0.3s ease;
+}
+
+.input-wrapper:focus-within {
+  box-shadow: 0 0 0 3px var(--input-focus-ring,rgba(79,70,229,0.4));
+  border-color: var(--primary-start,#4f46e5);
+}
+
+.input-wrapper input {
+  flex-grow: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 1rem;
+  color: var(--input-text,#374151);
+}
+
+.input-wrapper input::placeholder {
+  color: var(--placeholder-text,#9ca3af);
+}
+
+.send-button {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-start,#4f46e5) 0%, var(--primary-end,#3b82f6) 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.send-button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 15px rgba(59,130,246,0.3);
+}
+
+.send-button:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+  transform: scale(1);
+  box-shadow: none;
+}
+
+/* responsive */
+@media (max-width: 768px) {
+  .chat-container { border-radius: 0; }
+  .chat-messages { padding: 1rem; }
+  .chat-input { padding: 1rem; }
+}
+
+/* ─── External Chat: remove wrapper & leave only per-bubble colors ─── */
+.chat-container {
+  /* keep the overall card white */
+  background-color: #fff;
+}
+
+.chat-messages {
+  /* kill any inherited panel color */
+  background-color: transparent !important;
+}
+
+/* each message row itself must be transparent */
+.chat-messages .message {
+  background: transparent !important;
+}
+
+/* ensure no outer rounded box behind bubbles */
+.chat-messages .message:nth-child(odd),
+.chat-messages .message:nth-child(even) {
+  background: transparent !important;
+}
+
+/* force just the bubble to carry its color */
+.chat-messages .message-bubble {
+  background: none !important;
+  /* re-apply your bubble styles if needed */
+  /* padding, border-radius already set above */
+}
+
+/* re-color only the little bubble element */
+.chat-messages .message.bot .message-bubble {
+  background-color: var(--bot-bubble-bg,#eef2ff) !important;
+  color:            var(--bot-bubble-text,#3730a3) !important;
+}
+
+.chat-messages .message.user .message-bubble {
+  background: linear-gradient(
+               135deg,
+               var(--primary-start,#4f46e5) 0%,
+               var(--primary-end,#3b82f6)   100%
+             ) !important;
+  color:      white !important;
+}
+
+/* make sure the surrounding scroll-pane stays white/transparent */
+body .chat-container,
+body .chat-messages,
+body .chat-input {
+  background: none;
+}
+
+/* ─── External Chat: full-width override ─── */
+.chat-container {
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* ─── External Chat: full-screen & fixed header/footer ─── */
+.chat-container {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* header stays on top */
+.chat-header {
+  flex: 0 0 auto;
+  z-index: 10;
+}
+
+/* messages area takes all the leftover space and scrolls */
+.chat-messages {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  /* if you had padding, you can keep it, e.g.: */
+  /* padding: 2rem; */
+}
+
+/* footer input stays at bottom */
+.chat-input {
+  flex: 0 0 auto;
+  z-index: 10;
+}
+
+  /* Hide radios in-place to avoid scroll; keep them focusable for keyboard */
+  .rating-input.sr-only{
+    position:absolute !important;
+    width:1px; height:1px;
+    margin:0; padding:0; border:0;
+    opacity:0;
+    clip: rect(0 0 0 0); clip-path: inset(50%);
+    overflow:hidden; white-space:nowrap;
+  }
+
+  /* Layout */
+  .rating-group{ display:flex; flex-direction:row-reverse; justify-content:flex-end; gap:.25rem; }
+  .rating-star{ cursor:pointer; display:inline-flex; align-items:center; color:#d1d5db; }
+  .rating-star .material-icons-outlined{ color:inherit; }
+
+  /* Hover preview: hovered label + all following labels in DOM */
+  .rating-star:hover,
+  .rating-star:hover ~ .rating-star { color:#facc15; }
+
+  /* Selected: label that has a checked input + all following labels (DOM order is 5,4,3,2,1) */
+  .rating-group .rating-star:has(> .rating-input:checked),
+  .rating-group .rating-star:has(> .rating-input:checked) ~ .rating-star { color:#facc15; }
+
+  /* Keyboard focus ring on the star when its input is focused */
+  .rating-star:has(> .rating-input:focus) { outline:2px solid #60a5fa; outline-offset:2px; border-radius:.25rem; }
+
+/* ── Right-hand detail panel ─────────────────────────────────────────────
+   Layout agreed in the navigation prototype: context strip, kicker + title,
+   player and tabs for a call, overview box, numbered beats with timestamps,
+   actions along the bottom. Opened by ?item=<kind>-<id>; rendered from
+   base.html as a flex sibling of <main> so it scrolls on its own. */
+/* Panel width is a variable so the drag handle and the saved preference have a
+   single thing to write to. Restored from localStorage during parse (base.html)
+   so a wide panel never flashes at 340px first. */
+:root { --dp-w: 340px; }
+
+.dp {
+  flex: 0 0 var(--dp-w);
+  width: var(--dp-w);
+  box-sizing: border-box;
+  background: #fff;
+  border-left: 1px solid #e2e8f0;
+  padding: 14px 16px 24px;
+  overflow-y: auto;
+}
+
+/* <main> is a flex item, and flex items refuse to shrink past their content
+   unless told to. Without this the list pushes the panel off instead of
+   truncating its own row summaries. */
+body > main { min-width: 0; }
+
+/* Drag handle. Sits between <main> and .dp, so it only exists when a panel
+   does. Keyboard-operable: it is a real separator, not a decorative bar. */
+.dp-grip {
+  flex: 0 0 auto;
+  width: 9px;
+  cursor: col-resize;
+  background: #eef4f9;
+  border-left: 1px solid #e2e8f0;
+  display: flex; align-items: center; justify-content: center;
+  touch-action: none;
+}
+.dp-grip::after {
+  content: ""; width: 2px; height: 26px; border-radius: 2px; background: #94a3b8;
+}
+.dp-grip:hover, .dp-grip-live { background: #bae6fd; }
+.dp-grip:hover::after, .dp-grip-live::after { background: #0369a1; }
+.dp-grip:focus-visible { outline: 2px solid #0369a1; outline-offset: -2px; }
+
+/* Keep the cursor and kill text selection for the whole drag, not just while
+   the pointer happens to be over the 9px handle. */
+body.dp-resizing { cursor: col-resize; user-select: none; }
+
+.dp-head { display: flex; align-items: flex-start; gap: .5rem; margin-bottom: .6rem; }
+.dp-kick {
+  font-size: .59375rem; letter-spacing: .07em; text-transform: uppercase;
+  font-weight: 700; color: #0284c7;
+}
+.dp-kick-crit { color: #b91c1c; }
+.dp-kick-warn { color: #b45309; }
+.dp-title { font-size: .875rem; font-weight: 700; color: #1e293b; margin: .06rem 0 0; line-height: 1.35; }
+.dp-meta { font-size: .6875rem; color: #64748b; margin-top: .05rem; }
+.dp-close {
+  margin-left: auto; color: #94a3b8; font-size: .9375rem; line-height: 1;
+  padding: .1rem .25rem; text-decoration: none;
+}
+.dp-close:hover { color: #0f172a; }
+
+.dp-player { display: block; width: 100%; height: 34px; margin-bottom: .6rem; }
+/* Tabs, ported from the panel prototype. Pinned between the header and the
+   scrolling body — the point of them is that the header above and the actions
+   below never move, so they cannot live inside the part that scrolls.
+   Scroll sideways rather than wrap: a wrapped second row changes the panel's
+   height as you switch kinds. */
+.dp-tabs {
+  flex: 0 0 auto;
+  display: flex; gap: 2px;
+  margin: 12px 0 0;
+  padding: 0 16px;
+  border-bottom: 1px solid #e2e8f0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.dp-tabs::-webkit-scrollbar { display: none; }
+.dp-tab {
+  font: inherit; font-size: 12px; font-weight: 600; color: #64748b;
+  background: none; border: 0; border-bottom: 2px solid transparent;
+  padding: 7px 9px; margin-bottom: -1px;
+  cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.dp-tab:hover { color: #1e293b; }
+.dp-tab.on { color: #0369a1; border-bottom-color: #0369a1; font-weight: 700; }
+/* Same count pill as the section badges and the filter chips. */
+.dp-tab-n {
+  font-size: 10px; font-weight: 700; background: #f1f5f9; color: #64748b;
+  border-radius: 9999px; padding: 1px 7px;
+}
+.dp-tab.on .dp-tab-n { background: #e0f2fe; color: #0369a1; }
+
+.dp-ov {
+  background: #f0f9ff; border-left: 3px solid #0ea5e9;
+  border-radius: 0 .45rem .45rem 0; padding: .5rem .625rem; margin-bottom: .55rem;
+}
+.dp-ov-h {
+  font-size: .59375rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: #0369a1;
+}
+.dp-ov-t { font-size: .71875rem; color: #334155; line-height: 1.45; margin-top: .1rem; white-space: pre-line; }
+
+.dp-pt {
+  display: flex; gap: .45rem; align-items: flex-start;
+  border: 1px solid #eef2f7; border-radius: .45rem;
+  padding: .375rem .5rem; margin-bottom: .25rem;
+  font-size: .71875rem; line-height: 1.4;
+}
+.dp-ptn {
+  flex: 0 0 auto; width: .9375rem; height: .9375rem; border-radius: .25rem;
+  background: #e0f2fe; color: #0369a1; font-size: .59375rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; margin-top: .06rem;
+}
+.dp-ptt { flex: 1; min-width: 0; color: #334155; overflow-wrap: anywhere; }
+.dp-stamp {
+  margin-left: auto; font-size: .625rem; color: #0c4a6e; background: #e0f2fe;
+  border-radius: 9999px; padding: .05rem .375rem; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.dp-msgs { margin-top: .5rem; display: flex; flex-direction: column; gap: .25rem; }
+.dp-msg { font-size: .6875rem; line-height: 1.45; padding: .35rem .5rem; border-radius: .4rem; }
+.dp-msg-in { background: #f1f5f9; color: #334155; }
+.dp-msg-out { background: #e0f2fe; color: #0c4a6e; }
+
+.dp-transcript { font-size: .6875rem; color: #475569; white-space: pre-line; line-height: 1.5; }
+.dp-empty { font-size: .71875rem; color: #94a3b8; }
+
+/* Actions, at the foot of every panel and nowhere else. Stacked, not abreast:
+   three buttons across a 360px panel gives each about 110px, which is not
+   enough for a word and a mark. The one you came to press gets the full width
+   and its own line; the rest share the row beneath it. */
+.dp-acts { display: flex; flex-direction: column; gap: 6px; }
+.dp-acts-row { display: flex; gap: 6px; }
+.dp-acts-row > .dp-btn, .dp-acts-row > .dp-form > .dp-btn { flex: 1; min-width: 0; }
+.dp-acts .dp-btn { justify-content: center; }
+.dp-acts > .dp-btn, .dp-acts > .dp-form > .dp-btn {
+  width: 100%; padding: .5rem .625rem; font-size: .75rem;
+}
+.dp-form { display: contents; }
+.dp-btn {
+  font-size: .6875rem; border: 1px solid #cbd5e1; background: #fff; color: #475569;
+  border-radius: .375rem; padding: .3125rem .625rem; cursor: pointer;
+  text-decoration: none; white-space: nowrap; display: inline-flex; align-items: center;
+}
+.dp-btn:hover { background: #f0f9ff; color: #0f172a; }
+.dp-btn-pri { background: #0369a1; border-color: #0369a1; color: #fff; font-weight: 700; }
+.dp-btn-pri:hover { background: #075985; color: #fff; }
+.dp-btn-ghost { border-style: dashed; color: #64748b; }
+
+/* ── Scheduled call panel ────────────────────────────────────────────────
+   A working surface rather than a reading one: header and actions are pinned
+   so they stay reachable mid-call, and only the protocol list scrolls. */
+.dp-call,
+.dp-split { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+
+/* The call/idle rows and the live strip are toggled with the `hidden`
+   attribute, and an author `display: flex` beats the UA rule for [hidden].
+   Without this the panel shows Start call and End call at the same time. */
+.dp-call [hidden], .dp-split [hidden] { display: none !important; }
+.dpc-head { padding: 12px 16px 10px; border-bottom: 1px solid #e2e8f0; flex: 0 0 auto; }
+/* No top padding: a sticky header rests at the scrollport's padding edge, so
+   any padding here becomes a gap that question text scrolls through above the
+   pinned protocol name. Spacing comes off the first child instead. */
+.dpc-body { flex: 1; overflow-y: auto; padding: 0 16px 10px; }
+.dpc-body > *:first-child { margin-top: .625rem; }
+.dpc-foot { padding: 10px 16px; border-top: 1px solid #e2e8f0; flex: 0 0 auto; }
+/* Call actions, immediately after the notes. */
+.dpc-acts { margin-top: .875rem; }
+/* Last contact reads as a quieter clause beside the name it belongs to. */
+.dp-last { color: #64748b; }
+/* Keep "0 of 10 answered" from breaking across a line mid-phrase. */
+.dp-meta .dpc-count { white-space: nowrap; }
+.dpc-row { display: flex; gap: .375rem; align-items: center; }
+.dpc-row + .dpc-row { margin-top: .375rem; }
+.dpc-wide { flex: 1; justify-content: center; }
+.dpc-toaddress { margin-top: .5rem; }
+/* A recording is an attachment on the meeting, so it reads as a footnote to
+   the panel rather than a section competing with the answers. */
+.dpc-attach { font-size: .6875rem; color: #64748b; margin-top: .3125rem; }
+.dp-outcome {
+  flex: 1 1 100%; order: -1; font-size: .6875rem; color: #334155;
+  border: 1px solid #cbd5e1; border-radius: .375rem; padding: .375rem .5rem;
+  margin-bottom: .375rem; background: #fff; font-family: inherit;
+}
+.dp-outcome:focus { outline: 2px solid #0369a1; outline-offset: -1px; }
+.dp-outcome::placeholder { color: #b6c2d0; }
+.dpc-sect {
+  font-size: .59375rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: #94a3b8; margin: .8rem 0 .375rem;
+}
+
+/* Green to dial, red to stop, in the same slot — the phone convention. */
+.dpc-go { background: #16a34a; border-color: #16a34a; color: #fff; font-weight: 700; }
+.dpc-go:hover { background: #15803d; color: #fff; }
+.dpc-stop { background: #dc2626; border-color: #dc2626; color: #fff; font-weight: 700; }
+.dpc-stop:hover { background: #b91c1c; color: #fff; }
+
+.dpc-live {
+  display: flex; align-items: center; gap: .5rem;
+  background: #0369a1; color: #fff; padding: .5rem .875rem; flex: 0 0 auto;
+}
+.dpc-dot { width: 7px; height: 7px; border-radius: 9999px; background: #4ade80; flex: 0 0 auto; }
+.dpc-timer { font-weight: 700; font-size: .84375rem; font-variant-numeric: tabular-nums; }
+.dpc-live small { opacity: .88; font-size: .65625rem; }
+
+.dpc-saved { font-size: .625rem; color: #16a34a; font-weight: 600; }
+.dpc-saved.dpc-saving { color: #94a3b8; }
+
+/* No overflow:hidden on the card — it would create a clipping context and
+   silently break the sticky header. Corners are rounded on the header. */
+.dpc-card { border: 1px solid #e2e8f0; border-radius: .45rem; margin-bottom: .375rem; }
+.dpc-card-h {
+  display: flex; align-items: center; gap: .5rem; width: 100%;
+  padding: .5rem .625rem; background: #f8fbfe; border: 0; border-radius: .4rem;
+  cursor: pointer; text-align: left; font-family: inherit;
+}
+.dpc-card.open > .dpc-card-h { border-radius: .4rem .4rem 0 0; }
+.dpc-body .dpc-card.open > .dpc-card-h {
+  position: sticky; top: 0; z-index: 3;
+  background: #f0f9ff; border-bottom: 1px solid #bae6fd;
+}
+.dpc-chev { color: #94a3b8; font-size: .6875rem; transition: transform .15s ease; }
+.dpc-card.open .dpc-chev { transform: rotate(90deg); }
+.dpc-card-n { font-size: .75rem; font-weight: 600; color: #1e293b; flex: 1; min-width: 0; }
+.dpc-card-b { padding: .625rem; display: none; }
+.dpc-card.open .dpc-card-b { display: block; }
+
+.dpc-pill {
+  font-size: .59375rem; font-weight: 700; padding: .125rem .4375rem;
+  border-radius: 9999px; white-space: nowrap;
+}
+.dpc-pill-todo { background: #f1f5f9; color: #475569; }
+.dpc-pill-part { background: #fffbeb; color: #b45309; }
+.dpc-pill-done { background: #dcfce7; color: #166534; }
+
+.dpc-desc { font-size: .6875rem; color: #64748b; line-height: 1.45; margin-bottom: .5rem; }
+.dpc-q { margin-bottom: .6875rem; }
+.dpc-qp { font-size: .75rem; color: #334155; line-height: 1.5; margin-bottom: .3125rem; }
+.dpc-qp p { margin: 0; }
+.dpc-qp strong { color: #0f172a; }
+.dpc-ta {
+  width: 100%; border: 1px solid #cbd5e1; border-radius: .375rem;
+  padding: .375rem .5rem; font-size: .75rem; color: #334155;
+  font-family: inherit; background: #fff; resize: vertical; min-height: 3.125rem;
+}
+.dpc-ta:focus { outline: 2px solid #0369a1; outline-offset: -1px; border-color: #0369a1; }
+.dpc-ans {
+  font-size: .75rem; color: #334155; background: #f8fafc;
+  border-left: 2px solid #cbd5e1; padding: .3125rem .5rem; border-radius: 0 .25rem .25rem 0;
+}
+.dpc-cardfoot { display: flex; gap: .375rem; align-items: center; }
+
+.dpc-ask { font-size: .75rem; font-weight: 600; color: #1e293b; margin: 0 0 .4375rem; }
+.dpc-covered { font-size: .6875rem; color: #64748b; line-height: 1.5; margin: .4375rem 0 0; }
+.dpc-covered b { color: #334155; font-weight: 600; }
+.dpc-lnk {
+  font-size: .6875rem; color: #0369a1; text-decoration: underline; cursor: pointer;
+  background: none; border: 0; padding: 0; font-family: inherit;
+}
+.dpc-sel {
+  width: 100%; margin-top: .375rem; font-size: .71875rem; color: #334155;
+  border: 1px solid #cbd5e1; border-radius: .375rem; padding: .375rem .5rem;
+  background: #fff; font-family: inherit;
+}
+.dpc-status { font-size: .71875rem; color: #475569; font-weight: 600; }
+
+/* The way out of the panel: full width, centred, ruled off from the actions
+   above it. Outlined rather than filled so it never reads as a sibling of
+   Resolve, or of the red End call it sits under during a call. Taller than the
+   action buttons on purpose — it is the one control people go looking for. */
+/* Navigation, top right beside the close. Quiet on purpose: it is the way out,
+   not the thing you came to do — that lives at the foot. */
+.dp-headgo { margin-left: auto; flex: 0 0 auto; display: flex; gap: 4px; align-items: center; }
+.dp-go {
+  font-size: 11px; font-weight: 600; color: #0369a1;
+  background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px;
+  padding: 4px 9px; text-decoration: none; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.dp-go:hover { background: #e0f2fe; color: #075985; }
+.dp-go:focus-visible { outline: 2px solid #0369a1; outline-offset: 1px; }
+.dp-go .material-icons-outlined { font-size: 13px; }
+/* Below the narrowest useful panel the label goes and the icon carries it. */
+@media (max-width: 400px) { .dp-go-t { display: none; } }
+
+/* Communications, when it has been narrowed to one client. */
+.cm-clear { color: #0369a1; font-weight: 600; text-decoration: underline; margin-left: .25rem; }
+
+/* Notes. Not a protocol, so it sits apart from the accordion rather than
+   inside it, and carries its own save receipt. */
+.dpc-notes-h { display: flex; align-items: center; gap: .5rem; }
+.dpc-notes-h .dpc-saved { text-transform: none; letter-spacing: 0; margin-left: auto; }
+.dpc-notes { min-height: 4.5rem; }
+
+/* ── The item whose panel is currently open ──────────────────────────────
+   Two lists show this state and they should agree: a timeline card, which has
+   its own border to recolour, and a dashboard row, which does not. */
+
+/* Timeline card whose panel is currently open. */
+.tl-card-open { border-color: #0ea5e9 !important; background: #f0f9ff; }
+
+/* Dashboard row, same intent. The stroke is an inset shadow rather than a
+   border because a border adds height to one row and pushes every row below
+   it down by 3px each time the selection moves. */
+.dash-row-open {
+  background: #f0f9ff !important;
+  position: relative;
+}
+/* A rail on the row's own left edge, which is free now that priority has
+   moved into the right-hand columns. Drawn as a pseudo-element rather than a
+   border so selecting a row never changes its height. */
+.dash-row-open::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: #0369a1;
+}
+
+/* An alert nobody has opened yet. Weight alone — the left rail directly above
+   already means "this is the one you have open", and two rails in the same
+   gutter saying different things is worse than no mark at all. */
+.dash-row-new .dash-row-name { font-weight: 700; color: #0f172a; }
+.dash-row:not(.dash-row-new) .dash-row-name { font-weight: 500; color: #64748b; }
+
+/* The split holds down to a phone-ish width because the panel gives ground
+   before the list does (see the clamp in base.html). Below 720px there is no
+   honest split left, so the panel takes the whole viewport and the close
+   control acts as "back" — a full takeover rather than a floating overlay,
+   so nothing is ever half-hidden behind a shadow. */
+@media (max-width: 720px) {
+  .dp { position: fixed; inset: 0; width: 100%; z-index: 60; }
+  .dp-grip { display: none; }
+}
+
+/* Viewport width alone is the wrong test: an expanded 256px nav rail can
+   starve the list on a screen the media query still considers roomy. base.html
+   measures the rail and sets this class when a three-column layout no longer
+   fits, so the takeover happens for the real reason. */
+body.dp-takeover .dp { position: fixed; inset: 0; width: 100%; z-index: 60; }
+body.dp-takeover .dp-grip { display: none; }
+
+/* ── Notifications ───────────────────────────────────────────────────────
+   One component, two sources: the confirmations Django's message framework
+   already writes, and alerts that arrive while you are working. Everything
+   below the toaster is shared by both — a toast does not know or care which
+   one produced it. */
+.toaster {
+  position: fixed; right: 16px; bottom: 16px; z-index: 80;
+  display: flex; flex-direction: column; gap: 8px;
+  width: min(340px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto; position: relative; overflow: hidden;
+  display: flex; gap: 10px; align-items: flex-start;
+  background: #fff; border: 1px solid #e2e8f0; border-left: 3px solid #94a3b8;
+  border-radius: .5rem; padding: 10px 11px 11px;
+  box-shadow: 0 6px 20px -6px rgba(15, 23, 42, .22), 0 2px 5px -2px rgba(15, 23, 42, .1);
+  animation: toast-in .26s cubic-bezier(.2, .8, .3, 1);
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+.toast.toast-out { animation: toast-out .2s ease forwards; }
+@keyframes toast-out { to { opacity: 0; transform: translateY(4px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) {
+  .toast, .toast.toast-out { animation: none !important; }
+}
+
+.toast-ic { flex: 0 0 auto; width: 16px; height: 16px; margin-top: 1px; }
+.toast-tx { min-width: 0; flex: 1; }
+.toast-t { font-size: .78125rem; font-weight: 700; line-height: 1.35; color: #1e293b; }
+.toast-b { font-size: .75rem; color: #64748b; line-height: 1.45; margin-top: 1px; }
+.toast-a {
+  display: inline-flex; margin-top: .4375rem;
+  font-size: .71875rem; font-weight: 700; color: #0369a1;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: inherit; text-decoration: none;
+}
+.toast-a:hover { text-decoration: underline; }
+.toast-x {
+  flex: 0 0 auto; background: none; border: 0; cursor: pointer; padding: 0;
+  width: 18px; height: 18px; border-radius: .3125rem;
+  color: #94a3b8; font-size: .8125rem; line-height: 1; font-family: inherit;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.toast-x:hover { background: #f1f5f9; color: #0f172a; }
+.toast-x:focus-visible, .toast-a:focus-visible {
+  outline: 2px solid #0369a1; outline-offset: 1px;
+}
+
+/* The drain bar doubles as the timer: pausing it on hover is what stops a
+   toast disappearing while it is being read. */
+.toast-bar {
+  position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
+  background: currentColor; opacity: .32; transform-origin: left;
+  animation: toast-drain linear forwards;
+}
+@keyframes toast-drain { to { transform: scaleX(0); } }
+.toast:hover .toast-bar, .toast:focus-within .toast-bar { animation-play-state: paused; }
+
+.toast-ok { border-left-color: #16a34a; color: #15803d; }
+.toast-err { border-left-color: #dc2626; color: #b91c1c; }
+.toast-info { border-left-color: #0369a1; color: #0369a1; }
+.toast-high { border-left-color: #b91c1c; color: #b91c1c; background: #fffafa; }
+.toast-high .toast-t { color: #b91c1c; }
+
+/* Sidebar count. The rail already hides `.sidebar-badge` when collapsed, so
+   the number becomes a dot there — the count is unreadable at that width but
+   "something arrived" still needs to land. */
+.sidebar-item { position: relative; }
+/* Grey, not red, and never animated. A queue of forty never reaches zero, so a
+   red badge that grows is a permanent low-grade reproach rather than a signal.
+   Red is kept for the toast on a genuinely urgent alert, where it means
+   something because it is rare. */
+.sidebar-badge {
+  margin-left: auto; min-width: 1.0625rem; height: 1.0625rem; padding: 0 .3125rem;
+  border-radius: .5625rem; background: #e2e8f0; color: #475569;
+  font-size: .625rem; font-weight: 700; line-height: 1.0625rem; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.sidebar-badge[hidden] { display: none; }
+.sidebar.collapsed .sidebar-item:has(.sidebar-badge:not([hidden]))::before {
+  content: ""; position: absolute; top: .375rem; right: .375rem;
+  width: .4375rem; height: .4375rem; border-radius: 50%; background: #94a3b8;
+}
+
+.nl-opt {
+  width: 100%; text-align: left; font-size: .8125rem; color: #374151;
+  padding: .375rem .625rem; border: 0; background: none; border-radius: .375rem;
+  cursor: pointer; font-family: inherit;
+}
+.nl-opt:hover { background: #f1f5f9; }
+.nl-opt[aria-pressed="true"] { background: #f0f9ff; color: #0369a1; font-weight: 700; }
+
+
+/* ── Communications list ─────────────────────────────────────────────────
+   Shared by the cross-client Communications page and the Communications
+   tab on a client's own page. The two differ in what a row leads with,
+   not in how the list works — see templates/communications/_list.html. */
+  .cm-hd { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 2px; }
+  .cm-hd h1 { font-size: 29px; font-weight: 600; color: #1f2937; letter-spacing: -.01em; margin: 0; }
+  .cm-sub { font-size: 13.5px; color: #475569; margin: 2px 0 0; }
+  .cm-new {
+    margin-left: auto; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 700; color: #fff; background: #0369a1;
+    border: 0; border-radius: 8px; padding: 9px 14px; cursor: pointer;
+  }
+  .cm-new:hover { background: #075985; }
+  .cm-new .material-icons-outlined { font-size: 17px; }
+
+  .cm-box { background: #fff; border: 1px solid #e8f1fb; border-radius: 12px; overflow: hidden; margin-top: 16px; }
+
+  .cm-tabs { display: flex; gap: 2px; border-bottom: 1px solid #e2e8f0; padding: 0 16px; }
+  .cm-tab {
+    font-size: 13.5px; font-weight: 600; color: #64748b; text-decoration: none;
+    border-bottom: 2px solid transparent; padding: 11px 14px; margin-bottom: -1px;
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .cm-tab:hover { color: #1e293b; }
+  .cm-tab.on { color: #0369a1; border-bottom-color: #0369a1; font-weight: 700; }
+  .cm-tab .c {
+    font-size: 11px; font-weight: 700; background: #f1f5f9; color: #64748b;
+    border-radius: 9999px; padding: 1px 8px; font-variant-numeric: tabular-nums;
+  }
+  .cm-tab.on .c { background: #e0f2fe; color: #0369a1; }
+  .cm-warn { width: 6px; height: 6px; border-radius: 50%; background: #b91c1c; }
+
+  .cm-tools {
+    display: flex; gap: 7px; align-items: center; flex-wrap: wrap;
+    padding: 10px 16px; background: #f8fbfe; border-bottom: 1px solid #f1f5f9;
+  }
+  .cm-find {
+    flex: 1; min-width: 130px; font-size: 12.5px; color: #475569; background: #fff;
+    border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px;
+  }
+  .cm-find:focus { outline: 2px solid #0369a1; outline-offset: -1px; }
+  .cm-chip {
+    font-size: 11.5px; font-weight: 600; color: #475569; background: #fff;
+    border: 1px solid #e2e8f0; border-radius: 9999px; padding: 5px 12px;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .cm-chip:hover { border-color: #7dd3fc; }
+  .cm-chip.on { background: #f0f9ff; border-color: #7dd3fc; color: #0c4a6e; }
+  .cm-chip .n { font-size: 10.5px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+  .cm-chip.on .n { color: #0369a1; }
+
+  .cm-tools-when { background: #fff; border-bottom: 1px solid #f1f5f9; }
+  .cm-when-lab { font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
+                 text-transform: uppercase; color: #94a3b8; }
+
+  /* The day header is the control for its own day: the whole strip is the
+     hit area, so folding a busy Tuesday away is one click on the date. */
+  .cm-day {
+    position: sticky; top: 0; z-index: 2; background: #fff; width: 100%;
+    display: flex; align-items: center; gap: 8px; padding: 10px 18px 8px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: #94a3b8; border: 0; border-bottom: 1px solid #f1f5f9;
+    text-align: left; cursor: pointer; font-family: inherit;
+  }
+  .cm-day:hover { background: #f8fbfe; color: #475569; }
+  .cm-day:focus-visible { outline: 2px solid #0369a1; outline-offset: -2px; }
+  .cm-chev { font-size: 16px !important; color: #cbd5e1; transition: transform .15s ease; }
+  .cm-day:hover .cm-chev { color: #64748b; }
+  .cm-day[aria-expanded="false"] .cm-chev { transform: rotate(-90deg); }
+  .cm-dayrows[hidden] { display: none; }
+  @media (prefers-reduced-motion: reduce) { .cm-chev { transition: none; } }
+  .cm-day .rel { color: #0369a1; font-size: 11px; letter-spacing: 0; text-transform: none; }
+  .cm-day .n { margin-left: auto; color: #cbd5e1; letter-spacing: 0; text-transform: none;
+               font-variant-numeric: tabular-nums; }
+
+  .cm-row {
+    display: flex; align-items: center; gap: 12px; padding: 11px 18px;
+    border-bottom: 1px solid #f4f7fb; position: relative; text-decoration: none;
+  }
+  .cm-row:hover { background: #fafcff; }
+  .cm-row-open { background: #f0f9ff; }
+  .cm-row-open::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+                         width: 3px; background: #0369a1; }
+
+  /* Something the system produced that nobody has opened yet.
+     Weight alone, the way an inbox does it. A tint and a left edge were both
+     tried and both read as selection — the one thing this must not say, since
+     the selected row uses exactly that device in the two rules above. */
+  .cm-row-new .cm-who { font-weight: 700; color: #0f172a; }
+  .cm-row-new .cm-l2 { color: #475569; }
+  /* Read: lighter than the default, so the difference is visible scanning down
+     the list rather than only when two rows sit side by side. */
+  .cm-row:not(.cm-row-new) .cm-who { font-weight: 500; color: #64748b; }
+  .cm-ic {
+    flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .cm-ic .material-icons-outlined { font-size: 16px; }
+  .cm-ic-call { background: #eff6ff; color: #1d4ed8; }
+  .cm-ic-visit { background: #fff7ed; color: #c2410c; }
+  .cm-ic-chat { background: #f0fdf4; color: #15803d; }
+  .cm-ic-alert { background: #fef2f2; color: #b91c1c; }
+  .cm-ic-other { background: #f5f3ff; color: #6d28d9; }
+
+  .cm-main { flex: 1; min-width: 0; }
+  .cm-l1 { display: flex; align-items: center; gap: 8px; }
+  .cm-who { min-width: 0; font-weight: 600; font-size: 14px; color: #1e293b;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cm-l2 { display: block; font-size: 12px; color: #64748b; margin-top: 1px;
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cm-l2 b { color: #475569; font-weight: 600; }
+  .cm-tag { flex: 0 0 auto; font-size: 10px; font-weight: 700; padding: 2px 8px;
+            border-radius: 9999px; white-space: nowrap; }
+  .cm-tag-late { background: #fef2f2; color: #b91c1c; }
+  .cm-tag-todo { background: #f0f9ff; color: #0369a1; }
+  .cm-tag-high { background: #fef2f2; color: #b91c1c; }
+  .cm-tag-med  { background: #fffbeb; color: #b45309; }
+  .cm-tag-low  { background: #f0f9ff; color: #0369a1; }
+
+  .cm-right { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .cm-when { font-size: 12.5px; font-weight: 600; color: #475569; white-space: nowrap;
+             font-variant-numeric: tabular-nums; }
+  .cm-when-late { color: #b91c1c; }
+  .cm-sub2 { font-size: 10.5px; color: #94a3b8; white-space: nowrap;
+             display: flex; align-items: center; gap: 5px; }
+  .cm-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+  .cm-dot-done { background: #16a34a; }
+  .cm-dot-int  { background: #f59e0b; }
+  .cm-dot-no   { background: #94a3b8; }
+
+  .cm-empty { padding: 40px 18px; text-align: center; color: #94a3b8; font-size: 13px; }
+
+  .cm-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+             padding: 11px 18px; border-top: 1px solid #f1f5f9; }
+  .cm-count { font-size: 12px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+  .cm-pg { margin-left: auto; display: flex; align-items: center; gap: 3px; }
+  .cm-pg-n, .cm-pg-a {
+    min-width: 28px; height: 28px; display: inline-flex; align-items: center;
+    justify-content: center; font-size: 12px; font-weight: 600; color: #475569;
+    border-radius: 7px; text-decoration: none; font-variant-numeric: tabular-nums;
+  }
+  .cm-pg-n:hover, .cm-pg-a:hover { background: #f0f9ff; color: #0f172a; }
+  .cm-pg-n.on { background: #0369a1; color: #fff; font-weight: 700; }
+  .cm-pg-a.is-off { color: #cbd5e1; pointer-events: none; }
+  /* Given a number's width so the arrows never shift as you click through. */
+  .cm-pg-dots { min-width: 28px; height: 28px; display: inline-flex; align-items: center;
+                justify-content: center; color: #cbd5e1; font-size: 12px; }
+
+  /* Scheduling, in place. A new call is a small form and never needed a page
+     of its own; leaving the list behind to fill in four fields lost your place
+     and your filters. */
+  .cm-modal[hidden] { display: none; }
+  .cm-modal {
+    position: fixed; inset: 0; z-index: 90; display: flex;
+    align-items: center; justify-content: center; padding: 20px;
+    background: rgba(15, 23, 42, .45);
+  }
+  .cm-dialog {
+    background: #fff; border-radius: 14px; width: min(460px, 100%);
+    max-height: calc(100vh - 40px); overflow-y: auto;
+    box-shadow: 0 24px 60px -12px rgba(15, 23, 42, .4);
+  }
+  .cm-dialog-h { display: flex; align-items: flex-start; gap: 10px;
+                 padding: 18px 20px 0; }
+  .cm-dialog-h h2 { font-size: 17px; font-weight: 700; color: #1e293b; margin: 0; }
+  .cm-dialog-h p { font-size: 12.5px; color: #64748b; margin: 2px 0 0; }
+  .cm-dialog-x { margin-left: auto; background: none; border: 0; cursor: pointer;
+                 color: #94a3b8; font-size: 16px; line-height: 1; padding: 2px 4px;
+                 border-radius: 6px; }
+  .cm-dialog-x:hover { background: #f1f5f9; color: #0f172a; }
+  .cm-form { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 13px; }
+  .cm-field label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+                    text-transform: uppercase; color: #64748b; margin-bottom: 5px; }
+  .cm-field input, .cm-field select {
+    width: 100%; font-size: 13.5px; color: #1e293b; background: #fff;
+    border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; font-family: inherit;
+  }
+  .cm-field input:focus, .cm-field select:focus { outline: 2px solid #0369a1; outline-offset: -1px; }
+  .cm-field .err { font-size: 11.5px; color: #b91c1c; margin-top: 4px; }
+  .cm-field .hint { font-size: 11.5px; color: #94a3b8; margin-top: 4px; }
+  .cm-dialog-f { display: flex; gap: 8px; justify-content: flex-end; padding-top: 3px; }
+  .cm-btn { font-size: 13px; font-weight: 600; border-radius: 8px; padding: 9px 16px;
+            cursor: pointer; border: 1px solid #cbd5e1; background: #fff; color: #475569;
+            font-family: inherit; }
+  .cm-btn:hover { background: #f0f9ff; color: #0f172a; }
+  .cm-btn-pri { background: #0369a1; border-color: #0369a1; color: #fff; font-weight: 700; }
+  .cm-btn-pri:hover { background: #075985; color: #fff; }
+
+/* ── Client page chrome ──────────────────────────────────────────────────
+   The tabs and the avatar. These used to live in patients/_timeline_styles
+   alongside the month/week accordion, which the shared Communications list
+   replaced — the accordion went with it, these stayed. */
+  .pd-tabs { display: flex; gap: 1.4rem; border-bottom: 1px solid #e2e8f0; margin-bottom: 1.25rem; }
+  .pd-tab-btn { border: 0; background: none; cursor: pointer; padding: 0 0 .6rem; font-size: .9rem;
+    color: #64748b; display: inline-flex; align-items: center; gap: .4rem; }
+  .pd-tab-btn:hover { color: #0f172a; }
+  .pd-tab-btn.active { color: #0369a1; font-weight: 600; box-shadow: inset 0 -2px 0 #0369a1; }
+  .pd-tab-n { font-size: .68rem; background: #eef2f7; color: #475569; border-radius: 9999px; padding: 0 .4rem; }
+  .pd-tab-btn.active .pd-tab-n { background: #e0f2fe; color: #0369a1; }
+  .pd-icon { display: inline-flex; align-items: center; justify-content: center; border-radius: .5rem; padding: .5rem; flex-shrink: 0; }
+  .pd-avatar { width: 3rem; height: 3rem; border-radius: .7rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.1rem; font-weight: 600; }
+
+/* The client's name, the two or three facts you came for, and the one button
+   that edits the record. */
+.pd-hd { display: flex; align-items: flex-start; gap: .8125rem; margin-bottom: 1.25rem; }
+.pd-hd-main { flex: 1; min-width: 0; }
+.pd-hd-name {
+  font-size: 1.8125rem; font-weight: 600; color: #1f2937;
+  letter-spacing: -.01em; margin: 0; line-height: 1.2;
+}
+.pd-hd-meta {
+  display: flex; gap: .4375rem .9375rem; flex-wrap: wrap; margin-top: .4375rem;
+  font-size: .75rem; color: #64748b;
+}
+.pd-hd-meta span { display: inline-flex; align-items: center; gap: .3125rem; min-width: 0; }
+.pd-hd-meta b { color: #1e293b; font-weight: 600; }
+.pd-hd-meta .material-icons-outlined { font-size: .8125rem; opacity: .55; }
+.pd-hd-edit { flex: 0 0 auto; }
+.pd-hd-edit .material-icons-outlined { font-size: .875rem; }
+.pd-hd-edit[hidden] { display: none; }
+@media (max-width: 560px) {
+  .pd-hd { flex-wrap: wrap; }
+  .pd-hd-edit { flex: 1 1 100%; }
+}
+
+/* ── Client page: who this person is ─────────────────────────────────────
+   One block for the caregiver, the numbers, the agent, their stated terms and
+   the background — they all answer the same question, and four headed boxes of
+   equal weight answered it four times. Everything shown is stored. */
+.pd-about {
+  border: 1px solid #e2e8f0; border-radius: .75rem; overflow: hidden;
+  background: #fff; margin-bottom: 1.125rem;
+}
+/* Borders on the cells rather than a grid gap over a coloured background: a
+   row that does not fill left the background showing through as a grey slab. */
+.pd-dl {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0; background: #fff; margin: 0;
+}
+.pd-dl > div {
+  background: #fff; padding: .6875rem .875rem; min-width: 0;
+  border-right: 1px solid #e2e8f0; border-top: 1px solid #e2e8f0;
+}
+.pd-dl > div:nth-child(-n+3) { border-top: 0; }
+.pd-dl > div:nth-child(3n) { border-right: 0; }
+.pd-dl dt {
+  font-size: .625rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: #94a3b8; margin: 0 0 .1875rem;
+}
+.pd-dl dd {
+  margin: 0; font-size: .8125rem; color: #1e293b; font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.pd-dl dd small {
+  display: block; font-weight: 400; color: #64748b; font-size: .71875rem;
+}
+.pd-none { color: #94a3b8; font-weight: 400; }
+
+/* The caregiver reads as a person: who they are to the client, and whether
+   they are the one who actually answers. */
+.pd-cg { display: block; }
+.pd-cg-tx { min-width: 0; }
+.pd-cg-nm { display: block; font-size: .8125rem; font-weight: 600; }
+.pd-cg-rel { display: block; font-size: .71875rem; color: #64748b; }
+.pd-cg-rel i { color: #94a3b8; }
+.pd-cg-edit { display: flex; flex-direction: column; gap: .25rem; margin-top: .25rem; }
+/* An author `display` beats the UA rule for [hidden], so without this the edit
+   fields sit visible underneath the values they are meant to replace. */
+.pd-about [hidden] { display: none !important; }
+
+.pd-in, .pd-sel {
+  width: 100%; font-family: inherit; font-size: .78125rem; color: #1e293b;
+  background: #fff; border: 1px solid #cbd5e1; border-radius: .4375rem;
+  padding: .3125rem .5rem;
+}
+.pd-sel { padding-right: 1.5rem; cursor: pointer; appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2364748b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right .5rem center; }
+.pd-in:focus, .pd-sel:focus { outline: 2px solid #0369a1; outline-offset: -1px; }
+
+/* Their own terms. The note underneath says what scheduling does with them —
+   without it these are decoration implying a promise nobody keeps. */
+.pd-terms { padding: .75rem .875rem; border-top: 1px solid #e2e8f0; }
+.pd-terms-h {
+  font-size: .625rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: #94a3b8; margin: 0 0 .4375rem;
+}
+.pd-chips { display: flex; gap: .375rem; flex-wrap: wrap; }
+.pd-chip {
+  display: inline-flex; align-items: center; gap: .375rem; cursor: pointer;
+  font-size: .71875rem; font-weight: 600; color: #94a3b8;
+  border: 1px solid #e2e8f0; background: #fff; border-radius: 9999px;
+  padding: .3125rem .6875rem;
+}
+.pd-chip:hover { border-color: #7dd3fc; color: #475569; }
+.pd-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.pd-chip .material-icons-outlined { font-size: .6875rem; opacity: 0; }
+.pd-chip.on { background: #eef2ff; border-color: #c7d2fe; color: #4338ca; }
+.pd-chip.on .material-icons-outlined { opacity: 1; }
+.pd-chip:focus-within { outline: 2px solid #0369a1; outline-offset: 1px; }
+/* Adding one looks like the chips it joins, so it reads as "another of these"
+   rather than as a form field that wandered in. */
+.pd-chip-add { display: inline-flex; }
+.pd-newterm {
+  font-family: inherit; font-size: .71875rem; font-weight: 600; color: #4338ca;
+  border: 1px dashed #c7d2fe; background: #fff; border-radius: 9999px;
+  padding: .3125rem .6875rem; width: 9.5rem;
+}
+.pd-newterm::placeholder { color: #a5b4fc; font-weight: 600; }
+.pd-newterm:focus { outline: 2px solid #0369a1; outline-offset: 1px; border-style: solid; }
+
+.pd-bg { padding: .8125rem .875rem; border-top: 1px solid #e2e8f0; }
+.pd-bg-h {
+  display: flex; align-items: center; gap: .5rem;
+  font-size: .625rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: #94a3b8; margin: 0 0 .375rem;
+}
+.pd-lnk { margin-left: auto; font-size: .6875rem; font-weight: 600; color: #0369a1;
+          text-transform: none; letter-spacing: 0; }
+.pd-lnk:hover { text-decoration: underline; }
+
+.pd-about-f {
+  display: flex; justify-content: flex-end; gap: .375rem;
+  padding: .625rem .875rem; border-top: 1px solid #e2e8f0; background: #fbfdff;
+}
+.pd-about-f[hidden] { display: none; }
+.pd-btn {
+  font-family: inherit; font-size: .78125rem; font-weight: 600; cursor: pointer;
+  border: 1px solid #cbd5e1; background: #fff; color: #475569;
+  border-radius: .5rem; padding: .375rem .75rem; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: .375rem;
+}
+.pd-btn:hover { background: #f0f9ff; color: #0f172a; }
+.pd-btn-pri { background: #0369a1; border-color: #0369a1; color: #fff; font-weight: 700; }
+.pd-btn-pri:hover { background: #075985; color: #fff; }
+
+.pd-sec { margin-bottom: 1.125rem; }
+.pd-sect {
+  display: flex; align-items: center; gap: .5rem;
+  font-size: .65625rem; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: #94a3b8; margin: 0 0 .5rem;
+}
+.pd-sect-r {
+  margin-left: auto; font-size: .6875rem; font-weight: 400;
+  letter-spacing: 0; text-transform: none; color: #94a3b8;
+}
+.pd-box { background: #fff; border: 1px solid #e2e8f0; border-radius: .625rem; padding: .5rem .9375rem; }
+
+.pd-pr { display: flex; align-items: center; gap: .6875rem; padding: .5625rem 0;
+         font-size: .8125rem; color: inherit; text-decoration: none; }
+.pd-pr:hover { color: #0369a1; }
+.pd-pr:hover .pd-pr-go { color: #0369a1; }
+.pd-pr-go { font-size: 1rem !important; color: #cbd5e1; flex: 0 0 auto; }
+.pd-pr + .pd-pr { border-top: 1px solid #f4f7fb; }
+.pd-pr-n {
+  flex: 0 0 auto; width: 1.375rem; height: 1.375rem; border-radius: .375rem;
+  background: #eff6ff; color: #1d4ed8; font-size: .6875rem; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pd-pr-nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pd-pr-ct { flex: 0 0 auto; font-size: .75rem; color: #475569; font-variant-numeric: tabular-nums; }
+
+.pd-ta {
+  width: 100%; font-family: inherit; font-size: .8125rem; color: #334155;
+  border: 1px solid #cbd5e1; border-radius: .5rem; padding: .5625rem .6875rem;
+  resize: vertical; min-height: 4.625rem; background: #fff;
+}
+.pd-ta:focus { outline: 2px solid #0369a1; outline-offset: -1px; }
+.pd-ta::placeholder { color: #b6c2d0; }
+.pd-saved { font-size: .6875rem; color: #15803d; margin-top: .375rem; }
+
+.pd-drop {
+  display: flex; align-items: center; gap: .6875rem; padding: .875rem; cursor: pointer;
+  border: 1px dashed #cbd5e1; border-radius: .625rem; background: #fbfdff;
+}
+.pd-drop:hover { border-color: #7dd3fc; background: #f8fbff; }
+.pd-drop .material-icons-outlined { font-size: 1.1875rem; color: #94a3b8; flex: 0 0 auto; }
+.pd-drop-tx { flex: 1; min-width: 0; }
+.pd-drop-1 { display: block; font-size: .8125rem; font-weight: 600; color: #334155; }
+.pd-drop-2 { display: block; font-size: .71875rem; color: #94a3b8; margin-top: .0625rem; }
+
+.pd-file {
+  display: flex; align-items: center; gap: .6875rem; padding: .6875rem .8125rem;
+  border: 1px solid #e2e8f0; border-radius: .625rem; background: #fff;
+}
+.pd-pdf {
+  flex: 0 0 auto; width: 1.875rem; height: 1.875rem; border-radius: .4375rem;
+  background: #fef2f2; color: #b91c1c; font-size: .5625rem; font-weight: 800;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pd-file-tx { flex: 1; min-width: 0; }
+.pd-file-n { display: block; font-size: .8125rem; font-weight: 600;
+             overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pd-file-s { display: block; font-size: .71875rem; color: #64748b; margin-top: .0625rem; }
+.pd-file-a { flex: 0 0 auto; display: flex; gap: .375rem; }
+
+@media (max-width: 900px) {
+  .pd-dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pd-dl > div:nth-child(-n+3) { border-top: 1px solid #e2e8f0; }
+  .pd-dl > div:nth-child(-n+2) { border-top: 0; }
+  .pd-dl > div:nth-child(3n) { border-right: 1px solid #e2e8f0; }
+  .pd-dl > div:nth-child(2n) { border-right: 0; }
+}
+@media (max-width: 560px) {
+  .pd-file-a { flex-direction: column; }
+  .pd-about-f { flex-wrap: wrap; }
+}
+
+/* ── Panel: the review at the end of a conversation ───────────────────────── */
+/* The judgement is on the exchange as a whole, so it sits after the last
+   message rather than beside each one. */
+.dp-rev { margin-top: 14px; padding-top: 13px; border-top: 1px solid #e6edf5; }
+.dp-rev-h {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: #64748b; margin-bottom: 9px;
+}
+.dp-rev-h2 { margin-top: 14px; }
+.dp-stars { display: flex; align-items: center; gap: 2px; margin-bottom: 9px; }
+.dp-star {
+  width: 23px; height: 23px; padding: 2px; border: 0; background: none;
+  cursor: pointer; line-height: 0; color: #e2e8f0;
+}
+/* Drawn in CSS so the panel carries no icon font it would otherwise need. */
+.dp-star::before {
+  content: "★"; font-size: 18px; line-height: 1; color: currentColor;
+}
+.dp-star:hover { color: #fbbf24; }
+.dp-star.on { color: #f59e0b; }
+.dp-stars-n { margin-left: 7px; font-size: 11px; color: #94a3b8; }
+.dp-rev-t { width: 100%; }
+.dp-flags { display: flex; flex-direction: column; gap: 5px; }
+.dp-flag {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 12px; color: #334155; background: #fff;
+  border: 1px solid #e6edf5; border-radius: 8px; padding: 7px 10px; cursor: pointer;
+}
+.dp-flag:hover { background: #fafcff; }
+.dp-flag input { width: 15px; height: 15px; flex: 0 0 auto; accent-color: #0369a1; margin: 0; }
+.dp-hint { font-size: 10.5px; line-height: 1.5; color: #94a3b8; margin-top: 8px; }
+.dp-rated { display: none; }
+
+/* ── Panel: actions that need something from you first ────────────────────── */
+.dp-btn-danger { border-color: #fecaca; color: #b91c1c; }
+.dp-btn-danger:hover { background: #fef2f2; }
+
+.dp-dialog {
+  border: 0; border-radius: 12px; padding: 0; width: min(400px, calc(100vw - 32px));
+  box-shadow: 0 18px 48px rgba(15, 23, 42, .24); color: #0f172a;
+}
+.dp-dialog::backdrop { background: rgba(15, 23, 42, .42); }
+.dp-dialog form { padding: 16px 18px 13px; }
+.dp-dialog h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.dp-dialog-sub { margin: 4px 0 14px; font-size: 12px; line-height: 1.5; color: #64748b; }
+.dp-fld { display: block; margin-bottom: 12px; }
+.dp-fld > span {
+  display: block; margin-bottom: 5px;
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: #334155;
+}
+.dp-fld input, .dp-fld select, .dp-fld textarea {
+  font: inherit; font-size: 12.5px; color: #0f172a; width: 100%; box-sizing: border-box;
+  border: 1px solid #e6edf5; border-radius: 7px; padding: 8px 10px; background: #fff;
+}
+.dp-fld textarea { resize: vertical; min-height: 66px; }
+.dp-fld input:focus, .dp-fld select:focus, .dp-fld textarea:focus {
+  outline: 2px solid #bae6fd; outline-offset: -1px; border-color: #7dd3fc;
+}
+.dp-dialog-f {
+  display: flex; gap: 7px; justify-content: flex-end;
+  margin: 4px -18px -13px; padding: 11px 18px;
+  border-top: 1px solid #e6edf5; background: #fbfdff;
+}
+.dp-dialog-f .dp-btn { flex: 0 0 auto; }
+
+/* An action that belongs to the section it sits in rather than to the footer. */
+.dp-inline-form { margin-top: 6px; }
+
+/* Sending the care plan sits under the file it sends, not in a toolbar. */
+.pd-cp-send { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.pd-cp-send .pd-btn { display: inline-flex; align-items: center; gap: 6px; }
+.pd-cp-send .material-icons-outlined { font-size: 15px; }
+.pd-cp-note { font-size: 11.5px; color: #94a3b8; }
+
+/* Status beside the title, in the exact values the dashboard and Communications
+   rows use — an alert must not change colour on its way into the panel. */
+.dp-tag {
+  display: inline-flex; align-items: center;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 9999px;
+  white-space: nowrap; margin-left: 6px; vertical-align: 1px;
+}
+.dp-tag-high { background: #fef2f2; color: #b91c1c; }
+.dp-tag-med  { background: #fffbeb; color: #b45309; }
+.dp-tag-low  { background: #f0f9ff; color: #0369a1; }
+.dp-tag-todo { background: #f0f9ff; color: #0369a1; }
+.dp-tag-done { background: #dcfce7; color: #166534; }
+.dp-tag-int  { background: #fffbeb; color: #b45309; }
+
+/* Key/value list, used by the alert's technical record. */
+.dp-kv { margin: 0; font-size: .6875rem; }
+.dp-kv > div {
+  display: flex; gap: .75rem; justify-content: space-between;
+  padding: .3125rem 0; border-bottom: 1px solid #f1f5f9;
+}
+.dp-kv > div:last-child { border-bottom: 0; }
+.dp-kv dt { color: #94a3b8; flex: 0 0 auto; }
+.dp-kv dd { margin: 0; color: #334155; text-align: right; word-break: break-word; }
+
+/* A disabled action has to look disabled. Start call renders disabled whenever
+   a phone number is missing for the navigator or the caregiver, and until now
+   it was indistinguishable from one that would work. */
+.dp-btn:disabled,
+.dp-btn[disabled] {
+  opacity: .5;
+  cursor: not-allowed;
+  background: #f8fafc;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+}
+.dp-btn:disabled:hover { background: #f8fafc; color: #94a3b8; }
+
+/* The calendar event whose panel is open, marked the same way a list row is. */
+.cal-ev-open, .cal-chip.cal-ev-open {
+  background: #0369a1 !important;
+  color: #fff !important;
+  border-color: #0369a1 !important;
+}
+
+/* A cancelled call. It stays in the history because it was arranged — the
+   stroke says it deliberately did not happen, which is a different fact from
+   a call that was never scheduled at all. */
+.cm-row-off .cm-who,
+.cm-row-off .cm-l2 b { text-decoration: line-through; text-decoration-thickness: 1px; }
+.cm-row-off .cm-who,
+.cm-row-off .cm-l2,
+.cm-row-off .cm-when { color: #94a3b8; }
+.cm-row-off .cm-ic { background: #f8fafc; color: #cbd5e1; }
+.cm-dot-off { background: #cbd5e1; }
+.dp-tag-off { background: #f1f5f9; color: #64748b; }
+
+/* Same in the calendar, where a cancelled slot must not read as free. */
+.cal-chip-off, .cal-ev-off {
+  text-decoration: line-through;
+  background: #f1f5f9 !important;
+  color: #94a3b8 !important;
+  border-color: #e2e8f0 !important;
+}

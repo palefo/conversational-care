@@ -1,0 +1,1385 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}{% trans "Clients" %}{% endblock %}
+
+{% block content %}
+<style>
+  .pac-toolbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  .pac-toolbar-left,
+  .pac-filter-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .pac-search-wrap,
+  .pac-dropdown-wrap {
+    position: relative;
+  }
+
+  .pac-search-wrap {
+    min-width: 280px;
+    max-width: 520px;
+    width: 100%;
+  }
+
+  .pac-search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1rem;
+    height: 1rem;
+    color: #9ca3af;
+    pointer-events: none;
+  }
+
+  .pac-search-input,
+  .pac-filter-search,
+  .pac-per-page select {
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background: #fff;
+    color: #374151;
+    font-size: 0.875rem;
+    outline: none;
+  }
+
+  .pac-search-input {
+    width: 100%;
+    padding: 0.55rem 0.75rem 0.55rem 2.25rem;
+  }
+
+  .pac-filter-search {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .pac-search-input:focus,
+  .pac-filter-search:focus,
+  .pac-per-page select:focus {
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+  }
+
+  .pac-dropdown-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background: #fff;
+    color: #4b5563;
+    font-size: 0.875rem;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .pac-dropdown-btn:hover,
+  .pac-dropdown-btn.active {
+    border-color: #0ea5e9;
+    color: #0369a1;
+    background: #f0f9ff;
+  }
+
+  .pac-dropdown-btn svg,
+  .pac-search-icon {
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+
+  .pac-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.1rem;
+    height: 1.1rem;
+    padding: 0 0.3rem;
+    border-radius: 9999px;
+    background: #0284c7;
+    color: #fff;
+    font-size: 0.625rem;
+    font-weight: 600;
+  }
+
+  .pac-filter-summary {
+    margin-top: 0.25rem;
+    color: #6b7280;
+    font-size: 0.7rem;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .pac-filter-summary strong {
+    color: #374151;
+    font-weight: 600;
+  }
+
+  .pac-suggestions,
+  .pac-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    left: 0;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+    z-index: 40;
+    display: none;
+  }
+
+  .pac-suggestions.open,
+  .pac-dropdown-menu.open {
+    display: block;
+  }
+
+  .pac-suggestions {
+    right: 0;
+    overflow: hidden;
+  }
+
+  .pac-suggestion {
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+  }
+
+  .pac-suggestion:hover,
+  .pac-suggestion.active,
+  .pac-option-row:hover {
+    background: #f9fafb;
+  }
+
+  .pac-suggestion-type,
+  .pac-dropdown-title,
+  .pac-active-label,
+  .pac-empty-opts,
+  .pac-suggestion-empty {
+    color: #6b7280;
+    font-size: 0.75rem;
+  }
+
+  .pac-dropdown-menu {
+    width: 19rem;
+    overflow: hidden;
+  }
+
+  .pac-dropdown-body {
+    padding: 0.75rem;
+  }
+
+  .pac-dropdown-title {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .pac-selected-tags,
+  .pac-token-bar,
+  .pac-active-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .pac-token-bar,
+  .pac-active-filters {
+    margin-bottom: 0.75rem;
+  }
+
+  .pac-token-chip,
+  .pac-filter-chip,
+  .pac-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.25rem 0.6rem;
+    background: #e0f2fe;
+    color: #075985;
+    border: 1px solid #bae6fd;
+  }
+
+  .pac-token-chip button,
+  .pac-filter-chip button,
+  .pac-tag-chip button,
+  .pac-clear-all {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+  }
+
+  .pac-clear-all {
+    color: #6b7280;
+    padding: 0.25rem 0.3rem;
+  }
+
+  .pac-clear-all:hover {
+    color: #111827;
+  }
+
+  .pac-option-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    max-height: 12rem;
+    overflow-y: auto;
+  }
+
+  .pac-option-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .pac-option-row.selected {
+    background: #f0f9ff;
+    color: #075985;
+  }
+
+  .pac-option-row input {
+    accent-color: #0284c7;
+  }
+
+  .pac-th-inner {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .pac-sort-arrow {
+    display: inline-block;
+    min-width: 0.75rem;
+    color: #9ca3af;
+    font-size: 0.8rem;
+    line-height: 1;
+  }
+
+  th.pac-sorted .pac-sort-arrow {
+    color: #0369a1;
+  }
+
+  th.pac-sortable {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  th.pac-sortable:hover,
+  th.pac-sorted {
+    color: #0369a1;
+  }
+
+  .pac-click-link {
+    color: inherit;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .pac-avatar {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 0.72rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+
+  .pac-call-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .pac-call-cell .material-icons-outlined {
+    font-size: 1rem;
+  }
+
+  .pac-clickable-row {
+    cursor: pointer;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+  }
+
+  .pac-clickable-row:hover {
+    background: #f8fbfd;
+  }
+
+  .pac-clickable-row:hover td {
+    opacity: 0.92;
+  }
+
+  .pac-table-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+    color: #6b7280;
+    font-size: 0.875rem;
+  }
+
+  .pac-footer-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .pac-per-page,
+  .pac-pagination {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .pac-per-page select {
+    padding: 0.35rem 0.5rem;
+  }
+
+  .pac-page-btn {
+    min-width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background: #fff;
+    color: #4b5563;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .pac-page-btn:hover:not(:disabled) {
+    background: #f9fafb;
+  }
+
+  .pac-page-btn.active {
+    background: #0284c7;
+    color: #fff;
+    border-color: #0284c7;
+  }
+
+  .pac-page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .pac-page-dots {
+    padding: 0 0.2rem;
+    color: #9ca3af;
+  }
+
+  #showingText {
+    white-space: nowrap;
+  }
+
+  .pac-empty-state {
+    padding: 2.5rem 1.5rem;
+    color: #6b7280;
+    text-align: center;
+  }
+
+  .client-modal input:not([type=checkbox]):not([type=radio]),
+  .client-modal select,
+  .client-modal textarea {
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid #d1d5db;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    background: #fff;
+    color: #111827;
+  }
+
+  .client-modal input:focus,
+  .client-modal select:focus,
+  .client-modal textarea:focus {
+    outline: none;
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+  }
+</style>
+
+<header class="flex justify-between items-start mb-6">
+  <div>
+    <h1 class="text-3xl font-semibold text-gray-800">{% trans "Clients" %}</h1>
+    <p class="text-gray-500" id="subtitleCount">0 {% trans "clients" %}</p>
+  </div>
+  <button type="button" onclick="clientOpen()" class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+    <span class="material-icons-outlined text-base">person_add</span>{% trans "Add client" %}
+  </button>
+</header>
+
+<div class="pac-toolbar">
+  <div class="pac-toolbar-left flex-1">
+    <div class="pac-search-wrap">
+      <svg class="pac-search-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+      </svg>
+
+      {# Search placeholder includes navigator only for staff. #}
+      {% if request.user.is_staff %}
+      <input class="pac-search-input" type="text" id="searchInput" placeholder="{% trans 'Search by ID, client, caregiver or counsellor...' %}">
+      {% else %}
+      <input class="pac-search-input" type="text" id="searchInput" placeholder="{% trans 'Search by ID, client, caregiver...' %}">
+      {% endif %}
+
+      <div class="pac-suggestions" id="searchSuggestions"></div>
+    </div>
+  </div>
+
+  <div class="pac-filter-group">
+    {# Next Call filter is visible to all users. #}
+    <div class="pac-dropdown-wrap">
+      <button class="pac-dropdown-btn" id="nextCallBtn" type="button">
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm10 7H4v7h12V9z" clip-rule="evenodd"/>
+        </svg>
+        {% trans "Next call" %}
+        <span class="pac-badge" id="nextCallCount" style="display:none">1</span>
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+        </svg>
+      </button>
+
+      {# Small visible summary so users can see the selected Next Call filter without reopening the dropdown. #}
+      <div class="pac-filter-summary" id="nextCallSummary">
+        {% trans "Showing" %}: <strong>{% trans "all" %}</strong>
+      </div>
+
+      <div class="pac-dropdown-menu" id="nextCallMenu">
+        <div class="pac-dropdown-body">
+          <div class="pac-dropdown-title">{% trans "Filter by next call" %}</div>
+          <div class="pac-option-list">
+            <label class="pac-option-row" id="next-call-all-row">
+              <input type="radio" name="nextCallFilter" value="all" checked onchange="pacSetNextCallFilter(this.value)">
+              <span>{% trans "All" %}</span>
+            </label>
+
+            <label class="pac-option-row" id="next-call-scheduled-row">
+              <input type="radio" name="nextCallFilter" value="scheduled" onchange="pacSetNextCallFilter(this.value)">
+              <span>{% trans "Scheduled" %}</span>
+            </label>
+
+            <label class="pac-option-row" id="next-call-not-scheduled-row">
+              <input type="radio" name="nextCallFilter" value="not_scheduled" onchange="pacSetNextCallFilter(this.value)">
+              <span>{% trans "Not scheduled" %}</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# Navigator filter is only rendered for staff. #}
+    {% if request.user.is_staff %}
+    <div class="pac-dropdown-wrap">
+      <button class="pac-dropdown-btn" id="navigatorBtn" type="button">
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+        </svg>
+        {% trans "Counsellor" %}
+        <span class="pac-badge" id="navigatorCount" style="display:none">0</span>
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+        </svg>
+      </button>
+
+      <div class="pac-dropdown-menu" id="navigatorMenu">
+        <div class="pac-dropdown-body">
+          <div class="pac-dropdown-title">{% trans "Counsellor" %}</div>
+          <input class="pac-filter-search" id="navigatorFilterSearch" type="text" placeholder="{% trans 'Search counsellor' %}">
+          <div class="pac-selected-tags" id="navigatorSelectedTags"></div>
+          <div class="pac-option-list" id="navigatorOptionList"></div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="pac-token-bar" id="searchTokenBar"></div>
+<div class="pac-active-filters" id="activeFilters"></div>
+
+<div class="card overflow-x-auto">
+  <table class="table w-full text-sm text-left text-gray-700">
+    <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+      <tr>
+        <th class="px-6 py-3 pac-sortable" scope="col" id="th-study-id" onclick="pacSortTable('study_id')">
+          <div class="pac-th-inner">
+            {% trans "Id" %}
+            <span class="pac-sort-arrow">↕</span>
+          </div>
+        </th>
+
+        <th class="px-6 py-3 pac-sortable" scope="col" id="th-patient" onclick="pacSortTable('patient_name')">
+          <div class="pac-th-inner">
+            {% trans "Client" %}
+            <span class="pac-sort-arrow">↕</span>
+          </div>
+        </th>
+
+        <th class="px-6 py-3 pac-sortable" scope="col" id="th-caregiver" onclick="pacSortTable('caregiver_name')">
+          <div class="pac-th-inner">
+            {% trans "Caregiver" %}
+            <span class="pac-sort-arrow">↕</span>
+          </div>
+        </th>
+
+        {# Navigator column header is only visible to staff. #}
+        {% if request.user.is_staff %}
+        <th class="px-6 py-3 pac-sortable" scope="col" id="th-navigator" onclick="pacSortTable('navigator_name')">
+          <div class="pac-th-inner">
+            {% trans "Counsellor" %}
+            <span class="pac-sort-arrow">↕</span>
+          </div>
+        </th>
+        {% endif %}
+
+        <th class="px-6 py-3 pac-sortable" scope="col" id="th-next-call" onclick="pacSortTable('next_call_time')">
+          <div class="pac-th-inner">
+            {% trans "Next call" %}
+            <span class="pac-sort-arrow">↕</span>
+          </div>
+        </th>
+
+        <th class="px-6 py-3 pac-sortable" scope="col" id="th-last-call" onclick="pacSortTable('last_call_time')">
+          <div class="pac-th-inner">
+            {% trans "Last call" %}
+            <span class="pac-sort-arrow">↕</span>
+          </div>
+        </th>
+      </tr>
+    </thead>
+
+    <tbody id="tableBody"></tbody>
+  </table>
+
+  <div class="pac-empty-state" id="emptyState" style="display:none">
+    <span class="material-icons-outlined" style="font-size:2.5rem;color:#cbd5e1;">search_off</span>
+    <p class="mt-2">{% trans "No clients match the current filters." %}</p>
+  </div>
+</div>
+
+<div class="pac-table-footer">
+  <span id="showingText">—</span>
+
+  <div class="pac-footer-right">
+    <div class="pac-pagination" id="pagination"></div>
+
+    <div class="pac-per-page">
+      <label for="perPageSelect">{% trans "Records" %}:</label>
+      <select id="perPageSelect">
+        <option value="10">10</option>
+        <option value="25" selected>25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<script>
+const PAC_ALL_DATA = JSON.parse('{{ rows_json|escapejs }}');
+const PAC_DETAIL_URL_TPL = "{% url 'patient_detail' 99999 %}";
+
+/*
+  This lets the JavaScript know whether the current Django user is a superuser.
+  We use it to prevent navigator search/suggestion behaviour for non-superusers.
+*/
+const PAC_IS_SUPERUSER = "{{ request.user.is_staff|yesno:'true,false' }}" === "true";
+
+/*
+  Navigator filter options are only useful for superusers.
+  For non-superusers, this safely becomes an empty list.
+*/
+const PAC_NAV_OPTIONS = PAC_IS_SUPERUSER ? Array.from(
+  new Set(
+    PAC_ALL_DATA
+      .map((row) => row.navigator_name)
+      .filter((name) => name !== null && name !== undefined && String(name).trim() !== '')
+      .map((name) => String(name).trim())
+  )
+).sort((a, b) => a.localeCompare(b)) : [];
+
+let PAC_STATE = {
+  searchInput: '',
+  searchTokens: [],
+  navigatorFilters: [],
+  nextCallFilter: 'all',
+  sortCol: 'study_id',
+  sortDir: 'asc',
+  page: 1,
+  perPage: 25,
+};
+
+function pacEsc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function pacNorm(v) {
+  return String(v || '').trim().toLowerCase();
+}
+
+function pacTitle(v) {
+  return String(v || '').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function pacJsString(s) {
+  return JSON.stringify(String(s));
+}
+
+function pacPatientUrl(id) {
+  return PAC_DETAIL_URL_TPL.replace('99999', id);
+}
+
+function pacEmptyDash(value) {
+  return value ? pacEsc(value) : `<span class="text-gray-400 italic">—</span>`;
+}
+
+function pacInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+}
+
+function pacCallCell(value, icon, cls) {
+  if (!value) return `<span class="text-gray-400 italic">—</span>`;
+  return `<span class="pac-call-cell ${cls}"><span class="material-icons-outlined">${icon}</span>${pacEsc(value)}</span>`;
+}
+
+function pacHasNextCall(row) {
+  return row.next_call_time !== null &&
+    row.next_call_time !== undefined &&
+    String(row.next_call_time).trim() !== '';
+}
+
+function pacGetNextCallFilterLabel(value) {
+  if (value === 'scheduled') return 'Scheduled';
+  if (value === 'not_scheduled') return 'Not scheduled';
+  return 'All';
+}
+
+function pacRender() {
+  const filtered = pacGetFiltered();
+  const total = filtered.length;
+  const pages = Math.ceil(total / PAC_STATE.perPage);
+
+  if (PAC_STATE.page > pages && pages > 0) {
+    PAC_STATE.page = pages;
+  }
+
+  const start = (PAC_STATE.page - 1) * PAC_STATE.perPage;
+  const end = Math.min(start + PAC_STATE.perPage, total);
+  const pageRows = filtered.slice(start, end);
+
+  document.getElementById('subtitleCount').textContent =
+    `${total} client${total === 1 ? '' : 's'} in total`;
+
+  const tbody = document.getElementById('tableBody');
+  const emptyState = document.getElementById('emptyState');
+
+  if (!pageRows.length) {
+    tbody.innerHTML = '';
+    emptyState.style.display = 'block';
+  } else {
+    emptyState.style.display = 'none';
+
+    tbody.innerHTML = pageRows.map((r) => {
+      const safeId = Number(r.id);
+
+      return `
+        <tr class="bg-white border-b pac-clickable-row" onclick="window.location.href='${pacPatientUrl(safeId)}'">
+          <td class="px-6 py-4 text-gray-700">
+            ${r.study_id ? pacEsc(r.study_id) : `<span class="text-gray-400 italic">—</span>`}
+          </td>
+
+          <td class="px-6 py-4 font-medium text-gray-900">
+            <div class="flex items-center gap-2.5">
+              <span class="pac-avatar">${pacEsc(pacInitials(r.patient_name))}</span>
+              <span class="pac-click-link">${pacEsc(r.patient_name || '—')}</span>
+            </div>
+          </td>
+
+          <td class="px-6 py-4 text-gray-700">
+            ${r.caregiver_name ? pacEsc(r.caregiver_name) : `<span class="text-gray-400 italic">—</span>`}
+          </td>
+
+          {% if request.user.is_superuser %}
+          <td class="px-6 py-4 text-gray-700">
+            ${r.navigator_name ? pacEsc(r.navigator_name) : `<span class="text-gray-400 italic">—</span>`}
+          </td>
+          {% endif %}
+
+          <td class="px-6 py-4 text-gray-700">
+            ${pacCallCell(r.next_call_time, 'event', 'text-sky-700 font-medium')}
+          </td>
+
+          <td class="px-6 py-4 text-gray-700">
+            ${pacCallCell(r.last_call_time, 'history', 'text-gray-500')}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('showingText').textContent =
+    total === 0 ? 'No results' : `Showing ${start + 1}-${end} of ${total}`;
+
+  pacRenderPagination(total);
+  pacRenderSearchTokens();
+  pacRenderActiveFilters();
+  pacUpdateSortHeaders();
+  pacRenderNextCallMenu();
+  pacRenderNavigatorMenu();
+}
+
+function pacGetFiltered() {
+  let d = [...PAC_ALL_DATA];
+
+  if (PAC_STATE.searchTokens.length) {
+    d = d.filter((r) => {
+      /*
+        Non-superusers do not search by navigator.
+        Superusers can search by navigator because they can see the Navigator column/filter.
+      */
+      const fields = [
+        r.study_id,
+        r.patient_name,
+        r.caregiver_name,
+        ...(PAC_IS_SUPERUSER ? [r.navigator_name] : []),
+      ]
+        .filter(Boolean)
+        .map(pacNorm);
+
+      return PAC_STATE.searchTokens.some((tok) =>
+        fields.some((field) => field.includes(tok))
+      );
+    });
+  }
+
+  if (PAC_STATE.nextCallFilter === 'scheduled') {
+    d = d.filter((r) => pacHasNextCall(r));
+  }
+
+  if (PAC_STATE.nextCallFilter === 'not_scheduled') {
+    d = d.filter((r) => !pacHasNextCall(r));
+  }
+
+  /*
+    Navigator filtering is only applied for superusers.
+    This keeps the frontend logic consistent with the template visibility rules.
+  */
+  if (PAC_IS_SUPERUSER && PAC_STATE.navigatorFilters.length) {
+    d = d.filter((r) => {
+      return PAC_STATE.navigatorFilters.includes(pacNorm(r.navigator_name));
+    });
+  }
+
+  d.sort((a, b) => {
+    let av = a[PAC_STATE.sortCol];
+    let bv = b[PAC_STATE.sortCol];
+
+    const aEmpty = av === null || av === undefined || String(av).trim() === '';
+    const bEmpty = bv === null || bv === undefined || String(bv).trim() === '';
+
+    /*
+      Next Call sorting:
+      Ascending - scheduled calls first, earliest call first, unscheduled at bottom.
+      Descending - unscheduled calls first, then scheduled calls latest first.
+    */
+    if (PAC_STATE.sortCol === 'next_call_time') {
+      if (PAC_STATE.sortDir === 'asc') {
+        if (aEmpty && bEmpty) return 0;
+        if (aEmpty) return 1;
+        if (bEmpty) return -1;
+      } else {
+        if (aEmpty && bEmpty) return 0;
+        if (aEmpty) return -1;
+        if (bEmpty) return 1;
+      }
+
+      const aDate = new Date(av);
+      const bDate = new Date(bv);
+
+      const aValid = !Number.isNaN(aDate.getTime());
+      const bValid = !Number.isNaN(bDate.getTime());
+
+      if (aValid && bValid) {
+        const cmp = aDate - bDate;
+        return PAC_STATE.sortDir === 'asc' ? cmp : -cmp;
+      }
+
+      av = pacNorm(av);
+      bv = pacNorm(bv);
+
+      const cmp = av > bv ? 1 : av < bv ? -1 : 0;
+      return PAC_STATE.sortDir === 'asc' ? cmp : -cmp;
+    }
+
+    if (PAC_STATE.sortCol === 'last_call_time') {
+      if (aEmpty && bEmpty) return 0;
+      if (aEmpty) return 1;
+      if (bEmpty) return -1;
+
+      const aDate = new Date(av);
+      const bDate = new Date(bv);
+
+      const aValid = !Number.isNaN(aDate.getTime());
+      const bValid = !Number.isNaN(bDate.getTime());
+
+      if (aValid && bValid) {
+        const cmp = aDate - bDate;
+        return PAC_STATE.sortDir === 'asc' ? cmp : -cmp;
+      }
+
+      av = pacNorm(av);
+      bv = pacNorm(bv);
+
+      const cmp = av > bv ? 1 : av < bv ? -1 : 0;
+      return PAC_STATE.sortDir === 'asc' ? cmp : -cmp;
+    }
+
+    if (aEmpty && bEmpty) return 0;
+    if (aEmpty) return 1;
+    if (bEmpty) return -1;
+
+    av = pacNorm(av);
+    bv = pacNorm(bv);
+
+    const cmp = av > bv ? 1 : av < bv ? -1 : 0;
+    return PAC_STATE.sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  return d;
+}
+
+function pacRenderPagination(total) {
+  const pages = Math.ceil(total / PAC_STATE.perPage);
+  const cur = PAC_STATE.page;
+  const pg = document.getElementById('pagination');
+
+  if (pages <= 1) {
+    pg.innerHTML = '';
+    return;
+  }
+
+  let html = `<button class="pac-page-btn" onclick="pacGoPage(${cur - 1})" ${cur === 1 ? 'disabled' : ''}>‹</button>`;
+
+  pacGetPageNums(cur, pages).forEach((p) => {
+    if (p === '…') {
+      html += `<span class="pac-page-dots">…</span>`;
+    } else {
+      html += `<button class="pac-page-btn ${p === cur ? 'active' : ''}" onclick="pacGoPage(${p})">${p}</button>`;
+    }
+  });
+
+  html += `<button class="pac-page-btn" onclick="pacGoPage(${cur + 1})" ${cur === pages ? 'disabled' : ''}>›</button>`;
+
+  pg.innerHTML = html;
+}
+
+function pacGetPageNums(cur, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+
+  const nums = [1];
+
+  if (cur > 3) nums.push('…');
+
+  for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i += 1) {
+    nums.push(i);
+  }
+
+  if (cur < total - 2) nums.push('…');
+
+  nums.push(total);
+
+  return nums;
+}
+
+function pacGoPage(p) {
+  const pages = Math.ceil(pacGetFiltered().length / PAC_STATE.perPage);
+
+  if (p < 1 || p > pages) return;
+
+  PAC_STATE.page = p;
+  pacRender();
+}
+
+document.getElementById('perPageSelect').addEventListener('change', function () {
+  PAC_STATE.perPage = parseInt(this.value, 10);
+  PAC_STATE.page = 1;
+  pacRender();
+});
+
+function pacSortTable(col) {
+  /*
+    Safety guard:
+    non-superusers should not be able to trigger navigator sorting because the column is hidden.
+  */
+  if (col === 'navigator_name' && !PAC_IS_SUPERUSER) return;
+
+  if (PAC_STATE.sortCol === col) {
+    PAC_STATE.sortDir = PAC_STATE.sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    PAC_STATE.sortCol = col;
+    PAC_STATE.sortDir = 'asc';
+  }
+
+  PAC_STATE.page = 1;
+  pacRender();
+}
+
+function pacUpdateSortHeaders() {
+  const cols = {
+    study_id: 'th-study-id',
+    patient_name: 'th-patient',
+    caregiver_name: 'th-caregiver',
+    ...(PAC_IS_SUPERUSER ? { navigator_name: 'th-navigator' } : {}),
+    next_call_time: 'th-next-call',
+    last_call_time: 'th-last-call',
+  };
+
+  Object.entries(cols).forEach(([col, id]) => {
+    const th = document.getElementById(id);
+    if (!th) return;
+
+    const isActive = PAC_STATE.sortCol === col;
+    th.classList.toggle('pac-sorted', isActive);
+
+    const arrow = th.querySelector('.pac-sort-arrow');
+    if (arrow) {
+      arrow.textContent = !isActive ? '↕' : (PAC_STATE.sortDir === 'asc' ? '↑' : '↓');
+    }
+  });
+}
+
+function pacRenderSearchTokens() {
+  document.getElementById('searchTokenBar').innerHTML = PAC_STATE.searchTokens.map((tok) => `
+    <span class="pac-token-chip">
+      ${pacEsc(pacTitle(tok))}
+      <button onclick='pacRemoveSearchToken(${pacJsString(tok)})'>×</button>
+    </span>
+  `).join('');
+}
+
+function pacAddSearchToken(value) {
+  const n = pacNorm(value);
+
+  if (!n || PAC_STATE.searchTokens.includes(n)) return;
+
+  PAC_STATE.searchTokens.push(n);
+  PAC_STATE.searchInput = '';
+
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchSuggestions').classList.remove('open');
+
+  PAC_STATE.page = 1;
+  pacRender();
+}
+
+function pacRemoveSearchToken(value) {
+  PAC_STATE.searchTokens = PAC_STATE.searchTokens.filter((t) => t !== value);
+  PAC_STATE.page = 1;
+  pacRender();
+}
+
+function pacGetSearchSuggestions() {
+  const q = pacNorm(PAC_STATE.searchInput);
+
+  if (!q) return [];
+
+  const seen = new Set();
+  const result = [];
+
+  PAC_ALL_DATA.forEach((r) => {
+    /*
+      Navigator suggestions are only included for superusers.
+      This keeps the suggestions aligned with the visible table columns.
+    */
+    [
+      r.study_id ? { label: r.study_id, type: 'study ID' } : null,
+      r.patient_name ? { label: r.patient_name, type: 'client' } : null,
+      r.caregiver_name ? { label: r.caregiver_name, type: 'caregiver' } : null,
+      PAC_IS_SUPERUSER && r.navigator_name ? { label: r.navigator_name, type: 'navigator' } : null,
+    ].filter(Boolean).forEach((item) => {
+      const key = pacNorm(item.label);
+
+      if (!seen.has(key) && key.includes(q) && !PAC_STATE.searchTokens.includes(key)) {
+        seen.add(key);
+        result.push(item);
+      }
+    });
+  });
+
+  return result.slice(0, 8);
+}
+
+function pacRenderSearchSuggestions() {
+  const box = document.getElementById('searchSuggestions');
+  const q = PAC_STATE.searchInput.trim();
+
+  if (!q) {
+    box.classList.remove('open');
+    box.innerHTML = '';
+    return;
+  }
+
+  const suggestions = pacGetSearchSuggestions();
+  box.classList.add('open');
+
+  if (!suggestions.length) {
+    box.innerHTML = `<div class="pac-suggestion-empty">Press Enter to add "${pacEsc(q)}"</div>`;
+    return;
+  }
+
+  box.innerHTML = suggestions.map((item, i) => `
+    <button type="button" class="pac-suggestion ${i === 0 ? 'active' : ''}" onclick='pacAddSearchToken(${pacJsString(item.label)})'>
+      <span>${pacEsc(item.label)}</span>
+      <span class="pac-suggestion-type">${pacEsc(item.type)}</span>
+    </button>
+  `).join('');
+}
+
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  PAC_STATE.searchInput = e.target.value.trim();
+  pacRenderSearchSuggestions();
+});
+
+document.getElementById('searchInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+
+    const active = document.querySelector('#searchSuggestions .pac-suggestion.active');
+
+    if (active) active.click();
+    else if (PAC_STATE.searchInput.trim()) pacAddSearchToken(PAC_STATE.searchInput.trim());
+  }
+});
+
+function pacRenderActiveFilters() {
+  const container = document.getElementById('activeFilters');
+  const filters = [];
+
+  if (PAC_STATE.nextCallFilter !== 'all') {
+    filters.push(`
+      <div class="pac-filter-chip">
+        Next Call: ${pacEsc(pacGetNextCallFilterLabel(PAC_STATE.nextCallFilter))}
+        <button onclick="pacSetNextCallFilter('all')">×</button>
+      </div>
+    `);
+  }
+
+  if (PAC_IS_SUPERUSER) {
+    PAC_STATE.navigatorFilters.forEach((v) => {
+      filters.push(`
+        <div class="pac-filter-chip">
+          Navigator: ${pacEsc(getNavigatorDisplayName(v))}
+          <button onclick='pacRemoveNavigatorFilter(${pacJsString(v)})'>×</button>
+        </div>
+      `);
+    });
+  }
+
+  if (!filters.length) {
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML =
+    `<span class="pac-active-label">Active filters:</span>` +
+    filters.join('') +
+    `<button class="pac-clear-all" onclick="pacClearAllFilters()">Clear all</button>`;
+}
+
+function pacSetNextCallFilter(value) {
+  PAC_STATE.nextCallFilter = value;
+  PAC_STATE.page = 1;
+  pacCloseAllDropdowns();
+  pacRender();
+}
+
+function pacRenderNextCallMenu() {
+  const btn = document.getElementById('nextCallBtn');
+  const countEl = document.getElementById('nextCallCount');
+  const summaryEl = document.getElementById('nextCallSummary');
+
+  if (!btn || !countEl) return;
+
+  document.querySelectorAll('input[name="nextCallFilter"]').forEach((input) => {
+    input.checked = input.value === PAC_STATE.nextCallFilter;
+
+    const row = input.closest('.pac-option-row');
+    if (row) {
+      row.classList.toggle('selected', input.checked);
+    }
+  });
+
+  btn.classList.toggle('active', PAC_STATE.nextCallFilter !== 'all');
+  countEl.style.display = PAC_STATE.nextCallFilter !== 'all' ? 'inline-flex' : 'none';
+
+  /*
+    Updates the small text below the Next Call dropdown so the user can see
+    the currently selected option without reopening the dropdown.
+  */
+  if (summaryEl) {
+    summaryEl.innerHTML = `{% trans "Showing" %}: <strong>${pacEsc(pacGetNextCallFilterLabel(PAC_STATE.nextCallFilter))}</strong>`;
+  }
+}
+
+function getNavigatorDisplayName(normName) {
+  return PAC_NAV_OPTIONS.find((name) => pacNorm(name) === normName) || pacTitle(normName);
+}
+
+function pacRemoveNavigatorFilter(value) {
+  if (!PAC_IS_SUPERUSER) return;
+
+  PAC_STATE.navigatorFilters = PAC_STATE.navigatorFilters.filter((v) => v !== value);
+  PAC_STATE.page = 1;
+  pacRender();
+}
+
+function pacClearAllFilters() {
+  PAC_STATE.searchTokens = [];
+  PAC_STATE.searchInput = '';
+  PAC_STATE.navigatorFilters = [];
+  PAC_STATE.nextCallFilter = 'all';
+
+  document.getElementById('searchInput').value = '';
+
+  const navSearch = document.getElementById('navigatorFilterSearch');
+  if (navSearch) navSearch.value = '';
+
+  pacCloseAllDropdowns();
+
+  PAC_STATE.page = 1;
+  pacRender();
+}
+
+function pacRenderNavigatorMenu() {
+  /*
+    This function exits immediately for non-superusers because the navigator filter
+    is not rendered in the HTML for them.
+  */
+  if (!PAC_IS_SUPERUSER) return;
+
+  const selected = PAC_STATE.navigatorFilters;
+  const searchEl = document.getElementById('navigatorFilterSearch');
+  const listEl = document.getElementById('navigatorOptionList');
+  const tagsEl = document.getElementById('navigatorSelectedTags');
+  const btn = document.getElementById('navigatorBtn');
+  const countEl = document.getElementById('navigatorCount');
+
+  if (!searchEl || !listEl || !tagsEl || !btn || !countEl) return;
+
+  const q = pacNorm(searchEl.value);
+  const visible = PAC_NAV_OPTIONS.filter((name) => pacNorm(name).includes(q));
+
+  tagsEl.innerHTML = selected.map((v) => `
+    <span class="pac-tag-chip">
+      ${pacEsc(getNavigatorDisplayName(v))}
+      <button onclick='event.stopPropagation(); pacToggleNavigatorFilter(${pacJsString(v)}, false)'>×</button>
+    </span>
+  `).join('');
+
+  listEl.innerHTML = visible.length ? visible.map((name) => {
+    const val = pacNorm(name);
+    const isSelected = selected.includes(val);
+
+    return `
+      <label class="pac-option-row ${isSelected ? 'selected' : ''}">
+        <input type="checkbox" ${isSelected ? 'checked' : ''} onchange='pacToggleNavigatorFilter(${pacJsString(val)}, this.checked)'>
+        <span>${pacEsc(name)}</span>
+      </label>
+    `;
+  }).join('') : `<div class="pac-empty-opts">No matching navigators.</div>`;
+
+  btn.classList.toggle('active', selected.length > 0);
+  countEl.style.display = selected.length ? 'inline-flex' : 'none';
+  countEl.textContent = selected.length;
+}
+
+function pacToggleNavigatorFilter(value, checked) {
+  if (!PAC_IS_SUPERUSER) return;
+
+  const n = pacNorm(value);
+
+  if (checked) {
+    PAC_STATE.navigatorFilters = Array.from(new Set([...PAC_STATE.navigatorFilters, n]));
+  } else {
+    PAC_STATE.navigatorFilters = PAC_STATE.navigatorFilters.filter((v) => v !== n);
+  }
+
+  PAC_STATE.page = 1;
+  pacRender();
+}
+
+function pacToggleDropdown(menuId) {
+  const menu = document.getElementById(menuId);
+  if (!menu) return;
+
+  const willOpen = !menu.classList.contains('open');
+
+  pacCloseAllDropdowns();
+
+  if (willOpen) menu.classList.add('open');
+}
+
+function pacCloseAllDropdowns() {
+  document.querySelectorAll('.pac-dropdown-menu').forEach((m) => m.classList.remove('open'));
+}
+
+const nextCallBtn = document.getElementById('nextCallBtn');
+
+if (nextCallBtn) {
+  nextCallBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    pacRenderNextCallMenu();
+    pacToggleDropdown('nextCallMenu');
+  });
+}
+
+/*
+  Navigator dropdown event listeners are only attached if the button exists.
+  Since the button only renders for superusers, this is safe for all users.
+*/
+const navBtn = document.getElementById('navigatorBtn');
+
+if (navBtn) {
+  navBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    pacRenderNavigatorMenu();
+    pacToggleDropdown('navigatorMenu');
+  });
+}
+
+const navSearch = document.getElementById('navigatorFilterSearch');
+
+if (navSearch) {
+  navSearch.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
+  navSearch.addEventListener('input', () => {
+    pacRenderNavigatorMenu();
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.pac-dropdown-wrap')) pacCloseAllDropdowns();
+  if (!e.target.closest('.pac-search-wrap')) document.getElementById('searchSuggestions').classList.remove('open');
+});
+
+pacRender();
+</script>
+
+<div id="clientModal" class="client-modal" style="display:none;position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:1rem;">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-800">{% trans "Add client" %}</h3>
+      <button type="button" onclick="clientClose()" class="text-gray-400 hover:text-gray-600"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <form method="post" action="{% url 'create_client' %}">
+      {% csrf_token %}
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.name.label }}</label>
+          {{ client_form.name }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.lastname.label }}</label>
+          {{ client_form.lastname }}
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.phone_number.label }}</label>
+        {{ client_form.phone_number }}
+      </div>
+      {% if client_admin %}
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.navigator.label }}</label>
+          {{ client_form.navigator }}
+        </div>
+      {% endif %}
+      <div class="mb-3">
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.agent.label }}</label>
+        {{ client_form.agent }}
+      </div>
+      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">{% trans "Caregiver" %}</p>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.caregiver_name.label }}</label>
+          {{ client_form.caregiver_name }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.caregiver_lastname.label }}</label>
+          {{ client_form.caregiver_lastname }}
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.caregiver_phone.label }}</label>
+        {{ client_form.caregiver_phone }}
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="clientClose()" class="button-secondary py-2 px-4 rounded-lg text-sm">{% trans "Cancel" %}</button>
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Create" %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+  function clientOpen(){ document.getElementById('clientModal').style.display='flex'; }
+  function clientClose(){ document.getElementById('clientModal').style.display='none'; }
+  (function(){
+    var m=document.getElementById('clientModal');
+    if(m){ m.addEventListener('click', function(e){ if(e.target===this) clientClose(); }); }
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') clientClose(); });
+  })();
+</script>
+
+{% endblock %}

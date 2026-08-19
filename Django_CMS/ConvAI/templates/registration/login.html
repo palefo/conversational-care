@@ -1,0 +1,109 @@
+{% load static custom_filters %}
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="{% static 'app/css/vars.css' %}">
+    <link rel="stylesheet" href="{% static 'app/css/login.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  </head>
+
+  <body>
+    <div class="login">
+        <div class="login-card">
+            <div class="login-title">
+                <img class="brand-logo" src="{% brand_logo_url %}" alt="{% brand_name %}" />
+                <p class="login-subtitle">Sign in to your account</p>
+            </div>
+
+            {% if form.errors %}
+            <div class="login-error" role="alert">
+                Invalid credentials, please try again.
+            </div>
+            {% endif %}
+
+            <form method="post" class="form">  <!-- Start of the form -->
+                {% csrf_token %}  <!-- CSRF Token for security -->
+
+                <div class="field">
+                    <label for="id_username">User</label>
+                    <input type="text" name="username" autofocus="" autocapitalize="none" autocomplete="username" maxlength="150" required="" id="id_username" placeholder="Enter your username">
+                </div>
+
+                <div class="field">
+                    <label for="id_password">Password</label>
+                    <input type="password" name="password" autocomplete="current-password" required="" id="id_password" placeholder="Enter your password">
+                </div>
+
+                <button type="submit" class="submit-button">Login</button>
+            </form>  <!-- End of the form -->
+        </div>
+    </div>
+    
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <script>
+        // Function to retrieve CSRF token from the cookies
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // Check if this cookie's key matches the CSRF token name
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Get the CSRF token value
+        const csrftoken = getCookie('csrftoken');
+        console.log("CSRF Token:", csrftoken);  // You can verify this by checking the browser console
+
+        // Handle form submission using AJAX
+        $('#login-form').submit(function(event) {
+            event.preventDefault(); // Prevent the default form submission
+            
+            // Get the form data
+            const username = $('input[name="username"]').val();
+            const password = $('input[name="password"]').val();
+
+            // Send an AJAX POST request
+            $.ajax({
+                type: 'POST',
+                url: "{% url 'login' %}",  // Django login URL
+                data: {
+                    'username': username,
+                    'password': password,
+                    'csrfmiddlewaretoken': csrftoken,  // Pass the CSRF token
+                },
+                success: function(response) {
+                    // On success, you can redirect the user or reload the page
+                    if (response.success) {
+                        window.location.href = "{% url 'dashboard' %}";  // Redirect to the dashboard after successful login
+                    } else {
+                        // Show an error message for invalid credentials
+                        $('#login-error').text('Invalid credentials, please try again.').show();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    // Handle error if the login failed
+                    $('#login-error').text('An error occurred, please try again later.').show();
+                }
+            });
+        });
+
+    </script>
+
+  </body>
+</html>

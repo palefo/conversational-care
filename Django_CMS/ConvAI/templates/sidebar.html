@@ -1,0 +1,144 @@
+{% load i18n static custom_filters %}
+<aside id="sidebar" class="sidebar w-64 p-4 flex flex-col justify-between">
+  <div>
+    <div class="sidebar-header flex items-center justify-between mb-8">
+      <a href="{% url 'dashboard' %}" class="sidebar-logo inline-flex items-center">
+        <img src="{% brand_logo_url %}" alt="{% brand_name %}" class="w-auto" />
+      </a>
+      <button id="sidebarToggle" type="button"
+        class="sidebar-toggle flex items-center justify-center p-2 rounded-lg text-gray-700 hover:text-sky-700"
+        aria-label="{% trans 'Toggle sidebar' %}" aria-expanded="true" title="{% trans 'Toggle sidebar' %}">
+        <span class="material-icons-outlined">menu_open</span>
+      </button>
+    </div>
+    <nav>
+      <ul>
+        <li class="mb-2">
+          <a
+            href="{% url 'dashboard' %}"
+            title="{% trans 'Home' %}"
+            class="sidebar-item flex items-center py-2 px-3 rounded-lg
+                   {% if active_page == 'dashboard' %}active{% else %}text-gray-700 hover:text-sky-700{% endif %}"
+          >
+            <span class="material-icons-outlined mr-3">home</span>
+            <span class="sidebar-label">{% trans "Home" %}</span>
+            {# Ticks up when the poller sees a new alert. #}
+            <span class="sidebar-badge" data-alert-badge hidden>0</span>
+          </a>
+        </li>
+        <li class="mb-2">
+          <a
+            href="{% url 'communications' %}"
+            title="{% trans 'Communications' %}"
+            class="sidebar-item flex items-center py-2 px-3 rounded-lg
+                   {% if active_page == 'communications' %}active{% else %}text-gray-700 hover:text-sky-700{% endif %}"
+          >
+            <span class="material-icons-outlined mr-3">forum</span>
+            <span class="sidebar-label">{% trans "Communications" %}</span>
+            {# Ticks up when the poller sees a new alert. #}
+            <span class="sidebar-badge" data-alert-badge hidden>0</span>
+          </a>
+        </li>
+        <li class="mb-2">
+          <a
+            href="{% url 'patients' %}"
+            title="{% trans 'Clients' %}"
+            class="sidebar-item flex items-center py-2 px-3 rounded-lg
+                   {% if active_page == 'patients' %}active{% else %}text-gray-700 hover:text-sky-700{% endif %}"
+          >
+            <span class="material-icons-outlined mr-3">people</span>
+            <span class="sidebar-label">{% trans "Clients" %}</span>
+          </a>
+        </li>
+        <li class="mb-2">
+          <a
+            href="{% url 'calendar' %}{% if panel_item %}?item={{ panel_item.token }}{% endif %}"
+            title="{% trans 'Calendar' %}"
+            class="sidebar-item flex items-center py-2 px-3 rounded-lg
+                   {% if active_page == 'calendar' %}active{% else %}text-gray-700 hover:text-sky-700{% endif %}"
+          >
+            <span class="material-icons-outlined mr-3">calendar_today</span>
+            <span class="sidebar-label">{% trans "Calendar" %}</span>
+          </a>
+        </li>
+        {% if perms.ConvAI.access_configuration %}
+        <li class="mb-2">
+          <a
+            href="{% url 'agents' %}"
+            title="{% trans 'Agents' %}"
+            class="sidebar-item flex items-center py-2 px-3 rounded-lg
+                   {% if active_page == 'agents' %}active{% else %}text-gray-700 hover:text-sky-700{% endif %}"
+          >
+            <span class="material-icons-outlined mr-3">smart_toy</span>
+            <span class="sidebar-label">{% trans "Agents" %}</span>
+          </a>
+        </li>
+        <li class="mb-2">
+          <a
+            href="{% url 'config' %}"
+            title="{% trans 'Settings' %}"
+            class="sidebar-item flex items-center py-2 px-3 rounded-lg
+                   {% if active_page == 'admin' %}active{% else %}text-gray-700 hover:text-sky-700{% endif %}"
+          >
+            <span class="material-icons-outlined mr-3">settings</span>
+            <span class="sidebar-label">{% trans "Settings" %}</span>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+
+  <div>
+    <a
+      href="{% url 'help' %}"
+      title="{% trans 'Help' %}"
+      class="sidebar-item flex items-center py-2 px-3 rounded-lg mb-1
+             {% if active_page == 'help' %}active{% else %}text-gray-700 hover:text-sky-700{% endif %}"
+    >
+      <span class="material-icons-outlined mr-3">help_outline</span>
+      <span class="sidebar-label">{% trans "Help" %}</span>
+    </a>
+
+    <div class="relative dropdown">
+    <button id="profileMenuBtn"
+      type="button"
+      title="{% trans 'Profile' %}"
+      class="sidebar-item w-full flex items-center py-2 px-3 rounded-lg
+            {% if active_page == 'profile' %}active{% else %}text-gray-700 hover:text-sky-700{% endif %}">
+      <span class="material-icons-outlined mr-3">account_circle</span>
+      <span class="sidebar-label">{% trans "Profile" %}</span>
+      <span class="sidebar-caret material-icons-outlined ml-auto text-sm">expand_less</span>
+    </button>
+
+    <div id="profileMenu"
+        class="absolute left-0 bottom-12 z-50 w-56 min-w-max bg-white border border-gray-200 rounded-lg shadow hidden">
+      <a href="{% url 'profile' %}" class="block whitespace-nowrap px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-sky-700">
+        {% trans "View profile" %}
+      </a>
+      <div class="border-t border-gray-200"></div>
+      {% comment %}
+        How loud alerts are, decided by the person being interrupted. A count
+        that never reaches zero in a caseload of forty is a standing reproach,
+        so it has to be possible to turn it down. Per browser: it is a comfort
+        setting, not an account one, and nobody should have to ask for it.
+      {% endcomment %}
+      <div class="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+        {% trans "Alerts" %}
+      </div>
+      <div class="px-3 pb-2" id="notifyLevel">
+        <button type="button" class="nl-opt" data-level="all">{% trans "All" %}</button>
+        <button type="button" class="nl-opt" data-level="urgent">{% trans "Urgent only" %}</button>
+        <button type="button" class="nl-opt" data-level="off">{% trans "Off" %}</button>
+      </div>
+      <div class="border-t border-gray-200"></div>
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="w-full whitespace-nowrap text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-sky-700">
+          {% trans "Log out" %}
+        </button>
+      </form>
+    </div>
+    </div>
+  </div>
+</aside>

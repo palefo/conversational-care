@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      # Kept in sync with the app's DB_* variables in .env (same defaults).
+      - POSTGRES_DB=${DB_NAME:-djangocms_db}
+      - POSTGRES_USER=${DB_USER:-djangocms_user}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-djangocms_pass}  # Change this in production
+    ports:
+      # Host port that exposes the bundled Postgres. Change POSTGRES_PUBLISH_PORT
+      # in .env if the host's 5432 is already taken (see database.md). The app
+      # still talks to the DB over the internal Docker network on 5432.
+      - "${POSTGRES_PUBLISH_PORT:-5432}:5432"
+
+  web:
+    build: .
+    volumes:
+      - .:/app  # Mounts current directory into /app in container for live code changes
+      - media_data:/media  # Persist user uploads (MEDIA_ROOT) across rebuilds
+    ports:
+      - "8000:8000"
+    # Lets the app reach services published on the HOST (e.g. a remote agent /
+    # external Postgres) via the hostname `host.docker.internal`. Works on Docker
+    # Desktop out of the box; this mapping makes it work on Linux too (Docker 20.10+).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - db
+    env_file:
+      - .env  # Tell compose to load environment variables from a .env file
+
+volumes:
+  postgres_data:
+  media_data:

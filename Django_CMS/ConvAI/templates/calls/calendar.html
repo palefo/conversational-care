@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load custom_filters %}
+{% block title %}{% trans "Calendar" %} — {{ period_label }}{% endblock %}
+
+{% block head %}
+<style>
+  /* ───────── Calendar — shared ───────── */
+  .cal-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem; margin-bottom:1.25rem; }
+  .cal-navbtn { display:inline-flex; align-items:center; justify-content:center; width:2.25rem; height:2.25rem;
+    border-radius:.5rem; border:1px solid #e2e8f0; background:#fff; color:#475569; transition:background .15s,color .15s,border-color .15s; }
+  .cal-navbtn:hover { background:#f1f5f9; color:#0f172a; }
+  .cal-navbtn.disabled { opacity:.4; pointer-events:none; }
+  .cal-today { padding:.5rem .95rem; border-radius:.5rem; border:1px solid #e2e8f0; background:#fff; color:#0369a1;
+    font-size:.85rem; font-weight:600; transition:background .15s,border-color .15s; white-space:nowrap; }
+  .cal-today:hover { background:#f0f9ff; border-color:#7dd3fc; }
+  .cal-today.disabled { color:#94a3b8; pointer-events:none; }
+  .cal-period { font-size:1.125rem; font-weight:600; color:#1e293b; white-space:nowrap; }
+
+  /* Segmented view switcher */
+  .cal-views { display:inline-flex; gap:.2rem; background:#f1f5f9; padding:.25rem; border-radius:.6rem; }
+  .cal-view { display:inline-flex; align-items:center; gap:.35rem; padding:.4rem .8rem; border-radius:.45rem;
+    font-size:.82rem; font-weight:500; color:#475569; white-space:nowrap; transition:background .15s,color .15s; }
+  .cal-view:hover { color:#0f172a; }
+  .cal-view.active { background:#fff; color:#0369a1; box-shadow:0 1px 2px rgba(16,24,40,.09); }
+  .cal-view .material-icons-outlined { font-size:1.05rem; }
+
+  /* Legend */
+  .cal-legend { display:flex; flex-wrap:wrap; align-items:center; gap:.85rem; font-size:.72rem; color:#64748b; }
+  .cal-legend .dot { display:inline-flex; align-items:center; gap:.35rem; }
+  .cal-legend .swatch { width:.7rem; height:.7rem; border-radius:9999px; flex-shrink:0; }
+
+  /* Status colours (solid chips = week/day) */
+  .sw-pending{ background:#0ea5e9; }
+  .sw-completed{ background:#22c55e; }
+  .sw-interrupted{ background:#ef4444; }
+  .sw-missed{ background:#94a3b8; }
+
+  /* ───────── Month grid ───────── */
+  .cal-month { display:grid; grid-template-columns:repeat(7,minmax(0,1fr));
+    border:1px solid #e5e7eb; border-radius:.6rem; overflow:hidden; background:#e5e7eb; gap:1px; }
+  .cal-dow { background:#f8fafc; padding:.55rem .5rem; text-align:center; font-size:.68rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
+  .cal-cell { background:#fff; min-height:118px; padding:.4rem; display:flex; flex-direction:column; gap:.25rem;
+    transition:background .12s; }
+  .cal-cell.weekend { background:#fafbfc; }
+  .cal-cell.empty { background:#f8fafc; }
+  .cal-cell:not(.empty):hover { background:#f0f9ff; }
+  .cal-daynum { display:inline-flex; align-items:center; justify-content:center; min-width:1.6rem; height:1.6rem;
+    padding:0 .35rem; font-size:.78rem; font-weight:600; color:#475569; border-radius:9999px; align-self:flex-start; }
+  .cal-cell.is-today .cal-daynum { background:#0ea5e9; color:#fff; }
+
+  /* Month meeting pill (tinted by status) */
+  .m-pill { display:flex; align-items:center; gap:.3rem; font-size:.7rem; line-height:1.2; padding:.15rem .4rem;
+    border-radius:.35rem; border-left:3px solid; text-decoration:none; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .m-pill .m-time { font-weight:600; flex-shrink:0; }
+  .m-pill .m-name { overflow:hidden; text-overflow:ellipsis; }
+  .m-pending{ background:#f0f9ff; color:#0369a1; border-color:#0ea5e9; }
+  .m-pending:hover{ background:#e0f2fe; }
+  .m-completed{ background:#f0fdf4; color:#15803d; border-color:#22c55e; }
+  .m-completed:hover{ background:#dcfce7; }
+  .m-interrupted{ background:#fef2f2; color:#b91c1c; border-color:#ef4444; }
+  .m-interrupted:hover{ background:#fee2e2; }
+  .m-missed{ background:#f8fafc; color:#64748b; border-color:#94a3b8; }
+  .m-missed:hover{ background:#f1f5f9; }
+  .m-more { font-size:.68rem; font-weight:600; color:#94a3b8; padding:.05rem .4rem; }
+
+  /* ───────── Week / Day time grid ───────── */
+  .cal-grid { display:grid; grid-template-columns:3.5rem repeat(var(--span),minmax(0,1fr));
+    border:1px solid #e5e7eb; border-radius:.6rem; overflow:hidden; }
+  .cal-gh { background:#f8fafc; border-bottom:1px solid #e5e7eb; border-left:1px solid #f1f5f9; padding:.5rem .3rem; text-align:center; }
+  .cal-gh:first-child { border-left:0; }
+  .cal-gh.is-today { background:#eff6ff; }
+  .cal-gh .dow { font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
+  .cal-gh .dnum { font-size:.95rem; font-weight:600; color:#334155; margin-top:.05rem; line-height:1.1; }
+  .cal-gh.is-today .dnum { display:inline-flex; align-items:center; justify-content:center; width:1.7rem; height:1.7rem;
+    background:#0ea5e9; color:#fff; border-radius:9999px; }
+  .cal-time { border-bottom:1px solid #f1f5f9; font-size:.65rem; color:#94a3b8; text-align:right; padding:.15rem .4rem 0 0;
+    white-space:nowrap; }
+  .cal-time.hour { color:#64748b; font-weight:500; }
+  .cal-slot { position:relative; border-bottom:1px solid #f1f5f9; border-left:1px solid #f1f5f9; min-height:1.9rem;
+    padding:1px 2px; cursor:pointer; transition:background .1s; }
+  .cal-slot.half { border-bottom-style:solid; border-bottom-color:#f8fafc; }
+  .cal-slot:hover { background:#f0f9ff; box-shadow:inset 0 0 0 1px #bae6fd; }
+  .cal-slot.today { background:#f8fbff; }
+  .cal-slot.today:hover { background:#eff6ff; }
+  .cal-chip { display:block; font-size:.66rem; line-height:1.2; color:#fff; border-radius:.3rem; padding:.14rem .35rem;
+    margin-bottom:1px; text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; box-shadow:0 1px 1px rgba(0,0,0,.12); }
+  .cal-chip.is-pending{ background:#0ea5e9; } .cal-chip.is-pending:hover{ background:#0284c7; }
+  .cal-chip.is-completed{ background:#22c55e; } .cal-chip.is-completed:hover{ background:#16a34a; }
+  .cal-chip.is-interrupted{ background:#ef4444; } .cal-chip.is-interrupted:hover{ background:#dc2626; }
+  .cal-chip.is-missed{ background:#94a3b8; } .cal-chip.is-missed:hover{ background:#64748b; }
+  /* "now" indicator line */
+  .cal-now { position:absolute; left:0; right:0; height:2px; background:#ef4444; z-index:5; pointer-events:none; }
+  .cal-now::before { content:""; position:absolute; left:-3px; top:-3px; width:8px; height:8px; border-radius:9999px; background:#ef4444; }
+
+  /* ───────── Schedule modal ───────── */
+  .cal-modal-card input:not([type=hidden]), .cal-modal-card select {
+    width:100%; border-radius:.5rem; border:1px solid #d1d5db; padding:.5rem .7rem; font-size:.875rem; background:#fff; color:#111827; }
+  .cal-modal-card input:focus, .cal-modal-card select:focus {
+    outline:none; border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.15); }
+</style>
+{% endblock %}
+
+{% block content %}
+  <!-- Header -->
+  <header class="flex flex-wrap justify-between items-start gap-3 mb-6">
+    <div>
+      <h1 class="text-3xl font-semibold text-gray-800">{% trans "Calendar" %}</h1>
+      <p class="text-gray-500">{% trans "See your scheduled meetings at a glance and book new ones." %}</p>
+    </div>
+    <!-- View switcher -->
+    <div class="cal-views" role="tablist" aria-label="{% trans 'Calendar view' %}">
+      {% comment %}
+        Deliberately without `item`: changing the view is navigation, not
+        selecting something. Carrying the open panel across meant switching to
+        Month reopened an event you had not clicked, often one no longer on
+        screen. The panel opens when you click an event, and closes when you
+        stop looking at it.
+      {% endcomment %}
+      {% for v, label in view_options %}
+        <a href="?view={{ v }}" class="cal-view {% if view == v %}active{% endif %}" role="tab" aria-selected="{% if view == v %}true{% else %}false{% endif %}">
+          <span class="material-icons-outlined">{% if v == 'month' %}calendar_view_month{% elif v == 'week' %}view_week{% else %}calendar_view_day{% endif %}</span>
+          {{ label }}
+        </a>
+      {% endfor %}
+    </div>
+  </header>
+
+  <div class="card p-6">
+    <!-- Toolbar -->
+    <div class="cal-toolbar">
+      <a href="?view={{ view }}&amp;offset=0" class="cal-today {% if offset == 0 %}disabled{% endif %}">{% trans "Today" %}</a>
+      <a href="?view={{ view }}&amp;offset={{ offset|add:'-1' }}" class="cal-navbtn {% if at_min %}disabled{% endif %}" aria-label="{% trans 'Previous' %}">
+        <span class="material-icons-outlined">chevron_left</span>
+      </a>
+      <a href="?view={{ view }}&amp;offset={{ offset|add:'1' }}" class="cal-navbtn {% if at_max %}disabled{% endif %}" aria-label="{% trans 'Next' %}">
+        <span class="material-icons-outlined">chevron_right</span>
+      </a>
+      <h2 class="cal-period">{{ period_label }}</h2>
+
+      <div class="cal-legend ml-auto">
+        <span class="dot"><span class="swatch sw-pending"></span>{% trans "Pending" %}</span>
+        <span class="dot"><span class="swatch sw-completed"></span>{% trans "Complete" %}</span>
+        <span class="dot"><span class="swatch sw-interrupted"></span>{% trans "Interrupted" %}</span>
+        <span class="dot"><span class="swatch sw-missed"></span>{% trans "Not answered" %}</span>
+      </div>
+    </div>
+
+    {% if view == 'month' %}
+      {# ── Month grid ── #}
+      <div class="cal-month">
+        <div class="cal-dow">{% trans "Mon" %}</div>
+        <div class="cal-dow">{% trans "Tue" %}</div>
+        <div class="cal-dow">{% trans "Wed" %}</div>
+        <div class="cal-dow">{% trans "Thu" %}</div>
+        <div class="cal-dow">{% trans "Fri" %}</div>
+        <div class="cal-dow">{% trans "Sat" %}</div>
+        <div class="cal-dow">{% trans "Sun" %}</div>
+        {% for week in month_days %}
+          {% for day in week %}
+            {% if day %}
+              <div class="cal-cell{% if forloop.counter >= 6 %} weekend{% endif %}{% if offset == 0 and day == today_day %} is-today{% endif %}">
+                <span class="cal-daynum">{{ day }}</span>
+                {% with day_meetings=meetings_by_day|get_dict_value:day %}
+                  {% if day_meetings %}
+                    <div class="flex flex-col gap-1 overflow-hidden">
+                      {% for meeting in day_meetings|slice:":3" %}
+                        <a href="?{{ cal_qs }}item=meeting-{{ meeting.id }}"
+                           class="m-pill {% if meeting.status == 1 %}m-completed{% elif meeting.status == 2 %}m-interrupted{% elif meeting.status == 3 %}m-missed{% else %}m-pending{% endif %}{% if panel_item.token == meeting.panel_token %} cal-ev-open{% endif %}{% if meeting.status == 4 %} cal-ev-off{% endif %}"
+                           title="{{ meeting.scheduled_time|time:'H:i' }} · {{ meeting.patient.name }} {{ meeting.patient.lastname }} · {{ meeting.get_type_display }} ({{ meeting.get_status_display }})">
+                          <span class="m-time">{{ meeting.scheduled_time|time:"H:i" }}</span>
+                          <span class="m-name">{{ meeting.patient.name }} {{ meeting.patient.lastname }}</span>
+                        </a>
+                      {% endfor %}
+                      {% if day_meetings|length > 3 %}
+                        <span class="m-more">+{{ day_meetings|length|add:"-3" }} {% trans "more" %}</span>
+                      {% endif %}
+                    </div>
+                  {% endif %}
+                {% endwith %}
+              </div>
+            {% else %}
+              <div class="cal-cell empty"></div>
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      </div>
+
+    {% else %}
+      {# ── Week / Day time grid (half-hour blocks) ── #}
+      <p class="text-xs text-gray-400 mb-3 flex items-center gap-1">
+        <span class="material-icons-outlined text-sm">touch_app</span>{% trans "Click any empty slot to schedule a meeting." %}
+      </p>
+      <div class="overflow-x-auto">
+        <div class="cal-grid" style="--span:{{ span }}; min-width:{% if span > 1 %}760px{% else %}340px{% endif %}">
+          <div class="cal-gh"></div>
+          {% for d in day_headers %}
+            <div class="cal-gh {% if d.is_today %}is-today{% endif %}">
+              <div class="dow">{{ d.date|date:"D" }}</div>
+              <div class="dnum">{{ d.date|date:"j" }}</div>
+            </div>
+          {% endfor %}
+          {% for row in grid_rows %}
+            <div class="cal-time {% if ':00' in row.label %}hour{% endif %}">{% if ':00' in row.label %}{{ row.label }}{% endif %}</div>
+            {% for c in row.cells %}
+              <div class="cal-slot{% if ':30' in row.label %} half{% endif %}{% if c.is_today %} today{% endif %}" data-dt="{{ c.datetime }}" onclick="calOpen(this)">
+                {% for m in c.meetings %}
+                  <a href="?{{ cal_qs }}item=meeting-{{ m.id }}"
+                     class="cal-chip {% if m.status == 1 %}is-completed{% elif m.status == 2 %}is-interrupted{% elif m.status == 3 %}is-missed{% else %}is-pending{% endif %}{% if panel_item.token == m.panel_token %} cal-ev-open{% endif %}{% if m.status == 4 %} cal-chip-off{% endif %}"
+                     onclick="event.stopPropagation()"
+                     title="{{ m.scheduled_time|time:'H:i' }} · {{ m.patient.name }} {{ m.patient.lastname }} · {{ m.get_type_display }} ({{ m.get_status_display }})">{{ m.scheduled_time|time:"H:i" }} {{ m.patient.name }}</a>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if view != 'month' %}
+  <div id="calModal" style="display:none;position:fixed;inset:0;z-index:50;background:rgba(15,23,42,.5);align-items:center;justify-content:center;padding:1rem;">
+    <div class="cal-modal-card bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">event</span>
+        <div class="flex-1">
+          <h3 class="text-lg font-semibold text-gray-800">{% trans "New meeting" %}</h3>
+          <p class="text-sm text-gray-500" id="calModalWhen">{% trans "Pick a client and meeting type." %}</p>
+        </div>
+        <button type="button" onclick="calClose()" class="text-gray-400 hover:text-gray-600"><span class="material-icons-outlined">close</span></button>
+      </div>
+      <form method="post" action="{% url 'calendar_create_meeting' %}">
+        {% csrf_token %}
+        <input type="hidden" name="view" value="{{ view }}">
+        <input type="hidden" name="offset" value="{{ offset }}">
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.scheduled_time.label }}</label>
+          {{ meeting_form.scheduled_time }}
+        </div>
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.patient.label }}</label>
+          {{ meeting_form.patient }}
+        </div>
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.type.label }}</label>
+          {{ meeting_form.type }}
+        </div>
+        <div class="mb-5">
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.scheduled_protocol.label }}</label>
+          {{ meeting_form.scheduled_protocol }}
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="calClose()" class="button-secondary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Cancel" %}</button>
+          <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+            <span class="material-icons-outlined text-base">event_available</span>{% trans "Schedule" %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+  function calFmt(dt){
+    try {
+      var d = new Date(dt);
+      return d.toLocaleDateString(undefined, {weekday:'long', day:'numeric', month:'long'}) +
+             ' · ' + d.toLocaleTimeString(undefined, {hour:'2-digit', minute:'2-digit'});
+    } catch(e){ return dt; }
+  }
+  function calOpen(el){
+    var m = document.getElementById('calModal');
+    var dt = el.getAttribute('data-dt');
+    var i = m.querySelector('[name="scheduled_time"]');
+    if (i) { i.value = dt; }
+    var when = document.getElementById('calModalWhen');
+    if (when) { when.textContent = calFmt(dt); }
+    m.style.display = 'flex';
+    var sel = m.querySelector('[name="patient"]');
+    if (sel) { setTimeout(function(){ sel.focus(); }, 30); }
+  }
+  function calClose(){ var m = document.getElementById('calModal'); if (m) m.style.display = 'none'; }
+  (function(){
+    var m = document.getElementById('calModal');
+    if (m) { m.addEventListener('click', function(e){ if (e.target === this) calClose(); }); }
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') calClose(); });
+
+    // "Now" indicator on today's column (week/day views).
+    var now = new Date();
+    document.querySelectorAll('.cal-slot.today').forEach(function(cell){
+      var start = new Date(cell.getAttribute('data-dt'));
+      if (isNaN(start)) return;
+      var end = new Date(start.getTime() + 30*60000);
+      if (now >= start && now < end) {
+        var line = document.createElement('div');
+        line.className = 'cal-now';
+        line.style.top = ((now - start) / (30*60000) * 100) + '%';
+        cell.appendChild(line);
+      }
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,114 @@
+{% load i18n %}{% comment %}Shared timeline accordion + filter behaviour.{% endcomment %}
+  (function () {
+    var groups = document.getElementById('tlGroups');
+    if (!groups) return;
+
+    var months = Array.prototype.slice.call(groups.querySelectorAll('.tl-month'));
+    var weeks = Array.prototype.slice.call(groups.querySelectorAll('.tl-week'));
+    var items = Array.prototype.slice.call(groups.querySelectorAll('.tl-item'));
+    var chips = Array.prototype.slice.call(document.querySelectorAll('#tlFilters .tl-chip'));
+    var emptyEl = document.getElementById('tlEmpty');
+    var filter = 'all';
+
+    function updatePills(el) {
+      Array.prototype.slice.call(el.querySelectorAll('.tl-pill')).forEach(function (p) {
+        p.style.display = (filter === 'all' || p.dataset.kind === filter) ? '' : 'none';
+      });
+    }
+
+    function groupVisible(el) {
+      return filter === 'all'
+        ? Number(el.dataset.countTotal) > 0
+        : Number(el.dataset['count' + filter.charAt(0).toUpperCase() + filter.slice(1)]) > 0;
+    }
+
+    function applyFilter() {
+      items.forEach(function (it) {
+        it.style.display = (filter === 'all' || it.dataset.kind === filter) ? '' : 'none';
+      });
+      weeks.forEach(function (w) { w.style.display = groupVisible(w) ? '' : 'none'; updatePills(w); });
+      months.forEach(function (m) { m.style.display = groupVisible(m) ? '' : 'none'; updatePills(m); });
+      var any = filter === 'all' ? items.length > 0 : items.some(function (it) { return it.dataset.kind === filter; });
+      if (emptyEl) emptyEl.classList.toggle('hidden', any);
+    }
+
+    function setOpen(el, open) {
+      el.classList.toggle('open', open);
+      var head = el.querySelector(':scope > .tl-month-head, :scope > .tl-week-head');
+      if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    function resetDefaultOpen() {
+      months.concat(weeks).forEach(function (el) { setOpen(el, el.classList.contains('tl-default-open')); });
+    }
+
+    // Collapse / expand a month or week by clicking its header.
+    groups.addEventListener('click', function (ev) {
+      var head = ev.target.closest('.tl-month-head, .tl-week-head');
+      if (head) { var sec = head.parentElement; setOpen(sec, !sec.classList.contains('open')); return; }
+      // Otherwise, a click on a meeting card navigates to its meeting page.
+      var card = ev.target.closest('.tl-clickable');
+      if (!card || !card.dataset.href) return;
+      if (ev.target.closest('a, button, form, audio, input, label, summary, details')) return;
+      window.location.href = card.dataset.href;
+    });
+
+    // Filtering by type: reveal matches (auto-expand), or restore the default
+    // collapsed layout when back to "All" — so a filter never hides its results.
+    chips.forEach(function (c) {
+      c.addEventListener('click', function () {
+        chips.forEach(function (x) { x.classList.remove('active'); });
+        c.classList.add('active');
+        filter = c.dataset.filter;
+        applyFilter();
+        if (filter === 'all') {
+          resetDefaultOpen();
+        } else {
+          months.forEach(function (m) { if (m.style.display !== 'none') setOpen(m, true); });
+          weeks.forEach(function (w) { if (w.style.display !== 'none') setOpen(w, true); });
+        }
+      });
+    });
+
+    var expandAll = document.getElementById('tlExpandAll');
+    var collapseAll = document.getElementById('tlCollapseAll');
+    if (expandAll) expandAll.addEventListener('click', function () {
+      months.concat(weeks).forEach(function (el) { if (el.style.display !== 'none') setOpen(el, true); });
+    });
+    if (collapseAll) collapseAll.addEventListener('click', function () {
+      months.concat(weeks).forEach(function (el) { setOpen(el, false); });
+    });
+
+    // Transcription / summarization can take a few seconds — give feedback and
+    // prevent double submits.
+    Array.prototype.slice.call(groups.querySelectorAll('form.tl-async')).forEach(function (f) {
+      f.addEventListener('submit', function () {
+        var btn = f.querySelector('button[type=submit]');
+        if (!btn) return;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons-outlined text-sm" style="animation:spin 1s linear infinite">progress_activity</span>{% trans "Working…" %}';
+      });
+    });
+
+    applyFilter();
+
+    // Arriving with a panel open: bring that entry into view. Its month and
+    // week are already expanded server-side, so the card exists by now.
+    // Deferred a frame because on the client page the timeline sits inside a
+    // tab that the tab script un-hides straight after this runs — scrolling a
+    // hidden element does nothing.
+    // Jumps rather than animates: a deep link should arrive already there, and
+    // smooth scrolling over several thousand pixels is both slow and silently
+    // ignored in some browsers.
+    // setTimeout rather than requestAnimationFrame: rAF does not run while a
+    // tab is in the background, so a link opened in a new tab would never
+    // scroll. The zero delay still puts this after the client page's tab
+    // script, which un-hides the timeline.
+    var opened = groups.querySelector('.tl-card-open');
+    if (opened) {
+      setTimeout(function () {
+        if (!opened.offsetParent) return;   // still hidden: nothing to scroll to
+        opened.scrollIntoView({ block: 'center', behavior: 'auto' });
+      }, 0);
+    }
+  })();

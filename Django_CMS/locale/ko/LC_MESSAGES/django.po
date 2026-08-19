@@ -1,0 +1,4037 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Conversational Care 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-10 11:10+0100\n"
+"PO-Revision-Date: 2026-07-07 08:57\n"
+"Last-Translator: Conversational Care <team@conversational-care.ai>\n"
+"Language-Team: Korean <team@conversational-care.ai>\n"
+"Language: ko\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: ConvAI/forms.py:16
+msgid "Scheduled time"
+msgstr "예약 시간"
+
+#: ConvAI/forms.py:28
+msgid "Address or place"
+msgstr "주소 또는 장소"
+
+#: ConvAI/forms.py:34 ConvAI/forms.py:515
+#: ConvAI/templates/patients/edit_care_plan.html:13
+#: ConvAI/templates/patients/patient_detail.html:7
+#: ConvAI/templates/patients/patient_list.html:557
+#: ConvAI/templates/users/user_list.html:81
+msgid "Client"
+msgstr "환자"
+
+#: ConvAI/forms.py:35 ConvAI/templates/_detail_panel.html:320
+msgid "How"
+msgstr "방식"
+
+#: ConvAI/forms.py:36 ConvAI/templates/_detail_panel.html:83
+#: ConvAI/templates/_detail_panel.html:329
+msgid "Where"
+msgstr "장소"
+
+#: ConvAI/forms.py:37 ConvAI/templates/_detail_panel.html:335
+#: ConvAI/templates/_detail_panel.html:619
+msgid "Type"
+msgstr "유형"
+
+#: ConvAI/forms.py:38
+msgid "Scheduled protocol"
+msgstr "예약된 프로토콜"
+
+#: ConvAI/forms.py:69
+msgid "Say where the meeting takes place."
+msgstr "미팅이 열리는 장소를 입력하세요."
+
+#: ConvAI/forms.py:78
+msgid "Client – Caregiver"
+msgstr "환자 – 보호자"
+
+#: ConvAI/forms.py:83 ConvAI/templates/alerts/alert_detail.html:288
+msgid "Date"
+msgstr "날짜"
+
+#: ConvAI/forms.py:91
+msgid "State"
+msgstr "상태"
+
+#: ConvAI/forms.py:92 ConvAI/forms.py:99
+#: ConvAI/templates/patients/patient_list.html:497
+#: ConvAI/templates/sidebar.html:131 ConvAI/views/communications.py:66
+#: ConvAI/views/communications.py:72
+msgid "All"
+msgstr "전체"
+
+#: ConvAI/forms.py:98
+msgid "Call type"
+msgstr "통화 유형"
+
+#: ConvAI/forms.py:121
+msgid "Write the details here in Markdown..."
+msgstr "여기에 Markdown으로 세부 정보를 작성하세요..."
+
+#: ConvAI/forms.py:126
+msgid "Supports Markdown syntax."
+msgstr "Markdown 구문을 지원합니다."
+
+#: ConvAI/forms.py:137
+msgid "Care plan (PDF)"
+msgstr "돌봄 계획 (PDF)"
+
+#: ConvAI/forms.py:140
+msgid "PDF files only, maximum 5 MB."
+msgstr "PDF 파일만 가능, 최대 5MB."
+
+#: ConvAI/forms.py:150
+msgid "The file must have a .pdf extension."
+msgstr "파일은 .pdf 확장자를 가져야 합니다."
+
+#: ConvAI/forms.py:154
+msgid "The file must be a valid PDF."
+msgstr "파일은 유효한 PDF여야 합니다."
+
+#: ConvAI/forms.py:158
+msgid "The PDF cannot exceed 5 MB."
+msgstr "PDF는 5MB를 초과할 수 없습니다."
+
+#: ConvAI/forms.py:247
+msgid "•••• set (leave blank to keep)"
+msgstr "•••• 설정됨 (유지하려면 비워 두세요)"
+
+#: ConvAI/forms.py:267
+msgid "Hide meeting steps"
+msgstr "미팅 단계 숨기기"
+
+#: ConvAI/forms.py:268
+msgid "Enable automations"
+msgstr "자동화 활성화"
+
+#: ConvAI/forms.py:269
+msgid "Enable self-registration"
+msgstr "자가 등록 활성화"
+
+#: ConvAI/forms.py:270 ConvAI/forms.py:291
+msgid "Self-registration agent"
+msgstr "자가 등록 에이전트"
+
+#: ConvAI/forms.py:271
+msgid "Send care plan"
+msgstr "돌봄 계획 보내기"
+
+#: ConvAI/forms.py:272
+msgid "Enable WhatsApp audio"
+msgstr "WhatsApp 오디오 활성화"
+
+#: ConvAI/forms.py:286 ConvAI/models.py:706
+msgid "Use .env default"
+msgstr ".env 기본값 사용"
+
+#: ConvAI/forms.py:307
+msgid "Twilio Account SID"
+msgstr "Twilio 계정 SID"
+
+#: ConvAI/forms.py:308
+msgid "Twilio Auth Token"
+msgstr "Twilio 인증 토큰"
+
+#: ConvAI/forms.py:309
+msgid "Platform phone number"
+msgstr "플랫폼 전화번호"
+
+#: ConvAI/forms.py:310
+msgid "OpenAI API key"
+msgstr "OpenAI API 키"
+
+#: ConvAI/forms.py:311
+msgid "ElevenLabs API key"
+msgstr "ElevenLabs API 키"
+
+#: ConvAI/forms.py:312
+msgid "ElevenLabs voice ID"
+msgstr "ElevenLabs 음성 ID"
+
+#: ConvAI/forms.py:328
+msgid "SMS sender number"
+msgstr "SMS 발신 번호"
+
+#: ConvAI/forms.py:329
+msgid "Infection alert SMS template SID"
+msgstr "감염 알림 SMS 템플릿 SID"
+
+#: ConvAI/forms.py:330
+msgid "Infection alert SMS text"
+msgstr "감염 알림 SMS 문구"
+
+#: ConvAI/forms.py:331
+msgid "Care plan WhatsApp template SID"
+msgstr "돌봄 계획 WhatsApp 템플릿 SID"
+
+#: ConvAI/forms.py:350
+msgid "Meeting protocol summary prompt"
+msgstr "미팅 프로토콜 요약 프롬프트"
+
+#: ConvAI/forms.py:351
+msgid "Call transcript summary prompt"
+msgstr "통화 기록 요약 프롬프트"
+
+#: ConvAI/forms.py:355
+msgid ""
+"Base prompt for summarizing a meeting's protocol answers. Leave blank to use"
+" the built-in default. The meeting's protocol(s) and answers are appended "
+"automatically."
+msgstr ""
+"미팅 프로토콜 답변을 요약하기 위한 기본 프롬프트입니다. 비워 두면 내장 기본값이 사용됩니다. 미팅의 프로토콜과 답변은 자동으로 "
+"추가됩니다."
+
+#: ConvAI/forms.py:360
+msgid ""
+"Base prompt for post-processing a Whisper call transcript into a summary. "
+"Leave blank to use the built-in default. The transcript is appended "
+"automatically."
+msgstr ""
+"Whisper 통화 기록을 요약으로 후처리하기 위한 기본 프롬프트입니다. 비워 두면 내장 기본값이 사용됩니다. 통화 기록은 자동으로 "
+"추가됩니다."
+
+#: ConvAI/forms.py:373 ConvAI/forms.py:559
+msgid "Caregiver first name"
+msgstr "보호자 이름"
+
+#: ConvAI/forms.py:374 ConvAI/forms.py:560
+msgid "Caregiver last name"
+msgstr "보호자 성"
+
+#: ConvAI/forms.py:375 ConvAI/forms.py:561
+#: ConvAI/templates/patients/patient_detail.html:93
+msgid "Caregiver phone"
+msgstr "보호자 전화"
+
+#: ConvAI/forms.py:381 ConvAI/forms.py:567
+#: ConvAI/templates/account/profile.html:52
+msgid "First name"
+msgstr "이름"
+
+#: ConvAI/forms.py:381 ConvAI/forms.py:567
+#: ConvAI/templates/account/profile.html:56
+msgid "Last name"
+msgstr "성"
+
+#: ConvAI/forms.py:381 ConvAI/forms.py:567
+#: ConvAI/templates/settings/config.html:460
+msgid "Phone"
+msgstr "전화"
+
+#: ConvAI/forms.py:382 ConvAI/forms.py:568
+#: ConvAI/templates/patients/patient_detail.html:95 ConvAI/views/users.py:17
+msgid "Navigator"
+msgstr "내비게이터"
+
+#: ConvAI/forms.py:382 ConvAI/forms.py:568
+#: ConvAI/templates/patients/patient_detail.html:99 ConvAI/views/_panel.py:381
+msgid "Agent"
+msgstr "에이전트"
+
+#: ConvAI/forms.py:446 ConvAI/templates/agents/_agent_card.html:50
+msgid "Real-time voice agent"
+msgstr "실시간 음성 에이전트"
+
+#: ConvAI/forms.py:450
+msgid ""
+"Converse by live voice (GPT Realtime over Azure) instead of the text chat. "
+"The model above is ignored; the Realtime deployment from Settings → Agents "
+"is used."
+msgstr ""
+"텍스트 채팅 대신 실시간 음성(Azure의 GPT Realtime)으로 대화합니다. 위의 모델은 무시되며 설정 → 에이전트의 "
+"Realtime 배포가 사용됩니다."
+
+#: ConvAI/forms.py:490 ConvAI/forms.py:536
+#: ConvAI/templates/account/profile.html:64
+#: ConvAI/templates/users/test_user_result.html:25
+#: ConvAI/templates/users/user_list.html:76
+msgid "Username"
+msgstr "사용자 이름"
+
+#: ConvAI/forms.py:491 ConvAI/templates/users/test_user_result.html:36
+msgid "Password"
+msgstr "비밀번호"
+
+#: ConvAI/forms.py:496 ConvAI/forms.py:552
+msgid "A user with that username already exists."
+msgstr "해당 사용자 이름을 가진 사용자가 이미 있습니다."
+
+#: ConvAI/forms.py:526
+msgid "This client already has a test user."
+msgstr "이 환자에게는 이미 테스트 사용자가 있습니다."
+
+#: ConvAI/forms.py:537 ConvAI/templates/account/profile.html:60
+#: ConvAI/templates/settings/config.html:461
+#: ConvAI/templates/users/user_list.html:78
+msgid "E-mail"
+msgstr "이메일"
+
+#: ConvAI/forms.py:538 ConvAI/templates/account/profile.html:137
+#: ConvAI/templates/settings/config.html:518
+#: ConvAI/templates/users/user_list.html:105
+msgid "Active"
+msgstr "활성"
+
+#: ConvAI/forms.py:608
+msgid "Help page content (Markdown)"
+msgstr "도움말 페이지 콘텐츠(Markdown)"
+
+#: ConvAI/forms.py:610
+msgid "Supports Markdown. Leave blank to restore the shipped default content."
+msgstr "Markdown을 지원합니다. 비워 두면 기본 제공 콘텐츠로 복원됩니다."
+
+#: ConvAI/forms.py:622
+msgid "Brand name"
+msgstr "브랜드 이름"
+
+#: ConvAI/forms.py:623
+msgid "Brand logo (upload)"
+msgstr "브랜드 로고 (업로드)"
+
+#: ConvAI/forms.py:624
+msgid "Brand logo (static path)"
+msgstr "브랜드 로고 (정적 경로)"
+
+#: ConvAI/forms.py:627
+msgid "PNG, JPG or SVG, max 2 MB. Overrides the static path below."
+msgstr "PNG, JPG 또는 SVG, 최대 2MB. 아래 정적 경로를 대체합니다."
+
+#: ConvAI/forms.py:628
+msgid "Fallback used when no logo file is uploaded."
+msgstr "로고 파일이 업로드되지 않았을 때 사용됩니다."
+
+#: ConvAI/forms.py:640
+msgid "The logo cannot exceed 2 MB."
+msgstr "로고는 2MB를 초과할 수 없습니다."
+
+#: ConvAI/forms.py:672
+msgid "Default agent model"
+msgstr "기본 에이전트 모델"
+
+#: ConvAI/forms.py:673
+msgid "Anthropic API key"
+msgstr "Anthropic API 키"
+
+#: ConvAI/forms.py:674
+msgid "Google API key"
+msgstr "Google API 키"
+
+#: ConvAI/forms.py:675
+msgid "Mistral API key"
+msgstr "Mistral API 키"
+
+#: ConvAI/forms.py:676
+msgid "DeepSeek API key"
+msgstr "DeepSeek API 키"
+
+#: ConvAI/forms.py:677
+msgid "Allowed agent hosts (comma-separated)"
+msgstr "허용된 에이전트 호스트(쉼표로 구분)"
+
+#: ConvAI/forms.py:678
+msgid "Use Azure"
+msgstr "Azure 사용"
+
+#: ConvAI/forms.py:679
+msgid "Azure OpenAI endpoint"
+msgstr "Azure OpenAI 엔드포인트"
+
+#: ConvAI/forms.py:680
+msgid "Azure OpenAI key"
+msgstr "Azure OpenAI 키"
+
+#: ConvAI/forms.py:681
+msgid "Azure OpenAI API version"
+msgstr "Azure OpenAI API 버전"
+
+#: ConvAI/forms.py:682
+msgid "Azure Anthropic endpoint"
+msgstr "Azure Anthropic 엔드포인트"
+
+#: ConvAI/forms.py:683
+msgid "Azure Anthropic key"
+msgstr "Azure Anthropic 키"
+
+#: ConvAI/forms.py:684
+msgid "Azure Mistral endpoint"
+msgstr "Azure Mistral 엔드포인트"
+
+#: ConvAI/forms.py:685
+msgid "Azure Mistral key"
+msgstr "Azure Mistral 키"
+
+#: ConvAI/forms.py:686
+msgid "Azure DeepSeek endpoint"
+msgstr "Azure DeepSeek 엔드포인트"
+
+#: ConvAI/forms.py:687
+msgid "Azure DeepSeek key"
+msgstr "Azure DeepSeek 키"
+
+#: ConvAI/forms.py:688
+msgid "Azure Realtime endpoint"
+msgstr "Azure Realtime 엔드포인트"
+
+#: ConvAI/forms.py:689
+msgid "Azure Realtime key"
+msgstr "Azure Realtime 키"
+
+#: ConvAI/forms.py:690
+msgid "Realtime deployment"
+msgstr "Realtime 배포"
+
+#: ConvAI/forms.py:691
+msgid "Realtime voice"
+msgstr "Realtime 음성"
+
+#: ConvAI/forms.py:692
+msgid "Realtime WebRTC region"
+msgstr "Realtime WebRTC 리전"
+
+#: ConvAI/forms.py:695
+msgid ""
+"Used when an agent has no explicit model, e.g. 'openai/gpt-4.1-mini'. Blank "
+"uses the .env default."
+msgstr ""
+"에이전트에 명시적 모델이 없을 때 사용됩니다. 예: 'openai/gpt-4.1-mini'. 비워 두면 .env 기본값을 사용합니다."
+
+#: ConvAI/forms.py:697
+msgid "Route models to Azure instead of the public provider APIs."
+msgstr "공개 제공업체 API 대신 모델을 Azure로 라우팅합니다."
+
+#: ConvAI/forms.py:698
+msgid "Blank reuses the Azure Mistral endpoint/key."
+msgstr "비워 두면 Azure Mistral 엔드포인트/키를 재사용합니다."
+
+#: ConvAI/forms.py:699
+msgid "Blank reuses the Azure OpenAI endpoint/key."
+msgstr "비워 두면 Azure OpenAI 엔드포인트/키를 재사용합니다."
+
+#: ConvAI/forms.py:700
+msgid "Deployment used by real-time voice agents, e.g. 'gpt-realtime'."
+msgstr "실시간 음성 에이전트가 사용하는 배포입니다. 예: 'gpt-realtime'."
+
+#: ConvAI/forms.py:702
+msgid "Output voice for real-time voice agents. Blank uses 'marin'."
+msgstr "실시간 음성 에이전트의 출력 음성입니다. 비워 두면 'marin'을 사용합니다."
+
+#: ConvAI/forms.py:704
+msgid ""
+"Only for resources on the preview Realtime API: the resource's region, e.g. "
+"'swedencentral' or 'eastus2'."
+msgstr ""
+"미리 보기 Realtime API를 사용하는 리소스 전용: 리소스의 리전입니다. 예: 'swedencentral' 또는 "
+"'eastus2'."
+
+#: ConvAI/models.py:29
+msgid "Optional default LangGraph agent for this user (used for testing/API)."
+msgstr "이 사용자의 선택적 기본 LangGraph 에이전트(테스트/API에 사용)."
+
+#: ConvAI/models.py:52
+msgid "Preferred interface language; blank uses the system default."
+msgstr "선호하는 인터페이스 언어입니다. 비워 두면 시스템 기본값을 사용합니다."
+
+#: ConvAI/models.py:299 ConvAI/templates/_detail_panel.html:344
+msgid "Protocol"
+msgstr "프로토콜"
+
+#: ConvAI/models.py:300
+msgid "Onboarding"
+msgstr "온보딩"
+
+#: ConvAI/models.py:301
+msgid "Final"
+msgstr "최종"
+
+#: ConvAI/models.py:302
+msgid "Initial"
+msgstr "초기"
+
+#: ConvAI/models.py:303
+msgid "Follow-up"
+msgstr "후속 조치"
+
+#: ConvAI/models.py:306 ConvAI/templates/calls/calendar.html:144
+msgid "Pending"
+msgstr "대기 중"
+
+#: ConvAI/models.py:307 ConvAI/templates/_detail_panel.html:98
+#: ConvAI/templates/_detail_panel.html:406
+#: ConvAI/templates/calls/calendar.html:145
+msgid "Complete"
+msgstr "완료"
+
+#: ConvAI/models.py:308 ConvAI/templates/_detail_panel.html:408
+#: ConvAI/templates/calls/calendar.html:146
+msgid "Interrupted"
+msgstr "중단됨"
+
+#: ConvAI/models.py:309 ConvAI/templates/calls/calendar.html:147
+msgid "Not answered"
+msgstr "응답 없음"
+
+#: ConvAI/models.py:313 ConvAI/templates/communications/_list.html:79
+msgid "Cancelled"
+msgstr "취소됨"
+
+#: ConvAI/models.py:326 ConvAI/templates/patients/_timeline_event.html:34
+#: ConvAI/views/_panel.py:317
+msgid "Phone call"
+msgstr "전화 통화"
+
+#: ConvAI/models.py:327
+msgid "In person"
+msgstr "대면"
+
+#: ConvAI/models.py:330
+msgid "1. Protocol 1"
+msgstr "1. 프로토콜 1"
+
+#: ConvAI/models.py:331
+msgid "2. Protocol 2"
+msgstr "2. 프로토콜 2"
+
+#: ConvAI/models.py:332
+msgid "3. Protocol 3"
+msgstr "3. 프로토콜 3"
+
+#: ConvAI/models.py:333
+msgid "4. Protocol 4"
+msgstr "4. 프로토콜 4"
+
+#: ConvAI/models.py:334
+msgid "5. Protocol 5"
+msgstr "5. 프로토콜 5"
+
+#: ConvAI/models.py:335
+msgid "6. Protocol 6"
+msgstr "6. 프로토콜 6"
+
+#: ConvAI/models.py:336
+msgid "7. Protocol 7"
+msgstr "7. 프로토콜 7"
+
+#: ConvAI/models.py:337
+msgid "8. Protocol 8"
+msgstr "8. 프로토콜 8"
+
+#: ConvAI/models.py:338
+msgid "9. Final call"
+msgstr "9. 마지막 통화"
+
+#: ConvAI/models.py:339
+msgid "10. Follow-up"
+msgstr "10. 후속 조치"
+
+#: ConvAI/models.py:474 ConvAI/templates/agents/_agent_card.html:19
+#: ConvAI/templates/agents/agent_list.html:47
+msgid "Remote"
+msgstr "원격"
+
+#: ConvAI/models.py:476 ConvAI/templates/agents/_agent_card.html:21
+#: ConvAI/templates/agents/agent_list.html:51
+msgid "Native"
+msgstr "네이티브"
+
+#: ConvAI/models.py:479 ConvAI/templates/agents/agent_list.html:43
+msgid "Prompt-based"
+msgstr "프롬프트 기반"
+
+#: ConvAI/models.py:485
+msgid ""
+"Remote = runs on a LangGraph server (host:port). Native = ships with the "
+"platform. Prompt-based = in-process agent driven by a stored prompt."
+msgstr ""
+"원격 = LangGraph 서버(host:port)에서 실행됩니다. 네이티브 = 플랫폼에 기본 포함됩니다. 프롬프트 기반 = 저장된 "
+"프롬프트로 구동되는 인프로세스 에이전트입니다."
+
+#: ConvAI/models.py:491
+msgid ""
+"For native agents: which built-in graph to run (e.g. 'loopback', "
+"'link_worker')."
+msgstr "네이티브 에이전트의 경우: 실행할 내장 그래프(예: 'loopback', 'link_worker')."
+
+#: ConvAI/models.py:498
+msgid ""
+"System prompt for prompt-based agents. Used as the system message on every "
+"turn."
+msgstr "프롬프트 기반 에이전트의 시스템 프롬프트입니다. 매 턴마다 시스템 메시지로 사용됩니다."
+
+#: ConvAI/models.py:508
+msgid ""
+"Prompt-based agents only: chat through the real-time voice API (live speech "
+"in/out) instead of the text chat."
+msgstr "프롬프트 기반 에이전트 전용: 텍스트 채팅 대신 실시간 음성 API(실시간 음성 입출력)로 대화합니다."
+
+#: ConvAI/models.py:518
+msgid ""
+"Model behind this agent, e.g. 'openai/gpt-4.1-mini' or 'anthropic/claude-"
+"sonnet-4-6'. Blank uses the platform default. Not used by remote agents."
+msgstr ""
+"이 에이전트가 사용하는 모델입니다. 예: 'openai/gpt-4.1-mini' 또는 'anthropic/claude-"
+"sonnet-4-6'. 비워 두면 플랫폼 기본값을 사용합니다. 원격 에이전트에서는 사용되지 않습니다."
+
+#: ConvAI/models.py:698
+msgid "Must be a Twilio SID like HX + 32 hex characters."
+msgstr "HX + 16진수 32자 형식의 Twilio SID여야 합니다."
+
+#: ConvAI/models.py:699
+msgid "Enter a phone number in E.164 format, e.g. +447700900000."
+msgstr "E.164 형식으로 전화번호를 입력하세요. 예: +447700900000."
+
+#: ConvAI/models.py:707
+msgid "On"
+msgstr "켜기"
+
+#: ConvAI/models.py:708 ConvAI/templates/sidebar.html:133
+msgid "Off"
+msgstr "끄기"
+
+#: ConvAI/templates/_detail_panel.html:18
+msgid "Call details"
+msgstr "통화 상세"
+
+#: ConvAI/templates/_detail_panel.html:42
+#: ConvAI/templates/_detail_panel.html:464
+#: ConvAI/templates/patients/patient_detail.html:32
+#, python-format
+msgid "Last contact %(t)s ago"
+msgstr "마지막 연락 %(t)s 전"
+
+#: ConvAI/templates/_detail_panel.html:45
+#: ConvAI/templates/_detail_panel.html:100
+#: ConvAI/templates/_detail_panel.html:825
+#: ConvAI/templates/_detail_panel.html:982
+msgid "of"
+msgstr "/"
+
+#: ConvAI/templates/_detail_panel.html:45
+msgid "answered"
+msgstr "답변 완료"
+
+#: ConvAI/templates/_detail_panel.html:58
+#: ConvAI/templates/_detail_panel.html:469
+#: ConvAI/templates/communications/communications.html:50
+msgid "Close"
+msgstr "닫기"
+
+#: ConvAI/templates/_detail_panel.html:70
+#: ConvAI/templates/_detail_panel.html:91
+#: ConvAI/templates/settings/config.html:374
+#: ConvAI/views/settings_views.py:140
+msgid "Protocols"
+msgstr "프로토콜"
+
+#: ConvAI/templates/_detail_panel.html:73
+#: ConvAI/templates/_detail_panel.html:160
+msgid "Notes"
+msgstr "메모"
+
+#: ConvAI/templates/_detail_panel.html:75
+#: ConvAI/templates/_detail_panel.html:182 ConvAI/views/communications.py:174
+msgid "Recording"
+msgstr "녹음"
+
+#: ConvAI/templates/_detail_panel.html:83
+#: ConvAI/templates/dashboard/dashboard.html:515
+#: ConvAI/views/communications.py:124
+msgid "Location not set"
+msgstr "장소 미지정"
+
+#: ConvAI/templates/_detail_panel.html:87
+msgid "To address"
+msgstr "다룰 내용"
+
+#: ConvAI/templates/_detail_panel.html:102
+#, python-format
+msgid "%(n)s question"
+msgid_plural "%(n)s questions"
+msgstr[0] "질문 %(n)s개"
+
+#: ConvAI/templates/_detail_panel.html:118
+msgid "Type what they said"
+msgstr "상대방이 한 말을 입력하세요"
+
+#: ConvAI/templates/_detail_panel.html:131
+msgid "Send by text"
+msgstr "문자로 보내기"
+
+#: ConvAI/templates/_detail_panel.html:139
+msgid "No protocols have questions yet."
+msgstr "아직 질문이 있는 프로토콜이 없습니다."
+
+#: ConvAI/templates/_detail_panel.html:168
+msgid "Anything else worth recording from this meeting"
+msgstr "이 미팅에서 기록해 둘 만한 그 밖의 내용"
+
+#: ConvAI/templates/_detail_panel.html:168
+msgid "Anything else worth recording from this call"
+msgstr "이 통화에서 기록해 둘 만한 그 밖의 내용"
+
+#: ConvAI/templates/_detail_panel.html:186
+#, python-format
+msgid "Attached to this meeting · %(d)s"
+msgstr "이 미팅에 첨부됨 · %(d)s"
+
+#: ConvAI/templates/_detail_panel.html:202
+#: ConvAI/templates/_detail_panel.html:735
+msgid "Transcribe again"
+msgstr "다시 전사하기"
+
+#: ConvAI/templates/_detail_panel.html:203
+msgid "Transcribe this recording"
+msgstr "이 녹음 전사하기"
+
+#: ConvAI/templates/_detail_panel.html:207
+msgid "Nothing was recorded."
+msgstr "녹음된 내용이 없습니다."
+
+#: ConvAI/templates/_detail_panel.html:215
+#: ConvAI/templates/_detail_panel.html:489
+#: ConvAI/templates/_detail_panel.html:496 ConvAI/views/_panel.py:368
+msgid "Summary"
+msgstr "요약"
+
+#: ConvAI/templates/_detail_panel.html:219
+msgid "The protocol answers have not been summarised."
+msgstr "프로토콜 답변이 아직 요약되지 않았습니다."
+
+#: ConvAI/templates/_detail_panel.html:226
+msgid "Summarise again"
+msgstr "다시 요약하기"
+
+#: ConvAI/templates/_detail_panel.html:227
+msgid "Summarise the answers"
+msgstr "답변 요약하기"
+
+#: ConvAI/templates/_detail_panel.html:248
+msgid "Edit meeting"
+msgstr "미팅 편집"
+
+#: ConvAI/templates/_detail_panel.html:251
+#: ConvAI/templates/_detail_panel.html:254
+msgid "Start call"
+msgstr "통화 시작"
+
+#: ConvAI/templates/_detail_panel.html:254
+msgid "A phone number is missing for you or the caregiver."
+msgstr "본인 또는 보호자의 전화번호가 없습니다."
+
+#: ConvAI/templates/_detail_panel.html:262
+msgid "Send reminder"
+msgstr "리마인더 보내기"
+
+#: ConvAI/templates/_detail_panel.html:273
+msgid "Reschedule"
+msgstr "일정 변경"
+
+#: ConvAI/templates/_detail_panel.html:287
+#: ConvAI/templates/_detail_panel.html:370
+msgid "Cancel this call"
+msgstr "이 통화 취소"
+
+#: ConvAI/templates/_detail_panel.html:294
+msgid "End call"
+msgstr "통화 종료"
+
+#: ConvAI/templates/_detail_panel.html:308
+msgid "Edit this meeting"
+msgstr "이 미팅 편집"
+
+#: ConvAI/templates/_detail_panel.html:308
+msgid "Reschedule this call"
+msgstr "이 통화 일정 변경"
+
+#: ConvAI/templates/_detail_panel.html:310
+#, python-format
+msgid ""
+"For %(c)s. Everyone keeps the same appointment; only the details change."
+msgstr "%(c)s 대상. 약속 자체는 그대로이며 세부 사항만 변경됩니다."
+
+#: ConvAI/templates/_detail_panel.html:314
+#: ConvAI/templates/communications/_list.html:47
+msgid "When"
+msgstr "일시"
+
+#: ConvAI/templates/_detail_panel.html:331
+msgid "Only for an in-person meeting"
+msgstr "대면 미팅에만 해당"
+
+#: ConvAI/templates/_detail_panel.html:353
+#: ConvAI/templates/_detail_panel.html:717
+#: ConvAI/templates/_panel_agent_actions.html:67
+#: ConvAI/templates/_panel_agent_actions.html:94
+#: ConvAI/templates/account/help_edit.html:37
+#: ConvAI/templates/agents/agent_form.html:93
+#: ConvAI/templates/calls/calendar.html:255
+#: ConvAI/templates/chat/external_chat_with_audio.html:270
+#: ConvAI/templates/communications/communications.html:64
+#: ConvAI/templates/patients/edit_care_plan.html:73
+#: ConvAI/templates/patients/edit_patient.html:93
+#: ConvAI/templates/patients/edit_patient_details.html:39
+#: ConvAI/templates/patients/patient_detail.html:165
+#: ConvAI/templates/patients/patient_list.html:1369
+#: ConvAI/templates/users/edit_user.html:55
+#: ConvAI/templates/users/user_list.html:192
+#: ConvAI/templates/users/user_list.html:215
+msgid "Cancel"
+msgstr "취소"
+
+#: ConvAI/templates/_detail_panel.html:354
+#: ConvAI/templates/account/profile.html:70
+#: ConvAI/templates/account/profile.html:95
+#: ConvAI/templates/agents/agent_form.html:92
+#: ConvAI/templates/patients/edit_patient.html:92
+#: ConvAI/templates/settings/config.html:88
+#: ConvAI/templates/settings/config.html:132
+#: ConvAI/templates/settings/config.html:151
+#: ConvAI/templates/settings/config.html:174
+#: ConvAI/templates/settings/config.html:240
+#: ConvAI/templates/settings/config.html:270
+#: ConvAI/templates/users/edit_user.html:54
+msgid "Save changes"
+msgstr "변경 사항 저장"
+
+#: ConvAI/templates/_detail_panel.html:372
+msgid ""
+"It leaves the queue but stays in the history, struck through, so the record "
+"still shows it was arranged. You can put it back."
+msgstr ""
+"대기열에서는 빠지지만 기록에는 취소선이 그어진 채로 남아, 예정되었던 사실은 그대로 확인할 수 있습니다. 다시 되돌릴 수 있습니다."
+
+#: ConvAI/templates/_detail_panel.html:375
+#: ConvAI/templates/_detail_panel.html:708
+#: ConvAI/templates/_panel_agent_actions.html:84
+msgid "Why"
+msgstr "사유"
+
+#: ConvAI/templates/_detail_panel.html:377
+msgid "The client asked to stop"
+msgstr "환자가 중단을 요청함"
+
+#: ConvAI/templates/_detail_panel.html:378
+msgid "No longer needed"
+msgstr "더 이상 필요 없음"
+
+#: ConvAI/templates/_detail_panel.html:379
+msgid "Covered another way"
+msgstr "다른 방법으로 해결됨"
+
+#: ConvAI/templates/_detail_panel.html:380
+msgid "Arranged in error"
+msgstr "잘못 예약됨"
+
+#: ConvAI/templates/_detail_panel.html:381
+#: ConvAI/templates/_detail_panel.html:713
+#: ConvAI/templates/_panel_agent_actions.html:89
+#: ConvAI/templates/alerts/alert_detail.html:512
+msgid "Other"
+msgstr "기타"
+
+#: ConvAI/templates/_detail_panel.html:385
+#: ConvAI/templates/dashboard/dashboard.html:362
+msgid "Keep it"
+msgstr "유지하기"
+
+#: ConvAI/templates/_detail_panel.html:386
+msgid "Cancel the call"
+msgstr "통화 취소하기"
+
+#: ConvAI/templates/_detail_panel.html:392
+msgid "How did the call go?"
+msgstr "통화는 어떠셨나요?"
+
+#: ConvAI/templates/_detail_panel.html:409
+msgid "No answer"
+msgstr "응답 없음"
+
+#: ConvAI/templates/_detail_panel.html:414
+#, python-format
+msgid "Recording <b>%(p)s</b> as covered."
+msgstr "<b>%(p)s</b>을(를) 다룬 것으로 기록합니다."
+
+#: ConvAI/templates/_detail_panel.html:415
+#: ConvAI/templates/_detail_panel.html:1143
+msgid "Change"
+msgstr "변경"
+
+#: ConvAI/templates/_detail_panel.html:431
+msgid "Put it back on the schedule"
+msgstr "다시 일정에 추가"
+
+#: ConvAI/templates/_detail_panel.html:443
+msgid "Schedule a follow-up"
+msgstr "후속 일정 잡기"
+
+#: ConvAI/templates/_detail_panel.html:456
+#: ConvAI/templates/patients/patient_detail.html:44
+msgid "Details"
+msgstr "세부 정보"
+
+#: ConvAI/templates/_detail_panel.html:464
+#, python-format
+msgid "from %(s)s"
+msgstr "%(s)s에서"
+
+#: ConvAI/templates/_detail_panel.html:484
+msgid "Overview"
+msgstr "개요"
+
+#: ConvAI/templates/_detail_panel.html:485
+msgid "Technical"
+msgstr "기술 정보"
+
+#: ConvAI/templates/_detail_panel.html:490
+#: ConvAI/templates/alerts/alert_detail.html:289 ConvAI/views/_panel.py:365
+msgid "Conversation"
+msgstr "대화"
+
+#: ConvAI/templates/_detail_panel.html:497
+msgid "Transcript"
+msgstr "전사본"
+
+#: ConvAI/templates/_detail_panel.html:523
+msgid "Detail"
+msgstr "상세"
+
+#: ConvAI/templates/_detail_panel.html:543
+msgid "No messages recorded that day."
+msgstr "그날 기록된 메시지가 없습니다."
+
+#: ConvAI/templates/_detail_panel.html:559
+msgid "Your review of this conversation"
+msgstr "이 대화에 대한 평가"
+
+#: ConvAI/templates/_detail_panel.html:563
+msgid "Rating"
+msgstr "평점"
+
+#: ConvAI/templates/_detail_panel.html:566
+#: ConvAI/templates/_detail_panel.html:569
+#, python-format
+msgid "%(n)s of 5"
+msgstr "5점 만점에 %(n)s점"
+
+#: ConvAI/templates/_detail_panel.html:570
+msgid "Not rated"
+msgstr "평가 없음"
+
+#: ConvAI/templates/_detail_panel.html:575
+msgid "What was good or wrong about how the agent handled this?"
+msgstr "에이전트의 대응에서 좋았던 점이나 잘못된 점은 무엇인가요?"
+
+#: ConvAI/templates/_detail_panel.html:578
+msgid "Did these actually come up?"
+msgstr "실제로 이런 내용이 나왔나요?"
+
+#: ConvAI/templates/_detail_panel.html:588
+msgid ""
+"The agent flags these automatically. Your yes/no is what it is measured "
+"against."
+msgstr "에이전트가 이를 자동으로 표시합니다. 회원님의 예/아니오가 정확도를 판단하는 기준이 됩니다."
+
+#: ConvAI/templates/_detail_panel.html:604
+msgid "Not transcribed yet."
+msgstr "아직 전사되지 않았습니다."
+
+#: ConvAI/templates/_detail_panel.html:618
+msgid "Raised"
+msgstr "발생 시각"
+
+#: ConvAI/templates/_detail_panel.html:620
+#: ConvAI/templates/settings/config.html:395
+#: ConvAI/templates/settings/config.html:462
+#: ConvAI/templates/users/user_list.html:86
+msgid "Status"
+msgstr "상태"
+
+#: ConvAI/templates/_detail_panel.html:621
+msgid "Priority"
+msgstr "우선순위"
+
+#: ConvAI/templates/_detail_panel.html:623
+msgid "Raised by"
+msgstr "발생 주체"
+
+#: ConvAI/templates/_detail_panel.html:626
+msgid "Last acted"
+msgstr "최근 조치"
+
+#: ConvAI/templates/_detail_panel.html:628
+msgid "Reference"
+msgstr "참조 번호"
+
+#: ConvAI/templates/_detail_panel.html:631
+msgid "Recorded with the alert"
+msgstr "알림과 함께 기록됨"
+
+#: ConvAI/templates/_detail_panel.html:671
+msgid "What changed for them? (optional)"
+msgstr "그분에게 무엇이 달라졌나요? (선택)"
+
+#: ConvAI/templates/_detail_panel.html:672
+msgid "Resolve"
+msgstr "해결 처리"
+
+#: ConvAI/templates/_detail_panel.html:674
+#: ConvAI/templates/alerts/alert_detail.html:379 ConvAI/views/_panel.py:94
+msgid "False alarm"
+msgstr "오탐"
+
+#: ConvAI/templates/_detail_panel.html:675
+msgid "Add note"
+msgstr "메모 추가"
+
+#: ConvAI/templates/_detail_panel.html:678
+msgid "Reopen"
+msgstr "다시 열기"
+
+#: ConvAI/templates/_detail_panel.html:689
+#: ConvAI/templates/_panel_agent_actions.html:26
+msgid "Turn agent back on"
+msgstr "에이전트 다시 켜기"
+
+#: ConvAI/templates/_detail_panel.html:693
+#: ConvAI/templates/_panel_agent_actions.html:30
+msgid "Turn agent off"
+msgstr "에이전트 끄기"
+
+#: ConvAI/templates/_detail_panel.html:703
+#: ConvAI/templates/_panel_agent_actions.html:78
+#, python-format
+msgid "Turn the agent off for %(c)s"
+msgstr "%(c)s에 대해 에이전트 끄기"
+
+#: ConvAI/templates/_detail_panel.html:705
+#: ConvAI/templates/_panel_agent_actions.html:80
+msgid ""
+"Messages still arrive and are recorded. What stops is the agent answering "
+"them."
+msgstr "메시지는 계속 도착하고 기록됩니다. 중단되는 것은 에이전트의 응답뿐입니다."
+
+#: ConvAI/templates/_detail_panel.html:710
+#: ConvAI/templates/_panel_agent_actions.html:86
+msgid "Wrong advice"
+msgstr "잘못된 조언"
+
+#: ConvAI/templates/_detail_panel.html:711
+#: ConvAI/templates/_panel_agent_actions.html:87
+msgid "Distressing the caregiver"
+msgstr "보호자에게 부담을 줌"
+
+#: ConvAI/templates/_detail_panel.html:712
+#: ConvAI/templates/_panel_agent_actions.html:88
+msgid "Handling this myself"
+msgstr "제가 직접 처리함"
+
+#: ConvAI/templates/_detail_panel.html:718
+#: ConvAI/templates/_panel_agent_actions.html:95
+#: ConvAI/templates/account/profile.html:123
+msgid "Turn it off"
+msgstr "끄기"
+
+#: ConvAI/templates/_detail_panel.html:735
+#: ConvAI/templates/patients/_timeline_event.html:48
+msgid "Transcribe"
+msgstr "전사"
+
+#: ConvAI/templates/_detail_panel.html:800
+#: ConvAI/templates/_detail_panel.html:986
+#: ConvAI/templates/_detail_panel.html:1013
+msgid "saving…"
+msgstr "저장 중…"
+
+#: ConvAI/templates/_detail_panel.html:813
+#: ConvAI/templates/_detail_panel.html:996
+#: ConvAI/templates/_detail_panel.html:1024
+msgid "saved"
+msgstr "저장됨"
+
+#: ConvAI/templates/_detail_panel.html:816
+#: ConvAI/templates/_detail_panel.html:1000
+#: ConvAI/templates/_detail_panel.html:1028
+msgid "not saved — retrying"
+msgstr "저장되지 않음 — 재시도 중"
+
+#: ConvAI/templates/_detail_panel.html:1106
+msgid "attempt"
+msgstr "시도"
+
+#: ConvAI/templates/_detail_panel.html:1117
+msgid "Could not start the call."
+msgstr "통화를 시작할 수 없습니다."
+
+#: ConvAI/templates/_detail_panel.html:1143
+msgid "Keep as planned"
+msgstr "계획대로 유지"
+
+#: ConvAI/templates/_panel_agent_actions.html:17
+#: ConvAI/templates/_panel_agent_actions.html:40
+msgid "Raise an alert"
+msgstr "알림 등록"
+
+#: ConvAI/templates/_panel_agent_actions.html:42
+#, python-format
+msgid "For %(c)s, from what you have just read."
+msgstr "방금 읽은 내용을 근거로 %(c)s에 대해 등록합니다."
+
+#: ConvAI/templates/_panel_agent_actions.html:46
+msgid "What is it"
+msgstr "무엇에 관한 것인가요"
+
+#: ConvAI/templates/_panel_agent_actions.html:48
+msgid "A short title"
+msgstr "짧은 제목"
+
+#: ConvAI/templates/_panel_agent_actions.html:52
+msgid "Level"
+msgstr "수준"
+
+#: ConvAI/templates/_panel_agent_actions.html:54
+#: ConvAI/templates/alerts/alert_detail.html:220
+msgid "Low"
+msgstr "낮음"
+
+#: ConvAI/templates/_panel_agent_actions.html:55
+msgid "Medium"
+msgstr "보통"
+
+#: ConvAI/templates/_panel_agent_actions.html:56
+msgid "High"
+msgstr "높음"
+
+#: ConvAI/templates/_panel_agent_actions.html:61
+msgid "What you saw"
+msgstr "관찰한 내용"
+
+#: ConvAI/templates/_panel_agent_actions.html:63
+msgid "What the agent missed, or what worried you."
+msgstr "에이전트가 놓친 부분, 또는 우려되었던 점."
+
+#: ConvAI/templates/_panel_agent_actions.html:68
+msgid "Raise alert"
+msgstr "알림 등록"
+
+#: ConvAI/templates/_panel_open.html:19
+#, python-format
+msgid "Open %(c)s"
+msgstr "%(c)s 열기"
+
+#: ConvAI/templates/_panel_open.html:21
+msgid "Open client"
+msgstr "환자 열기"
+
+#: ConvAI/templates/account/help.html:3 ConvAI/templates/account/help.html:9
+#: ConvAI/templates/sidebar.html:95 ConvAI/templates/sidebar.html:100
+msgid "Help"
+msgstr "도움말"
+
+#: ConvAI/templates/account/help.html:10
+msgid "Guidance for using the platform."
+msgstr "플랫폼 사용 안내."
+
+#: ConvAI/templates/account/help.html:15
+#: ConvAI/templates/agents/_agent_actions.html:10
+#: ConvAI/templates/protocols/protocol_form.html:125
+#: ConvAI/templates/settings/config.html:419
+#: ConvAI/templates/users/user_list.html:111
+msgid "Edit"
+msgstr "편집"
+
+#: ConvAI/templates/account/help.html:22
+msgid ""
+"This page is showing the default placeholder content. Use Edit to replace it"
+" with guidance for your team."
+msgstr "이 페이지에는 기본 예시 콘텐츠가 표시되고 있습니다. 편집을 사용하여 팀에 맞는 안내로 교체하세요."
+
+#: ConvAI/templates/account/help_edit.html:4
+#: ConvAI/templates/account/help_edit.html:8
+msgid "Edit help page"
+msgstr "도움말 페이지 편집"
+
+#: ConvAI/templates/account/help_edit.html:12
+msgid "Back to help"
+msgstr "도움말로 돌아가기"
+
+#: ConvAI/templates/account/help_edit.html:34
+#: ConvAI/templates/patients/edit_care_plan.html:67
+#: ConvAI/templates/patients/edit_patient_details.html:38
+#: ConvAI/templates/patients/patient_detail.html:166
+#: ConvAI/templates/protocols/protocol_editor.html:135
+#: ConvAI/templates/protocols/protocol_form.html:60
+msgid "Save"
+msgstr "저장"
+
+#: ConvAI/templates/account/profile.html:3 ConvAI/templates/sidebar.html:106
+#: ConvAI/templates/sidebar.html:110
+msgid "Profile"
+msgstr "프로필"
+
+#: ConvAI/templates/account/profile.html:44
+msgid "Personal information"
+msgstr "개인 정보"
+
+#: ConvAI/templates/account/profile.html:45
+msgid "Update how your name appears across the platform."
+msgstr "플랫폼 전체에 표시되는 이름을 수정할 수 있습니다."
+
+#: ConvAI/templates/account/profile.html:66
+msgid "Your username can't be changed here."
+msgstr "사용자 이름(아이디)은 여기에서 변경할 수 없습니다."
+
+#: ConvAI/templates/account/profile.html:80
+#: ConvAI/templates/settings/config.html:105
+msgid "Language"
+msgstr "언어"
+
+#: ConvAI/templates/account/profile.html:81
+msgid "Choose your interface language, or use the system default."
+msgstr "인터페이스 언어를 선택하거나 시스템 기본값을 사용하세요."
+
+#: ConvAI/templates/account/profile.html:87
+msgid "Interface language"
+msgstr "인터페이스 언어"
+
+#: ConvAI/templates/account/profile.html:89
+msgid "System default"
+msgstr "시스템 기본값"
+
+#: ConvAI/templates/account/profile.html:104 ConvAI/templates/sidebar.html:19
+#: ConvAI/templates/sidebar.html:24
+msgid "Home"
+msgstr "홈"
+
+#: ConvAI/templates/account/profile.html:106
+msgid ""
+"The next-call card sits at the top of Home when a call is overdue or due "
+"within the week. Closing it with the ✕ puts that one call away until it is "
+"done; this switch turns the card off for good."
+msgstr ""
+"통화가 지연되었거나 일주일 이내에 예정된 경우 다음 통화 카드가 홈 상단에 표시됩니다. ✕로 닫으면 해당 통화가 완료될 때까지 숨겨지며,"
+" 이 스위치는 카드를 완전히 끕니다."
+
+#: ConvAI/templates/account/profile.html:115
+msgid "The next-call card is off."
+msgstr "다음 통화 카드가 꺼져 있습니다."
+
+#: ConvAI/templates/account/profile.html:117
+msgid "Turn it back on"
+msgstr "다시 켜기"
+
+#: ConvAI/templates/account/profile.html:121
+msgid "The next-call card is on."
+msgstr "다음 통화 카드가 켜져 있습니다."
+
+#: ConvAI/templates/account/profile.html:135
+msgid "API token"
+msgstr "API 토큰"
+
+#: ConvAI/templates/account/profile.html:139
+msgid "None yet"
+msgstr "아직 없음"
+
+#: ConvAI/templates/account/profile.html:142
+msgid ""
+"Used by the Python API client. Shown only once when generated — regenerate "
+"if you lose it."
+msgstr "Python API 클라이언트에서 사용됩니다. 생성 시 한 번만 표시되므로, 분실하면 다시 생성하세요."
+
+#: ConvAI/templates/account/profile.html:148
+msgid "Copy your token now — for security it will not be shown again."
+msgstr "지금 토큰을 복사하세요. 보안을 위해 다시 표시되지 않습니다."
+
+#: ConvAI/templates/account/profile.html:152
+msgid "Show/Hide"
+msgstr "표시/숨기기"
+
+#: ConvAI/templates/account/profile.html:155
+#: ConvAI/templates/settings/config.html:569
+#: ConvAI/templates/users/test_user_result.html:31
+#: ConvAI/templates/users/test_user_result.html:42
+msgid "Copy"
+msgstr "복사"
+
+#: ConvAI/templates/account/profile.html:159
+msgid "Copied to clipboard!"
+msgstr "클립보드에 복사됨!"
+
+#: ConvAI/templates/account/profile.html:167
+msgid "Regenerate token"
+msgstr "토큰 재생성"
+
+#: ConvAI/templates/account/profile.html:167
+msgid "Generate token"
+msgstr "토큰 생성"
+
+#: ConvAI/templates/account/profile.html:170
+msgid "On regenerating, the previous token will stop working."
+msgstr "다시 생성하면 이전 토큰은 작동을 멈춥니다."
+
+#: ConvAI/templates/account/profile.html:180
+msgid "Session"
+msgstr "세션"
+
+#: ConvAI/templates/account/profile.html:181
+msgid "End your session on this device."
+msgstr "이 기기에서 세션을 종료합니다."
+
+#: ConvAI/templates/account/profile.html:187 ConvAI/templates/sidebar.html:139
+msgid "Log out"
+msgstr "로그아웃"
+
+#: ConvAI/templates/agents/_agent_actions.html:6
+msgid "Test"
+msgstr "테스트"
+
+#: ConvAI/templates/agents/_agent_actions.html:15
+msgid "Delete this agent? This cannot be undone."
+msgstr "이 에이전트를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다."
+
+#: ConvAI/templates/agents/_agent_actions.html:18
+#: ConvAI/templates/protocols/protocol_editor.html:249
+#: ConvAI/templates/settings/config.html:427
+msgid "Delete"
+msgstr "삭제"
+
+#: ConvAI/templates/agents/_agent_card.html:17
+msgid "Prompt"
+msgstr "프롬프트"
+
+#: ConvAI/templates/agents/_agent_card.html:26
+msgid "No prompt set"
+msgstr "프롬프트가 설정되지 않음"
+
+#: ConvAI/templates/agents/_agent_card.html:28
+msgid "Remote LangGraph agent"
+msgstr "원격 LangGraph 에이전트"
+
+#: ConvAI/templates/agents/_agent_card.html:39
+msgid "Host"
+msgstr "호스트"
+
+#: ConvAI/templates/agents/_agent_card.html:44
+msgid "Model"
+msgstr "모델"
+
+#: ConvAI/templates/agents/_agent_card.html:46
+msgid "default"
+msgstr "기본값"
+
+#: ConvAI/templates/agents/_agent_card.html:52
+msgid "Real-time voice"
+msgstr "실시간 음성"
+
+#: ConvAI/templates/agents/_agent_card.html:56
+msgid "Voice ID"
+msgstr "음성 ID"
+
+#: ConvAI/templates/agents/agent_form.html:3
+msgid "Edit agent"
+msgstr "에이전트 편집"
+
+#: ConvAI/templates/agents/agent_form.html:3
+msgid "Add agent"
+msgstr "에이전트 추가"
+
+#: ConvAI/templates/agents/agent_form.html:25
+msgid "Back to agents"
+msgstr "에이전트로 돌아가기"
+
+#: ConvAI/templates/agents/agent_form.html:38
+#, python-format
+msgid "Edit %(kind)s"
+msgstr "%(kind)s 편집"
+
+#: ConvAI/templates/agents/agent_form.html:38
+#, python-format
+msgid "New %(kind)s"
+msgstr "새 %(kind)s"
+
+#: ConvAI/templates/agents/agent_form.html:41
+msgid "Runs in-process, driven by your system prompt. No tools."
+msgstr "인프로세스로 실행되며 시스템 프롬프트로 구동됩니다. 도구 없음."
+
+#: ConvAI/templates/agents/agent_form.html:43
+msgid "Connects to an agent on a LangGraph server (host:port)."
+msgstr "LangGraph 서버(host:port)의 에이전트에 연결합니다."
+
+#: ConvAI/templates/agents/agent_form.html:45
+msgid "Built-in agent — set the model and voice it uses."
+msgstr "내장 에이전트 — 사용하는 모델과 음성을 설정하세요."
+
+#: ConvAI/templates/agents/agent_form.html:73
+msgid "Advanced: conversation classification"
+msgstr "고급: 대화 분류"
+
+#: ConvAI/templates/agents/agent_form.html:75
+msgid ""
+"How this agent's conversations are summarised and flagged for human review. "
+"Optional."
+msgstr "이 에이전트의 대화가 어떻게 요약되고 사람 검토 대상으로 표시되는지입니다. 선택 사항."
+
+#: ConvAI/templates/agents/agent_list.html:3
+#: ConvAI/templates/agents/agent_list.html:35
+#: ConvAI/templates/settings/config.html:185 ConvAI/templates/sidebar.html:68
+#: ConvAI/templates/sidebar.html:73 ConvAI/views/settings_views.py:138
+msgid "Agents"
+msgstr "에이전트"
+
+#: ConvAI/templates/agents/agent_list.html:36
+msgid ""
+"The assistants that power every chat surface — pick their kind, model, and "
+"voice."
+msgstr "모든 채팅 화면을 구동하는 어시스턴트입니다. 종류, 모델, 음성을 선택하세요."
+
+#: ConvAI/templates/agents/agent_list.html:41
+msgid "Agent types"
+msgstr "에이전트 유형"
+
+#: ConvAI/templates/agents/agent_list.html:59
+msgid ""
+"Custom in-process agents driven by a system prompt you write. No tools."
+msgstr "직접 작성한 시스템 프롬프트로 구동되는 사용자 지정 인프로세스 에이전트입니다. 도구 없음."
+
+#: ConvAI/templates/agents/agent_list.html:65
+#: ConvAI/templates/agents/agent_list.html:74
+msgid "New prompt agent"
+msgstr "새 프롬프트 에이전트"
+
+#: ConvAI/templates/agents/agent_list.html:71
+msgid "No prompt-based agents yet."
+msgstr "아직 프롬프트 기반 에이전트가 없습니다."
+
+#: ConvAI/templates/agents/agent_list.html:72
+msgid "Create one and drive it with your own system prompt."
+msgstr "직접 만들고 자신의 시스템 프롬프트로 구동하세요."
+
+#: ConvAI/templates/agents/agent_list.html:83
+msgid "External agents running on a LangGraph server (host:port)."
+msgstr "LangGraph 서버(host:port)에서 실행되는 외부 에이전트입니다."
+
+#: ConvAI/templates/agents/agent_list.html:89
+#: ConvAI/templates/agents/agent_list.html:98
+msgid "New remote agent"
+msgstr "새 원격 에이전트"
+
+#: ConvAI/templates/agents/agent_list.html:95
+msgid "No remote agents yet."
+msgstr "아직 원격 에이전트가 없습니다."
+
+#: ConvAI/templates/agents/agent_list.html:96
+msgid "Connect an agent running on your own LangGraph server."
+msgstr "자체 LangGraph 서버에서 실행되는 에이전트를 연결하세요."
+
+#: ConvAI/templates/agents/agent_list.html:108
+msgid ""
+"Built-in agents that ship with the platform and run in-process. You can "
+"change their model and voice."
+msgstr "플랫폼에 기본 포함되어 인프로세스로 실행되는 내장 에이전트입니다. 모델과 음성을 변경할 수 있습니다."
+
+#: ConvAI/templates/agents/agent_list.html:117
+msgid "No native agents."
+msgstr "네이티브 에이전트가 없습니다."
+
+#: ConvAI/templates/alerts/alert_detail.html:4
+msgid "Alert review"
+msgstr "알림 검토"
+
+#: ConvAI/templates/alerts/alert_detail.html:206
+msgid "Back to home"
+msgstr "홈으로 돌아가기"
+
+#: ConvAI/templates/alerts/alert_detail.html:216
+#: ConvAI/templates/patients/patient_conversation_detail.html:124
+msgid "Urgent"
+msgstr "긴급"
+
+#: ConvAI/templates/alerts/alert_detail.html:218
+#: ConvAI/templates/patients/patient_conversation_detail.html:126
+msgid "Review"
+msgstr "검토"
+
+#: ConvAI/templates/alerts/alert_detail.html:242
+msgid "Client:"
+msgstr "환자:"
+
+#: ConvAI/templates/alerts/alert_detail.html:247
+msgid "Caregiver:"
+msgstr "보호자:"
+
+#: ConvAI/templates/alerts/alert_detail.html:253
+msgid "Summary:"
+msgstr "요약:"
+
+#: ConvAI/templates/alerts/alert_detail.html:261
+msgid "No summary."
+msgstr "요약 없음."
+
+#: ConvAI/templates/alerts/alert_detail.html:268
+msgid "Detected"
+msgstr "감지됨"
+
+#: ConvAI/templates/alerts/alert_detail.html:277
+#: ConvAI/templates/alerts/alert_detail.html:332
+msgid "Review conversation"
+msgstr "대화 검토"
+
+#: ConvAI/templates/alerts/alert_detail.html:278
+msgid "Open the linked conversation for the date associated with this alert."
+msgstr "이 알림과 연결된 날짜의 대화를 엽니다."
+
+#: ConvAI/templates/alerts/alert_detail.html:285
+msgid "Open conversation"
+msgstr "대화 열기"
+
+#: ConvAI/templates/alerts/alert_detail.html:294
+msgid "No conversation URL available"
+msgstr "사용 가능한 대화 URL이 없습니다"
+
+#: ConvAI/templates/alerts/alert_detail.html:295
+msgid ""
+"This alert does not currently include a linked conversation_id or thread_id,"
+" so the exact conversation URL could not be generated."
+msgstr ""
+"이 알림에는 현재 연결된 conversation_id 또는 thread_id가 포함되어 있지 않아 정확한 대화 URL을 생성할 수 "
+"없습니다."
+
+#: ConvAI/templates/alerts/alert_detail.html:302
+#: ConvAI/templates/settings/config.html:396
+#: ConvAI/templates/settings/config.html:464
+#: ConvAI/templates/users/user_list.html:88
+msgid "Actions"
+msgstr "작업"
+
+#: ConvAI/templates/alerts/alert_detail.html:304
+msgid ""
+"Choose the next step after reviewing the alert. The selected action is saved"
+" to the alert log and updates the status shown on the alert card."
+msgstr "알림을 검토한 후 다음 단계를 선택하세요. 선택한 작업은 알림 로그에 저장되고 알림 카드에 표시된 상태를 업데이트합니다."
+
+#: ConvAI/templates/alerts/alert_detail.html:309
+msgid "Current saved action:"
+msgstr "현재 저장된 작업:"
+
+#: ConvAI/templates/alerts/alert_detail.html:311
+msgid "Reviewed - review in progress"
+msgstr "검토됨 - 검토 진행 중"
+
+#: ConvAI/templates/alerts/alert_detail.html:313
+msgid "Chatbot disabled - review in progress"
+msgstr "챗봇 비활성화됨 - 검토 진행 중"
+
+#: ConvAI/templates/alerts/alert_detail.html:315
+msgid "Chatbot re-enabled - feedback submitted"
+msgstr "챗봇 재활성화됨 - 피드백 제출됨"
+
+#: ConvAI/templates/alerts/alert_detail.html:317
+msgid "False alarm - resolved"
+msgstr "오탐 - 해결됨"
+
+#: ConvAI/templates/alerts/alert_detail.html:319
+#: ConvAI/templates/alerts/alert_detail.html:391 ConvAI/views/_panel.py:94
+msgid "Resolved"
+msgstr "해결됨"
+
+#: ConvAI/templates/alerts/alert_detail.html:321
+msgid "Reopened - review in progress"
+msgstr "다시 열림 - 검토 진행 중"
+
+#: ConvAI/templates/alerts/alert_detail.html:343
+msgid "Reviewed"
+msgstr "검토됨"
+
+#: ConvAI/templates/alerts/alert_detail.html:355
+msgid "Enable chatbot"
+msgstr "챗봇 활성화"
+
+#: ConvAI/templates/alerts/alert_detail.html:366
+msgid "Disable chatbot"
+msgstr "챗봇 비활성화"
+
+#: ConvAI/templates/alerts/alert_detail.html:404
+msgid "Reopen alert"
+msgstr "알림 다시 열기"
+
+#: ConvAI/templates/alerts/alert_detail.html:415
+msgid "Internal note"
+msgstr "내부 메모"
+
+#: ConvAI/templates/alerts/alert_detail.html:416
+msgid ""
+"Add a note about what was reviewed, decided or escalated. This must be saved"
+" to the alert log, not just kept in the browser."
+msgstr "검토, 결정 또는 상위 보고된 내용에 대한 메모를 추가하세요. 브라우저에만 두지 말고 반드시 알림 로그에 저장해야 합니다."
+
+#: ConvAI/templates/alerts/alert_detail.html:426
+msgid "Add a brief note about what action was taken..."
+msgstr "취한 조치에 대한 간단한 메모를 추가하세요..."
+
+#: ConvAI/templates/alerts/alert_detail.html:430
+msgid "Save note"
+msgstr "메모 저장"
+
+#: ConvAI/templates/alerts/alert_detail.html:438
+msgid "Show technical alert data"
+msgstr "기술 알림 데이터 표시"
+
+#: ConvAI/templates/alerts/alert_detail.html:450
+msgid "No additional data."
+msgstr "추가 데이터가 없습니다."
+
+#: ConvAI/templates/alerts/alert_detail.html:461
+msgid "Feedback to improve the alert"
+msgstr "알림 개선을 위한 피드백"
+
+#: ConvAI/templates/alerts/alert_detail.html:462
+msgid "This helps improve future alert and chatbot decisions."
+msgstr "이것은 향후 알림 및 챗봇 결정을 개선하는 데 도움이 됩니다."
+
+#: ConvAI/templates/alerts/alert_detail.html:485
+msgid "Step 1 of 5"
+msgstr "5단계 중 1단계"
+
+#: ConvAI/templates/alerts/alert_detail.html:486
+msgid "Was the alert accurate?"
+msgstr "알림이 정확했나요?"
+
+#: ConvAI/templates/alerts/alert_detail.html:488
+msgid "Accurate"
+msgstr "정확함"
+
+#: ConvAI/templates/alerts/alert_detail.html:489
+msgid "Partially accurate"
+msgstr "부분적으로 정확함"
+
+#: ConvAI/templates/alerts/alert_detail.html:490
+msgid "Inaccurate"
+msgstr "부정확함"
+
+#: ConvAI/templates/alerts/alert_detail.html:495
+msgid "Step 2 of 5"
+msgstr "5단계 중 2단계"
+
+#: ConvAI/templates/alerts/alert_detail.html:496
+msgid "Was the chatbot's response appropriate?"
+msgstr "챗봇의 응답이 적절했나요?"
+
+#: ConvAI/templates/alerts/alert_detail.html:498
+msgid "Good response"
+msgstr "좋은 응답"
+
+#: ConvAI/templates/alerts/alert_detail.html:499
+msgid "Needs improvement"
+msgstr "개선 필요"
+
+#: ConvAI/templates/alerts/alert_detail.html:500
+msgid "Should not have responded"
+msgstr "응답하지 말았어야 함"
+
+#: ConvAI/templates/alerts/alert_detail.html:505
+msgid "Step 3 of 5"
+msgstr "5단계 중 3단계"
+
+#: ConvAI/templates/alerts/alert_detail.html:506
+msgid "What type of problem was this?"
+msgstr "어떤 유형의 문제였나요?"
+
+#: ConvAI/templates/alerts/alert_detail.html:508
+msgid "Incorrect risk level"
+msgstr "잘못된 위험 수준"
+
+#: ConvAI/templates/alerts/alert_detail.html:509
+msgid "Risk not detected"
+msgstr "위험 미감지"
+
+#: ConvAI/templates/alerts/alert_detail.html:510
+msgid "Excessive escalation"
+msgstr "과도한 에스컬레이션"
+
+#: ConvAI/templates/alerts/alert_detail.html:511
+msgid "Incorrect action"
+msgstr "잘못된 작업"
+
+#: ConvAI/templates/alerts/alert_detail.html:517
+msgid "Step 4 of 5"
+msgstr "5단계 중 4단계"
+
+#: ConvAI/templates/alerts/alert_detail.html:518
+msgid "Any additional comments?"
+msgstr "추가 의견이 있나요?"
+
+#: ConvAI/templates/alerts/alert_detail.html:519
+msgid "Optional comments..."
+msgstr "선택 사항 의견..."
+
+#: ConvAI/templates/alerts/alert_detail.html:523
+msgid "Step 5 of 5"
+msgstr "5단계 중 5단계"
+
+#: ConvAI/templates/alerts/alert_detail.html:524
+msgid "Submit feedback and update the alert"
+msgstr "피드백을 제출하고 알림을 업데이트"
+
+#: ConvAI/templates/alerts/alert_detail.html:525
+msgid "The alert update will now be sent with these comments."
+msgstr "이제 이 의견과 함께 알림 업데이트가 전송됩니다."
+
+#: ConvAI/templates/alerts/alert_detail.html:529
+#: ConvAI/templates/protocols/protocol_editor.html:65
+msgid "Back"
+msgstr "뒤로"
+
+#: ConvAI/templates/alerts/alert_detail.html:530
+#: ConvAI/templates/alerts/alert_detail.html:560
+#: ConvAI/templates/calls/calendar.html:138
+#: ConvAI/templates/communications/_list.html:138
+msgid "Next"
+msgstr "다음"
+
+#: ConvAI/templates/alerts/alert_detail.html:560
+#: ConvAI/templates/chat/external_chat_with_audio.html:280
+msgid "Send"
+msgstr "보내기"
+
+#: ConvAI/templates/base.html:126
+msgid "Resize details panel"
+msgstr "상세 패널 크기 조절"
+
+#: ConvAI/templates/base.html:128
+msgid "Drag to resize · double-click to reset"
+msgstr "드래그하여 크기 조절 · 더블클릭하면 초기화"
+
+#: ConvAI/templates/base.html:231
+msgid "Notifications"
+msgstr "알림"
+
+#: ConvAI/templates/base.html:236
+msgid "Dismiss"
+msgstr "닫기"
+
+#: ConvAI/templates/base.html:237
+#: ConvAI/templates/patients/patient_detail.html:217
+msgid "Open"
+msgstr "열기"
+
+#: ConvAI/templates/calls/calendar.html:4
+#: ConvAI/templates/calls/calendar.html:109 ConvAI/templates/sidebar.html:56
+#: ConvAI/templates/sidebar.html:61
+msgid "Calendar"
+msgstr "캘린더"
+
+#: ConvAI/templates/calls/calendar.html:110
+msgid "See your scheduled meetings at a glance and book new ones."
+msgstr "예약된 미팅을 한눈에 확인하고 새 미팅을 예약하세요."
+
+#: ConvAI/templates/calls/calendar.html:113
+msgid "Calendar view"
+msgstr "캘린더 보기"
+
+#: ConvAI/templates/calls/calendar.html:134 ConvAI/views/communications.py:96
+#: ConvAI/views/dashboard.py:47
+msgid "Today"
+msgstr "오늘"
+
+#: ConvAI/templates/calls/calendar.html:135
+#: ConvAI/templates/communications/_list.html:125
+msgid "Previous"
+msgstr "이전"
+
+#: ConvAI/templates/calls/calendar.html:154
+msgid "Mon"
+msgstr "월"
+
+#: ConvAI/templates/calls/calendar.html:155
+msgid "Tue"
+msgstr "화"
+
+#: ConvAI/templates/calls/calendar.html:156
+msgid "Wed"
+msgstr "수"
+
+#: ConvAI/templates/calls/calendar.html:157
+msgid "Thu"
+msgstr "목"
+
+#: ConvAI/templates/calls/calendar.html:158
+msgid "Fri"
+msgstr "금"
+
+#: ConvAI/templates/calls/calendar.html:159
+msgid "Sat"
+msgstr "토"
+
+#: ConvAI/templates/calls/calendar.html:160
+msgid "Sun"
+msgstr "일"
+
+#: ConvAI/templates/calls/calendar.html:178
+msgid "more"
+msgstr "더 보기"
+
+#: ConvAI/templates/calls/calendar.html:194
+msgid "Click any empty slot to schedule a meeting."
+msgstr "빈 시간대를 클릭하여 미팅을 예약하세요."
+
+#: ConvAI/templates/calls/calendar.html:229
+msgid "New meeting"
+msgstr "새 미팅"
+
+#: ConvAI/templates/calls/calendar.html:230
+msgid "Pick a client and meeting type."
+msgstr "환자와 미팅 유형을 선택하세요."
+
+#: ConvAI/templates/calls/calendar.html:257
+#: ConvAI/templates/communications/communications.html:30
+#: ConvAI/templates/communications/communications.html:47
+#: ConvAI/templates/communications/communications.html:65
+msgid "Schedule"
+msgstr "일정"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:4
+msgid "External Chat"
+msgstr "외부 채팅"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:223
+msgid "online"
+msgstr "온라인"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:235
+#: ConvAI/templates/chat/external_chat_with_audio.html:518
+msgid "Play/Pause"
+msgstr "재생/일시정지"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:248
+msgid "Type a message or tap the microphone to speak"
+msgstr "메시지를 입력하거나 마이크를 눌러 말하세요"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:263
+msgid "Type a message"
+msgstr "메시지를 입력하세요"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:273
+msgid "Recording…"
+msgstr "녹음 중…"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:277
+msgid "Record audio"
+msgstr "음성 녹음"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:283
+msgid "Send audio"
+msgstr "음성 보내기"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:287
+msgid "Write a message, or type <code>/quit</code> to end the conversation."
+msgstr "메시지를 작성하거나 <code>/quit</code>을 입력하여 대화를 종료하세요."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:371
+#: ConvAI/templates/chatbot.html:145 ConvAI/views/chat.py:240
+msgid "Conversation ended. Send a message to start a new one."
+msgstr "대화가 종료되었습니다. 새 대화를 시작하려면 메시지를 보내세요."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:388
+msgid "Error: could not get a response."
+msgstr "오류: 응답을 받을 수 없습니다."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:400
+msgid ""
+"Recording needs a secure connection (HTTPS) or localhost. Open the site over"
+" HTTPS to use the microphone."
+msgstr "녹음에는 보안 연결(HTTPS) 또는 localhost가 필요합니다. 마이크를 사용하려면 HTTPS로 사이트를 여세요."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:409
+msgid "Microphone permission denied. Allow it in the browser to record."
+msgstr "마이크 권한이 거부되었습니다. 녹음하려면 브라우저에서 허용하세요."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:411
+msgid "No microphone was found, or it is in use by another app."
+msgstr "마이크를 찾을 수 없거나 다른 앱에서 사용 중입니다."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:413
+#: ConvAI/templates/chat/realtime_voice.html:260
+msgid "Could not access the microphone."
+msgstr "마이크에 접근할 수 없습니다."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:474
+#: ConvAI/templates/chat/external_chat_with_audio.html:478
+msgid "Error: could not process the audio."
+msgstr "오류: 오디오를 처리할 수 없습니다."
+
+#: ConvAI/templates/chat/realtime_voice.html:4
+msgid "Voice chat"
+msgstr "음성 채팅"
+
+#: ConvAI/templates/chat/realtime_voice.html:185
+#: ConvAI/templates/chat/realtime_voice.html:256
+msgid "voice agent"
+msgstr "음성 에이전트"
+
+#: ConvAI/templates/chat/realtime_voice.html:194
+msgid ""
+"Real-time voice is not configured yet. Set the Azure Realtime endpoint, key "
+"and deployment under Settings → Agents."
+msgstr ""
+"실시간 음성이 아직 구성되지 않았습니다. 설정 → 에이전트에서 Azure Realtime 엔드포인트, 키, 배포를 설정하십시오."
+
+#: ConvAI/templates/chat/realtime_voice.html:203
+#: ConvAI/templates/chat/realtime_voice.html:249
+msgid "Tap the button to start talking"
+msgstr "버튼을 눌러 대화를 시작하십시오"
+
+#: ConvAI/templates/chat/realtime_voice.html:213
+#: ConvAI/templates/chat/realtime_voice.html:264
+msgid "Mute microphone"
+msgstr "마이크 음소거"
+
+#: ConvAI/templates/chat/realtime_voice.html:218
+#: ConvAI/templates/chat/realtime_voice.html:262
+msgid "Start conversation"
+msgstr "대화 시작"
+
+#: ConvAI/templates/chat/realtime_voice.html:250
+msgid "Connecting…"
+msgstr "연결 중…"
+
+#: ConvAI/templates/chat/realtime_voice.html:251
+msgid "Listening…"
+msgstr "듣는 중…"
+
+#: ConvAI/templates/chat/realtime_voice.html:252
+msgid "Speaking…"
+msgstr "말하는 중…"
+
+#: ConvAI/templates/chat/realtime_voice.html:253
+msgid "Microphone muted"
+msgstr "마이크가 음소거되었습니다"
+
+#: ConvAI/templates/chat/realtime_voice.html:254
+msgid "Conversation ended"
+msgstr "대화가 종료되었습니다"
+
+#: ConvAI/templates/chat/realtime_voice.html:255
+msgid "Ended after inactivity — tap to resume"
+msgstr "활동이 없어 종료되었습니다 — 눌러서 다시 시작하십시오"
+
+#: ConvAI/templates/chat/realtime_voice.html:257
+msgid "live"
+msgstr "통화 중"
+
+#: ConvAI/templates/chat/realtime_voice.html:258
+msgid "Could not start the voice session."
+msgstr "음성 세션을 시작할 수 없습니다."
+
+#: ConvAI/templates/chat/realtime_voice.html:259
+msgid "Microphone permission denied. Allow it in the browser to talk."
+msgstr "마이크 권한이 거부되었습니다. 대화하려면 브라우저에서 허용하십시오."
+
+#: ConvAI/templates/chat/realtime_voice.html:261
+msgid "Voice needs a secure connection (HTTPS) or localhost."
+msgstr "음성 기능에는 보안 연결(HTTPS) 또는 localhost가 필요합니다."
+
+#: ConvAI/templates/chat/realtime_voice.html:263
+#: ConvAI/templates/chatbot.html:14
+msgid "End conversation"
+msgstr "대화 종료"
+
+#: ConvAI/templates/chat/realtime_voice.html:265
+msgid "Unmute microphone"
+msgstr "마이크 음소거 해제"
+
+#: ConvAI/templates/chatbot.html:12
+msgid "Virtual Assistant"
+msgstr "가상 비서"
+
+#: ConvAI/templates/chatbot.html:24
+msgid "Type your message..."
+msgstr "메시지를 입력하세요..."
+
+#: ConvAI/templates/chatbot.html:29
+msgid "Type a message, or <code>/quit</code> to end the conversation."
+msgstr "메시지를 입력하거나 <code>/quit</code>으로 대화를 종료하세요."
+
+#: ConvAI/templates/communications/_list.html:15
+msgid "Coming up"
+msgstr "예정"
+
+#: ConvAI/templates/communications/_list.html:20
+msgid "Happened"
+msgstr "완료됨"
+
+#: ConvAI/templates/communications/_list.html:29
+msgid "Find a protocol, alert or place"
+msgstr "프로토콜, 알림 또는 장소 검색"
+
+#: ConvAI/templates/communications/_list.html:29
+msgid "Find a client, protocol or place"
+msgstr "환자, 프로토콜 또는 장소 검색"
+
+#: ConvAI/templates/communications/_list.html:79
+#: ConvAI/templates/dashboard/dashboard.html:424
+msgid "Not opened yet"
+msgstr "아직 열지 않음"
+
+#: ConvAI/templates/communications/_list.html:110
+msgid "Nothing matches that search."
+msgstr "검색 결과가 없습니다."
+
+#: ConvAI/templates/communications/_list.html:111
+msgid "Nothing scheduled."
+msgstr "예정된 항목이 없습니다."
+
+#: ConvAI/templates/communications/_list.html:112
+msgid "Nothing has happened yet."
+msgstr "아직 아무 일도 없었습니다."
+
+#: ConvAI/templates/communications/_list.html:119
+#, python-format
+msgid "%(a)s–%(b)s of %(t)s"
+msgstr "%(t)s개 중 %(a)s–%(b)s"
+
+#: ConvAI/templates/communications/_list.html:122
+msgid "Pages"
+msgstr "페이지"
+
+#: ConvAI/templates/communications/communications.html:4
+#: ConvAI/templates/communications/communications.html:16
+#: ConvAI/templates/patients/patient_detail.html:46
+#: ConvAI/templates/sidebar.html:32 ConvAI/templates/sidebar.html:37
+msgid "Communications"
+msgstr "커뮤니케이션"
+
+#: ConvAI/templates/communications/communications.html:20
+msgid "Show all clients"
+msgstr "모든 환자 표시"
+
+#: ConvAI/templates/communications/communications.html:24
+msgid "What still needs doing, soonest first."
+msgstr "아직 해야 할 일, 가까운 순서대로."
+
+#: ConvAI/templates/communications/communications.html:25
+msgid "What has already happened, newest first."
+msgstr "이미 일어난 일, 최신 순서대로."
+
+#: ConvAI/templates/communications/communications.html:48
+msgid "A call or an in-person meeting."
+msgstr "통화 또는 대면 미팅."
+
+#: ConvAI/templates/dashboard/dashboard.html:298
+#, python-format
+msgid "%(n)s meeting pending"
+msgid_plural "%(n)s meetings pending"
+msgstr[0] "대기 중인 미팅 %(n)s건"
+
+#: ConvAI/templates/dashboard/dashboard.html:299
+#, python-format
+msgid "%(t)s today"
+msgid_plural "%(t)s today"
+msgstr[0] "오늘 %(t)s건"
+
+#: ConvAI/templates/dashboard/dashboard.html:300
+#, python-format
+msgid "%(co)s still to make"
+msgid_plural "%(co)s still to make"
+msgstr[0] "아직 %(co)s건 남음"
+
+#: ConvAI/templates/dashboard/dashboard.html:302
+msgid "No meetings pending."
+msgstr "대기 중인 미팅이 없습니다."
+
+#: ConvAI/templates/dashboard/dashboard.html:306
+#, python-format
+msgid "%(n)s chat flagged for review"
+msgid_plural "%(n)s chats flagged for review"
+msgstr[0] "검토 대상으로 표시된 대화 %(n)s건"
+
+#: ConvAI/templates/dashboard/dashboard.html:307
+#, python-format
+msgid "%(h)s high priority"
+msgid_plural "%(h)s high priority"
+msgstr[0] "%(h)s건은 높은 우선순위"
+
+#: ConvAI/templates/dashboard/dashboard.html:309
+#, python-format
+msgid "all “%(topic)s”"
+msgstr "모두 “%(topic)s” 관련"
+
+#: ConvAI/templates/dashboard/dashboard.html:326
+#: ConvAI/templates/patients/patient_detail.html:28
+#: ConvAI/templates/patients/patient_list.html:479
+#: ConvAI/templates/patients/patient_list.html:581
+msgid "Next call"
+msgstr "다음 통화"
+
+#: ConvAI/templates/dashboard/dashboard.html:326
+#: ConvAI/templates/dashboard/dashboard.html:518
+msgid "not yet made"
+msgstr "아직 진행되지 않음"
+
+#: ConvAI/templates/dashboard/dashboard.html:333
+msgid "Open call"
+msgstr "통화 열기"
+
+#: ConvAI/templates/dashboard/dashboard.html:335
+#: ConvAI/templates/dashboard/dashboard.html:350
+msgid "Put this away"
+msgstr "숨기기"
+
+#: ConvAI/templates/dashboard/dashboard.html:352
+#, python-format
+msgid ""
+"The call with %(n)s is still scheduled either way — this only decides what "
+"sits at the top of Home."
+msgstr "%(n)s와의 통화는 어느 쪽이든 예정대로 유지됩니다. 이 설정은 홈 상단에 무엇을 표시할지만 결정합니다."
+
+#: ConvAI/templates/dashboard/dashboard.html:355
+msgid "For how long"
+msgstr "기간"
+
+#: ConvAI/templates/dashboard/dashboard.html:357
+msgid "Just this call — the card comes back with the next one"
+msgstr "이 통화만 — 다음 통화 때 카드가 다시 나타납니다"
+
+#: ConvAI/templates/dashboard/dashboard.html:358
+msgid "Turn the card off — until I switch it back on in Profile"
+msgstr "카드 끄기 — 프로필에서 다시 켤 때까지"
+
+#: ConvAI/templates/dashboard/dashboard.html:363
+msgid "Put it away"
+msgstr "숨기기"
+
+#: ConvAI/templates/dashboard/dashboard.html:393
+msgid "Chats to review"
+msgstr "검토할 대화"
+
+#: ConvAI/templates/dashboard/dashboard.html:408
+#: ConvAI/templates/dashboard/dashboard.html:409
+#: ConvAI/templates/dashboard/dashboard.html:484
+msgid "Find a client"
+msgstr "환자 검색"
+
+#: ConvAI/templates/dashboard/dashboard.html:410
+#: ConvAI/templates/dashboard/dashboard.html:485
+msgid "Sort"
+msgstr "정렬"
+
+#: ConvAI/templates/dashboard/dashboard.html:412
+msgid "Priority first"
+msgstr "우선순위 순"
+
+#: ConvAI/templates/dashboard/dashboard.html:413
+msgid "Newest first"
+msgstr "최신순"
+
+#: ConvAI/templates/dashboard/dashboard.html:414
+msgid "Oldest first"
+msgstr "오래된순"
+
+#: ConvAI/templates/dashboard/dashboard.html:416
+msgid "Apply"
+msgstr "적용"
+
+#: ConvAI/templates/dashboard/dashboard.html:454
+msgid "Nothing to review."
+msgstr "검토할 항목이 없습니다."
+
+#: ConvAI/templates/dashboard/dashboard.html:456
+#: ConvAI/templates/dashboard/dashboard.html:523
+#: ConvAI/templates/dashboard/dashboard.html:526
+msgid "No client matches that."
+msgstr "해당하는 환자가 없습니다."
+
+#: ConvAI/templates/dashboard/dashboard.html:462
+msgid "Showing the first 200 — narrow the search to see the rest."
+msgstr "처음 200개만 표시됩니다 — 나머지를 보려면 검색 범위를 좁히세요."
+
+#: ConvAI/templates/dashboard/dashboard.html:473
+msgid "Pending meetings"
+msgstr "대기 중인 미팅"
+
+#: ConvAI/templates/dashboard/dashboard.html:486
+msgid "Soonest first"
+msgstr "가까운 순"
+
+#: ConvAI/templates/dashboard/dashboard.html:487
+msgid "Latest first"
+msgstr "먼 순"
+
+#: ConvAI/templates/dashboard/dashboard.html:523
+msgid "Nothing pending."
+msgstr "대기 중인 항목이 없습니다."
+
+#: ConvAI/templates/dashboard/dashboard.html:541
+msgid "Calls completed today"
+msgstr "오늘 완료된 통화"
+
+#: ConvAI/templates/dashboard/dashboard.html:575
+msgid "Nothing completed yet today."
+msgstr "오늘 완료된 항목이 아직 없습니다."
+
+#: ConvAI/templates/dashboard/dashboard.html:588
+msgid "What changed this week"
+msgstr "이번 주 변화"
+
+#: ConvAI/templates/dashboard/dashboard.html:690
+msgid "Previous page"
+msgstr "이전 페이지"
+
+#: ConvAI/templates/dashboard/dashboard.html:697
+msgid "Next page"
+msgstr "다음 페이지"
+
+#: ConvAI/templates/dashboard/dashboard.html:720
+msgid "pending"
+msgstr "대기 중"
+
+#: ConvAI/templates/dashboard/dashboard.html:722
+msgid "to review"
+msgstr "검토 필요"
+
+#: ConvAI/templates/patients/_timeline_event.html:39
+msgid "To"
+msgstr "받는 사람"
+
+#: ConvAI/templates/patients/_timeline_event.html:43
+msgid "Listen"
+msgstr "듣기"
+
+#: ConvAI/templates/patients/_timeline_event.html:48
+msgid "Re-transcribe"
+msgstr "다시 전사"
+
+#: ConvAI/templates/patients/_timeline_event.html:55
+#: ConvAI/views/_panel.py:322
+msgid "Transcript summary"
+msgstr "통화 기록 요약"
+
+#: ConvAI/templates/patients/_timeline_event.html:60
+msgid "Show full transcript"
+msgstr "전체 통화 기록 보기"
+
+#: ConvAI/templates/patients/_timeline_event.html:70
+msgid "Meeting"
+msgstr "미팅"
+
+#: ConvAI/templates/patients/_timeline_event.html:88
+msgid "Open meeting"
+msgstr "미팅 열기"
+
+#: ConvAI/templates/patients/_timeline_event.html:93
+msgid "Re-summarize"
+msgstr "다시 요약"
+
+#: ConvAI/templates/patients/_timeline_event.html:93
+msgid "Summarize protocols"
+msgstr "프로토콜 요약"
+
+#: ConvAI/templates/patients/_timeline_event.html:101
+msgid "Protocol summary"
+msgstr "프로토콜 요약"
+
+#: ConvAI/templates/patients/_timeline_event.html:110
+#: ConvAI/views/_panel.py:363
+msgid "Chatbot"
+msgstr "챗봇"
+
+#: ConvAI/templates/patients/_timeline_event.html:112
+#: ConvAI/templates/patients/patient_conversation_detail.html:137
+#, python-format
+msgid "%(counter)s message"
+msgid_plural "%(counter)s messages"
+msgstr[0] "%(counter)s개의 메시지"
+
+#: ConvAI/templates/patients/_timeline_event.html:120
+msgid "View conversation"
+msgstr "대화 보기"
+
+#: ConvAI/templates/patients/_timeline_pills.html:4
+#: ConvAI/views/communications.py:68 ConvAI/views/communications.py:73
+msgid "Calls"
+msgstr "통화"
+
+#: ConvAI/templates/patients/_timeline_pills.html:5
+#: ConvAI/views/communications.py:69 ConvAI/views/communications.py:74
+msgid "Meetings"
+msgstr "미팅"
+
+#: ConvAI/templates/patients/_timeline_pills.html:6
+#: ConvAI/templates/sidebar.html:128 ConvAI/views/communications.py:76
+msgid "Alerts"
+msgstr "알림"
+
+#: ConvAI/templates/patients/_timeline_pills.html:7
+#: ConvAI/views/communications.py:75
+msgid "Chats"
+msgstr "채팅"
+
+#: ConvAI/templates/patients/_timeline_script.html:90
+msgid "Working…"
+msgstr "처리 중…"
+
+#: ConvAI/templates/patients/edit_care_plan.html:7
+#: ConvAI/templates/patients/edit_care_plan.html:12
+msgid "Edit Care Plan"
+msgstr "돌봄 계획 편집"
+
+#: ConvAI/templates/patients/edit_care_plan.html:15
+#: ConvAI/templates/patients/edit_patient.html:70
+#: ConvAI/templates/patients/edit_patient_details.html:22
+#: ConvAI/templates/patients/patient_detail.html:24
+#: ConvAI/templates/patients/patient_detail.html:65
+#: ConvAI/templates/patients/patient_list.html:564
+#: ConvAI/templates/patients/patient_list.html:1353
+msgid "Caregiver"
+msgstr "보호자"
+
+#: ConvAI/templates/patients/edit_care_plan.html:27
+#: ConvAI/templates/patients/edit_patient.html:21
+#: ConvAI/templates/patients/edit_patient_details.html:14
+#: ConvAI/templates/patients/patient_conversation_detail.html:90
+#: ConvAI/templates/patients/view_care_plan.html:17
+msgid "Back to client"
+msgstr "환자로 돌아가기"
+
+#: ConvAI/templates/patients/edit_care_plan.html:53
+msgid "Current file:"
+msgstr "현재 파일:"
+
+#: ConvAI/templates/patients/edit_patient.html:3
+#: ConvAI/templates/patients/edit_patient.html:27
+#: ConvAI/templates/users/test_user_result.html:70
+msgid "Edit client"
+msgstr "클라이언트 편집"
+
+#: ConvAI/templates/patients/edit_patient.html:64
+msgid ""
+"The agent that handles this client's chat (including the test-user chatbot)."
+msgstr "이 클라이언트의 채팅을 담당하는 에이전트(테스트 사용자 챗봇 포함)."
+
+#: ConvAI/templates/patients/edit_patient.html:71
+msgid "The caregiver's phone is the number called when you start a call."
+msgstr "보호자의 전화번호는 통화를 시작할 때 전화가 걸리는 번호입니다."
+
+#: ConvAI/templates/patients/edit_patient_details.html:5
+#: ConvAI/templates/patients/patient_detail.html:37
+msgid "Edit details"
+msgstr "세부 정보 편집"
+
+#: ConvAI/templates/patients/edit_patient_details.html:20
+msgid "Edit details of"
+msgstr "세부 정보 편집:"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:6
+msgid "Conversation with"
+msgstr "대화 상대"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:98
+msgid "Conversation history"
+msgstr "대화 기록"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:103
+msgid "Previous day"
+msgstr "이전 날짜"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:107
+msgid "Next day"
+msgstr "다음 날짜"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:132
+msgid ""
+"This conversation has not been analysed yet. It may take a few moments."
+msgstr "이 대화는 아직 분석되지 않았습니다. 잠시 시간이 걸릴 수 있습니다."
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:133
+msgid "Analysis pending"
+msgstr "분석 대기 중"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:155
+msgid "Voice message"
+msgstr "음성 메시지"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:173
+msgid "Voice reply"
+msgstr "음성 답장"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:184
+msgid "Like"
+msgstr "좋아요"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:187
+msgid "Dislike"
+msgstr "싫어요"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:190
+msgid "Flag as warning"
+msgstr "경고로 표시"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:193
+msgid "Flag as dangerous"
+msgstr "위험으로 표시"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:207
+msgid "Conversation feedback"
+msgstr "대화 피드백"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:208
+#: ConvAI/templates/patients/patient_detail.html:204
+#: ConvAI/views/settings_views.py:35
+msgid "Saved"
+msgstr "저장됨"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:213
+msgid "Conversation rating"
+msgstr "대화 평가"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:224
+msgid "Feedback"
+msgstr "피드백"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:226
+msgid "Enter your feedback here..."
+msgstr "여기에 피드백을 입력하세요..."
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:232
+msgid "Human validation"
+msgstr "사람 검증"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:255
+msgid "No messages recorded on this day."
+msgstr "이 날짜에 기록된 메시지가 없습니다."
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:256
+msgid "Use the arrows above to browse other days."
+msgstr "위의 화살표로 다른 날짜를 탐색하세요."
+
+#: ConvAI/templates/patients/patient_detail.html:74
+msgid "Relationship not recorded"
+msgstr "관계 미기록"
+
+#: ConvAI/templates/patients/patient_detail.html:79
+msgid "Daughter, neighbour, paid carer…"
+msgstr "딸, 이웃, 유급 간병인…"
+
+#: ConvAI/templates/patients/patient_detail.html:82
+msgid "Usually on the call"
+msgstr "보통 통화에 함께함"
+
+#: ConvAI/templates/patients/patient_detail.html:87
+#: ConvAI/views/dashboard.py:258
+msgid "No caregiver"
+msgstr "보호자 없음"
+
+#: ConvAI/templates/patients/patient_detail.html:101
+#: ConvAI/templates/patients/patient_detail.html:106
+msgid "No agent"
+msgstr "에이전트 없음"
+
+#: ConvAI/templates/patients/patient_detail.html:102
+msgid "Answers this client's chats"
+msgstr "이 환자의 대화에 응답함"
+
+#: ConvAI/templates/patients/patient_detail.html:102
+msgid "Chats are not answered automatically"
+msgstr "대화가 자동으로 응답되지 않음"
+
+#: ConvAI/templates/patients/patient_detail.html:116
+msgid "Client since"
+msgstr "환자 등록일"
+
+#: ConvAI/templates/patients/patient_detail.html:128
+msgid "How they want to be contacted"
+msgstr "선호하는 연락 방식"
+
+#: ConvAI/templates/patients/patient_detail.html:145
+msgid "Add another…"
+msgstr "다른 항목 추가…"
+
+#: ConvAI/templates/patients/patient_detail.html:146
+msgid "Add a contact preference"
+msgstr "연락 선호 사항 추가"
+
+#: ConvAI/templates/patients/patient_detail.html:152
+msgid "Background"
+msgstr "배경 정보"
+
+#: ConvAI/templates/patients/patient_detail.html:157
+msgid "Nothing recorded yet."
+msgstr "아직 기록된 내용이 없습니다."
+
+#: ConvAI/templates/patients/patient_detail.html:161
+msgid "Who they live with, how they get about, what to avoid. Markdown."
+msgstr "누구와 함께 사는지, 어떻게 이동하는지, 무엇을 피해야 하는지. Markdown 사용 가능."
+
+#: ConvAI/templates/patients/patient_detail.html:172
+msgid "Protocols completed"
+msgstr "완료된 프로토콜"
+
+#: ConvAI/templates/patients/patient_detail.html:198
+msgid "Handover note"
+msgstr "인수인계 메모"
+
+#: ConvAI/templates/patients/patient_detail.html:202
+msgid ""
+"What the next person should know to make the first call feel like continuity"
+msgstr "다음 담당자가 첫 통화를 자연스러운 연속으로 이어가려면 알아야 할 내용"
+
+#: ConvAI/templates/patients/patient_detail.html:208
+#: ConvAI/templates/patients/view_care_plan.html:6
+#: ConvAI/templates/patients/view_care_plan.html:11
+msgid "Care plan"
+msgstr "돌봄 계획"
+
+#: ConvAI/templates/patients/patient_detail.html:218
+msgid "Replace"
+msgstr "교체"
+
+#: ConvAI/templates/patients/patient_detail.html:234
+msgid "Send to caregiver on WhatsApp"
+msgstr "WhatsApp으로 보호자에게 보내기"
+
+#: ConvAI/templates/patients/patient_detail.html:238
+#, python-format
+msgid "Goes to %(n)s as a single-use link."
+msgstr "%(n)s에게 일회용 링크로 전송됩니다."
+
+#: ConvAI/templates/patients/patient_detail.html:240
+msgid "No caregiver number on file."
+msgstr "등록된 보호자 번호가 없습니다."
+
+#: ConvAI/templates/patients/patient_detail.html:251
+msgid "Upload a care plan"
+msgstr "돌봄 계획 업로드"
+
+#: ConvAI/templates/patients/patient_detail.html:252
+msgid "PDF"
+msgstr "PDF"
+
+#: ConvAI/templates/patients/patient_detail.html:254
+msgid "Choose file"
+msgstr "파일 선택"
+
+#: ConvAI/templates/patients/patient_list.html:6
+#: ConvAI/templates/patients/patient_list.html:446
+#: ConvAI/templates/sidebar.html:45 ConvAI/templates/sidebar.html:50
+msgid "Clients"
+msgstr "환자"
+
+#: ConvAI/templates/patients/patient_list.html:447
+msgid "clients"
+msgstr "환자"
+
+#: ConvAI/templates/patients/patient_list.html:450
+#: ConvAI/templates/patients/patient_list.html:1324
+msgid "Add client"
+msgstr "환자 추가"
+
+#: ConvAI/templates/patients/patient_list.html:463
+msgid "Search by ID, client, caregiver or counsellor..."
+msgstr "ID, 환자, 보호자 또는 상담사로 검색..."
+
+#: ConvAI/templates/patients/patient_list.html:465
+msgid "Search by ID, client, caregiver..."
+msgstr "ID, 환자, 보호자로 검색..."
+
+#: ConvAI/templates/patients/patient_list.html:488
+#: ConvAI/templates/patients/patient_list.html:1171
+msgid "Showing"
+msgstr "표시 중"
+
+#: ConvAI/templates/patients/patient_list.html:488
+msgid "all"
+msgstr "전체"
+
+#: ConvAI/templates/patients/patient_list.html:493
+msgid "Filter by next call"
+msgstr "다음 통화로 필터"
+
+#: ConvAI/templates/patients/patient_list.html:502
+msgid "Scheduled"
+msgstr "예약됨"
+
+#: ConvAI/templates/patients/patient_list.html:507
+msgid "Not scheduled"
+msgstr "예약되지 않음"
+
+#: ConvAI/templates/patients/patient_list.html:521
+#: ConvAI/templates/patients/patient_list.html:530
+#: ConvAI/templates/patients/patient_list.html:573 ConvAI/views/account.py:16
+msgid "Counsellor"
+msgstr "상담사"
+
+#: ConvAI/templates/patients/patient_list.html:531
+msgid "Search counsellor"
+msgstr "상담사 검색"
+
+#: ConvAI/templates/patients/patient_list.html:550
+msgid "Id"
+msgstr "Id"
+
+#: ConvAI/templates/patients/patient_list.html:588
+msgid "Last call"
+msgstr "마지막 통화"
+
+#: ConvAI/templates/patients/patient_list.html:600
+msgid "No clients match the current filters."
+msgstr "현재 필터와 일치하는 환자가 없습니다."
+
+#: ConvAI/templates/patients/patient_list.html:611
+#: ConvAI/templates/users/user_list.html:162
+msgid "Records"
+msgstr "기록"
+
+#: ConvAI/templates/patients/patient_list.html:1370
+#: ConvAI/templates/users/user_list.html:193
+#: ConvAI/templates/users/user_list.html:216
+msgid "Create"
+msgstr "생성"
+
+#: ConvAI/templates/patients/view_care_plan.html:29
+msgid "Update Care Plan"
+msgstr "돌봄 계획 업데이트"
+
+#: ConvAI/templates/patients/view_care_plan.html:42
+msgid "No Care Plan uploaded for this client."
+msgstr "이 환자에 대해 업로드된 돌봄 계획이 없습니다."
+
+#: ConvAI/templates/patients/view_care_plan.html:48
+msgid "Upload Care Plan"
+msgstr "돌봄 계획 업로드"
+
+#: ConvAI/templates/protocols/protocol_editor.html:5
+#: ConvAI/templates/protocols/protocol_editor.html:69
+msgid "Protocol editor"
+msgstr "프로토콜 편집기"
+
+#: ConvAI/templates/protocols/protocol_editor.html:71
+#: ConvAI/templates/protocols/protocol_form.html:78
+#: ConvAI/templates/settings/config.html:375
+msgid "Beta"
+msgstr "베타"
+
+#: ConvAI/templates/protocols/protocol_editor.html:74
+#, python-format
+msgid "Protocol #%(n)s — design its questions as in a form."
+msgstr "프로토콜 #%(n)s — 양식처럼 질문을 구성하세요."
+
+#: ConvAI/templates/protocols/protocol_editor.html:84
+msgid "Read-only. Protocols are edited in Settings by an administrator."
+msgstr "읽기 전용입니다. 프로토콜은 관리자가 설정에서 편집합니다."
+
+#: ConvAI/templates/protocols/protocol_editor.html:86
+msgid ""
+"This protocol already has recorded answers, so its structure cannot be "
+"modified. It is shown in read-only mode."
+msgstr "이 프로토콜에는 이미 기록된 답변이 있어 구조를 수정할 수 없습니다. 읽기 전용 모드로 표시됩니다."
+
+#: ConvAI/templates/protocols/protocol_editor.html:98
+msgid "Protocol title"
+msgstr "프로토콜 제목"
+
+#: ConvAI/templates/protocols/protocol_editor.html:104
+msgid "Protocol name"
+msgstr "프로토콜 이름"
+
+#: ConvAI/templates/protocols/protocol_editor.html:107
+msgid "Description (Markdown, optional)"
+msgstr "설명 (Markdown, 선택 사항)"
+
+#: ConvAI/templates/protocols/protocol_editor.html:112
+msgid "Describe the goal of this protocol…"
+msgstr "이 프로토콜의 목표를 설명하세요…"
+
+#: ConvAI/templates/protocols/protocol_editor.html:117
+#: ConvAI/templates/settings/config.html:394
+msgid "Questions"
+msgstr "질문"
+
+#: ConvAI/templates/protocols/protocol_editor.html:124
+msgid "No questions yet. Add the first one."
+msgstr "아직 질문이 없습니다. 첫 번째 질문을 추가하세요."
+
+#: ConvAI/templates/protocols/protocol_editor.html:131
+msgid "Add question"
+msgstr "질문 추가"
+
+#: ConvAI/templates/protocols/protocol_editor.html:191
+msgid "bold text"
+msgstr "굵은 텍스트"
+
+#: ConvAI/templates/protocols/protocol_editor.html:192
+msgid "italic text"
+msgstr "기울임꼴 텍스트"
+
+#: ConvAI/templates/protocols/protocol_editor.html:193
+msgid "code"
+msgstr "코드"
+
+#: ConvAI/templates/protocols/protocol_editor.html:199
+msgid "text"
+msgstr "텍스트"
+
+#: ConvAI/templates/protocols/protocol_editor.html:219
+msgid "Drag to reorder"
+msgstr "드래그하여 순서 변경"
+
+#: ConvAI/templates/protocols/protocol_editor.html:227
+msgid "Bold"
+msgstr "굵게"
+
+#: ConvAI/templates/protocols/protocol_editor.html:228
+msgid "Italic"
+msgstr "기울임꼴"
+
+#: ConvAI/templates/protocols/protocol_editor.html:230
+#: ConvAI/templates/settings/config.html:393
+msgid "Title"
+msgstr "제목"
+
+#: ConvAI/templates/protocols/protocol_editor.html:231
+msgid "List"
+msgstr "목록"
+
+#: ConvAI/templates/protocols/protocol_editor.html:232
+msgid "Numbered list"
+msgstr "번호 매기기 목록"
+
+#: ConvAI/templates/protocols/protocol_editor.html:233
+msgid "Appointment"
+msgstr "예약"
+
+#: ConvAI/templates/protocols/protocol_editor.html:235
+msgid "Link"
+msgstr "링크"
+
+#: ConvAI/templates/protocols/protocol_editor.html:236
+msgid "Code"
+msgstr "코드"
+
+#: ConvAI/templates/protocols/protocol_editor.html:239
+msgid "Write the question or guide in Markdown…"
+msgstr "Markdown으로 질문이나 안내를 작성하세요…"
+
+#: ConvAI/templates/protocols/protocol_editor.html:241
+msgid "Preview"
+msgstr "미리보기"
+
+#: ConvAI/templates/protocols/protocol_editor.html:246
+msgid "Upload"
+msgstr "업로드"
+
+#: ConvAI/templates/protocols/protocol_editor.html:247
+msgid "Move down"
+msgstr "아래로 이동"
+
+#: ConvAI/templates/protocols/protocol_editor.html:248
+msgid "Duplicate"
+msgstr "복제"
+
+#: ConvAI/templates/protocols/protocol_editor.html:320
+msgid "Question"
+msgstr "질문"
+
+#: ConvAI/templates/protocols/protocol_editor.html:326
+msgid "question(s)"
+msgstr "질문"
+
+#: ConvAI/templates/protocols/protocol_editor.html:353
+msgid "The title is required."
+msgstr "제목은 필수입니다."
+
+#: ConvAI/templates/protocols/protocol_editor.html:376
+msgid "Protocol saved."
+msgstr "프로토콜이 저장되었습니다."
+
+#: ConvAI/templates/protocols/protocol_editor.html:379
+msgid "Could not save."
+msgstr "저장할 수 없습니다."
+
+#: ConvAI/templates/protocols/protocol_editor.html:383
+msgid "Network error while saving."
+msgstr "저장 중 네트워크 오류가 발생했습니다."
+
+#: ConvAI/templates/protocols/protocol_form.html:13
+msgid "Answers saved successfully."
+msgstr "답변이 성공적으로 저장되었습니다."
+
+#: ConvAI/templates/protocols/protocol_form.html:20
+msgid "An error occurred while saving the answers."
+msgstr "답변을 저장하는 중 오류가 발생했습니다."
+
+#: ConvAI/templates/protocols/protocol_form.html:48
+#: ConvAI/templates/protocols/protocol_form.html:49
+msgid "Reload"
+msgstr "새로 고침"
+
+#: ConvAI/templates/protocols/protocol_form.html:75
+msgid "Edit protocol structure"
+msgstr "프로토콜 구조 편집"
+
+#: ConvAI/templates/protocols/protocol_form.html:77
+msgid "Edit protocol"
+msgstr "프로토콜 편집"
+
+#: ConvAI/templates/settings/config.html:5
+#: ConvAI/templates/settings/config.html:50 ConvAI/templates/sidebar.html:79
+#: ConvAI/templates/sidebar.html:84
+msgid "Settings"
+msgstr "설정"
+
+#: ConvAI/templates/settings/config.html:51
+msgid "Configure how the platform behaves, connects, and looks."
+msgstr "플랫폼의 동작, 연결, 모양을 구성합니다."
+
+#: ConvAI/templates/settings/config.html:54
+#: ConvAI/templates/users/user_list.html:3
+#: ConvAI/templates/users/user_list.html:42
+#: ConvAI/templates/users/user_list.html:51
+msgid "Users"
+msgstr "사용자"
+
+#: ConvAI/templates/settings/config.html:80
+msgid "Behaviour"
+msgstr "동작"
+
+#: ConvAI/templates/settings/config.html:81
+msgid "Feature flags and defaults that take effect immediately."
+msgstr "즉시 적용되는 기능 플래그와 기본값입니다."
+
+#: ConvAI/templates/settings/config.html:98
+msgid "System"
+msgstr "시스템"
+
+#: ConvAI/templates/settings/config.html:99
+msgid "Restart required"
+msgstr "재시작 필요"
+
+#: ConvAI/templates/settings/config.html:101
+msgid "These are read at server start and managed in .env."
+msgstr "서버 시작 시 읽으며 .env에서 관리됩니다."
+
+#: ConvAI/templates/settings/config.html:106
+msgid "Timezone"
+msgstr "시간대"
+
+#: ConvAI/templates/settings/config.html:107
+msgid "Async WhatsApp reply"
+msgstr "비동기 WhatsApp 응답"
+
+#: ConvAI/templates/settings/config.html:107
+#: ConvAI/templates/settings/config.html:108
+msgid "On,Off"
+msgstr "켜짐,꺼짐"
+
+#: ConvAI/templates/settings/config.html:108
+msgid "Debug mode"
+msgstr "디버그 모드"
+
+#: ConvAI/templates/settings/config.html:111
+msgid "Twilio webhook URL"
+msgstr "Twilio 웹훅 URL"
+
+#: ConvAI/templates/settings/config.html:113
+msgid ""
+"Configure this URL in the Twilio console. Change the path with "
+"TWILIO_WEBHOOK_PATH in .env."
+msgstr "Twilio 콘솔에서 이 URL을 설정하세요. .env의 TWILIO_WEBHOOK_PATH로 경로를 변경합니다."
+
+#: ConvAI/templates/settings/config.html:124
+msgid "Integration credentials"
+msgstr "통합 자격 증명"
+
+#: ConvAI/templates/settings/config.html:125
+msgid ""
+"Secrets are stored securely and never shown again after saving. Leave blank "
+"to keep the current value."
+msgstr "비밀 값은 안전하게 저장되며 저장 후에는 다시 표시되지 않습니다. 현재 값을 유지하려면 비워 두세요."
+
+#: ConvAI/templates/settings/config.html:143
+msgid "Messaging templates"
+msgstr "메시징 템플릿"
+
+#: ConvAI/templates/settings/config.html:144
+msgid "SMS/WhatsApp sender numbers and template identifiers."
+msgstr "SMS/WhatsApp 발신 번호와 템플릿 식별자입니다."
+
+#: ConvAI/templates/settings/config.html:162
+#: ConvAI/views/settings_views.py:137
+msgid "Branding"
+msgstr "브랜딩"
+
+#: ConvAI/templates/settings/config.html:163
+msgid "The name and logo shown across the app and on the login page."
+msgstr "앱 전반과 로그인 페이지에 표시되는 이름과 로고입니다."
+
+#: ConvAI/templates/settings/config.html:170
+msgid "Current logo"
+msgstr "현재 로고"
+
+#: ConvAI/templates/settings/config.html:186
+msgid ""
+"The model behind in-process agents, provider keys, and Azure routing. These "
+"override .env."
+msgstr "인프로세스 에이전트의 모델, 제공업체 키, Azure 라우팅입니다. .env보다 우선 적용됩니다."
+
+#: ConvAI/templates/settings/config.html:193
+msgid "Default model"
+msgstr "기본 모델"
+
+#: ConvAI/templates/settings/config.html:197
+msgid "Provider API keys"
+msgstr "제공업체 API 키"
+
+#: ConvAI/templates/settings/config.html:207
+msgid "Security"
+msgstr "보안"
+
+#: ConvAI/templates/settings/config.html:212
+msgid "Azure"
+msgstr "Azure"
+
+#: ConvAI/templates/settings/config.html:228
+msgid "Azure OpenAI Realtime (voice agents)"
+msgstr "Azure OpenAI Realtime(음성 에이전트)"
+
+#: ConvAI/templates/settings/config.html:229
+msgid ""
+"Used by prompt-based agents with real-time voice enabled. Speech goes "
+"straight between the browser and this deployment; a short-lived key is "
+"minted per conversation."
+msgstr ""
+"실시간 음성이 활성화된 프롬프트 기반 에이전트에서 사용됩니다. 음성은 브라우저와 이 배포 간에 직접 전송되며, 대화마다 단기 키가 "
+"발급됩니다."
+
+#: ConvAI/templates/settings/config.html:262
+msgid "Summarization prompts"
+msgstr "요약 프롬프트"
+
+#: ConvAI/templates/settings/config.html:263
+msgid ""
+"Base prompts used to summarize meeting protocols and call transcripts. Leave"
+" a field blank to use the built-in default. The relevant protocol answers or"
+" transcript are appended automatically."
+msgstr ""
+"미팅 프로토콜과 통화 기록을 요약하는 데 사용되는 기본 프롬프트입니다. 필드를 비워 두면 내장 기본값이 사용됩니다. 관련 프로토콜 "
+"답변이나 통화 기록은 자동으로 추가됩니다."
+
+#: ConvAI/templates/settings/config.html:282
+msgid "Python API client"
+msgstr "Python API 클라이언트"
+
+#: ConvAI/templates/settings/config.html:284
+msgid "The REST API is exposed, so the client can connect."
+msgstr "REST API가 노출되어 있어 클라이언트가 연결할 수 있습니다."
+
+#: ConvAI/templates/settings/config.html:285
+msgid "API enabled"
+msgstr "API 활성화됨"
+
+#: ConvAI/templates/settings/config.html:288
+msgid "Set ENABLE_API=1 in .env and restart to expose the REST API."
+msgstr "REST API를 노출하려면 .env에 ENABLE_API=1을 설정하고 다시 시작하세요."
+
+#: ConvAI/templates/settings/config.html:289
+msgid "API disabled"
+msgstr "API 비활성화됨"
+
+#: ConvAI/templates/settings/config.html:293
+msgid ""
+"Install the client package to script the platform — list clients and "
+"schedule meetings — using your personal API token. Permissions match the web"
+" app."
+msgstr ""
+"개인 API 토큰으로 플랫폼을 스크립트로 제어(환자 목록 조회, 미팅 예약)하려면 클라이언트 패키지를 설치하세요. 권한은 웹 앱과 "
+"동일합니다."
+
+#: ConvAI/templates/settings/config.html:299
+msgid ""
+"The REST API is currently <b>disabled</b>, so the client cannot connect. Set"
+" <code>ENABLE_API=1</code> in <code>.env</code> and restart the server to "
+"turn it on."
+msgstr ""
+"REST API가 현재 <b>비활성화</b>되어 있어 클라이언트가 연결할 수 없습니다. <code>.env</code>에 "
+"<code>ENABLE_API=1</code>을 설정하고 서버를 다시 시작하여 활성화하세요."
+
+#: ConvAI/templates/settings/config.html:307
+msgid "Get your API token"
+msgstr "API 토큰 받기"
+
+#: ConvAI/templates/settings/config.html:310
+msgid ""
+"Open your <b>Profile</b> page and click <b>Generate API token</b>. Copy it "
+"immediately — it is shown only once, and generating a new one revokes the "
+"old one."
+msgstr ""
+"<b>프로필</b> 페이지를 열고 <b>API 토큰 생성</b>을 클릭하세요. 한 번만 표시되므로 즉시 복사하세요. 새 토큰을 생성하면 "
+"이전 토큰은 무효화됩니다."
+
+#: ConvAI/templates/settings/config.html:313
+msgid "Go to Profile → API token"
+msgstr "프로필 → API 토큰으로 이동"
+
+#: ConvAI/templates/settings/config.html:321
+msgid "Download & install with pip"
+msgstr "pip으로 다운로드 및 설치"
+
+#: ConvAI/templates/settings/config.html:323
+msgid "Download the package and install it into your Python environment:"
+msgstr "패키지를 다운로드하여 Python 환경에 설치하세요:"
+
+#: ConvAI/templates/settings/config.html:330
+msgid ""
+"No <code>wget</code>? Use the button below or <code>curl -L -o "
+"conversationalcare_api.zip \"URL\"</code>. The zip installs directly — no "
+"need to unzip."
+msgstr ""
+"<code>wget</code>이 없나요? 아래 버튼을 사용하거나 <code>curl -L -o "
+"conversationalcare_api.zip \"URL\"</code>을 사용하세요. zip은 압축을 풀 필요 없이 바로 설치됩니다."
+
+#: ConvAI/templates/settings/config.html:333
+msgid "Download client (.zip)"
+msgstr "클라이언트 다운로드(.zip)"
+
+#: ConvAI/templates/settings/config.html:341
+msgid "Use it in Python"
+msgstr "Python에서 사용하기"
+
+#: ConvAI/templates/settings/config.html:380
+msgid "New protocol"
+msgstr "새 프로토콜"
+
+#: ConvAI/templates/settings/config.html:384
+msgid ""
+"A new protocol stays fully editable until answers are recorded against it, "
+"after which it locks to protect collected data."
+msgstr "새 프로토콜은 답변이 기록되기 전까지 완전히 편집 가능하며, 이후에는 수집된 데이터를 보호하기 위해 잠깁니다."
+
+#: ConvAI/templates/settings/config.html:408
+msgid "With answers"
+msgstr "답변 있음"
+
+#: ConvAI/templates/settings/config.html:411
+msgid "Editable"
+msgstr "편집 가능"
+
+#: ConvAI/templates/settings/config.html:419
+msgid "View"
+msgstr "보기"
+
+#: ConvAI/templates/settings/config.html:423
+msgid "Delete this protocol? This cannot be undone."
+msgstr "이 프로토콜을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다."
+
+#: ConvAI/templates/settings/config.html:439
+msgid "No protocols yet."
+msgstr "아직 프로토콜이 없습니다."
+
+#: ConvAI/templates/settings/config.html:450
+msgid "Pre-registrations (Self Registration)"
+msgstr "사전 등록 (자가 등록)"
+
+#: ConvAI/templates/settings/config.html:451
+msgid ""
+"People who self-registered and are waiting to be approved and assigned an "
+"agent."
+msgstr "직접 등록하고 승인 및 에이전트 배정을 기다리는 사람들입니다."
+
+#: ConvAI/templates/settings/config.html:459
+msgid "Name"
+msgstr "이름"
+
+#: ConvAI/templates/settings/config.html:463
+msgid "Created"
+msgstr "생성됨"
+
+#: ConvAI/templates/settings/config.html:475
+msgid "Registered"
+msgstr "등록됨"
+
+#: ConvAI/templates/settings/config.html:477
+msgid "Approved"
+msgstr "승인됨"
+
+#: ConvAI/templates/settings/config.html:486
+msgid "— No agent —"
+msgstr "— 에이전트 없음 —"
+
+#: ConvAI/templates/settings/config.html:491
+msgid "Approve"
+msgstr "승인"
+
+#: ConvAI/templates/settings/config.html:494
+msgid "Already approved"
+msgstr "이미 승인됨"
+
+#: ConvAI/templates/settings/config.html:503
+msgid "No pre-registrations yet."
+msgstr "아직 사전 등록이 없습니다."
+
+#: ConvAI/templates/settings/config.html:515
+#: ConvAI/views/settings_views.py:142
+msgid "Self registration"
+msgstr "자가 등록"
+
+#: ConvAI/templates/settings/config.html:522
+#: ConvAI/templates/users/user_list.html:107
+msgid "Inactive"
+msgstr "비활성"
+
+#: ConvAI/templates/settings/config.html:526
+msgid ""
+"Share this QR in demos so people can start a WhatsApp chat that registers "
+"them. Scanning opens WhatsApp with a pre-filled message in the platform "
+"language."
+msgstr ""
+"데모에서 이 QR을 공유하면 사람들이 자신을 등록하는 WhatsApp 채팅을 시작할 수 있습니다. 스캔하면 플랫폼 언어로 미리 작성된 "
+"메시지와 함께 WhatsApp이 열립니다."
+
+#: ConvAI/templates/settings/config.html:534
+msgid ""
+"Self-registration is currently <b>off</b>, so scans won't be answered "
+"automatically. Turn it on and pick the <b>Self Registration Agent</b> under"
+msgstr ""
+"자가 등록이 현재 <b>꺼져</b> 있어 스캔에 자동으로 응답하지 않습니다. 다음 설정에서 켜고 <b>자가 등록 에이전트</b>를 "
+"선택하세요:"
+
+#: ConvAI/templates/settings/config.html:535
+msgid "General settings"
+msgstr "일반 설정"
+
+#: ConvAI/templates/settings/config.html:549
+msgid "Download"
+msgstr "다운로드"
+
+#: ConvAI/templates/settings/config.html:552
+msgid "Copy image"
+msgstr "이미지 복사"
+
+#: ConvAI/templates/settings/config.html:560
+msgid "Pre-filled message"
+msgstr "미리 작성된 메시지"
+
+#: ConvAI/templates/settings/config.html:565
+msgid "WhatsApp link"
+msgstr "WhatsApp 링크"
+
+#: ConvAI/templates/settings/config.html:576
+msgid "Platform number"
+msgstr "플랫폼 번호"
+
+#: ConvAI/templates/settings/config.html:580
+msgid "Handled by"
+msgstr "담당 에이전트"
+
+#: ConvAI/templates/settings/config.html:581
+msgid "— not selected —"
+msgstr "— 선택 안 됨 —"
+
+#: ConvAI/templates/settings/config.html:586
+msgid "Test the link"
+msgstr "링크 테스트"
+
+#: ConvAI/templates/settings/config.html:594
+msgid ""
+"No <b>platform phone number</b> is configured, so a WhatsApp link can't be "
+"built. Add it under"
+msgstr "<b>플랫폼 전화번호</b>가 설정되지 않아 WhatsApp 링크를 만들 수 없습니다. 다음에서 추가하세요:"
+
+#: ConvAI/templates/settings/config.html:595
+#: ConvAI/views/settings_views.py:135
+msgid "Integrations"
+msgstr "통합"
+
+#: ConvAI/templates/settings/config.html:608
+#: ConvAI/views/settings_views.py:144
+msgid "Maintenance"
+msgstr "유지 관리"
+
+#: ConvAI/templates/settings/config.html:609
+msgid "One-off background jobs you can trigger by hand."
+msgstr "직접 실행할 수 있는 일회성 백그라운드 작업입니다."
+
+#: ConvAI/templates/settings/config.html:615
+#: ConvAI/templates/settings/config.html:620
+msgid "Update recordings"
+msgstr "녹음 업데이트"
+
+#: ConvAI/templates/settings/config.html:616
+msgid "Fetch new call recordings from Twilio."
+msgstr "Twilio에서 새 통화 녹음을 가져옵니다."
+
+#: ConvAI/templates/settings/config.html:629
+#: ConvAI/templates/settings/config.html:634
+msgid "Classify conversations"
+msgstr "대화 분류"
+
+#: ConvAI/templates/settings/config.html:630
+msgid "Processes only conversations that have not yet been analysed."
+msgstr "아직 분석되지 않은 대화만 처리합니다."
+
+#: ConvAI/templates/settings/config.html:723
+msgid "This browser cannot copy images. Use Download instead."
+msgstr "이 브라우저는 이미지를 복사할 수 없습니다. 대신 다운로드를 사용하세요."
+
+#: ConvAI/templates/settings/config.html:729
+msgid "Could not copy the image. Use Download instead."
+msgstr "이미지를 복사할 수 없습니다. 대신 다운로드를 사용하세요."
+
+#: ConvAI/templates/sidebar.html:10
+msgid "Toggle sidebar"
+msgstr "사이드바 전환"
+
+#: ConvAI/templates/sidebar.html:117
+msgid "View profile"
+msgstr "프로필 보기"
+
+#: ConvAI/templates/sidebar.html:132
+msgid "Urgent only"
+msgstr "긴급 시에만"
+
+#: ConvAI/templates/users/edit_user.html:3
+#: ConvAI/templates/users/edit_user.html:27
+msgid "Edit user"
+msgstr "사용자 편집"
+
+#: ConvAI/templates/users/edit_user.html:21
+#: ConvAI/templates/users/test_user_result.html:80
+msgid "Back to users"
+msgstr "사용자로 돌아가기"
+
+#: ConvAI/templates/users/test_user_result.html:3
+#: ConvAI/templates/users/test_user_result.html:11
+msgid "Test user created"
+msgstr "테스트 사용자가 생성되었습니다"
+
+#: ConvAI/templates/users/test_user_result.html:13
+#, python-format
+msgid "Account for %(name)s %(last)s."
+msgstr "%(name)s %(last)s님의 계정입니다."
+
+#: ConvAI/templates/users/test_user_result.html:19
+msgid ""
+"Copy these credentials now — the password is shown only once and cannot be "
+"recovered. You can reset it later by editing the user."
+msgstr ""
+"지금 이 자격 증명을 복사하세요 — 비밀번호는 한 번만 표시되며 복구할 수 없습니다. 나중에 사용자를 편집하여 재설정할 수 있습니다."
+
+#: ConvAI/templates/users/test_user_result.html:53
+msgid "Agent for this client"
+msgstr "이 클라이언트의 에이전트"
+
+#: ConvAI/templates/users/test_user_result.html:56
+msgid "This client's chat is handled by:"
+msgstr "이 클라이언트의 채팅을 담당하는 에이전트:"
+
+#: ConvAI/templates/users/test_user_result.html:59
+msgid "To change it, edit the client and pick a different agent."
+msgstr "변경하려면 클라이언트를 편집하고 다른 에이전트를 선택하세요."
+
+#: ConvAI/templates/users/test_user_result.html:62
+msgid ""
+"No agent is configured for this client yet — the test chat will not work "
+"until one is set."
+msgstr "이 클라이언트에는 아직 에이전트가 구성되지 않았습니다 — 하나를 설정하기 전까지 테스트 채팅이 작동하지 않습니다."
+
+#: ConvAI/templates/users/test_user_result.html:64
+msgid "Edit the client to choose the agent that should handle their chat."
+msgstr "클라이언트를 편집하여 채팅을 담당할 에이전트를 선택하세요."
+
+#: ConvAI/templates/users/test_user_result.html:73
+msgid "View client"
+msgstr "클라이언트 보기"
+
+#: ConvAI/templates/users/test_user_result.html:93
+msgid "Copied"
+msgstr "복사됨"
+
+#: ConvAI/templates/users/user_list.html:43
+msgid "Manage navigator and test-user accounts."
+msgstr "내비게이터 및 테스트 사용자 계정을 관리합니다."
+
+#: ConvAI/templates/users/user_list.html:49
+msgid "User types"
+msgstr "사용자 유형"
+
+#: ConvAI/templates/users/user_list.html:55
+msgid "Test users"
+msgstr "테스트 사용자"
+
+#: ConvAI/templates/users/user_list.html:62
+#: ConvAI/templates/users/user_list.html:204
+msgid "Add test user"
+msgstr "테스트 사용자 추가"
+
+#: ConvAI/templates/users/user_list.html:66
+#: ConvAI/templates/users/user_list.html:177
+msgid "Add user"
+msgstr "사용자 추가"
+
+#: ConvAI/templates/users/user_list.html:84
+msgid "Role"
+msgstr "역할"
+
+#: ConvAI/templates/users/user_list.html:117
+msgid "No users yet."
+msgstr "아직 사용자가 없습니다."
+
+#: ConvAI/templates/users/user_list.html:128
+#, python-format
+msgid "Showing %(start)s-%(end)s of %(total)s"
+msgstr "%(total)s개 중 %(start)s-%(end)s 표시"
+
+#: ConvAI/templates/users/user_list.html:130
+msgid "No results"
+msgstr "결과 없음"
+
+#: ConvAI/templates/users/user_list.html:180
+msgid "Creates a Navigator account."
+msgstr "Navigator 계정을 만듭니다."
+
+#: ConvAI/templates/users/user_list.html:212
+msgid ""
+"Only clients without a test user are listed. A username and password will be"
+" generated and shown once."
+msgstr "테스트 사용자가 없는 클라이언트만 표시됩니다. 사용자 이름과 비밀번호가 생성되어 한 번만 표시됩니다."
+
+#: ConvAI/views/_panel.py:90
+#, python-format
+msgid "Navigator: %s"
+msgstr "내비게이터: %s"
+
+#: ConvAI/views/_panel.py:93
+#, python-format
+msgid "Archived as: %s"
+msgstr "보관 형태: %s"
+
+#: ConvAI/views/_panel.py:96
+#, python-format
+msgid "Note: %s"
+msgstr "메모: %s"
+
+#: ConvAI/views/_panel.py:130 ConvAI/views/_panel.py:135
+#: ConvAI/views/patients.py:275
+msgid "Alert"
+msgstr "알림"
+
+#: ConvAI/views/_panel.py:138
+msgid "Description"
+msgstr "설명"
+
+#: ConvAI/views/_panel.py:236 ConvAI/views/communications.py:137
+msgid "To do"
+msgstr "할 일"
+
+#: ConvAI/views/_panel.py:238 ConvAI/views/communications.py:139
+msgid "In-person meeting"
+msgstr "대면 미팅"
+
+#: ConvAI/views/_panel.py:238
+msgid "Meeting ended"
+msgstr "미팅 종료"
+
+#: ConvAI/views/_panel.py:239 ConvAI/views/communications.py:139
+msgid "Scheduled call"
+msgstr "예정된 통화"
+
+#: ConvAI/views/_panel.py:239
+msgid "Call ended"
+msgstr "통화 종료"
+
+#: ConvAI/views/_panel.py:243
+#, python-format
+msgid "Meeting with %s"
+msgstr "%s와의 미팅"
+
+#: ConvAI/views/_panel.py:243
+#, python-format
+msgid "Call with %s"
+msgstr "%s와의 통화"
+
+#: ConvAI/views/_panel.py:319 ConvAI/views/communications.py:172
+msgid "Call recording"
+msgstr "통화 녹음"
+
+#: ConvAI/views/_panel.py:325
+#, python-format
+msgid "Called %s"
+msgstr "%s에게 전화함"
+
+#: ConvAI/views/_panel.py:376
+msgid "Messages"
+msgstr "메시지"
+
+#: ConvAI/views/_panel.py:377
+msgid "Between"
+msgstr "시간대"
+
+#: ConvAI/views/_panel.py:380
+msgid "—"
+msgstr "—"
+
+#: ConvAI/views/_panel.py:381
+msgid "Not recorded"
+msgstr "기록 없음"
+
+#: ConvAI/views/_panel.py:382
+msgid "Topic"
+msgstr "주제"
+
+#: ConvAI/views/_panel.py:382
+msgid "Not classified"
+msgstr "미분류"
+
+#: ConvAI/views/_panel.py:383
+msgid "Flagged"
+msgstr "표시 상태"
+
+#: ConvAI/views/_panel.py:383
+msgid "Needs attention"
+msgstr "주의 필요"
+
+#: ConvAI/views/_panel.py:384
+msgid "Nothing raised automatically"
+msgstr "자동으로 표시된 항목 없음"
+
+#: ConvAI/views/account.py:14
+msgid "Administrator"
+msgstr "관리자"
+
+#: ConvAI/views/account.py:18 ConvAI/views/users.py:19
+msgid "Test user"
+msgstr "테스트 사용자"
+
+#: ConvAI/views/account.py:19
+msgid "User"
+msgstr "사용자"
+
+#: ConvAI/views/account.py:47
+msgid "Help page updated."
+msgstr "도움말 페이지가 업데이트되었습니다."
+
+#: ConvAI/views/account.py:103
+msgid "Please enter a valid e-mail address."
+msgstr "올바른 이메일 주소를 입력하세요."
+
+#: ConvAI/views/account.py:110
+msgid "Profile updated."
+msgstr "프로필이 업데이트되었습니다."
+
+#: ConvAI/views/account.py:124
+msgid "Language updated."
+msgstr "언어가 업데이트되었습니다."
+
+#: ConvAI/views/account.py:134
+msgid ""
+"Your token has been generated. Copy it now; it will be shown only once."
+msgstr "토큰이 생성되었습니다. 지금 복사하세요. 한 번만 표시됩니다."
+
+#: ConvAI/views/agents.py:22
+msgid "remote agent"
+msgstr "원격 에이전트"
+
+#: ConvAI/views/agents.py:23
+msgid "prompt-based agent"
+msgstr "프롬프트 기반 에이전트"
+
+#: ConvAI/views/agents.py:24
+msgid "native agent"
+msgstr "네이티브 에이전트"
+
+#: ConvAI/views/agents.py:55
+msgid "That agent kind cannot be edited here."
+msgstr "이 에이전트 유형은 여기에서 편집할 수 없습니다."
+
+#: ConvAI/views/agents.py:58
+msgid "That agent kind cannot be created here."
+msgstr "이 에이전트 유형은 여기에서 만들 수 없습니다."
+
+#: ConvAI/views/agents.py:69
+msgid "Agent saved."
+msgstr "에이전트가 저장되었습니다."
+
+#: ConvAI/views/agents.py:69
+msgid "Agent created."
+msgstr "에이전트가 생성되었습니다."
+
+#: ConvAI/views/agents.py:95
+msgid "Native agents cannot be deleted."
+msgstr "네이티브 에이전트는 삭제할 수 없습니다."
+
+#: ConvAI/views/agents.py:98
+msgid "Agent deleted."
+msgstr "에이전트가 삭제되었습니다."
+
+#: ConvAI/views/agents.py:125
+msgid ""
+"Could not start a voice session. Check the Azure Realtime settings and try "
+"again."
+msgstr "음성 세션을 시작할 수 없습니다. Azure Realtime 설정을 확인하고 다시 시도하십시오."
+
+#: ConvAI/views/agents.py:141 ConvAI/views/agents.py:146
+msgid "test"
+msgstr "테스트"
+
+#: ConvAI/views/agents.py:173
+msgid "Conversation ended."
+msgstr "대화가 종료되었습니다."
+
+#: ConvAI/views/alerts.py:51
+msgid "You do not have permission to view this alert."
+msgstr "이 알림을 볼 권한이 없습니다."
+
+#: ConvAI/views/alerts.py:64 ConvAI/views/alerts.py:74
+msgid "Invalid alert status."
+msgstr "잘못된 알림 상태입니다."
+
+#: ConvAI/views/alerts.py:182
+msgid "Alert reopened and moved back to Active Alerts."
+msgstr "알림이 다시 열려 활성 알림으로 이동했습니다."
+
+#: ConvAI/views/alerts.py:187
+msgid "Alert marked as false alarm and moved to the resolved archive."
+msgstr "알림이 오경보로 표시되어 해결됨 보관함으로 이동했습니다."
+
+#: ConvAI/views/alerts.py:189
+msgid "Alert resolved and moved to the resolved archive."
+msgstr "알림이 해결되어 해결됨 보관함으로 이동했습니다."
+
+#: ConvAI/views/alerts.py:193
+msgid "Chatbot marked as disabled for this alert. Alert moved to In Progress."
+msgstr "이 알림에 대해 챗봇이 비활성화로 표시되었습니다. 알림이 처리 중으로 이동했습니다."
+
+#: ConvAI/views/alerts.py:195
+msgid ""
+"Chatbot marked as enabled again. Alert remains In Progress until resolved."
+msgstr "챗봇이 다시 활성화로 표시되었습니다. 해결될 때까지 알림은 처리 중으로 유지됩니다."
+
+#: ConvAI/views/alerts.py:197
+msgid "Alert moved to In Progress."
+msgstr "알림이 처리 중으로 이동했습니다."
+
+#: ConvAI/views/alerts.py:199
+msgid "Alert moved back to New."
+msgstr "알림이 신규로 되돌아갔습니다."
+
+#: ConvAI/views/alerts.py:201
+msgid "Alert updated."
+msgstr "알림이 업데이트되었습니다."
+
+#: ConvAI/views/alerts.py:224
+msgid "Internal note saved."
+msgstr "내부 메모가 저장되었습니다."
+
+#: ConvAI/views/alerts.py:319
+msgid "You do not have permission to act on this alert."
+msgstr "이 알림을 처리할 권한이 없습니다."
+
+#: ConvAI/views/alerts.py:331
+msgid "No webhook is configured for this alert."
+msgstr "이 알림에 대해 설정된 웹훅이 없습니다."
+
+#: ConvAI/views/alerts.py:367
+msgid "Webhook executed successfully."
+msgstr "웹훅이 성공적으로 실행되었습니다."
+
+#: ConvAI/views/alerts.py:395
+msgid "The alert's user has no phone number."
+msgstr "이 알림의 사용자는 전화번호가 없습니다."
+
+#: ConvAI/views/alerts.py:416
+msgid "Cannot send SMS via Twilio."
+msgstr "Twilio로 SMS를 보낼 수 없습니다."
+
+#: ConvAI/views/alerts.py:453
+msgid "SMS sent successfully."
+msgstr "SMS가 성공적으로 전송되었습니다."
+
+#: ConvAI/views/alerts.py:503
+msgid "High priority"
+msgstr "높은 우선순위"
+
+#: ConvAI/views/alerts.py:503
+msgid "New chat to review"
+msgstr "검토할 새 대화"
+
+#: ConvAI/views/calls.py:30 ConvAI/views/chat.py:320 ConvAI/views/chat.py:355
+#: ConvAI/views/chat.py:386
+msgid "Not authorised."
+msgstr "권한이 없습니다."
+
+#: ConvAI/views/calls.py:68
+msgid "There is already a meeting scheduled within this time range."
+msgstr "이 시간대에 이미 예정된 미팅이 있습니다."
+
+#: ConvAI/views/calls.py:85 ConvAI/views/calls.py:364
+#: ConvAI/views/communications.py:202
+msgid "Meeting scheduled."
+msgstr "미팅이 예약되었습니다."
+
+#: ConvAI/views/calls.py:105
+msgid "You do not have permission to start this call."
+msgstr "이 통화를 시작할 권한이 없습니다."
+
+#: ConvAI/views/calls.py:109
+msgid "This client has no caregiver with a valid phone number."
+msgstr "이 환자에게는 유효한 전화번호를 가진 보호자가 없습니다."
+
+#: ConvAI/views/calls.py:115
+msgid "Your own phone number is not set, so the call cannot be placed."
+msgstr "본인의 전화번호가 설정되어 있지 않아 통화를 걸 수 없습니다."
+
+#: ConvAI/views/calls.py:163
+msgid "Invalid status."
+msgstr "잘못된 상태입니다."
+
+#: ConvAI/views/calls.py:174
+msgid "You must choose an executed protocol."
+msgstr "실행된 프로토콜을 선택해야 합니다."
+
+#: ConvAI/views/calls.py:180
+msgid "Meeting status updated."
+msgstr "미팅 상태가 업데이트되었습니다."
+
+#: ConvAI/views/calls.py:245
+msgid "Month"
+msgstr "월"
+
+#: ConvAI/views/calls.py:245
+msgid "Week"
+msgstr "주"
+
+#: ConvAI/views/calls.py:245
+msgid "Day"
+msgstr "일"
+
+#: ConvAI/views/calls.py:361
+msgid "You already have a meeting scheduled within this time range."
+msgstr "이 시간대에 이미 예약된 미팅이 있습니다."
+
+#: ConvAI/views/calls.py:366
+msgid "Please check the meeting details and try again."
+msgstr "미팅 세부 정보를 확인하고 다시 시도하세요."
+
+#: ConvAI/views/calls.py:390
+msgid "Only pending meetings can be rescheduled"
+msgstr "대기 중인 미팅만 일정을 변경할 수 있습니다"
+
+#: ConvAI/views/calls.py:406
+msgid "Meeting rescheduled successfully."
+msgstr "미팅 일정이 성공적으로 변경되었습니다."
+
+#: ConvAI/views/calls.py:433
+msgid "You do not have permission to send reminders."
+msgstr "리마인더를 보낼 권한이 없습니다."
+
+#: ConvAI/views/calls.py:439 ConvAI/views/calls.py:444
+msgid "The reminder could not be sent."
+msgstr "알림을 보낼 수 없습니다."
+
+#: ConvAI/views/calls.py:447
+msgid "Reminder sent via WhatsApp."
+msgstr "WhatsApp으로 리마인더를 보냈습니다."
+
+#: ConvAI/views/calls.py:463 ConvAI/views/protocols.py:209
+msgid "You do not have permission to do this."
+msgstr "이 작업을 할 권한이 없습니다."
+
+#: ConvAI/views/calls.py:492
+msgid "That call was not cancelled."
+msgstr "해당 통화는 취소되지 않았습니다."
+
+#: ConvAI/views/calls.py:498
+msgid "The call is back on the schedule."
+msgstr "해당 통화가 다시 일정에 등록되었습니다."
+
+#: ConvAI/views/calls.py:504
+msgid "Only a scheduled call can be cancelled."
+msgstr "예정된 통화만 취소할 수 있습니다."
+
+#: ConvAI/views/calls.py:511
+msgid "Call cancelled. It stays in the history."
+msgstr "통화가 취소되었습니다. 기록에는 남아 있습니다."
+
+#: ConvAI/views/chat.py:274
+msgid "The client has no caregiver phone number."
+msgstr "이 환자는 보호자 전화번호가 없습니다."
+
+#: ConvAI/views/chat.py:280
+#, python-format
+msgid "Share this link with the caregiver: %(url)s"
+msgstr "이 링크를 보호자와 공유하세요: %(url)s"
+
+#: ConvAI/views/chat.py:296
+msgid "Assistant"
+msgstr "어시스턴트"
+
+#: ConvAI/views/communications.py:67
+msgid "Overdue"
+msgstr "기한 초과"
+
+#: ConvAI/views/communications.py:82
+msgid "Any time"
+msgstr "전체 기간"
+
+#: ConvAI/views/communications.py:83
+msgid "Last 7 days"
+msgstr "최근 7일"
+
+#: ConvAI/views/communications.py:84
+msgid "Last 30 days"
+msgstr "최근 30일"
+
+#: ConvAI/views/communications.py:85
+msgid "Last 3 months"
+msgstr "최근 3개월"
+
+#: ConvAI/views/communications.py:98 ConvAI/views/dashboard.py:49
+msgid "Tomorrow"
+msgstr "내일"
+
+#: ConvAI/views/communications.py:100 ConvAI/views/dashboard.py:31
+#: ConvAI/views/dashboard.py:51
+msgid "Yesterday"
+msgstr "어제"
+
+#: ConvAI/views/communications.py:126
+#, python-format
+msgid "with %s"
+msgstr "%s와 함께"
+
+#: ConvAI/views/communications.py:133 ConvAI/views/dashboard.py:67
+#, python-format
+msgid "Due %(d)s"
+msgstr "기한 %(d)s"
+
+#: ConvAI/views/communications.py:155
+msgid "Chatbot conversation"
+msgstr "챗봇 대화"
+
+#: ConvAI/views/communications.py:156
+#, python-format
+msgid "%(n)d message"
+msgid_plural "%(n)d messages"
+msgstr[0] "메시지 %(n)d개"
+
+#: ConvAI/views/communications.py:158
+msgid "Chat"
+msgstr "대화"
+
+#: ConvAI/views/dashboard.py:27
+msgid "Just now"
+msgstr "방금"
+
+#: ConvAI/views/dashboard.py:29
+#, python-format
+msgid "%(h)dh ago"
+msgstr "%(h)d시간 전"
+
+#: ConvAI/views/dashboard.py:33
+#, python-format
+msgid "%(d)d days ago"
+msgstr "%(d)d일 전"
+
+#: ConvAI/views/dashboard.py:71
+msgid "in under an hour"
+msgstr "한 시간 이내"
+
+#: ConvAI/views/dashboard.py:73
+#, python-format
+msgid "in %(h)dh"
+msgstr "%(h)d시간 후"
+
+#: ConvAI/views/dashboard.py:74
+msgid "scheduled"
+msgstr "예정됨"
+
+#: ConvAI/views/dashboard.py:227
+msgid "Good morning"
+msgstr "안녕하세요"
+
+#: ConvAI/views/dashboard.py:228
+msgid "Good afternoon"
+msgstr "안녕하세요"
+
+#: ConvAI/views/dashboard.py:229
+msgid "Good evening"
+msgstr "안녕하세요"
+
+#: ConvAI/views/dashboard.py:271
+msgid "nothing recorded"
+msgstr "기록된 내용 없음"
+
+#: ConvAI/views/dashboard.py:272
+#, python-format
+msgid "%(a)d of %(t)d recorded"
+msgstr "%(t)d개 중 %(a)d개 기록됨"
+
+#: ConvAI/views/feedback.py:86
+msgid "You do not have permission to update this conversation."
+msgstr "이 대화를 업데이트할 권한이 없습니다."
+
+#: ConvAI/views/media.py:47
+msgid "You are not authorised to access this file."
+msgstr "이 파일에 접근할 권한이 없습니다."
+
+#: ConvAI/views/media.py:94
+msgid "You are not authorised to access this audio."
+msgstr "이 오디오에 접근할 권한이 없습니다."
+
+#: ConvAI/views/media.py:122
+msgid "Sending the care plan is disabled."
+msgstr "돌봄 계획 전송 기능이 비활성화되어 있습니다."
+
+#: ConvAI/views/media.py:128
+msgid "You do not have permission to send this."
+msgstr "이 항목을 보낼 권한이 없습니다."
+
+#: ConvAI/views/media.py:131 ConvAI/views/protocols.py:214
+msgid "The client has no caregiver with a valid phone number."
+msgstr "이 환자는 유효한 전화번호를 가진 보호자가 없습니다."
+
+#: ConvAI/views/media.py:135 ConvAI/views/patients.py:624
+msgid "This client has no care plan uploaded."
+msgstr "이 환자는 업로드된 케어 플랜이 없습니다."
+
+#: ConvAI/views/media.py:140
+msgid "WHATSAPP_TEMPLATE_CARE_PLAN_SID is missing in .env."
+msgstr ".env에 WHATSAPP_TEMPLATE_CARE_PLAN_SID가 없습니다."
+
+#: ConvAI/views/media.py:153
+msgid "Could not send the WhatsApp message. Check credentials/template."
+msgstr "WhatsApp 메시지를 보낼 수 없습니다. 자격 증명/템플릿을 확인하세요."
+
+#: ConvAI/views/media.py:164
+msgid "Care plan sent via WhatsApp."
+msgstr "케어 플랜을 WhatsApp으로 보냈습니다."
+
+#: ConvAI/views/patients.py:192
+msgid "Client created."
+msgstr "환자가 생성되었습니다."
+
+#: ConvAI/views/patients.py:195
+msgid "Could not create client."
+msgstr "환자를 생성할 수 없습니다."
+
+#: ConvAI/views/patients.py:208
+msgid "You cannot edit this client."
+msgstr "이 클라이언트를 편집할 수 없습니다."
+
+#: ConvAI/views/patients.py:231 ConvAI/views/patients.py:736
+msgid "Client updated."
+msgstr "클라이언트가 업데이트되었습니다."
+
+#: ConvAI/views/patients.py:392
+msgid "You do not have permission to view this client."
+msgstr "이 환자를 볼 권한이 없습니다."
+
+#: ConvAI/views/patients.py:429
+#, python-format
+msgid "Protocol %s"
+msgstr "프로토콜 %s"
+
+#: ConvAI/views/patients.py:486
+msgid "You do not have permission to view this conversation."
+msgstr "이 대화를 볼 권한이 없습니다."
+
+#: ConvAI/views/patients.py:564 ConvAI/views/patients.py:680
+#: ConvAI/views/patients.py:698
+msgid "You do not have permission to edit this client."
+msgstr "이 환자를 편집할 권한이 없습니다."
+
+#: ConvAI/views/patients.py:590
+msgid "You do not have permission to edit this care plan."
+msgstr "이 케어 플랜을 편집할 권한이 없습니다."
+
+#: ConvAI/views/patients.py:597
+msgid "Care plan updated successfully."
+msgstr "케어 플랜이 성공적으로 업데이트되었습니다."
+
+#: ConvAI/views/patients.py:619
+msgid "You do not have permission to view this care plan."
+msgstr "이 케어 플랜을 볼 권한이 없습니다."
+
+#: ConvAI/views/patients.py:643
+msgid "You do not have permission to view this file."
+msgstr "이 파일을 볼 권한이 없습니다."
+
+#: ConvAI/views/patients.py:763
+msgid "You cannot change this client's agent."
+msgstr "이 환자의 에이전트를 변경할 수 없습니다."
+
+#: ConvAI/views/patients.py:771
+#, python-format
+msgid ""
+"The agent is off for %s. Messages still arrive; nothing is answered "
+"automatically."
+msgstr "%s에 대해 에이전트가 꺼져 있습니다. 메시지는 계속 도착하지만 자동 응답은 되지 않습니다."
+
+#: ConvAI/views/patients.py:777
+#, python-format
+msgid "The agent is answering %s again."
+msgstr "에이전트가 %s에게 다시 응답합니다."
+
+#: ConvAI/views/patients.py:795
+msgid "You cannot raise an alert for this client."
+msgstr "이 환자에 대해 알림을 등록할 수 없습니다."
+
+#: ConvAI/views/patients.py:814
+msgid "Raised by navigator"
+msgstr "내비게이터가 등록함"
+
+#: ConvAI/views/patients.py:818
+#, python-format
+msgid "Alert raised for %s."
+msgstr "%s에 대한 알림이 등록되었습니다."
+
+#: ConvAI/views/protocols.py:175
+msgid "Untitled protocol"
+msgstr "제목 없는 프로토콜"
+
+#: ConvAI/views/protocols.py:178
+msgid ""
+"New protocol created. It stays editable until answers are recorded against "
+"it."
+msgstr "새 프로토콜이 생성되었습니다. 답변이 기록되기 전까지 편집할 수 있습니다."
+
+#: ConvAI/views/protocols.py:190
+msgid "This protocol has recorded answers and cannot be deleted."
+msgstr "이 프로토콜에는 기록된 답변이 있어 삭제할 수 없습니다."
+
+#: ConvAI/views/protocols.py:193
+msgid "Protocol deleted."
+msgstr "프로토콜이 삭제되었습니다."
+
+#: ConvAI/views/protocols.py:207
+msgid "Automations are disabled."
+msgstr "자동화 기능이 비활성화되어 있습니다."
+
+#: ConvAI/views/protocols.py:251
+msgid "Automation started."
+msgstr "자동화가 시작되었습니다."
+
+#: ConvAI/views/protocols.py:253
+msgid "Automation could not send the WhatsApp message."
+msgstr "자동화가 WhatsApp 메시지를 보내지 못했습니다."
+
+#: ConvAI/views/settings_views.py:92
+msgid "Hi! I want to register"
+msgstr "안녕하세요! 등록하고 싶어요"
+
+#: ConvAI/views/settings_views.py:134
+msgid "General"
+msgstr "일반"
+
+#: ConvAI/views/settings_views.py:136
+msgid "Messaging"
+msgstr "메시징"
+
+#: ConvAI/views/settings_views.py:139
+msgid "Prompts"
+msgstr "프롬프트"
+
+#: ConvAI/views/settings_views.py:141
+msgid "Registrations"
+msgstr "등록"
+
+#: ConvAI/views/settings_views.py:143
+msgid "API client"
+msgstr "API 클라이언트"
+
+#: ConvAI/views/settings_views.py:194
+msgid "Settings saved."
+msgstr "설정이 저장되었습니다."
+
+#: ConvAI/views/settings_views.py:197
+msgid "Please correct the errors below."
+msgstr "아래 오류를 수정하세요."
+
+#: ConvAI/views/settings_views.py:271
+#, python-format
+msgid "Classification completed. Conversations processed: %(n)s."
+msgstr "분류가 완료되었습니다. 처리된 대화: %(n)s건."
+
+#: ConvAI/views/settings_views.py:282
+msgid "This self-registration is already approved."
+msgstr "이 자가 등록은 이미 승인되었습니다."
+
+#: ConvAI/views/summaries.py:43
+msgid "You cannot summarize this meeting."
+msgstr "이 미팅을 요약할 수 없습니다."
+
+#: ConvAI/views/summaries.py:47
+msgid "Protocol summary generated."
+msgstr "프로토콜 요약이 생성되었습니다."
+
+#: ConvAI/views/summaries.py:49
+#, python-format
+msgid "Could not generate the summary: %(err)s"
+msgstr "요약을 생성할 수 없습니다: %(err)s"
+
+#: ConvAI/views/summaries.py:62
+msgid "You cannot transcribe this recording."
+msgstr "이 녹음을 전사할 수 없습니다."
+
+#: ConvAI/views/summaries.py:66
+msgid "Recording transcribed and summarized."
+msgstr "녹음이 전사되고 요약되었습니다."
+
+#: ConvAI/views/summaries.py:68
+#, python-format
+msgid "Could not transcribe the recording: %(err)s"
+msgstr "녹음을 전사할 수 없습니다: %(err)s"
+
+#: ConvAI/views/users.py:15
+msgid "Admin"
+msgstr "관리자"
+
+#: ConvAI/views/users.py:161
+msgid "Navigator user created."
+msgstr "내비게이터 사용자가 생성되었습니다."
+
+#: ConvAI/views/users.py:164
+msgid "Could not create user."
+msgstr "사용자를 생성할 수 없습니다."
+
+#: ConvAI/views/users.py:192
+msgid "Could not create test user."
+msgstr "테스트 사용자를 생성할 수 없습니다."
+
+#: ConvAI/views/users.py:247
+msgid "User updated."
+msgstr "사용자가 업데이트되었습니다."
+
+#: Django_CMS/settings_default.py:184
+msgid "Spanish"
+msgstr "스페인어"
+
+#: Django_CMS/settings_default.py:185
+msgid "Portuguese"
+msgstr "포르투갈어"
+
+#: Django_CMS/settings_default.py:186
+msgid "English"
+msgstr "영어"
+
+#: Django_CMS/settings_default.py:187
+msgid "Italian"
+msgstr "이탈리아어"
+
+#: Django_CMS/settings_default.py:188
+msgid "Korean"
+msgstr "한국어"
+
+#: Django_CMS/settings_default.py:189
+msgid "Chinese (Simplified)"
+msgstr "중국어(간체)"
+
+#: Django_CMS/settings_default.py:233
+msgid "Standard"
+msgstr "표준"

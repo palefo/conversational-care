@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Agents" %}{% endblock %}
+
+{% block content %}
+<style>
+  .agent-tabs { display: inline-flex; gap: .25rem; background: #f1f5f9; padding: .25rem; border-radius: .6rem; }
+  .agent-tab { padding: .4rem .9rem; border-radius: .45rem; font-size: .85rem; font-weight: 500; color: #475569;
+    cursor: pointer; display: inline-flex; align-items: center; gap: .45rem; white-space: nowrap; border: 0; background: transparent; }
+  .agent-tab:hover { color: #0f172a; }
+  .agent-tab.active { background: #fff; color: #0369a1; box-shadow: 0 1px 2px rgba(16,24,40,.08); }
+  .agent-tab .count { font-size: .7rem; background: #e2e8f0; color: #475569; border-radius: 9999px; padding: 0 .4rem; line-height: 1.3; }
+  .agent-tab.active .count { background: #e0f2fe; color: #0369a1; }
+
+  .agent-panel { display: none; }
+  .agent-panel.active { display: block; }
+
+  .agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 1rem; }
+  .agent-card { background: #fff; border: 1px solid #eef2f7; border-radius: .75rem; padding: 1.1rem;
+    box-shadow: 0 1px 2px rgba(16,24,40,.04); transition: box-shadow .15s, border-color .15s; display: flex; flex-direction: column; }
+  .agent-card:hover { box-shadow: 0 8px 20px -6px rgba(16,24,40,.14); border-color: #e2e8f0; }
+  .agent-avatar { width: 2.5rem; height: 2.5rem; border-radius: .6rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .agent-chip { display: inline-flex; align-items: center; gap: .3rem; padding: .18rem .5rem; border-radius: 9999px;
+    background: #f1f5f9; color: #475569; font-size: .72rem; font-weight: 500; max-width: 100%; }
+  .agent-chip code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .agent-badge { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: .12rem .45rem; border-radius: 9999px; flex-shrink: 0; }
+  .agent-empty { border: 1.5px dashed #e2e8f0; border-radius: .75rem; padding: 2.75rem 1rem; text-align: center; background: #fafbfc; }
+
+  .agent-add { border: 1.5px dashed #cbd5e1; box-shadow: none; align-items: center; justify-content: center;
+    text-align: center; color: #64748b; gap: .5rem; min-height: 168px; text-decoration: none; }
+  .agent-add:hover { border-color: #38bdf8; color: #0369a1; background: #f0f9ff; box-shadow: none; }
+</style>
+
+<header class="mb-6">
+  <h1 class="text-3xl font-semibold text-gray-800">{% trans "Agents" %}</h1>
+  <p class="text-gray-500">{% trans "The assistants that power every chat surface — pick their kind, model, and voice." %}</p>
+</header>
+
+{% comment %} ---------- Segmented tab control ---------- {% endcomment %}
+<div class="agent-tabs mb-6" role="tablist" aria-label="{% trans 'Agent types' %}">
+  <button type="button" data-agent-tab="prompt" class="agent-tab">
+    <span class="material-icons-outlined text-base">chat</span>{% trans "Prompt-based" %}
+    <span class="count">{{ prompt_agents|length }}</span>
+  </button>
+  <button type="button" data-agent-tab="remote" class="agent-tab">
+    <span class="material-icons-outlined text-base">cloud</span>{% trans "Remote" %}
+    <span class="count">{{ remote_agents|length }}</span>
+  </button>
+  <button type="button" data-agent-tab="native" class="agent-tab">
+    <span class="material-icons-outlined text-base">bolt</span>{% trans "Native" %}
+    <span class="count">{{ native_agents|length }}</span>
+  </button>
+</div>
+
+{% comment %} ---------- Prompt-based ---------- {% endcomment %}
+<section class="agent-panel" data-agent-panel="prompt">
+  <p class="text-sm text-gray-500 max-w-xl mb-4">{% trans "Custom in-process agents driven by a system prompt you write. No tools." %}</p>
+  {% if prompt_agents %}
+    <div class="agent-grid">
+      {% for a in prompt_agents %}{% include "agents/_agent_card.html" with a=a %}{% endfor %}
+      <a href="{% url 'agent_create' 'prompt' %}" class="agent-card agent-add">
+        <span class="material-icons-outlined text-3xl">add</span>
+        <span class="font-medium text-sm">{% trans "New prompt agent" %}</span>
+      </a>
+    </div>
+  {% else %}
+    <div class="agent-empty">
+      <span class="material-icons-outlined text-4xl text-indigo-300">chat</span>
+      <p class="mt-2 font-medium text-gray-700">{% trans "No prompt-based agents yet." %}</p>
+      <p class="text-sm text-gray-500 mb-4">{% trans "Create one and drive it with your own system prompt." %}</p>
+      <a href="{% url 'agent_create' 'prompt' %}" class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+        <span class="material-icons-outlined text-base">add</span>{% trans "New prompt agent" %}
+      </a>
+    </div>
+  {% endif %}
+</section>
+
+{% comment %} ---------- Remote ---------- {% endcomment %}
+<section class="agent-panel" data-agent-panel="remote">
+  <p class="text-sm text-gray-500 max-w-xl mb-4">{% trans "External agents running on a LangGraph server (host:port)." %}</p>
+  {% if remote_agents %}
+    <div class="agent-grid">
+      {% for a in remote_agents %}{% include "agents/_agent_card.html" with a=a %}{% endfor %}
+      <a href="{% url 'agent_create' 'remote' %}" class="agent-card agent-add">
+        <span class="material-icons-outlined text-3xl">add</span>
+        <span class="font-medium text-sm">{% trans "New remote agent" %}</span>
+      </a>
+    </div>
+  {% else %}
+    <div class="agent-empty">
+      <span class="material-icons-outlined text-4xl text-sky-300">cloud</span>
+      <p class="mt-2 font-medium text-gray-700">{% trans "No remote agents yet." %}</p>
+      <p class="text-sm text-gray-500 mb-4">{% trans "Connect an agent running on your own LangGraph server." %}</p>
+      <a href="{% url 'agent_create' 'remote' %}" class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+        <span class="material-icons-outlined text-base">add</span>{% trans "New remote agent" %}
+      </a>
+    </div>
+  {% endif %}
+</section>
+
+{% comment %} ---------- Native ---------- {% endcomment %}
+<section class="agent-panel" data-agent-panel="native">
+  <div class="mb-4">
+    <p class="text-sm text-gray-500 max-w-xl">{% trans "Built-in agents that ship with the platform and run in-process. You can change their model and voice." %}</p>
+  </div>
+  {% if native_agents %}
+    <div class="agent-grid">
+      {% for a in native_agents %}{% include "agents/_agent_card.html" with a=a %}{% endfor %}
+    </div>
+  {% else %}
+    <div class="agent-empty">
+      <span class="material-icons-outlined text-4xl text-emerald-300">bolt</span>
+      <p class="mt-2 font-medium text-gray-700">{% trans "No native agents." %}</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+  (function () {
+    var tabs = document.querySelectorAll('.agent-tab');
+    var panels = document.querySelectorAll('.agent-panel');
+    function activate(name) {
+      tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.agentTab === name); });
+      panels.forEach(function (p) { p.classList.toggle('active', p.dataset.agentPanel === name); });
+      try { history.replaceState(null, '', '#' + name); } catch (e) {}
+    }
+    tabs.forEach(function (t) {
+      t.addEventListener('click', function () { activate(t.dataset.agentTab); });
+    });
+    var initial = (location.hash || '').replace('#', '');
+    var valid = ['prompt', 'remote', 'native'];
+    activate(valid.indexOf(initial) >= 0 ? initial : 'prompt');
+  })();
+</script>
+{% endblock %}

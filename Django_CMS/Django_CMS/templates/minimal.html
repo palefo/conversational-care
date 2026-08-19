@@ -1,0 +1,15 @@
+<!DOCTYPE html>{% load cms_tags menu_tags sekizai_tags static i18n %}
+{% load cms_tags sekizai_tags %}
+<html>
+    <head>
+        <title>{% page_attribute "page_title" %}</title>
+        {% render_block "css" %}
+    </head>
+    <body>
+        {% block content %}
+            {% placeholder "feature" %}
+            {% placeholder "content" %}
+            {% placeholder "splashbox" %}
+        {% endblock content %}
+    </body>
+</html>

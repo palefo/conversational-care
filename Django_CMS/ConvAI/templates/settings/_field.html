@@ -1,0 +1,8 @@
+{% comment %} Renders one bound form field with consistent settings styling.
+Usage: {% include "settings/_field.html" with field=some_form.field_name %} {% endcomment %}
+<div class="stg-field">
+  <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
+  {{ field }}
+  {% if field.help_text %}<p class="text-xs text-gray-500 mt-1">{{ field.help_text }}</p>{% endif %}
+  {% for e in field.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+</div>

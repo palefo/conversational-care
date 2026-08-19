@@ -1,0 +1,23 @@
+{% load i18n %}
+{% comment %}
+The way out of the panel: the client this belongs to. Sits top right, beside the
+close, because it is navigation rather than an action — the foot of the panel is
+for things you do to the item, and mixing the two put "leave" next to "Resolve".
+
+Named after where it goes rather than the shape of what is there — "timeline"
+described the page's layout, which is not what anyone is looking for.
+
+Hidden in exactly two cases: on that client's own page, where it would point at
+the page you are already on (`panel_context` is dropped there, which is what the
+check below reads), and on a general alert, which has no client to open.
+Communications is not one of them — it is a queue across clients, so opening the
+one in front of you is the whole point.
+{% endcomment %}
+{% if panel_context and panel_item.patient %}
+  <a class="dp-go"
+     href="{% url 'patient_detail' panel_item.patient.pk %}?item={{ panel_item.token }}#comms"
+     title="{% blocktrans with c=panel_item.patient %}Open {{ c }}{% endblocktrans %}">
+    <span class="material-icons-outlined" aria-hidden="true">person</span>
+    <span class="dp-go-t">{% trans "Open client" %}</span>
+  </a>
+{% endif %}

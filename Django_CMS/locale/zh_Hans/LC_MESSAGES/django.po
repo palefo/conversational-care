@@ -1,0 +1,4015 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Conversational Care 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-10 11:10+0100\n"
+"PO-Revision-Date: 2026-07-10 12:00+0100\n"
+"Last-Translator: Conversational Care <team@conversational-care.ai>\n"
+"Language-Team: Chinese (Simplified) <team@conversational-care.ai>\n"
+"Language: zh_Hans\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: ConvAI/forms.py:16
+msgid "Scheduled time"
+msgstr "预约时间"
+
+#: ConvAI/forms.py:28
+msgid "Address or place"
+msgstr "地址或地点"
+
+#: ConvAI/forms.py:34 ConvAI/forms.py:515
+#: ConvAI/templates/patients/edit_care_plan.html:13
+#: ConvAI/templates/patients/patient_detail.html:7
+#: ConvAI/templates/patients/patient_list.html:557
+#: ConvAI/templates/users/user_list.html:81
+msgid "Client"
+msgstr "患者"
+
+#: ConvAI/forms.py:35 ConvAI/templates/_detail_panel.html:320
+msgid "How"
+msgstr "方式"
+
+#: ConvAI/forms.py:36 ConvAI/templates/_detail_panel.html:83
+#: ConvAI/templates/_detail_panel.html:329
+msgid "Where"
+msgstr "地点"
+
+#: ConvAI/forms.py:37 ConvAI/templates/_detail_panel.html:335
+#: ConvAI/templates/_detail_panel.html:619
+msgid "Type"
+msgstr "类型"
+
+#: ConvAI/forms.py:38
+msgid "Scheduled protocol"
+msgstr "预定方案"
+
+#: ConvAI/forms.py:69
+msgid "Say where the meeting takes place."
+msgstr "说明会议的地点。"
+
+#: ConvAI/forms.py:78
+msgid "Client – Caregiver"
+msgstr "患者 – 照护者"
+
+#: ConvAI/forms.py:83 ConvAI/templates/alerts/alert_detail.html:288
+msgid "Date"
+msgstr "日期"
+
+#: ConvAI/forms.py:91
+msgid "State"
+msgstr "状态"
+
+#: ConvAI/forms.py:92 ConvAI/forms.py:99
+#: ConvAI/templates/patients/patient_list.html:497
+#: ConvAI/templates/sidebar.html:131 ConvAI/views/communications.py:66
+#: ConvAI/views/communications.py:72
+msgid "All"
+msgstr "全部"
+
+#: ConvAI/forms.py:98
+msgid "Call type"
+msgstr "通话类型"
+
+#: ConvAI/forms.py:121
+msgid "Write the details here in Markdown..."
+msgstr "在此用 Markdown 填写详细信息…"
+
+#: ConvAI/forms.py:126
+msgid "Supports Markdown syntax."
+msgstr "支持 Markdown 语法。"
+
+#: ConvAI/forms.py:137
+msgid "Care plan (PDF)"
+msgstr "护理计划(PDF)"
+
+#: ConvAI/forms.py:140
+msgid "PDF files only, maximum 5 MB."
+msgstr "仅限 PDF 文件,最大 5 MB。"
+
+#: ConvAI/forms.py:150
+msgid "The file must have a .pdf extension."
+msgstr "文件必须以 .pdf 为扩展名。"
+
+#: ConvAI/forms.py:154
+msgid "The file must be a valid PDF."
+msgstr "文件必须是有效的 PDF。"
+
+#: ConvAI/forms.py:158
+msgid "The PDF cannot exceed 5 MB."
+msgstr "PDF 不能超过 5 MB。"
+
+#: ConvAI/forms.py:247
+msgid "•••• set (leave blank to keep)"
+msgstr "•••• 已设置(留空以保留)"
+
+#: ConvAI/forms.py:267
+msgid "Hide meeting steps"
+msgstr "隐藏会议步骤"
+
+#: ConvAI/forms.py:268
+msgid "Enable automations"
+msgstr "启用自动化"
+
+#: ConvAI/forms.py:269
+msgid "Enable self-registration"
+msgstr "启用自助注册"
+
+#: ConvAI/forms.py:270 ConvAI/forms.py:291
+msgid "Self-registration agent"
+msgstr "自助注册智能体"
+
+#: ConvAI/forms.py:271
+msgid "Send care plan"
+msgstr "发送护理计划"
+
+#: ConvAI/forms.py:272
+msgid "Enable WhatsApp audio"
+msgstr "启用 WhatsApp 语音"
+
+#: ConvAI/forms.py:286 ConvAI/models.py:706
+msgid "Use .env default"
+msgstr "使用 .env 默认值"
+
+#: ConvAI/forms.py:307
+msgid "Twilio Account SID"
+msgstr "Twilio 账户 SID"
+
+#: ConvAI/forms.py:308
+msgid "Twilio Auth Token"
+msgstr "Twilio 认证令牌"
+
+#: ConvAI/forms.py:309
+msgid "Platform phone number"
+msgstr "平台电话号码"
+
+#: ConvAI/forms.py:310
+msgid "OpenAI API key"
+msgstr "OpenAI API 密钥"
+
+#: ConvAI/forms.py:311
+msgid "ElevenLabs API key"
+msgstr "ElevenLabs API 密钥"
+
+#: ConvAI/forms.py:312
+msgid "ElevenLabs voice ID"
+msgstr "ElevenLabs 语音 ID"
+
+#: ConvAI/forms.py:328
+msgid "SMS sender number"
+msgstr "短信发送号码"
+
+#: ConvAI/forms.py:329
+msgid "Infection alert SMS template SID"
+msgstr "感染警报短信模板 SID"
+
+#: ConvAI/forms.py:330
+msgid "Infection alert SMS text"
+msgstr "感染警报短信内容"
+
+#: ConvAI/forms.py:331
+msgid "Care plan WhatsApp template SID"
+msgstr "护理计划 WhatsApp 模板 SID"
+
+#: ConvAI/forms.py:350
+msgid "Meeting protocol summary prompt"
+msgstr "会议方案摘要提示词"
+
+#: ConvAI/forms.py:351
+msgid "Call transcript summary prompt"
+msgstr "通话转写摘要提示词"
+
+#: ConvAI/forms.py:355
+msgid ""
+"Base prompt for summarizing a meeting's protocol answers. Leave blank to use"
+" the built-in default. The meeting's protocol(s) and answers are appended "
+"automatically."
+msgstr "用于总结会议方案答复的基础提示词。留空则使用内置默认值。会议的方案及答复会自动附加。"
+
+#: ConvAI/forms.py:360
+msgid ""
+"Base prompt for post-processing a Whisper call transcript into a summary. "
+"Leave blank to use the built-in default. The transcript is appended "
+"automatically."
+msgstr "用于将 Whisper 通话转写整理为摘要的基础提示词。留空则使用内置默认值。转写内容会自动附加。"
+
+#: ConvAI/forms.py:373 ConvAI/forms.py:559
+msgid "Caregiver first name"
+msgstr "照护者名字"
+
+#: ConvAI/forms.py:374 ConvAI/forms.py:560
+msgid "Caregiver last name"
+msgstr "照护者姓氏"
+
+#: ConvAI/forms.py:375 ConvAI/forms.py:561
+#: ConvAI/templates/patients/patient_detail.html:93
+msgid "Caregiver phone"
+msgstr "照护者电话"
+
+#: ConvAI/forms.py:381 ConvAI/forms.py:567
+#: ConvAI/templates/account/profile.html:52
+msgid "First name"
+msgstr "名字"
+
+#: ConvAI/forms.py:381 ConvAI/forms.py:567
+#: ConvAI/templates/account/profile.html:56
+msgid "Last name"
+msgstr "姓氏"
+
+#: ConvAI/forms.py:381 ConvAI/forms.py:567
+#: ConvAI/templates/settings/config.html:460
+msgid "Phone"
+msgstr "电话"
+
+#: ConvAI/forms.py:382 ConvAI/forms.py:568
+#: ConvAI/templates/patients/patient_detail.html:95 ConvAI/views/users.py:17
+msgid "Navigator"
+msgstr "导航员"
+
+#: ConvAI/forms.py:382 ConvAI/forms.py:568
+#: ConvAI/templates/patients/patient_detail.html:99 ConvAI/views/_panel.py:381
+msgid "Agent"
+msgstr "智能体"
+
+#: ConvAI/forms.py:446 ConvAI/templates/agents/_agent_card.html:50
+msgid "Real-time voice agent"
+msgstr "实时语音智能体"
+
+#: ConvAI/forms.py:450
+msgid ""
+"Converse by live voice (GPT Realtime over Azure) instead of the text chat. "
+"The model above is ignored; the Realtime deployment from Settings → Agents "
+"is used."
+msgstr ""
+"通过实时语音（Azure 上的 GPT Realtime）而非文字聊天进行对话。上方的模型将被忽略，改用“设置 → 智能体”中的 Realtime "
+"部署。"
+
+#: ConvAI/forms.py:490 ConvAI/forms.py:536
+#: ConvAI/templates/account/profile.html:64
+#: ConvAI/templates/users/test_user_result.html:25
+#: ConvAI/templates/users/user_list.html:76
+msgid "Username"
+msgstr "用户名"
+
+#: ConvAI/forms.py:491 ConvAI/templates/users/test_user_result.html:36
+msgid "Password"
+msgstr "密码"
+
+#: ConvAI/forms.py:496 ConvAI/forms.py:552
+msgid "A user with that username already exists."
+msgstr "该用户名已被使用。"
+
+#: ConvAI/forms.py:526
+msgid "This client already has a test user."
+msgstr "该患者已有测试用户。"
+
+#: ConvAI/forms.py:537 ConvAI/templates/account/profile.html:60
+#: ConvAI/templates/settings/config.html:461
+#: ConvAI/templates/users/user_list.html:78
+msgid "E-mail"
+msgstr "电子邮箱"
+
+#: ConvAI/forms.py:538 ConvAI/templates/account/profile.html:137
+#: ConvAI/templates/settings/config.html:518
+#: ConvAI/templates/users/user_list.html:105
+msgid "Active"
+msgstr "启用"
+
+#: ConvAI/forms.py:608
+msgid "Help page content (Markdown)"
+msgstr "帮助页面内容(Markdown)"
+
+#: ConvAI/forms.py:610
+msgid "Supports Markdown. Leave blank to restore the shipped default content."
+msgstr "支持 Markdown。留空可恢复自带的默认内容。"
+
+#: ConvAI/forms.py:622
+msgid "Brand name"
+msgstr "品牌名称"
+
+#: ConvAI/forms.py:623
+msgid "Brand logo (upload)"
+msgstr "品牌标志(上传)"
+
+#: ConvAI/forms.py:624
+msgid "Brand logo (static path)"
+msgstr "品牌标志(静态路径)"
+
+#: ConvAI/forms.py:627
+msgid "PNG, JPG or SVG, max 2 MB. Overrides the static path below."
+msgstr "PNG、JPG 或 SVG,最大 2 MB。优先于下方的静态路径。"
+
+#: ConvAI/forms.py:628
+msgid "Fallback used when no logo file is uploaded."
+msgstr "未上传标志文件时使用的备用路径。"
+
+#: ConvAI/forms.py:640
+msgid "The logo cannot exceed 2 MB."
+msgstr "标志不能超过 2 MB。"
+
+#: ConvAI/forms.py:672
+msgid "Default agent model"
+msgstr "默认智能体模型"
+
+#: ConvAI/forms.py:673
+msgid "Anthropic API key"
+msgstr "Anthropic API 密钥"
+
+#: ConvAI/forms.py:674
+msgid "Google API key"
+msgstr "Google API 密钥"
+
+#: ConvAI/forms.py:675
+msgid "Mistral API key"
+msgstr "Mistral API 密钥"
+
+#: ConvAI/forms.py:676
+msgid "DeepSeek API key"
+msgstr "DeepSeek API 密钥"
+
+#: ConvAI/forms.py:677
+msgid "Allowed agent hosts (comma-separated)"
+msgstr "允许的智能体主机(逗号分隔)"
+
+#: ConvAI/forms.py:678
+msgid "Use Azure"
+msgstr "使用 Azure"
+
+#: ConvAI/forms.py:679
+msgid "Azure OpenAI endpoint"
+msgstr "Azure OpenAI 端点"
+
+#: ConvAI/forms.py:680
+msgid "Azure OpenAI key"
+msgstr "Azure OpenAI 密钥"
+
+#: ConvAI/forms.py:681
+msgid "Azure OpenAI API version"
+msgstr "Azure OpenAI API 版本"
+
+#: ConvAI/forms.py:682
+msgid "Azure Anthropic endpoint"
+msgstr "Azure Anthropic 端点"
+
+#: ConvAI/forms.py:683
+msgid "Azure Anthropic key"
+msgstr "Azure Anthropic 密钥"
+
+#: ConvAI/forms.py:684
+msgid "Azure Mistral endpoint"
+msgstr "Azure Mistral 端点"
+
+#: ConvAI/forms.py:685
+msgid "Azure Mistral key"
+msgstr "Azure Mistral 密钥"
+
+#: ConvAI/forms.py:686
+msgid "Azure DeepSeek endpoint"
+msgstr "Azure DeepSeek 端点"
+
+#: ConvAI/forms.py:687
+msgid "Azure DeepSeek key"
+msgstr "Azure DeepSeek 密钥"
+
+#: ConvAI/forms.py:688
+msgid "Azure Realtime endpoint"
+msgstr "Azure Realtime 端点"
+
+#: ConvAI/forms.py:689
+msgid "Azure Realtime key"
+msgstr "Azure Realtime 密钥"
+
+#: ConvAI/forms.py:690
+msgid "Realtime deployment"
+msgstr "Realtime 部署"
+
+#: ConvAI/forms.py:691
+msgid "Realtime voice"
+msgstr "Realtime 语音"
+
+#: ConvAI/forms.py:692
+msgid "Realtime WebRTC region"
+msgstr "Realtime WebRTC 区域"
+
+#: ConvAI/forms.py:695
+msgid ""
+"Used when an agent has no explicit model, e.g. 'openai/gpt-4.1-mini'. Blank "
+"uses the .env default."
+msgstr "在智能体未显式指定模型时使用,例如 'openai/gpt-4.1-mini'。留空则使用 .env 默认值。"
+
+#: ConvAI/forms.py:697
+msgid "Route models to Azure instead of the public provider APIs."
+msgstr "将模型请求路由到 Azure,而非公开的提供商 API。"
+
+#: ConvAI/forms.py:698
+msgid "Blank reuses the Azure Mistral endpoint/key."
+msgstr "留空则复用 Azure Mistral 的端点/密钥。"
+
+#: ConvAI/forms.py:699
+msgid "Blank reuses the Azure OpenAI endpoint/key."
+msgstr "留空则复用 Azure OpenAI 端点/密钥。"
+
+#: ConvAI/forms.py:700
+msgid "Deployment used by real-time voice agents, e.g. 'gpt-realtime'."
+msgstr "实时语音智能体使用的部署，例如 “gpt-realtime”。"
+
+#: ConvAI/forms.py:702
+msgid "Output voice for real-time voice agents. Blank uses 'marin'."
+msgstr "实时语音智能体的输出语音。留空使用 “marin”。"
+
+#: ConvAI/forms.py:704
+msgid ""
+"Only for resources on the preview Realtime API: the resource's region, e.g. "
+"'swedencentral' or 'eastus2'."
+msgstr "仅适用于使用预览版 Realtime API 的资源：资源所在区域，例如 “swedencentral” 或 “eastus2”。"
+
+#: ConvAI/models.py:29
+msgid "Optional default LangGraph agent for this user (used for testing/API)."
+msgstr "该用户的可选默认 LangGraph 智能体(用于测试/API)。"
+
+#: ConvAI/models.py:52
+msgid "Preferred interface language; blank uses the system default."
+msgstr "首选界面语言;留空则使用系统默认。"
+
+#: ConvAI/models.py:299 ConvAI/templates/_detail_panel.html:344
+msgid "Protocol"
+msgstr "方案"
+
+#: ConvAI/models.py:300
+msgid "Onboarding"
+msgstr "入组"
+
+#: ConvAI/models.py:301
+msgid "Final"
+msgstr "结束"
+
+#: ConvAI/models.py:302
+msgid "Initial"
+msgstr "初次"
+
+#: ConvAI/models.py:303
+msgid "Follow-up"
+msgstr "随访"
+
+#: ConvAI/models.py:306 ConvAI/templates/calls/calendar.html:144
+msgid "Pending"
+msgstr "待处理"
+
+#: ConvAI/models.py:307 ConvAI/templates/_detail_panel.html:98
+#: ConvAI/templates/_detail_panel.html:406
+#: ConvAI/templates/calls/calendar.html:145
+msgid "Complete"
+msgstr "已完成"
+
+#: ConvAI/models.py:308 ConvAI/templates/_detail_panel.html:408
+#: ConvAI/templates/calls/calendar.html:146
+msgid "Interrupted"
+msgstr "已中断"
+
+#: ConvAI/models.py:309 ConvAI/templates/calls/calendar.html:147
+msgid "Not answered"
+msgstr "未接听"
+
+#: ConvAI/models.py:313 ConvAI/templates/communications/_list.html:79
+msgid "Cancelled"
+msgstr "已取消"
+
+#: ConvAI/models.py:326 ConvAI/templates/patients/_timeline_event.html:34
+#: ConvAI/views/_panel.py:317
+msgid "Phone call"
+msgstr "电话通话"
+
+#: ConvAI/models.py:327
+msgid "In person"
+msgstr "面对面"
+
+#: ConvAI/models.py:330
+msgid "1. Protocol 1"
+msgstr "1. 方案 1"
+
+#: ConvAI/models.py:331
+msgid "2. Protocol 2"
+msgstr "2. 方案 2"
+
+#: ConvAI/models.py:332
+msgid "3. Protocol 3"
+msgstr "3. 方案 3"
+
+#: ConvAI/models.py:333
+msgid "4. Protocol 4"
+msgstr "4. 方案 4"
+
+#: ConvAI/models.py:334
+msgid "5. Protocol 5"
+msgstr "5. 方案 5"
+
+#: ConvAI/models.py:335
+msgid "6. Protocol 6"
+msgstr "6. 方案 6"
+
+#: ConvAI/models.py:336
+msgid "7. Protocol 7"
+msgstr "7. 方案 7"
+
+#: ConvAI/models.py:337
+msgid "8. Protocol 8"
+msgstr "8. 方案 8"
+
+#: ConvAI/models.py:338
+msgid "9. Final call"
+msgstr "9. 结束通话"
+
+#: ConvAI/models.py:339
+msgid "10. Follow-up"
+msgstr "10. 随访"
+
+#: ConvAI/models.py:474 ConvAI/templates/agents/_agent_card.html:19
+#: ConvAI/templates/agents/agent_list.html:47
+msgid "Remote"
+msgstr "远程"
+
+#: ConvAI/models.py:476 ConvAI/templates/agents/_agent_card.html:21
+#: ConvAI/templates/agents/agent_list.html:51
+msgid "Native"
+msgstr "内置"
+
+#: ConvAI/models.py:479 ConvAI/templates/agents/agent_list.html:43
+msgid "Prompt-based"
+msgstr "基于提示词"
+
+#: ConvAI/models.py:485
+msgid ""
+"Remote = runs on a LangGraph server (host:port). Native = ships with the "
+"platform. Prompt-based = in-process agent driven by a stored prompt."
+msgstr ""
+"远程 = 运行在 LangGraph 服务器上(host:port)。内置 = 随平台一起提供。基于提示词 = 由保存的提示词驱动的进程内智能体。"
+
+#: ConvAI/models.py:491
+msgid ""
+"For native agents: which built-in graph to run (e.g. 'loopback', "
+"'link_worker')."
+msgstr "针对内置智能体:要运行的内置图(例如 'loopback'、'link_worker')。"
+
+#: ConvAI/models.py:498
+msgid ""
+"System prompt for prompt-based agents. Used as the system message on every "
+"turn."
+msgstr "基于提示词的智能体的系统提示词,在每一轮对话中作为系统消息使用。"
+
+#: ConvAI/models.py:508
+msgid ""
+"Prompt-based agents only: chat through the real-time voice API (live speech "
+"in/out) instead of the text chat."
+msgstr "仅限提示词智能体：通过实时语音 API（实时语音输入/输出）而非文字聊天进行对话。"
+
+#: ConvAI/models.py:518
+msgid ""
+"Model behind this agent, e.g. 'openai/gpt-4.1-mini' or 'anthropic/claude-"
+"sonnet-4-6'. Blank uses the platform default. Not used by remote agents."
+msgstr ""
+"该智能体使用的模型,例如 'openai/gpt-4.1-mini' 或 'anthropic/claude-"
+"sonnet-4-6'。留空则使用平台默认值。远程智能体不使用此项。"
+
+#: ConvAI/models.py:698
+msgid "Must be a Twilio SID like HX + 32 hex characters."
+msgstr "必须是 Twilio SID,格式为 HX + 32 位十六进制字符。"
+
+#: ConvAI/models.py:699
+msgid "Enter a phone number in E.164 format, e.g. +447700900000."
+msgstr "请输入 E.164 格式的电话号码,例如 +447700900000。"
+
+#: ConvAI/models.py:707
+msgid "On"
+msgstr "开"
+
+#: ConvAI/models.py:708 ConvAI/templates/sidebar.html:133
+msgid "Off"
+msgstr "关"
+
+#: ConvAI/templates/_detail_panel.html:18
+msgid "Call details"
+msgstr "通话详情"
+
+#: ConvAI/templates/_detail_panel.html:42
+#: ConvAI/templates/_detail_panel.html:464
+#: ConvAI/templates/patients/patient_detail.html:32
+#, python-format
+msgid "Last contact %(t)s ago"
+msgstr "上次联系于 %(t)s前"
+
+#: ConvAI/templates/_detail_panel.html:45
+#: ConvAI/templates/_detail_panel.html:100
+#: ConvAI/templates/_detail_panel.html:825
+#: ConvAI/templates/_detail_panel.html:982
+msgid "of"
+msgstr "/"
+
+#: ConvAI/templates/_detail_panel.html:45
+msgid "answered"
+msgstr "已回答"
+
+#: ConvAI/templates/_detail_panel.html:58
+#: ConvAI/templates/_detail_panel.html:469
+#: ConvAI/templates/communications/communications.html:50
+msgid "Close"
+msgstr "关闭"
+
+#: ConvAI/templates/_detail_panel.html:70
+#: ConvAI/templates/_detail_panel.html:91
+#: ConvAI/templates/settings/config.html:374
+#: ConvAI/views/settings_views.py:140
+msgid "Protocols"
+msgstr "方案"
+
+#: ConvAI/templates/_detail_panel.html:73
+#: ConvAI/templates/_detail_panel.html:160
+msgid "Notes"
+msgstr "备注"
+
+#: ConvAI/templates/_detail_panel.html:75
+#: ConvAI/templates/_detail_panel.html:182 ConvAI/views/communications.py:174
+msgid "Recording"
+msgstr "录音"
+
+#: ConvAI/templates/_detail_panel.html:83
+#: ConvAI/templates/dashboard/dashboard.html:515
+#: ConvAI/views/communications.py:124
+msgid "Location not set"
+msgstr "未设置地点"
+
+#: ConvAI/templates/_detail_panel.html:87
+msgid "To address"
+msgstr "待处理事项"
+
+#: ConvAI/templates/_detail_panel.html:102
+#, python-format
+msgid "%(n)s question"
+msgid_plural "%(n)s questions"
+msgstr[0] "%(n)s 个问题"
+
+#: ConvAI/templates/_detail_panel.html:118
+msgid "Type what they said"
+msgstr "输入对方所说的内容"
+
+#: ConvAI/templates/_detail_panel.html:131
+msgid "Send by text"
+msgstr "以短信发送"
+
+#: ConvAI/templates/_detail_panel.html:139
+msgid "No protocols have questions yet."
+msgstr "还没有任何方案包含问题。"
+
+#: ConvAI/templates/_detail_panel.html:168
+msgid "Anything else worth recording from this meeting"
+msgstr "本次会议中其他值得记录的内容"
+
+#: ConvAI/templates/_detail_panel.html:168
+msgid "Anything else worth recording from this call"
+msgstr "本次通话中其他值得记录的内容"
+
+#: ConvAI/templates/_detail_panel.html:186
+#, python-format
+msgid "Attached to this meeting · %(d)s"
+msgstr "已附加到本次会议 · %(d)s"
+
+#: ConvAI/templates/_detail_panel.html:202
+#: ConvAI/templates/_detail_panel.html:735
+msgid "Transcribe again"
+msgstr "重新转写"
+
+#: ConvAI/templates/_detail_panel.html:203
+msgid "Transcribe this recording"
+msgstr "转写此录音"
+
+#: ConvAI/templates/_detail_panel.html:207
+msgid "Nothing was recorded."
+msgstr "没有任何录音。"
+
+#: ConvAI/templates/_detail_panel.html:215
+#: ConvAI/templates/_detail_panel.html:489
+#: ConvAI/templates/_detail_panel.html:496 ConvAI/views/_panel.py:368
+msgid "Summary"
+msgstr "摘要"
+
+#: ConvAI/templates/_detail_panel.html:219
+msgid "The protocol answers have not been summarised."
+msgstr "尚未生成方案回答的摘要。"
+
+#: ConvAI/templates/_detail_panel.html:226
+msgid "Summarise again"
+msgstr "重新生成摘要"
+
+#: ConvAI/templates/_detail_panel.html:227
+msgid "Summarise the answers"
+msgstr "生成回答摘要"
+
+#: ConvAI/templates/_detail_panel.html:248
+msgid "Edit meeting"
+msgstr "编辑会议"
+
+#: ConvAI/templates/_detail_panel.html:251
+#: ConvAI/templates/_detail_panel.html:254
+msgid "Start call"
+msgstr "开始通话"
+
+#: ConvAI/templates/_detail_panel.html:254
+msgid "A phone number is missing for you or the caregiver."
+msgstr "您或照护者缺少电话号码。"
+
+#: ConvAI/templates/_detail_panel.html:262
+msgid "Send reminder"
+msgstr "发送提醒"
+
+#: ConvAI/templates/_detail_panel.html:273
+msgid "Reschedule"
+msgstr "重新安排"
+
+#: ConvAI/templates/_detail_panel.html:287
+#: ConvAI/templates/_detail_panel.html:370
+msgid "Cancel this call"
+msgstr "取消此通话"
+
+#: ConvAI/templates/_detail_panel.html:294
+msgid "End call"
+msgstr "结束通话"
+
+#: ConvAI/templates/_detail_panel.html:308
+msgid "Edit this meeting"
+msgstr "编辑此会议"
+
+#: ConvAI/templates/_detail_panel.html:308
+msgid "Reschedule this call"
+msgstr "重新安排此通话"
+
+#: ConvAI/templates/_detail_panel.html:310
+#, python-format
+msgid ""
+"For %(c)s. Everyone keeps the same appointment; only the details change."
+msgstr "针对 %(c)s。所有人的预约不变，只是细节有所调整。"
+
+#: ConvAI/templates/_detail_panel.html:314
+#: ConvAI/templates/communications/_list.html:47
+msgid "When"
+msgstr "时间"
+
+#: ConvAI/templates/_detail_panel.html:331
+msgid "Only for an in-person meeting"
+msgstr "仅适用于面对面会议"
+
+#: ConvAI/templates/_detail_panel.html:353
+#: ConvAI/templates/_detail_panel.html:717
+#: ConvAI/templates/_panel_agent_actions.html:67
+#: ConvAI/templates/_panel_agent_actions.html:94
+#: ConvAI/templates/account/help_edit.html:37
+#: ConvAI/templates/agents/agent_form.html:93
+#: ConvAI/templates/calls/calendar.html:255
+#: ConvAI/templates/chat/external_chat_with_audio.html:270
+#: ConvAI/templates/communications/communications.html:64
+#: ConvAI/templates/patients/edit_care_plan.html:73
+#: ConvAI/templates/patients/edit_patient.html:93
+#: ConvAI/templates/patients/edit_patient_details.html:39
+#: ConvAI/templates/patients/patient_detail.html:165
+#: ConvAI/templates/patients/patient_list.html:1369
+#: ConvAI/templates/users/edit_user.html:55
+#: ConvAI/templates/users/user_list.html:192
+#: ConvAI/templates/users/user_list.html:215
+msgid "Cancel"
+msgstr "取消"
+
+#: ConvAI/templates/_detail_panel.html:354
+#: ConvAI/templates/account/profile.html:70
+#: ConvAI/templates/account/profile.html:95
+#: ConvAI/templates/agents/agent_form.html:92
+#: ConvAI/templates/patients/edit_patient.html:92
+#: ConvAI/templates/settings/config.html:88
+#: ConvAI/templates/settings/config.html:132
+#: ConvAI/templates/settings/config.html:151
+#: ConvAI/templates/settings/config.html:174
+#: ConvAI/templates/settings/config.html:240
+#: ConvAI/templates/settings/config.html:270
+#: ConvAI/templates/users/edit_user.html:54
+msgid "Save changes"
+msgstr "保存更改"
+
+#: ConvAI/templates/_detail_panel.html:372
+msgid ""
+"It leaves the queue but stays in the history, struck through, so the record "
+"still shows it was arranged. You can put it back."
+msgstr "它会离开队列，但仍保留在历史记录中并以删除线显示，因此记录仍能表明曾经安排过。您可以将其恢复。"
+
+#: ConvAI/templates/_detail_panel.html:375
+#: ConvAI/templates/_detail_panel.html:708
+#: ConvAI/templates/_panel_agent_actions.html:84
+msgid "Why"
+msgstr "原因"
+
+#: ConvAI/templates/_detail_panel.html:377
+msgid "The client asked to stop"
+msgstr "患者要求停止"
+
+#: ConvAI/templates/_detail_panel.html:378
+msgid "No longer needed"
+msgstr "已不再需要"
+
+#: ConvAI/templates/_detail_panel.html:379
+msgid "Covered another way"
+msgstr "已通过其他方式处理"
+
+#: ConvAI/templates/_detail_panel.html:380
+msgid "Arranged in error"
+msgstr "误安排"
+
+#: ConvAI/templates/_detail_panel.html:381
+#: ConvAI/templates/_detail_panel.html:713
+#: ConvAI/templates/_panel_agent_actions.html:89
+#: ConvAI/templates/alerts/alert_detail.html:512
+msgid "Other"
+msgstr "其他"
+
+#: ConvAI/templates/_detail_panel.html:385
+#: ConvAI/templates/dashboard/dashboard.html:362
+msgid "Keep it"
+msgstr "保留"
+
+#: ConvAI/templates/_detail_panel.html:386
+msgid "Cancel the call"
+msgstr "取消通话"
+
+#: ConvAI/templates/_detail_panel.html:392
+msgid "How did the call go?"
+msgstr "通话进行得如何？"
+
+#: ConvAI/templates/_detail_panel.html:409
+msgid "No answer"
+msgstr "无人接听"
+
+#: ConvAI/templates/_detail_panel.html:414
+#, python-format
+msgid "Recording <b>%(p)s</b> as covered."
+msgstr "将 <b>%(p)s</b> 记录为已完成。"
+
+#: ConvAI/templates/_detail_panel.html:415
+#: ConvAI/templates/_detail_panel.html:1143
+msgid "Change"
+msgstr "更改"
+
+#: ConvAI/templates/_detail_panel.html:431
+msgid "Put it back on the schedule"
+msgstr "重新加入日程"
+
+#: ConvAI/templates/_detail_panel.html:443
+msgid "Schedule a follow-up"
+msgstr "安排后续跟进"
+
+#: ConvAI/templates/_detail_panel.html:456
+#: ConvAI/templates/patients/patient_detail.html:44
+msgid "Details"
+msgstr "详情"
+
+#: ConvAI/templates/_detail_panel.html:464
+#, python-format
+msgid "from %(s)s"
+msgstr "来自 %(s)s"
+
+#: ConvAI/templates/_detail_panel.html:484
+msgid "Overview"
+msgstr "概览"
+
+#: ConvAI/templates/_detail_panel.html:485
+msgid "Technical"
+msgstr "技术信息"
+
+#: ConvAI/templates/_detail_panel.html:490
+#: ConvAI/templates/alerts/alert_detail.html:289 ConvAI/views/_panel.py:365
+msgid "Conversation"
+msgstr "对话"
+
+#: ConvAI/templates/_detail_panel.html:497
+msgid "Transcript"
+msgstr "转写文本"
+
+#: ConvAI/templates/_detail_panel.html:523
+msgid "Detail"
+msgstr "详情"
+
+#: ConvAI/templates/_detail_panel.html:543
+msgid "No messages recorded that day."
+msgstr "当天没有记录任何消息。"
+
+#: ConvAI/templates/_detail_panel.html:559
+msgid "Your review of this conversation"
+msgstr "您对本次对话的评价"
+
+#: ConvAI/templates/_detail_panel.html:563
+msgid "Rating"
+msgstr "评分"
+
+#: ConvAI/templates/_detail_panel.html:566
+#: ConvAI/templates/_detail_panel.html:569
+#, python-format
+msgid "%(n)s of 5"
+msgstr "%(n)s / 5"
+
+#: ConvAI/templates/_detail_panel.html:570
+msgid "Not rated"
+msgstr "未评分"
+
+#: ConvAI/templates/_detail_panel.html:575
+msgid "What was good or wrong about how the agent handled this?"
+msgstr "智能体的处理方式有哪些好的或不当之处？"
+
+#: ConvAI/templates/_detail_panel.html:578
+msgid "Did these actually come up?"
+msgstr "这些情况确实出现了吗？"
+
+#: ConvAI/templates/_detail_panel.html:588
+msgid ""
+"The agent flags these automatically. Your yes/no is what it is measured "
+"against."
+msgstr "智能体会自动标记这些内容。您的“是/否”是衡量其准确性的基准。"
+
+#: ConvAI/templates/_detail_panel.html:604
+msgid "Not transcribed yet."
+msgstr "尚未转写。"
+
+#: ConvAI/templates/_detail_panel.html:618
+msgid "Raised"
+msgstr "触发时间"
+
+#: ConvAI/templates/_detail_panel.html:620
+#: ConvAI/templates/settings/config.html:395
+#: ConvAI/templates/settings/config.html:462
+#: ConvAI/templates/users/user_list.html:86
+msgid "Status"
+msgstr "状态"
+
+#: ConvAI/templates/_detail_panel.html:621
+msgid "Priority"
+msgstr "优先级"
+
+#: ConvAI/templates/_detail_panel.html:623
+msgid "Raised by"
+msgstr "触发者"
+
+#: ConvAI/templates/_detail_panel.html:626
+msgid "Last acted"
+msgstr "最近处理"
+
+#: ConvAI/templates/_detail_panel.html:628
+msgid "Reference"
+msgstr "参考编号"
+
+#: ConvAI/templates/_detail_panel.html:631
+msgid "Recorded with the alert"
+msgstr "随警报一并记录"
+
+#: ConvAI/templates/_detail_panel.html:671
+msgid "What changed for them? (optional)"
+msgstr "对方发生了什么变化？（可选）"
+
+#: ConvAI/templates/_detail_panel.html:672
+msgid "Resolve"
+msgstr "标记为已解决"
+
+#: ConvAI/templates/_detail_panel.html:674
+#: ConvAI/templates/alerts/alert_detail.html:379 ConvAI/views/_panel.py:94
+msgid "False alarm"
+msgstr "误报"
+
+#: ConvAI/templates/_detail_panel.html:675
+msgid "Add note"
+msgstr "添加备注"
+
+#: ConvAI/templates/_detail_panel.html:678
+msgid "Reopen"
+msgstr "重新打开"
+
+#: ConvAI/templates/_detail_panel.html:689
+#: ConvAI/templates/_panel_agent_actions.html:26
+msgid "Turn agent back on"
+msgstr "重新开启智能体"
+
+#: ConvAI/templates/_detail_panel.html:693
+#: ConvAI/templates/_panel_agent_actions.html:30
+msgid "Turn agent off"
+msgstr "关闭智能体"
+
+#: ConvAI/templates/_detail_panel.html:703
+#: ConvAI/templates/_panel_agent_actions.html:78
+#, python-format
+msgid "Turn the agent off for %(c)s"
+msgstr "为 %(c)s 关闭智能体"
+
+#: ConvAI/templates/_detail_panel.html:705
+#: ConvAI/templates/_panel_agent_actions.html:80
+msgid ""
+"Messages still arrive and are recorded. What stops is the agent answering "
+"them."
+msgstr "消息仍会送达并被记录，停止的只是智能体的自动回复。"
+
+#: ConvAI/templates/_detail_panel.html:710
+#: ConvAI/templates/_panel_agent_actions.html:86
+msgid "Wrong advice"
+msgstr "建议有误"
+
+#: ConvAI/templates/_detail_panel.html:711
+#: ConvAI/templates/_panel_agent_actions.html:87
+msgid "Distressing the caregiver"
+msgstr "让照护者感到不安"
+
+#: ConvAI/templates/_detail_panel.html:712
+#: ConvAI/templates/_panel_agent_actions.html:88
+msgid "Handling this myself"
+msgstr "由我本人处理"
+
+#: ConvAI/templates/_detail_panel.html:718
+#: ConvAI/templates/_panel_agent_actions.html:95
+#: ConvAI/templates/account/profile.html:123
+msgid "Turn it off"
+msgstr "关闭"
+
+#: ConvAI/templates/_detail_panel.html:735
+#: ConvAI/templates/patients/_timeline_event.html:48
+msgid "Transcribe"
+msgstr "转写"
+
+#: ConvAI/templates/_detail_panel.html:800
+#: ConvAI/templates/_detail_panel.html:986
+#: ConvAI/templates/_detail_panel.html:1013
+msgid "saving…"
+msgstr "正在保存…"
+
+#: ConvAI/templates/_detail_panel.html:813
+#: ConvAI/templates/_detail_panel.html:996
+#: ConvAI/templates/_detail_panel.html:1024
+msgid "saved"
+msgstr "已保存"
+
+#: ConvAI/templates/_detail_panel.html:816
+#: ConvAI/templates/_detail_panel.html:1000
+#: ConvAI/templates/_detail_panel.html:1028
+msgid "not saved — retrying"
+msgstr "未保存 — 正在重试"
+
+#: ConvAI/templates/_detail_panel.html:1106
+msgid "attempt"
+msgstr "尝试"
+
+#: ConvAI/templates/_detail_panel.html:1117
+msgid "Could not start the call."
+msgstr "无法发起通话。"
+
+#: ConvAI/templates/_detail_panel.html:1143
+msgid "Keep as planned"
+msgstr "维持原计划"
+
+#: ConvAI/templates/_panel_agent_actions.html:17
+#: ConvAI/templates/_panel_agent_actions.html:40
+msgid "Raise an alert"
+msgstr "发出警报"
+
+#: ConvAI/templates/_panel_agent_actions.html:42
+#, python-format
+msgid "For %(c)s, from what you have just read."
+msgstr "针对 %(c)s，基于您刚才读到的内容。"
+
+#: ConvAI/templates/_panel_agent_actions.html:46
+msgid "What is it"
+msgstr "问题是什么"
+
+#: ConvAI/templates/_panel_agent_actions.html:48
+msgid "A short title"
+msgstr "简短标题"
+
+#: ConvAI/templates/_panel_agent_actions.html:52
+msgid "Level"
+msgstr "级别"
+
+#: ConvAI/templates/_panel_agent_actions.html:54
+#: ConvAI/templates/alerts/alert_detail.html:220
+msgid "Low"
+msgstr "低"
+
+#: ConvAI/templates/_panel_agent_actions.html:55
+msgid "Medium"
+msgstr "中"
+
+#: ConvAI/templates/_panel_agent_actions.html:56
+msgid "High"
+msgstr "高"
+
+#: ConvAI/templates/_panel_agent_actions.html:61
+msgid "What you saw"
+msgstr "您观察到的情况"
+
+#: ConvAI/templates/_panel_agent_actions.html:63
+msgid "What the agent missed, or what worried you."
+msgstr "智能体遗漏了什么，或有什么让您担心。"
+
+#: ConvAI/templates/_panel_agent_actions.html:68
+msgid "Raise alert"
+msgstr "发出警报"
+
+#: ConvAI/templates/_panel_open.html:19
+#, python-format
+msgid "Open %(c)s"
+msgstr "打开 %(c)s"
+
+#: ConvAI/templates/_panel_open.html:21
+msgid "Open client"
+msgstr "打开患者"
+
+#: ConvAI/templates/account/help.html:3 ConvAI/templates/account/help.html:9
+#: ConvAI/templates/sidebar.html:95 ConvAI/templates/sidebar.html:100
+msgid "Help"
+msgstr "帮助"
+
+#: ConvAI/templates/account/help.html:10
+msgid "Guidance for using the platform."
+msgstr "平台使用指南。"
+
+#: ConvAI/templates/account/help.html:15
+#: ConvAI/templates/agents/_agent_actions.html:10
+#: ConvAI/templates/protocols/protocol_form.html:125
+#: ConvAI/templates/settings/config.html:419
+#: ConvAI/templates/users/user_list.html:111
+msgid "Edit"
+msgstr "编辑"
+
+#: ConvAI/templates/account/help.html:22
+msgid ""
+"This page is showing the default placeholder content. Use Edit to replace it"
+" with guidance for your team."
+msgstr "此页面显示的是默认占位内容。请点击“编辑”,替换为面向您团队的指南。"
+
+#: ConvAI/templates/account/help_edit.html:4
+#: ConvAI/templates/account/help_edit.html:8
+msgid "Edit help page"
+msgstr "编辑帮助页面"
+
+#: ConvAI/templates/account/help_edit.html:12
+msgid "Back to help"
+msgstr "返回帮助"
+
+#: ConvAI/templates/account/help_edit.html:34
+#: ConvAI/templates/patients/edit_care_plan.html:67
+#: ConvAI/templates/patients/edit_patient_details.html:38
+#: ConvAI/templates/patients/patient_detail.html:166
+#: ConvAI/templates/protocols/protocol_editor.html:135
+#: ConvAI/templates/protocols/protocol_form.html:60
+msgid "Save"
+msgstr "保存"
+
+#: ConvAI/templates/account/profile.html:3 ConvAI/templates/sidebar.html:106
+#: ConvAI/templates/sidebar.html:110
+msgid "Profile"
+msgstr "个人资料"
+
+#: ConvAI/templates/account/profile.html:44
+msgid "Personal information"
+msgstr "个人信息"
+
+#: ConvAI/templates/account/profile.html:45
+msgid "Update how your name appears across the platform."
+msgstr "更新您的姓名在平台中的显示方式。"
+
+#: ConvAI/templates/account/profile.html:66
+msgid "Your username can't be changed here."
+msgstr "用户名无法在此处修改。"
+
+#: ConvAI/templates/account/profile.html:80
+#: ConvAI/templates/settings/config.html:105
+msgid "Language"
+msgstr "语言"
+
+#: ConvAI/templates/account/profile.html:81
+msgid "Choose your interface language, or use the system default."
+msgstr "选择您的界面语言,或使用系统默认。"
+
+#: ConvAI/templates/account/profile.html:87
+msgid "Interface language"
+msgstr "界面语言"
+
+#: ConvAI/templates/account/profile.html:89
+msgid "System default"
+msgstr "系统默认"
+
+#: ConvAI/templates/account/profile.html:104 ConvAI/templates/sidebar.html:19
+#: ConvAI/templates/sidebar.html:24
+msgid "Home"
+msgstr "首页"
+
+#: ConvAI/templates/account/profile.html:106
+msgid ""
+"The next-call card sits at the top of Home when a call is overdue or due "
+"within the week. Closing it with the ✕ puts that one call away until it is "
+"done; this switch turns the card off for good."
+msgstr "当有通话逾期或将在一周内到期时，下次通话卡片会显示在首页顶部。用 ✕ 关闭会将该通话隐藏至完成为止；此开关则会永久关闭该卡片。"
+
+#: ConvAI/templates/account/profile.html:115
+msgid "The next-call card is off."
+msgstr "下次通话卡片已关闭。"
+
+#: ConvAI/templates/account/profile.html:117
+msgid "Turn it back on"
+msgstr "重新开启"
+
+#: ConvAI/templates/account/profile.html:121
+msgid "The next-call card is on."
+msgstr "下次通话卡片已开启。"
+
+#: ConvAI/templates/account/profile.html:135
+msgid "API token"
+msgstr "API 令牌"
+
+#: ConvAI/templates/account/profile.html:139
+msgid "None yet"
+msgstr "暂无"
+
+#: ConvAI/templates/account/profile.html:142
+msgid ""
+"Used by the Python API client. Shown only once when generated — regenerate "
+"if you lose it."
+msgstr "供 Python API 客户端使用。生成时仅显示一次,如遗失请重新生成。"
+
+#: ConvAI/templates/account/profile.html:148
+msgid "Copy your token now — for security it will not be shown again."
+msgstr "请立即复制您的令牌——出于安全考虑,它不会再次显示。"
+
+#: ConvAI/templates/account/profile.html:152
+msgid "Show/Hide"
+msgstr "显示/隐藏"
+
+#: ConvAI/templates/account/profile.html:155
+#: ConvAI/templates/settings/config.html:569
+#: ConvAI/templates/users/test_user_result.html:31
+#: ConvAI/templates/users/test_user_result.html:42
+msgid "Copy"
+msgstr "复制"
+
+#: ConvAI/templates/account/profile.html:159
+msgid "Copied to clipboard!"
+msgstr "已复制到剪贴板!"
+
+#: ConvAI/templates/account/profile.html:167
+msgid "Regenerate token"
+msgstr "重新生成令牌"
+
+#: ConvAI/templates/account/profile.html:167
+msgid "Generate token"
+msgstr "生成令牌"
+
+#: ConvAI/templates/account/profile.html:170
+msgid "On regenerating, the previous token will stop working."
+msgstr "重新生成后,先前的令牌将失效。"
+
+#: ConvAI/templates/account/profile.html:180
+msgid "Session"
+msgstr "会话"
+
+#: ConvAI/templates/account/profile.html:181
+msgid "End your session on this device."
+msgstr "结束您在此设备上的会话。"
+
+#: ConvAI/templates/account/profile.html:187 ConvAI/templates/sidebar.html:139
+msgid "Log out"
+msgstr "退出登录"
+
+#: ConvAI/templates/agents/_agent_actions.html:6
+msgid "Test"
+msgstr "测试"
+
+#: ConvAI/templates/agents/_agent_actions.html:15
+msgid "Delete this agent? This cannot be undone."
+msgstr "删除此智能体?此操作无法撤销。"
+
+#: ConvAI/templates/agents/_agent_actions.html:18
+#: ConvAI/templates/protocols/protocol_editor.html:249
+#: ConvAI/templates/settings/config.html:427
+msgid "Delete"
+msgstr "删除"
+
+#: ConvAI/templates/agents/_agent_card.html:17
+msgid "Prompt"
+msgstr "提示词"
+
+#: ConvAI/templates/agents/_agent_card.html:26
+msgid "No prompt set"
+msgstr "未设置提示词"
+
+#: ConvAI/templates/agents/_agent_card.html:28
+msgid "Remote LangGraph agent"
+msgstr "远程 LangGraph 智能体"
+
+#: ConvAI/templates/agents/_agent_card.html:39
+msgid "Host"
+msgstr "主机"
+
+#: ConvAI/templates/agents/_agent_card.html:44
+msgid "Model"
+msgstr "模型"
+
+#: ConvAI/templates/agents/_agent_card.html:46
+msgid "default"
+msgstr "默认"
+
+#: ConvAI/templates/agents/_agent_card.html:52
+msgid "Real-time voice"
+msgstr "实时语音"
+
+#: ConvAI/templates/agents/_agent_card.html:56
+msgid "Voice ID"
+msgstr "语音 ID"
+
+#: ConvAI/templates/agents/agent_form.html:3
+msgid "Edit agent"
+msgstr "编辑智能体"
+
+#: ConvAI/templates/agents/agent_form.html:3
+msgid "Add agent"
+msgstr "添加智能体"
+
+#: ConvAI/templates/agents/agent_form.html:25
+msgid "Back to agents"
+msgstr "返回智能体列表"
+
+#: ConvAI/templates/agents/agent_form.html:38
+#, python-format
+msgid "Edit %(kind)s"
+msgstr "编辑%(kind)s"
+
+#: ConvAI/templates/agents/agent_form.html:38
+#, python-format
+msgid "New %(kind)s"
+msgstr "新建%(kind)s"
+
+#: ConvAI/templates/agents/agent_form.html:41
+msgid "Runs in-process, driven by your system prompt. No tools."
+msgstr "在进程内运行,由您的系统提示词驱动。不带工具。"
+
+#: ConvAI/templates/agents/agent_form.html:43
+msgid "Connects to an agent on a LangGraph server (host:port)."
+msgstr "连接到 LangGraph 服务器上的智能体(host:port)。"
+
+#: ConvAI/templates/agents/agent_form.html:45
+msgid "Built-in agent — set the model and voice it uses."
+msgstr "内置智能体——设置其使用的模型和语音。"
+
+#: ConvAI/templates/agents/agent_form.html:73
+msgid "Advanced: conversation classification"
+msgstr "高级:对话分类"
+
+#: ConvAI/templates/agents/agent_form.html:75
+msgid ""
+"How this agent's conversations are summarised and flagged for human review. "
+"Optional."
+msgstr "该智能体的对话如何被总结并标记以供人工审核。可选。"
+
+#: ConvAI/templates/agents/agent_list.html:3
+#: ConvAI/templates/agents/agent_list.html:35
+#: ConvAI/templates/settings/config.html:185 ConvAI/templates/sidebar.html:68
+#: ConvAI/templates/sidebar.html:73 ConvAI/views/settings_views.py:138
+msgid "Agents"
+msgstr "智能体"
+
+#: ConvAI/templates/agents/agent_list.html:36
+msgid ""
+"The assistants that power every chat surface — pick their kind, model, and "
+"voice."
+msgstr "为每个聊天界面提供支持的助手——选择其类型、模型和语音。"
+
+#: ConvAI/templates/agents/agent_list.html:41
+msgid "Agent types"
+msgstr "智能体类型"
+
+#: ConvAI/templates/agents/agent_list.html:59
+msgid ""
+"Custom in-process agents driven by a system prompt you write. No tools."
+msgstr "由您编写的系统提示词驱动的自定义进程内智能体。不带工具。"
+
+#: ConvAI/templates/agents/agent_list.html:65
+#: ConvAI/templates/agents/agent_list.html:74
+msgid "New prompt agent"
+msgstr "新建提示词智能体"
+
+#: ConvAI/templates/agents/agent_list.html:71
+msgid "No prompt-based agents yet."
+msgstr "暂无基于提示词的智能体。"
+
+#: ConvAI/templates/agents/agent_list.html:72
+msgid "Create one and drive it with your own system prompt."
+msgstr "创建一个,并用您自己的系统提示词驱动它。"
+
+#: ConvAI/templates/agents/agent_list.html:83
+msgid "External agents running on a LangGraph server (host:port)."
+msgstr "运行在 LangGraph 服务器上的外部智能体(host:port)。"
+
+#: ConvAI/templates/agents/agent_list.html:89
+#: ConvAI/templates/agents/agent_list.html:98
+msgid "New remote agent"
+msgstr "新建远程智能体"
+
+#: ConvAI/templates/agents/agent_list.html:95
+msgid "No remote agents yet."
+msgstr "暂无远程智能体。"
+
+#: ConvAI/templates/agents/agent_list.html:96
+msgid "Connect an agent running on your own LangGraph server."
+msgstr "连接运行在您自己 LangGraph 服务器上的智能体。"
+
+#: ConvAI/templates/agents/agent_list.html:108
+msgid ""
+"Built-in agents that ship with the platform and run in-process. You can "
+"change their model and voice."
+msgstr "随平台提供并在进程内运行的内置智能体。您可以更改其模型和语音。"
+
+#: ConvAI/templates/agents/agent_list.html:117
+msgid "No native agents."
+msgstr "没有内置智能体。"
+
+#: ConvAI/templates/alerts/alert_detail.html:4
+msgid "Alert review"
+msgstr "警报审核"
+
+#: ConvAI/templates/alerts/alert_detail.html:206
+msgid "Back to home"
+msgstr "返回首页"
+
+#: ConvAI/templates/alerts/alert_detail.html:216
+#: ConvAI/templates/patients/patient_conversation_detail.html:124
+msgid "Urgent"
+msgstr "紧急"
+
+#: ConvAI/templates/alerts/alert_detail.html:218
+#: ConvAI/templates/patients/patient_conversation_detail.html:126
+msgid "Review"
+msgstr "审核"
+
+#: ConvAI/templates/alerts/alert_detail.html:242
+msgid "Client:"
+msgstr "患者:"
+
+#: ConvAI/templates/alerts/alert_detail.html:247
+msgid "Caregiver:"
+msgstr "照护者:"
+
+#: ConvAI/templates/alerts/alert_detail.html:253
+msgid "Summary:"
+msgstr "摘要:"
+
+#: ConvAI/templates/alerts/alert_detail.html:261
+msgid "No summary."
+msgstr "无摘要。"
+
+#: ConvAI/templates/alerts/alert_detail.html:268
+msgid "Detected"
+msgstr "检测到"
+
+#: ConvAI/templates/alerts/alert_detail.html:277
+#: ConvAI/templates/alerts/alert_detail.html:332
+msgid "Review conversation"
+msgstr "审核对话"
+
+#: ConvAI/templates/alerts/alert_detail.html:278
+msgid "Open the linked conversation for the date associated with this alert."
+msgstr "打开与此警报关联日期的相关对话。"
+
+#: ConvAI/templates/alerts/alert_detail.html:285
+msgid "Open conversation"
+msgstr "打开对话"
+
+#: ConvAI/templates/alerts/alert_detail.html:294
+msgid "No conversation URL available"
+msgstr "没有可用的对话链接"
+
+#: ConvAI/templates/alerts/alert_detail.html:295
+msgid ""
+"This alert does not currently include a linked conversation_id or thread_id,"
+" so the exact conversation URL could not be generated."
+msgstr "此警报当前未包含关联的 conversation_id 或 thread_id,因此无法生成准确的对话链接。"
+
+#: ConvAI/templates/alerts/alert_detail.html:302
+#: ConvAI/templates/settings/config.html:396
+#: ConvAI/templates/settings/config.html:464
+#: ConvAI/templates/users/user_list.html:88
+msgid "Actions"
+msgstr "操作"
+
+#: ConvAI/templates/alerts/alert_detail.html:304
+msgid ""
+"Choose the next step after reviewing the alert. The selected action is saved"
+" to the alert log and updates the status shown on the alert card."
+msgstr "审核警报后选择下一步操作。所选操作会保存到警报日志,并更新警报卡片上显示的状态。"
+
+#: ConvAI/templates/alerts/alert_detail.html:309
+msgid "Current saved action:"
+msgstr "当前已保存的操作:"
+
+#: ConvAI/templates/alerts/alert_detail.html:311
+msgid "Reviewed - review in progress"
+msgstr "已查看 - 审核进行中"
+
+#: ConvAI/templates/alerts/alert_detail.html:313
+msgid "Chatbot disabled - review in progress"
+msgstr "聊天机器人已停用 - 审核进行中"
+
+#: ConvAI/templates/alerts/alert_detail.html:315
+msgid "Chatbot re-enabled - feedback submitted"
+msgstr "聊天机器人已重新启用 - 反馈已提交"
+
+#: ConvAI/templates/alerts/alert_detail.html:317
+msgid "False alarm - resolved"
+msgstr "误报 - 已解决"
+
+#: ConvAI/templates/alerts/alert_detail.html:319
+#: ConvAI/templates/alerts/alert_detail.html:391 ConvAI/views/_panel.py:94
+msgid "Resolved"
+msgstr "已解决"
+
+#: ConvAI/templates/alerts/alert_detail.html:321
+msgid "Reopened - review in progress"
+msgstr "已重新打开 - 审核进行中"
+
+#: ConvAI/templates/alerts/alert_detail.html:343
+msgid "Reviewed"
+msgstr "已查看"
+
+#: ConvAI/templates/alerts/alert_detail.html:355
+msgid "Enable chatbot"
+msgstr "启用聊天机器人"
+
+#: ConvAI/templates/alerts/alert_detail.html:366
+msgid "Disable chatbot"
+msgstr "停用聊天机器人"
+
+#: ConvAI/templates/alerts/alert_detail.html:404
+msgid "Reopen alert"
+msgstr "重新打开警报"
+
+#: ConvAI/templates/alerts/alert_detail.html:415
+msgid "Internal note"
+msgstr "内部备注"
+
+#: ConvAI/templates/alerts/alert_detail.html:416
+msgid ""
+"Add a note about what was reviewed, decided or escalated. This must be saved"
+" to the alert log, not just kept in the browser."
+msgstr "记录审核、决定或上报的内容。备注必须保存到警报日志,而不能只保留在浏览器中。"
+
+#: ConvAI/templates/alerts/alert_detail.html:426
+msgid "Add a brief note about what action was taken..."
+msgstr "简要记录采取了什么操作…"
+
+#: ConvAI/templates/alerts/alert_detail.html:430
+msgid "Save note"
+msgstr "保存备注"
+
+#: ConvAI/templates/alerts/alert_detail.html:438
+msgid "Show technical alert data"
+msgstr "显示警报技术数据"
+
+#: ConvAI/templates/alerts/alert_detail.html:450
+msgid "No additional data."
+msgstr "无其他数据。"
+
+#: ConvAI/templates/alerts/alert_detail.html:461
+msgid "Feedback to improve the alert"
+msgstr "改进警报的反馈"
+
+#: ConvAI/templates/alerts/alert_detail.html:462
+msgid "This helps improve future alert and chatbot decisions."
+msgstr "这有助于改进未来的警报和聊天机器人决策。"
+
+#: ConvAI/templates/alerts/alert_detail.html:485
+msgid "Step 1 of 5"
+msgstr "第 1 步,共 5 步"
+
+#: ConvAI/templates/alerts/alert_detail.html:486
+msgid "Was the alert accurate?"
+msgstr "警报是否准确?"
+
+#: ConvAI/templates/alerts/alert_detail.html:488
+msgid "Accurate"
+msgstr "准确"
+
+#: ConvAI/templates/alerts/alert_detail.html:489
+msgid "Partially accurate"
+msgstr "部分准确"
+
+#: ConvAI/templates/alerts/alert_detail.html:490
+msgid "Inaccurate"
+msgstr "不准确"
+
+#: ConvAI/templates/alerts/alert_detail.html:495
+msgid "Step 2 of 5"
+msgstr "第 2 步,共 5 步"
+
+#: ConvAI/templates/alerts/alert_detail.html:496
+msgid "Was the chatbot's response appropriate?"
+msgstr "聊天机器人的回应是否恰当?"
+
+#: ConvAI/templates/alerts/alert_detail.html:498
+msgid "Good response"
+msgstr "回应良好"
+
+#: ConvAI/templates/alerts/alert_detail.html:499
+msgid "Needs improvement"
+msgstr "需要改进"
+
+#: ConvAI/templates/alerts/alert_detail.html:500
+msgid "Should not have responded"
+msgstr "本不应回应"
+
+#: ConvAI/templates/alerts/alert_detail.html:505
+msgid "Step 3 of 5"
+msgstr "第 3 步,共 5 步"
+
+#: ConvAI/templates/alerts/alert_detail.html:506
+msgid "What type of problem was this?"
+msgstr "这是什么类型的问题?"
+
+#: ConvAI/templates/alerts/alert_detail.html:508
+msgid "Incorrect risk level"
+msgstr "风险等级不正确"
+
+#: ConvAI/templates/alerts/alert_detail.html:509
+msgid "Risk not detected"
+msgstr "未检测到风险"
+
+#: ConvAI/templates/alerts/alert_detail.html:510
+msgid "Excessive escalation"
+msgstr "过度上报"
+
+#: ConvAI/templates/alerts/alert_detail.html:511
+msgid "Incorrect action"
+msgstr "操作不正确"
+
+#: ConvAI/templates/alerts/alert_detail.html:517
+msgid "Step 4 of 5"
+msgstr "第 4 步,共 5 步"
+
+#: ConvAI/templates/alerts/alert_detail.html:518
+msgid "Any additional comments?"
+msgstr "还有其他意见吗?"
+
+#: ConvAI/templates/alerts/alert_detail.html:519
+msgid "Optional comments..."
+msgstr "可选意见…"
+
+#: ConvAI/templates/alerts/alert_detail.html:523
+msgid "Step 5 of 5"
+msgstr "第 5 步,共 5 步"
+
+#: ConvAI/templates/alerts/alert_detail.html:524
+msgid "Submit feedback and update the alert"
+msgstr "提交反馈并更新警报"
+
+#: ConvAI/templates/alerts/alert_detail.html:525
+msgid "The alert update will now be sent with these comments."
+msgstr "警报更新将连同这些意见一起发送。"
+
+#: ConvAI/templates/alerts/alert_detail.html:529
+#: ConvAI/templates/protocols/protocol_editor.html:65
+msgid "Back"
+msgstr "返回"
+
+#: ConvAI/templates/alerts/alert_detail.html:530
+#: ConvAI/templates/alerts/alert_detail.html:560
+#: ConvAI/templates/calls/calendar.html:138
+#: ConvAI/templates/communications/_list.html:138
+msgid "Next"
+msgstr "下一步"
+
+#: ConvAI/templates/alerts/alert_detail.html:560
+#: ConvAI/templates/chat/external_chat_with_audio.html:280
+msgid "Send"
+msgstr "发送"
+
+#: ConvAI/templates/base.html:126
+msgid "Resize details panel"
+msgstr "调整详情面板大小"
+
+#: ConvAI/templates/base.html:128
+msgid "Drag to resize · double-click to reset"
+msgstr "拖动可调整大小 · 双击可重置"
+
+#: ConvAI/templates/base.html:231
+msgid "Notifications"
+msgstr "通知"
+
+#: ConvAI/templates/base.html:236
+msgid "Dismiss"
+msgstr "忽略"
+
+#: ConvAI/templates/base.html:237
+#: ConvAI/templates/patients/patient_detail.html:217
+msgid "Open"
+msgstr "打开"
+
+#: ConvAI/templates/calls/calendar.html:4
+#: ConvAI/templates/calls/calendar.html:109 ConvAI/templates/sidebar.html:56
+#: ConvAI/templates/sidebar.html:61
+msgid "Calendar"
+msgstr "日历"
+
+#: ConvAI/templates/calls/calendar.html:110
+msgid "See your scheduled meetings at a glance and book new ones."
+msgstr "一目了然地查看已安排的会议,并预约新的会议。"
+
+#: ConvAI/templates/calls/calendar.html:113
+msgid "Calendar view"
+msgstr "日历视图"
+
+#: ConvAI/templates/calls/calendar.html:134 ConvAI/views/communications.py:96
+#: ConvAI/views/dashboard.py:47
+msgid "Today"
+msgstr "今天"
+
+#: ConvAI/templates/calls/calendar.html:135
+#: ConvAI/templates/communications/_list.html:125
+msgid "Previous"
+msgstr "上一个"
+
+#: ConvAI/templates/calls/calendar.html:154
+msgid "Mon"
+msgstr "周一"
+
+#: ConvAI/templates/calls/calendar.html:155
+msgid "Tue"
+msgstr "周二"
+
+#: ConvAI/templates/calls/calendar.html:156
+msgid "Wed"
+msgstr "周三"
+
+#: ConvAI/templates/calls/calendar.html:157
+msgid "Thu"
+msgstr "周四"
+
+#: ConvAI/templates/calls/calendar.html:158
+msgid "Fri"
+msgstr "周五"
+
+#: ConvAI/templates/calls/calendar.html:159
+msgid "Sat"
+msgstr "周六"
+
+#: ConvAI/templates/calls/calendar.html:160
+msgid "Sun"
+msgstr "周日"
+
+#: ConvAI/templates/calls/calendar.html:178
+msgid "more"
+msgstr "更多"
+
+#: ConvAI/templates/calls/calendar.html:194
+msgid "Click any empty slot to schedule a meeting."
+msgstr "点击任意空闲时段以安排会议。"
+
+#: ConvAI/templates/calls/calendar.html:229
+msgid "New meeting"
+msgstr "新建会议"
+
+#: ConvAI/templates/calls/calendar.html:230
+msgid "Pick a client and meeting type."
+msgstr "选择患者和会议类型。"
+
+#: ConvAI/templates/calls/calendar.html:257
+#: ConvAI/templates/communications/communications.html:30
+#: ConvAI/templates/communications/communications.html:47
+#: ConvAI/templates/communications/communications.html:65
+msgid "Schedule"
+msgstr "安排"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:4
+msgid "External Chat"
+msgstr "外部聊天"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:223
+msgid "online"
+msgstr "在线"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:235
+#: ConvAI/templates/chat/external_chat_with_audio.html:518
+msgid "Play/Pause"
+msgstr "播放/暂停"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:248
+msgid "Type a message or tap the microphone to speak"
+msgstr "输入消息,或点按麦克风说话"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:263
+msgid "Type a message"
+msgstr "输入消息"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:273
+msgid "Recording…"
+msgstr "录音中…"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:277
+msgid "Record audio"
+msgstr "录制语音"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:283
+msgid "Send audio"
+msgstr "发送语音"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:287
+msgid "Write a message, or type <code>/quit</code> to end the conversation."
+msgstr "写一条消息,或输入 <code>/quit</code> 结束对话。"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:371
+#: ConvAI/templates/chatbot.html:145 ConvAI/views/chat.py:240
+msgid "Conversation ended. Send a message to start a new one."
+msgstr "对话已结束。发送消息以开始新的对话。"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:388
+msgid "Error: could not get a response."
+msgstr "错误:未能获取回复。"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:400
+msgid ""
+"Recording needs a secure connection (HTTPS) or localhost. Open the site over"
+" HTTPS to use the microphone."
+msgstr "录音需要安全连接(HTTPS)或 localhost。请通过 HTTPS 打开本站以使用麦克风。"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:409
+msgid "Microphone permission denied. Allow it in the browser to record."
+msgstr "麦克风权限被拒绝。请在浏览器中允许后再录音。"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:411
+msgid "No microphone was found, or it is in use by another app."
+msgstr "未找到麦克风,或它正被其他应用占用。"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:413
+#: ConvAI/templates/chat/realtime_voice.html:260
+msgid "Could not access the microphone."
+msgstr "无法访问麦克风。"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:474
+#: ConvAI/templates/chat/external_chat_with_audio.html:478
+msgid "Error: could not process the audio."
+msgstr "错误:无法处理音频。"
+
+#: ConvAI/templates/chat/realtime_voice.html:4
+msgid "Voice chat"
+msgstr "语音聊天"
+
+#: ConvAI/templates/chat/realtime_voice.html:185
+#: ConvAI/templates/chat/realtime_voice.html:256
+msgid "voice agent"
+msgstr "语音智能体"
+
+#: ConvAI/templates/chat/realtime_voice.html:194
+msgid ""
+"Real-time voice is not configured yet. Set the Azure Realtime endpoint, key "
+"and deployment under Settings → Agents."
+msgstr "实时语音尚未配置。请在“设置 → 智能体”中设置 Azure Realtime 端点、密钥和部署。"
+
+#: ConvAI/templates/chat/realtime_voice.html:203
+#: ConvAI/templates/chat/realtime_voice.html:249
+msgid "Tap the button to start talking"
+msgstr "点按按钮开始对话"
+
+#: ConvAI/templates/chat/realtime_voice.html:213
+#: ConvAI/templates/chat/realtime_voice.html:264
+msgid "Mute microphone"
+msgstr "麦克风静音"
+
+#: ConvAI/templates/chat/realtime_voice.html:218
+#: ConvAI/templates/chat/realtime_voice.html:262
+msgid "Start conversation"
+msgstr "开始对话"
+
+#: ConvAI/templates/chat/realtime_voice.html:250
+msgid "Connecting…"
+msgstr "连接中…"
+
+#: ConvAI/templates/chat/realtime_voice.html:251
+msgid "Listening…"
+msgstr "正在聆听…"
+
+#: ConvAI/templates/chat/realtime_voice.html:252
+msgid "Speaking…"
+msgstr "正在说话…"
+
+#: ConvAI/templates/chat/realtime_voice.html:253
+msgid "Microphone muted"
+msgstr "麦克风已静音"
+
+#: ConvAI/templates/chat/realtime_voice.html:254
+msgid "Conversation ended"
+msgstr "对话已结束"
+
+#: ConvAI/templates/chat/realtime_voice.html:255
+msgid "Ended after inactivity — tap to resume"
+msgstr "因长时间无活动已结束 — 点按以继续"
+
+#: ConvAI/templates/chat/realtime_voice.html:257
+msgid "live"
+msgstr "通话中"
+
+#: ConvAI/templates/chat/realtime_voice.html:258
+msgid "Could not start the voice session."
+msgstr "无法启动语音会话。"
+
+#: ConvAI/templates/chat/realtime_voice.html:259
+msgid "Microphone permission denied. Allow it in the browser to talk."
+msgstr "麦克风权限被拒绝。请在浏览器中允许后再对话。"
+
+#: ConvAI/templates/chat/realtime_voice.html:261
+msgid "Voice needs a secure connection (HTTPS) or localhost."
+msgstr "语音功能需要安全连接（HTTPS）或 localhost。"
+
+#: ConvAI/templates/chat/realtime_voice.html:263
+#: ConvAI/templates/chatbot.html:14
+msgid "End conversation"
+msgstr "结束对话"
+
+#: ConvAI/templates/chat/realtime_voice.html:265
+msgid "Unmute microphone"
+msgstr "取消麦克风静音"
+
+#: ConvAI/templates/chatbot.html:12
+msgid "Virtual Assistant"
+msgstr "虚拟助手"
+
+#: ConvAI/templates/chatbot.html:24
+msgid "Type your message..."
+msgstr "输入您的消息…"
+
+#: ConvAI/templates/chatbot.html:29
+msgid "Type a message, or <code>/quit</code> to end the conversation."
+msgstr "输入消息,或输入 <code>/quit</code> 结束对话。"
+
+#: ConvAI/templates/communications/_list.html:15
+msgid "Coming up"
+msgstr "即将进行"
+
+#: ConvAI/templates/communications/_list.html:20
+msgid "Happened"
+msgstr "已发生"
+
+#: ConvAI/templates/communications/_list.html:29
+msgid "Find a protocol, alert or place"
+msgstr "查找方案、警报或地点"
+
+#: ConvAI/templates/communications/_list.html:29
+msgid "Find a client, protocol or place"
+msgstr "查找患者、方案或地点"
+
+#: ConvAI/templates/communications/_list.html:79
+#: ConvAI/templates/dashboard/dashboard.html:424
+msgid "Not opened yet"
+msgstr "尚未打开"
+
+#: ConvAI/templates/communications/_list.html:110
+msgid "Nothing matches that search."
+msgstr "没有符合该搜索条件的结果。"
+
+#: ConvAI/templates/communications/_list.html:111
+msgid "Nothing scheduled."
+msgstr "没有安排任何日程。"
+
+#: ConvAI/templates/communications/_list.html:112
+msgid "Nothing has happened yet."
+msgstr "还没有发生任何事情。"
+
+#: ConvAI/templates/communications/_list.html:119
+#, python-format
+msgid "%(a)s–%(b)s of %(t)s"
+msgstr "第 %(a)s–%(b)s 项，共 %(t)s 项"
+
+#: ConvAI/templates/communications/_list.html:122
+msgid "Pages"
+msgstr "页"
+
+#: ConvAI/templates/communications/communications.html:4
+#: ConvAI/templates/communications/communications.html:16
+#: ConvAI/templates/patients/patient_detail.html:46
+#: ConvAI/templates/sidebar.html:32 ConvAI/templates/sidebar.html:37
+msgid "Communications"
+msgstr "沟通记录"
+
+#: ConvAI/templates/communications/communications.html:20
+msgid "Show all clients"
+msgstr "显示所有患者"
+
+#: ConvAI/templates/communications/communications.html:24
+msgid "What still needs doing, soonest first."
+msgstr "尚待处理的事项，按时间由近及远排列。"
+
+#: ConvAI/templates/communications/communications.html:25
+msgid "What has already happened, newest first."
+msgstr "已经发生的事项，按时间由新到旧排列。"
+
+#: ConvAI/templates/communications/communications.html:48
+msgid "A call or an in-person meeting."
+msgstr "一次通话或一次面对面会议。"
+
+#: ConvAI/templates/dashboard/dashboard.html:298
+#, python-format
+msgid "%(n)s meeting pending"
+msgid_plural "%(n)s meetings pending"
+msgstr[0] "%(n)s 场会议待处理"
+
+#: ConvAI/templates/dashboard/dashboard.html:299
+#, python-format
+msgid "%(t)s today"
+msgid_plural "%(t)s today"
+msgstr[0] "今天 %(t)s 场"
+
+#: ConvAI/templates/dashboard/dashboard.html:300
+#, python-format
+msgid "%(co)s still to make"
+msgid_plural "%(co)s still to make"
+msgstr[0] "还有 %(co)s 场未完成"
+
+#: ConvAI/templates/dashboard/dashboard.html:302
+msgid "No meetings pending."
+msgstr "没有待处理的会议。"
+
+#: ConvAI/templates/dashboard/dashboard.html:306
+#, python-format
+msgid "%(n)s chat flagged for review"
+msgid_plural "%(n)s chats flagged for review"
+msgstr[0] "%(n)s 个对话被标记待复核"
+
+#: ConvAI/templates/dashboard/dashboard.html:307
+#, python-format
+msgid "%(h)s high priority"
+msgid_plural "%(h)s high priority"
+msgstr[0] "%(h)s 个为高优先级"
+
+#: ConvAI/templates/dashboard/dashboard.html:309
+#, python-format
+msgid "all “%(topic)s”"
+msgstr "全部关于“%(topic)s”"
+
+#: ConvAI/templates/dashboard/dashboard.html:326
+#: ConvAI/templates/patients/patient_detail.html:28
+#: ConvAI/templates/patients/patient_list.html:479
+#: ConvAI/templates/patients/patient_list.html:581
+msgid "Next call"
+msgstr "下次通话"
+
+#: ConvAI/templates/dashboard/dashboard.html:326
+#: ConvAI/templates/dashboard/dashboard.html:518
+msgid "not yet made"
+msgstr "尚未拨出"
+
+#: ConvAI/templates/dashboard/dashboard.html:333
+msgid "Open call"
+msgstr "打开通话"
+
+#: ConvAI/templates/dashboard/dashboard.html:335
+#: ConvAI/templates/dashboard/dashboard.html:350
+msgid "Put this away"
+msgstr "收起"
+
+#: ConvAI/templates/dashboard/dashboard.html:352
+#, python-format
+msgid ""
+"The call with %(n)s is still scheduled either way — this only decides what "
+"sits at the top of Home."
+msgstr "无论如何，与 %(n)s 的通话仍然在日程中——此设置只决定首页顶部显示什么。"
+
+#: ConvAI/templates/dashboard/dashboard.html:355
+msgid "For how long"
+msgstr "持续多久"
+
+#: ConvAI/templates/dashboard/dashboard.html:357
+msgid "Just this call — the card comes back with the next one"
+msgstr "仅本次通话——卡片将在下一次通话时重新出现"
+
+#: ConvAI/templates/dashboard/dashboard.html:358
+msgid "Turn the card off — until I switch it back on in Profile"
+msgstr "关闭卡片——直到我在个人资料中重新开启"
+
+#: ConvAI/templates/dashboard/dashboard.html:363
+msgid "Put it away"
+msgstr "收起"
+
+#: ConvAI/templates/dashboard/dashboard.html:393
+msgid "Chats to review"
+msgstr "待复核的对话"
+
+#: ConvAI/templates/dashboard/dashboard.html:408
+#: ConvAI/templates/dashboard/dashboard.html:409
+#: ConvAI/templates/dashboard/dashboard.html:484
+msgid "Find a client"
+msgstr "查找患者"
+
+#: ConvAI/templates/dashboard/dashboard.html:410
+#: ConvAI/templates/dashboard/dashboard.html:485
+msgid "Sort"
+msgstr "排序"
+
+#: ConvAI/templates/dashboard/dashboard.html:412
+msgid "Priority first"
+msgstr "优先级优先"
+
+#: ConvAI/templates/dashboard/dashboard.html:413
+msgid "Newest first"
+msgstr "最新优先"
+
+#: ConvAI/templates/dashboard/dashboard.html:414
+msgid "Oldest first"
+msgstr "最早优先"
+
+#: ConvAI/templates/dashboard/dashboard.html:416
+msgid "Apply"
+msgstr "应用"
+
+#: ConvAI/templates/dashboard/dashboard.html:454
+msgid "Nothing to review."
+msgstr "没有需要复核的内容。"
+
+#: ConvAI/templates/dashboard/dashboard.html:456
+#: ConvAI/templates/dashboard/dashboard.html:523
+#: ConvAI/templates/dashboard/dashboard.html:526
+msgid "No client matches that."
+msgstr "没有符合条件的患者。"
+
+#: ConvAI/templates/dashboard/dashboard.html:462
+msgid "Showing the first 200 — narrow the search to see the rest."
+msgstr "仅显示前 200 项——请缩小搜索范围以查看其余内容。"
+
+#: ConvAI/templates/dashboard/dashboard.html:473
+msgid "Pending meetings"
+msgstr "待处理会议"
+
+#: ConvAI/templates/dashboard/dashboard.html:486
+msgid "Soonest first"
+msgstr "最近的优先"
+
+#: ConvAI/templates/dashboard/dashboard.html:487
+msgid "Latest first"
+msgstr "最远的优先"
+
+#: ConvAI/templates/dashboard/dashboard.html:523
+msgid "Nothing pending."
+msgstr "没有待处理事项。"
+
+#: ConvAI/templates/dashboard/dashboard.html:541
+msgid "Calls completed today"
+msgstr "今日已完成通话"
+
+#: ConvAI/templates/dashboard/dashboard.html:575
+msgid "Nothing completed yet today."
+msgstr "今天还没有完成任何事项。"
+
+#: ConvAI/templates/dashboard/dashboard.html:588
+msgid "What changed this week"
+msgstr "本周有哪些变化"
+
+#: ConvAI/templates/dashboard/dashboard.html:690
+msgid "Previous page"
+msgstr "上一页"
+
+#: ConvAI/templates/dashboard/dashboard.html:697
+msgid "Next page"
+msgstr "下一页"
+
+#: ConvAI/templates/dashboard/dashboard.html:720
+msgid "pending"
+msgstr "待处理"
+
+#: ConvAI/templates/dashboard/dashboard.html:722
+msgid "to review"
+msgstr "待复核"
+
+#: ConvAI/templates/patients/_timeline_event.html:39
+msgid "To"
+msgstr "致"
+
+#: ConvAI/templates/patients/_timeline_event.html:43
+msgid "Listen"
+msgstr "收听"
+
+#: ConvAI/templates/patients/_timeline_event.html:48
+msgid "Re-transcribe"
+msgstr "重新转写"
+
+#: ConvAI/templates/patients/_timeline_event.html:55
+#: ConvAI/views/_panel.py:322
+msgid "Transcript summary"
+msgstr "转写摘要"
+
+#: ConvAI/templates/patients/_timeline_event.html:60
+msgid "Show full transcript"
+msgstr "显示完整转写"
+
+#: ConvAI/templates/patients/_timeline_event.html:70
+msgid "Meeting"
+msgstr "会议"
+
+#: ConvAI/templates/patients/_timeline_event.html:88
+msgid "Open meeting"
+msgstr "打开会议"
+
+#: ConvAI/templates/patients/_timeline_event.html:93
+msgid "Re-summarize"
+msgstr "重新总结"
+
+#: ConvAI/templates/patients/_timeline_event.html:93
+msgid "Summarize protocols"
+msgstr "总结方案"
+
+#: ConvAI/templates/patients/_timeline_event.html:101
+msgid "Protocol summary"
+msgstr "方案摘要"
+
+#: ConvAI/templates/patients/_timeline_event.html:110
+#: ConvAI/views/_panel.py:363
+msgid "Chatbot"
+msgstr "聊天机器人"
+
+#: ConvAI/templates/patients/_timeline_event.html:112
+#: ConvAI/templates/patients/patient_conversation_detail.html:137
+#, python-format
+msgid "%(counter)s message"
+msgid_plural "%(counter)s messages"
+msgstr[0] "%(counter)s 条消息"
+
+#: ConvAI/templates/patients/_timeline_event.html:120
+msgid "View conversation"
+msgstr "查看对话"
+
+#: ConvAI/templates/patients/_timeline_pills.html:4
+#: ConvAI/views/communications.py:68 ConvAI/views/communications.py:73
+msgid "Calls"
+msgstr "通话"
+
+#: ConvAI/templates/patients/_timeline_pills.html:5
+#: ConvAI/views/communications.py:69 ConvAI/views/communications.py:74
+msgid "Meetings"
+msgstr "会议"
+
+#: ConvAI/templates/patients/_timeline_pills.html:6
+#: ConvAI/templates/sidebar.html:128 ConvAI/views/communications.py:76
+msgid "Alerts"
+msgstr "警报"
+
+#: ConvAI/templates/patients/_timeline_pills.html:7
+#: ConvAI/views/communications.py:75
+msgid "Chats"
+msgstr "聊天"
+
+#: ConvAI/templates/patients/_timeline_script.html:90
+msgid "Working…"
+msgstr "处理中…"
+
+#: ConvAI/templates/patients/edit_care_plan.html:7
+#: ConvAI/templates/patients/edit_care_plan.html:12
+msgid "Edit Care Plan"
+msgstr "编辑护理计划"
+
+#: ConvAI/templates/patients/edit_care_plan.html:15
+#: ConvAI/templates/patients/edit_patient.html:70
+#: ConvAI/templates/patients/edit_patient_details.html:22
+#: ConvAI/templates/patients/patient_detail.html:24
+#: ConvAI/templates/patients/patient_detail.html:65
+#: ConvAI/templates/patients/patient_list.html:564
+#: ConvAI/templates/patients/patient_list.html:1353
+msgid "Caregiver"
+msgstr "照护者"
+
+#: ConvAI/templates/patients/edit_care_plan.html:27
+#: ConvAI/templates/patients/edit_patient.html:21
+#: ConvAI/templates/patients/edit_patient_details.html:14
+#: ConvAI/templates/patients/patient_conversation_detail.html:90
+#: ConvAI/templates/patients/view_care_plan.html:17
+msgid "Back to client"
+msgstr "返回患者"
+
+#: ConvAI/templates/patients/edit_care_plan.html:53
+msgid "Current file:"
+msgstr "当前文件:"
+
+#: ConvAI/templates/patients/edit_patient.html:3
+#: ConvAI/templates/patients/edit_patient.html:27
+#: ConvAI/templates/users/test_user_result.html:70
+msgid "Edit client"
+msgstr "编辑患者"
+
+#: ConvAI/templates/patients/edit_patient.html:64
+msgid ""
+"The agent that handles this client's chat (including the test-user chatbot)."
+msgstr "处理该患者聊天的智能体(包括测试用户聊天机器人)。"
+
+#: ConvAI/templates/patients/edit_patient.html:71
+msgid "The caregiver's phone is the number called when you start a call."
+msgstr "照护者的电话即发起通话时拨打的号码。"
+
+#: ConvAI/templates/patients/edit_patient_details.html:5
+#: ConvAI/templates/patients/patient_detail.html:37
+msgid "Edit details"
+msgstr "编辑详情"
+
+#: ConvAI/templates/patients/edit_patient_details.html:20
+msgid "Edit details of"
+msgstr "编辑详情:"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:6
+msgid "Conversation with"
+msgstr "对话对象:"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:98
+msgid "Conversation history"
+msgstr "对话历史"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:103
+msgid "Previous day"
+msgstr "前一天"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:107
+msgid "Next day"
+msgstr "后一天"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:132
+msgid ""
+"This conversation has not been analysed yet. It may take a few moments."
+msgstr "此对话尚未分析,可能需要一些时间。"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:133
+msgid "Analysis pending"
+msgstr "分析待完成"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:155
+msgid "Voice message"
+msgstr "语音消息"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:173
+msgid "Voice reply"
+msgstr "语音回复"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:184
+msgid "Like"
+msgstr "赞"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:187
+msgid "Dislike"
+msgstr "踩"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:190
+msgid "Flag as warning"
+msgstr "标记为警告"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:193
+msgid "Flag as dangerous"
+msgstr "标记为危险"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:207
+msgid "Conversation feedback"
+msgstr "对话反馈"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:208
+#: ConvAI/templates/patients/patient_detail.html:204
+#: ConvAI/views/settings_views.py:35
+msgid "Saved"
+msgstr "已保存"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:213
+msgid "Conversation rating"
+msgstr "对话评分"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:224
+msgid "Feedback"
+msgstr "反馈"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:226
+msgid "Enter your feedback here..."
+msgstr "在此输入您的反馈…"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:232
+msgid "Human validation"
+msgstr "人工验证"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:255
+msgid "No messages recorded on this day."
+msgstr "这一天没有记录任何消息。"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:256
+msgid "Use the arrows above to browse other days."
+msgstr "使用上方箭头浏览其他日期。"
+
+#: ConvAI/templates/patients/patient_detail.html:74
+msgid "Relationship not recorded"
+msgstr "未记录关系"
+
+#: ConvAI/templates/patients/patient_detail.html:79
+msgid "Daughter, neighbour, paid carer…"
+msgstr "女儿、邻居、聘请的照护者……"
+
+#: ConvAI/templates/patients/patient_detail.html:82
+msgid "Usually on the call"
+msgstr "通常会参与通话"
+
+#: ConvAI/templates/patients/patient_detail.html:87
+#: ConvAI/views/dashboard.py:258
+msgid "No caregiver"
+msgstr "无照护者"
+
+#: ConvAI/templates/patients/patient_detail.html:101
+#: ConvAI/templates/patients/patient_detail.html:106
+msgid "No agent"
+msgstr "无智能体"
+
+#: ConvAI/templates/patients/patient_detail.html:102
+msgid "Answers this client's chats"
+msgstr "回复该患者的对话"
+
+#: ConvAI/templates/patients/patient_detail.html:102
+msgid "Chats are not answered automatically"
+msgstr "对话不会自动回复"
+
+#: ConvAI/templates/patients/patient_detail.html:116
+msgid "Client since"
+msgstr "成为患者的时间"
+
+#: ConvAI/templates/patients/patient_detail.html:128
+msgid "How they want to be contacted"
+msgstr "他们希望的联系方式"
+
+#: ConvAI/templates/patients/patient_detail.html:145
+msgid "Add another…"
+msgstr "添加其他…"
+
+#: ConvAI/templates/patients/patient_detail.html:146
+msgid "Add a contact preference"
+msgstr "添加联系偏好"
+
+#: ConvAI/templates/patients/patient_detail.html:152
+msgid "Background"
+msgstr "背景信息"
+
+#: ConvAI/templates/patients/patient_detail.html:157
+msgid "Nothing recorded yet."
+msgstr "尚未记录任何内容。"
+
+#: ConvAI/templates/patients/patient_detail.html:161
+msgid "Who they live with, how they get about, what to avoid. Markdown."
+msgstr "与谁同住、如何出行、需要避免什么。支持 Markdown。"
+
+#: ConvAI/templates/patients/patient_detail.html:172
+msgid "Protocols completed"
+msgstr "已完成的方案"
+
+#: ConvAI/templates/patients/patient_detail.html:198
+msgid "Handover note"
+msgstr "交接说明"
+
+#: ConvAI/templates/patients/patient_detail.html:202
+msgid ""
+"What the next person should know to make the first call feel like continuity"
+msgstr "下一位接手的人需要知道什么，才能让第一次通话具有延续感"
+
+#: ConvAI/templates/patients/patient_detail.html:208
+#: ConvAI/templates/patients/view_care_plan.html:6
+#: ConvAI/templates/patients/view_care_plan.html:11
+msgid "Care plan"
+msgstr "护理计划"
+
+#: ConvAI/templates/patients/patient_detail.html:218
+msgid "Replace"
+msgstr "替换"
+
+#: ConvAI/templates/patients/patient_detail.html:234
+msgid "Send to caregiver on WhatsApp"
+msgstr "通过 WhatsApp 发送给照护者"
+
+#: ConvAI/templates/patients/patient_detail.html:238
+#, python-format
+msgid "Goes to %(n)s as a single-use link."
+msgstr "以一次性链接的形式发送给 %(n)s。"
+
+#: ConvAI/templates/patients/patient_detail.html:240
+msgid "No caregiver number on file."
+msgstr "没有登记照护者的号码。"
+
+#: ConvAI/templates/patients/patient_detail.html:251
+msgid "Upload a care plan"
+msgstr "上传护理计划"
+
+#: ConvAI/templates/patients/patient_detail.html:252
+msgid "PDF"
+msgstr "PDF"
+
+#: ConvAI/templates/patients/patient_detail.html:254
+msgid "Choose file"
+msgstr "选择文件"
+
+#: ConvAI/templates/patients/patient_list.html:6
+#: ConvAI/templates/patients/patient_list.html:446
+#: ConvAI/templates/sidebar.html:45 ConvAI/templates/sidebar.html:50
+msgid "Clients"
+msgstr "患者"
+
+#: ConvAI/templates/patients/patient_list.html:447
+msgid "clients"
+msgstr "位患者"
+
+#: ConvAI/templates/patients/patient_list.html:450
+#: ConvAI/templates/patients/patient_list.html:1324
+msgid "Add client"
+msgstr "添加患者"
+
+#: ConvAI/templates/patients/patient_list.html:463
+msgid "Search by ID, client, caregiver or counsellor..."
+msgstr "按 ID、患者、照护者或咨询师搜索…"
+
+#: ConvAI/templates/patients/patient_list.html:465
+msgid "Search by ID, client, caregiver..."
+msgstr "按 ID、患者、照护者搜索…"
+
+#: ConvAI/templates/patients/patient_list.html:488
+#: ConvAI/templates/patients/patient_list.html:1171
+msgid "Showing"
+msgstr "显示"
+
+#: ConvAI/templates/patients/patient_list.html:488
+msgid "all"
+msgstr "全部"
+
+#: ConvAI/templates/patients/patient_list.html:493
+msgid "Filter by next call"
+msgstr "按下次通话筛选"
+
+#: ConvAI/templates/patients/patient_list.html:502
+msgid "Scheduled"
+msgstr "已安排"
+
+#: ConvAI/templates/patients/patient_list.html:507
+msgid "Not scheduled"
+msgstr "未安排"
+
+#: ConvAI/templates/patients/patient_list.html:521
+#: ConvAI/templates/patients/patient_list.html:530
+#: ConvAI/templates/patients/patient_list.html:573 ConvAI/views/account.py:16
+msgid "Counsellor"
+msgstr "咨询师"
+
+#: ConvAI/templates/patients/patient_list.html:531
+msgid "Search counsellor"
+msgstr "搜索咨询师"
+
+#: ConvAI/templates/patients/patient_list.html:550
+msgid "Id"
+msgstr "ID"
+
+#: ConvAI/templates/patients/patient_list.html:588
+msgid "Last call"
+msgstr "上次通话"
+
+#: ConvAI/templates/patients/patient_list.html:600
+msgid "No clients match the current filters."
+msgstr "没有符合当前筛选条件的患者。"
+
+#: ConvAI/templates/patients/patient_list.html:611
+#: ConvAI/templates/users/user_list.html:162
+msgid "Records"
+msgstr "记录"
+
+#: ConvAI/templates/patients/patient_list.html:1370
+#: ConvAI/templates/users/user_list.html:193
+#: ConvAI/templates/users/user_list.html:216
+msgid "Create"
+msgstr "创建"
+
+#: ConvAI/templates/patients/view_care_plan.html:29
+msgid "Update Care Plan"
+msgstr "更新护理计划"
+
+#: ConvAI/templates/patients/view_care_plan.html:42
+msgid "No Care Plan uploaded for this client."
+msgstr "尚未为该患者上传护理计划。"
+
+#: ConvAI/templates/patients/view_care_plan.html:48
+msgid "Upload Care Plan"
+msgstr "上传护理计划"
+
+#: ConvAI/templates/protocols/protocol_editor.html:5
+#: ConvAI/templates/protocols/protocol_editor.html:69
+msgid "Protocol editor"
+msgstr "方案编辑器"
+
+#: ConvAI/templates/protocols/protocol_editor.html:71
+#: ConvAI/templates/protocols/protocol_form.html:78
+#: ConvAI/templates/settings/config.html:375
+msgid "Beta"
+msgstr "测试版"
+
+#: ConvAI/templates/protocols/protocol_editor.html:74
+#, python-format
+msgid "Protocol #%(n)s — design its questions as in a form."
+msgstr "方案 #%(n)s——像设计表单一样设计其问题。"
+
+#: ConvAI/templates/protocols/protocol_editor.html:84
+msgid "Read-only. Protocols are edited in Settings by an administrator."
+msgstr "只读。方案由管理员在“设置”中编辑。"
+
+#: ConvAI/templates/protocols/protocol_editor.html:86
+msgid ""
+"This protocol already has recorded answers, so its structure cannot be "
+"modified. It is shown in read-only mode."
+msgstr "该方案已记录答复,因此无法修改其结构,当前以只读模式显示。"
+
+#: ConvAI/templates/protocols/protocol_editor.html:98
+msgid "Protocol title"
+msgstr "方案标题"
+
+#: ConvAI/templates/protocols/protocol_editor.html:104
+msgid "Protocol name"
+msgstr "方案名称"
+
+#: ConvAI/templates/protocols/protocol_editor.html:107
+msgid "Description (Markdown, optional)"
+msgstr "描述(Markdown,可选)"
+
+#: ConvAI/templates/protocols/protocol_editor.html:112
+msgid "Describe the goal of this protocol…"
+msgstr "描述此方案的目标…"
+
+#: ConvAI/templates/protocols/protocol_editor.html:117
+#: ConvAI/templates/settings/config.html:394
+msgid "Questions"
+msgstr "问题"
+
+#: ConvAI/templates/protocols/protocol_editor.html:124
+msgid "No questions yet. Add the first one."
+msgstr "暂无问题。请添加第一个。"
+
+#: ConvAI/templates/protocols/protocol_editor.html:131
+msgid "Add question"
+msgstr "添加问题"
+
+#: ConvAI/templates/protocols/protocol_editor.html:191
+msgid "bold text"
+msgstr "粗体文本"
+
+#: ConvAI/templates/protocols/protocol_editor.html:192
+msgid "italic text"
+msgstr "斜体文本"
+
+#: ConvAI/templates/protocols/protocol_editor.html:193
+msgid "code"
+msgstr "代码"
+
+#: ConvAI/templates/protocols/protocol_editor.html:199
+msgid "text"
+msgstr "文本"
+
+#: ConvAI/templates/protocols/protocol_editor.html:219
+msgid "Drag to reorder"
+msgstr "拖动以重新排序"
+
+#: ConvAI/templates/protocols/protocol_editor.html:227
+msgid "Bold"
+msgstr "粗体"
+
+#: ConvAI/templates/protocols/protocol_editor.html:228
+msgid "Italic"
+msgstr "斜体"
+
+#: ConvAI/templates/protocols/protocol_editor.html:230
+#: ConvAI/templates/settings/config.html:393
+msgid "Title"
+msgstr "标题"
+
+#: ConvAI/templates/protocols/protocol_editor.html:231
+msgid "List"
+msgstr "列表"
+
+#: ConvAI/templates/protocols/protocol_editor.html:232
+msgid "Numbered list"
+msgstr "编号列表"
+
+#: ConvAI/templates/protocols/protocol_editor.html:233
+msgid "Appointment"
+msgstr "预约"
+
+#: ConvAI/templates/protocols/protocol_editor.html:235
+msgid "Link"
+msgstr "链接"
+
+#: ConvAI/templates/protocols/protocol_editor.html:236
+msgid "Code"
+msgstr "代码"
+
+#: ConvAI/templates/protocols/protocol_editor.html:239
+msgid "Write the question or guide in Markdown…"
+msgstr "用 Markdown 编写问题或指引…"
+
+#: ConvAI/templates/protocols/protocol_editor.html:241
+msgid "Preview"
+msgstr "预览"
+
+#: ConvAI/templates/protocols/protocol_editor.html:246
+msgid "Upload"
+msgstr "上传"
+
+#: ConvAI/templates/protocols/protocol_editor.html:247
+msgid "Move down"
+msgstr "下移"
+
+#: ConvAI/templates/protocols/protocol_editor.html:248
+msgid "Duplicate"
+msgstr "复制"
+
+#: ConvAI/templates/protocols/protocol_editor.html:320
+msgid "Question"
+msgstr "问题"
+
+#: ConvAI/templates/protocols/protocol_editor.html:326
+msgid "question(s)"
+msgstr "个问题"
+
+#: ConvAI/templates/protocols/protocol_editor.html:353
+msgid "The title is required."
+msgstr "标题为必填项。"
+
+#: ConvAI/templates/protocols/protocol_editor.html:376
+msgid "Protocol saved."
+msgstr "方案已保存。"
+
+#: ConvAI/templates/protocols/protocol_editor.html:379
+msgid "Could not save."
+msgstr "无法保存。"
+
+#: ConvAI/templates/protocols/protocol_editor.html:383
+msgid "Network error while saving."
+msgstr "保存时发生网络错误。"
+
+#: ConvAI/templates/protocols/protocol_form.html:13
+msgid "Answers saved successfully."
+msgstr "答复已成功保存。"
+
+#: ConvAI/templates/protocols/protocol_form.html:20
+msgid "An error occurred while saving the answers."
+msgstr "保存答复时出错。"
+
+#: ConvAI/templates/protocols/protocol_form.html:48
+#: ConvAI/templates/protocols/protocol_form.html:49
+msgid "Reload"
+msgstr "重新加载"
+
+#: ConvAI/templates/protocols/protocol_form.html:75
+msgid "Edit protocol structure"
+msgstr "编辑方案结构"
+
+#: ConvAI/templates/protocols/protocol_form.html:77
+msgid "Edit protocol"
+msgstr "编辑方案"
+
+#: ConvAI/templates/settings/config.html:5
+#: ConvAI/templates/settings/config.html:50 ConvAI/templates/sidebar.html:79
+#: ConvAI/templates/sidebar.html:84
+msgid "Settings"
+msgstr "设置"
+
+#: ConvAI/templates/settings/config.html:51
+msgid "Configure how the platform behaves, connects, and looks."
+msgstr "配置平台的行为、连接和外观。"
+
+#: ConvAI/templates/settings/config.html:54
+#: ConvAI/templates/users/user_list.html:3
+#: ConvAI/templates/users/user_list.html:42
+#: ConvAI/templates/users/user_list.html:51
+msgid "Users"
+msgstr "用户"
+
+#: ConvAI/templates/settings/config.html:80
+msgid "Behaviour"
+msgstr "行为"
+
+#: ConvAI/templates/settings/config.html:81
+msgid "Feature flags and defaults that take effect immediately."
+msgstr "立即生效的功能开关和默认值。"
+
+#: ConvAI/templates/settings/config.html:98
+msgid "System"
+msgstr "系统"
+
+#: ConvAI/templates/settings/config.html:99
+msgid "Restart required"
+msgstr "需要重启"
+
+#: ConvAI/templates/settings/config.html:101
+msgid "These are read at server start and managed in .env."
+msgstr "这些配置在服务器启动时读取,并在 .env 中管理。"
+
+#: ConvAI/templates/settings/config.html:106
+msgid "Timezone"
+msgstr "时区"
+
+#: ConvAI/templates/settings/config.html:107
+msgid "Async WhatsApp reply"
+msgstr "异步 WhatsApp 回复"
+
+#: ConvAI/templates/settings/config.html:107
+#: ConvAI/templates/settings/config.html:108
+msgid "On,Off"
+msgstr "开,关"
+
+#: ConvAI/templates/settings/config.html:108
+msgid "Debug mode"
+msgstr "调试模式"
+
+#: ConvAI/templates/settings/config.html:111
+msgid "Twilio webhook URL"
+msgstr "Twilio Webhook 地址"
+
+#: ConvAI/templates/settings/config.html:113
+msgid ""
+"Configure this URL in the Twilio console. Change the path with "
+"TWILIO_WEBHOOK_PATH in .env."
+msgstr "在 Twilio 控制台中配置此地址。可通过 .env 中的 TWILIO_WEBHOOK_PATH 更改路径。"
+
+#: ConvAI/templates/settings/config.html:124
+msgid "Integration credentials"
+msgstr "集成凭据"
+
+#: ConvAI/templates/settings/config.html:125
+msgid ""
+"Secrets are stored securely and never shown again after saving. Leave blank "
+"to keep the current value."
+msgstr "密钥会安全存储,保存后不再显示。留空则保留当前值。"
+
+#: ConvAI/templates/settings/config.html:143
+msgid "Messaging templates"
+msgstr "消息模板"
+
+#: ConvAI/templates/settings/config.html:144
+msgid "SMS/WhatsApp sender numbers and template identifiers."
+msgstr "短信/WhatsApp 发送号码和模板标识符。"
+
+#: ConvAI/templates/settings/config.html:162
+#: ConvAI/views/settings_views.py:137
+msgid "Branding"
+msgstr "品牌"
+
+#: ConvAI/templates/settings/config.html:163
+msgid "The name and logo shown across the app and on the login page."
+msgstr "在应用各处和登录页显示的名称与标志。"
+
+#: ConvAI/templates/settings/config.html:170
+msgid "Current logo"
+msgstr "当前标志"
+
+#: ConvAI/templates/settings/config.html:186
+msgid ""
+"The model behind in-process agents, provider keys, and Azure routing. These "
+"override .env."
+msgstr "进程内智能体使用的模型、提供商密钥和 Azure 路由。这些设置会覆盖 .env。"
+
+#: ConvAI/templates/settings/config.html:193
+msgid "Default model"
+msgstr "默认模型"
+
+#: ConvAI/templates/settings/config.html:197
+msgid "Provider API keys"
+msgstr "提供商 API 密钥"
+
+#: ConvAI/templates/settings/config.html:207
+msgid "Security"
+msgstr "安全"
+
+#: ConvAI/templates/settings/config.html:212
+msgid "Azure"
+msgstr "Azure"
+
+#: ConvAI/templates/settings/config.html:228
+msgid "Azure OpenAI Realtime (voice agents)"
+msgstr "Azure OpenAI Realtime（语音智能体）"
+
+#: ConvAI/templates/settings/config.html:229
+msgid ""
+"Used by prompt-based agents with real-time voice enabled. Speech goes "
+"straight between the browser and this deployment; a short-lived key is "
+"minted per conversation."
+msgstr "用于启用了实时语音的提示词智能体。语音在浏览器与该部署之间直接传输；每次对话都会生成一个短期密钥。"
+
+#: ConvAI/templates/settings/config.html:262
+msgid "Summarization prompts"
+msgstr "摘要提示词"
+
+#: ConvAI/templates/settings/config.html:263
+msgid ""
+"Base prompts used to summarize meeting protocols and call transcripts. Leave"
+" a field blank to use the built-in default. The relevant protocol answers or"
+" transcript are appended automatically."
+msgstr "用于总结会议方案和通话转写的基础提示词。字段留空则使用内置默认值。相关的方案答复或转写内容会自动附加。"
+
+#: ConvAI/templates/settings/config.html:282
+msgid "Python API client"
+msgstr "Python API 客户端"
+
+#: ConvAI/templates/settings/config.html:284
+msgid "The REST API is exposed, so the client can connect."
+msgstr "REST API 已开放,客户端可以连接。"
+
+#: ConvAI/templates/settings/config.html:285
+msgid "API enabled"
+msgstr "API 已启用"
+
+#: ConvAI/templates/settings/config.html:288
+msgid "Set ENABLE_API=1 in .env and restart to expose the REST API."
+msgstr "在 .env 中设置 ENABLE_API=1 并重启,以开放 REST API。"
+
+#: ConvAI/templates/settings/config.html:289
+msgid "API disabled"
+msgstr "API 已禁用"
+
+#: ConvAI/templates/settings/config.html:293
+msgid ""
+"Install the client package to script the platform — list clients and "
+"schedule meetings — using your personal API token. Permissions match the web"
+" app."
+msgstr "安装客户端包,即可使用您的个人 API 令牌以脚本方式操作平台(列出患者、安排会议)。权限与网页应用一致。"
+
+#: ConvAI/templates/settings/config.html:299
+msgid ""
+"The REST API is currently <b>disabled</b>, so the client cannot connect. Set"
+" <code>ENABLE_API=1</code> in <code>.env</code> and restart the server to "
+"turn it on."
+msgstr ""
+"REST API 当前<b>已禁用</b>,客户端无法连接。请在 <code>.env</code> 中设置 "
+"<code>ENABLE_API=1</code> 并重启服务器以启用。"
+
+#: ConvAI/templates/settings/config.html:307
+msgid "Get your API token"
+msgstr "获取您的 API 令牌"
+
+#: ConvAI/templates/settings/config.html:310
+msgid ""
+"Open your <b>Profile</b> page and click <b>Generate API token</b>. Copy it "
+"immediately — it is shown only once, and generating a new one revokes the "
+"old one."
+msgstr "打开您的<b>个人资料</b>页面,点击<b>生成 API 令牌</b>。请立即复制——它只显示一次,生成新令牌会使旧令牌失效。"
+
+#: ConvAI/templates/settings/config.html:313
+msgid "Go to Profile → API token"
+msgstr "前往 个人资料 → API 令牌"
+
+#: ConvAI/templates/settings/config.html:321
+msgid "Download & install with pip"
+msgstr "使用 pip 下载并安装"
+
+#: ConvAI/templates/settings/config.html:323
+msgid "Download the package and install it into your Python environment:"
+msgstr "下载该包并安装到您的 Python 环境中:"
+
+#: ConvAI/templates/settings/config.html:330
+msgid ""
+"No <code>wget</code>? Use the button below or <code>curl -L -o "
+"conversationalcare_api.zip \"URL\"</code>. The zip installs directly — no "
+"need to unzip."
+msgstr ""
+"没有 <code>wget</code>?使用下方按钮或 <code>curl -L -o conversationalcare_api.zip "
+"\"URL\"</code>。该 zip 可直接安装,无需解压。"
+
+#: ConvAI/templates/settings/config.html:333
+msgid "Download client (.zip)"
+msgstr "下载客户端(.zip)"
+
+#: ConvAI/templates/settings/config.html:341
+msgid "Use it in Python"
+msgstr "在 Python 中使用"
+
+#: ConvAI/templates/settings/config.html:380
+msgid "New protocol"
+msgstr "新建方案"
+
+#: ConvAI/templates/settings/config.html:384
+msgid ""
+"A new protocol stays fully editable until answers are recorded against it, "
+"after which it locks to protect collected data."
+msgstr "新方案在记录答复之前可完全编辑,记录答复后将锁定,以保护已收集的数据。"
+
+#: ConvAI/templates/settings/config.html:408
+msgid "With answers"
+msgstr "已有答复"
+
+#: ConvAI/templates/settings/config.html:411
+msgid "Editable"
+msgstr "可编辑"
+
+#: ConvAI/templates/settings/config.html:419
+msgid "View"
+msgstr "查看"
+
+#: ConvAI/templates/settings/config.html:423
+msgid "Delete this protocol? This cannot be undone."
+msgstr "删除此方案?此操作无法撤销。"
+
+#: ConvAI/templates/settings/config.html:439
+msgid "No protocols yet."
+msgstr "暂无方案。"
+
+#: ConvAI/templates/settings/config.html:450
+msgid "Pre-registrations (Self Registration)"
+msgstr "预注册(自助注册)"
+
+#: ConvAI/templates/settings/config.html:451
+msgid ""
+"People who self-registered and are waiting to be approved and assigned an "
+"agent."
+msgstr "已自助注册、正在等待批准并分配智能体的人员。"
+
+#: ConvAI/templates/settings/config.html:459
+msgid "Name"
+msgstr "姓名"
+
+#: ConvAI/templates/settings/config.html:463
+msgid "Created"
+msgstr "创建时间"
+
+#: ConvAI/templates/settings/config.html:475
+msgid "Registered"
+msgstr "已注册"
+
+#: ConvAI/templates/settings/config.html:477
+msgid "Approved"
+msgstr "已批准"
+
+#: ConvAI/templates/settings/config.html:486
+msgid "— No agent —"
+msgstr "— 无智能体 —"
+
+#: ConvAI/templates/settings/config.html:491
+msgid "Approve"
+msgstr "批准"
+
+#: ConvAI/templates/settings/config.html:494
+msgid "Already approved"
+msgstr "已批准"
+
+#: ConvAI/templates/settings/config.html:503
+msgid "No pre-registrations yet."
+msgstr "暂无预注册。"
+
+#: ConvAI/templates/settings/config.html:515
+#: ConvAI/views/settings_views.py:142
+msgid "Self registration"
+msgstr "自助注册"
+
+#: ConvAI/templates/settings/config.html:522
+#: ConvAI/templates/users/user_list.html:107
+msgid "Inactive"
+msgstr "未启用"
+
+#: ConvAI/templates/settings/config.html:526
+msgid ""
+"Share this QR in demos so people can start a WhatsApp chat that registers "
+"them. Scanning opens WhatsApp with a pre-filled message in the platform "
+"language."
+msgstr "在演示中分享此二维码,人们即可发起用于注册的 WhatsApp 聊天。扫码会打开 WhatsApp,并附带平台语言的预填消息。"
+
+#: ConvAI/templates/settings/config.html:534
+msgid ""
+"Self-registration is currently <b>off</b>, so scans won't be answered "
+"automatically. Turn it on and pick the <b>Self Registration Agent</b> under"
+msgstr "自助注册当前<b>已关闭</b>,扫码不会得到自动回复。请开启它,并在以下位置选择<b>自助注册智能体</b>:"
+
+#: ConvAI/templates/settings/config.html:535
+msgid "General settings"
+msgstr "常规设置"
+
+#: ConvAI/templates/settings/config.html:549
+msgid "Download"
+msgstr "下载"
+
+#: ConvAI/templates/settings/config.html:552
+msgid "Copy image"
+msgstr "复制图片"
+
+#: ConvAI/templates/settings/config.html:560
+msgid "Pre-filled message"
+msgstr "预填消息"
+
+#: ConvAI/templates/settings/config.html:565
+msgid "WhatsApp link"
+msgstr "WhatsApp 链接"
+
+#: ConvAI/templates/settings/config.html:576
+msgid "Platform number"
+msgstr "平台号码"
+
+#: ConvAI/templates/settings/config.html:580
+msgid "Handled by"
+msgstr "处理方"
+
+#: ConvAI/templates/settings/config.html:581
+msgid "— not selected —"
+msgstr "— 未选择 —"
+
+#: ConvAI/templates/settings/config.html:586
+msgid "Test the link"
+msgstr "测试链接"
+
+#: ConvAI/templates/settings/config.html:594
+msgid ""
+"No <b>platform phone number</b> is configured, so a WhatsApp link can't be "
+"built. Add it under"
+msgstr "未配置<b>平台电话号码</b>,无法生成 WhatsApp 链接。请在以下位置添加:"
+
+#: ConvAI/templates/settings/config.html:595
+#: ConvAI/views/settings_views.py:135
+msgid "Integrations"
+msgstr "集成"
+
+#: ConvAI/templates/settings/config.html:608
+#: ConvAI/views/settings_views.py:144
+msgid "Maintenance"
+msgstr "维护"
+
+#: ConvAI/templates/settings/config.html:609
+msgid "One-off background jobs you can trigger by hand."
+msgstr "可手动触发的一次性后台任务。"
+
+#: ConvAI/templates/settings/config.html:615
+#: ConvAI/templates/settings/config.html:620
+msgid "Update recordings"
+msgstr "更新录音"
+
+#: ConvAI/templates/settings/config.html:616
+msgid "Fetch new call recordings from Twilio."
+msgstr "从 Twilio 获取新的通话录音。"
+
+#: ConvAI/templates/settings/config.html:629
+#: ConvAI/templates/settings/config.html:634
+msgid "Classify conversations"
+msgstr "分类对话"
+
+#: ConvAI/templates/settings/config.html:630
+msgid "Processes only conversations that have not yet been analysed."
+msgstr "仅处理尚未分析的对话。"
+
+#: ConvAI/templates/settings/config.html:723
+msgid "This browser cannot copy images. Use Download instead."
+msgstr "此浏览器无法复制图片。请改用下载。"
+
+#: ConvAI/templates/settings/config.html:729
+msgid "Could not copy the image. Use Download instead."
+msgstr "无法复制图片。请改用下载。"
+
+#: ConvAI/templates/sidebar.html:10
+msgid "Toggle sidebar"
+msgstr "切换侧边栏"
+
+#: ConvAI/templates/sidebar.html:117
+msgid "View profile"
+msgstr "查看资料"
+
+#: ConvAI/templates/sidebar.html:132
+msgid "Urgent only"
+msgstr "仅紧急情况"
+
+#: ConvAI/templates/users/edit_user.html:3
+#: ConvAI/templates/users/edit_user.html:27
+msgid "Edit user"
+msgstr "编辑用户"
+
+#: ConvAI/templates/users/edit_user.html:21
+#: ConvAI/templates/users/test_user_result.html:80
+msgid "Back to users"
+msgstr "返回用户列表"
+
+#: ConvAI/templates/users/test_user_result.html:3
+#: ConvAI/templates/users/test_user_result.html:11
+msgid "Test user created"
+msgstr "测试用户已创建"
+
+#: ConvAI/templates/users/test_user_result.html:13
+#, python-format
+msgid "Account for %(name)s %(last)s."
+msgstr "%(name)s %(last)s 的账户。"
+
+#: ConvAI/templates/users/test_user_result.html:19
+msgid ""
+"Copy these credentials now — the password is shown only once and cannot be "
+"recovered. You can reset it later by editing the user."
+msgstr "请立即复制这些凭据——密码只显示一次且无法找回。之后可通过编辑用户来重置。"
+
+#: ConvAI/templates/users/test_user_result.html:53
+msgid "Agent for this client"
+msgstr "该患者的智能体"
+
+#: ConvAI/templates/users/test_user_result.html:56
+msgid "This client's chat is handled by:"
+msgstr "该患者的聊天由以下智能体处理:"
+
+#: ConvAI/templates/users/test_user_result.html:59
+msgid "To change it, edit the client and pick a different agent."
+msgstr "如需更改,请编辑患者并选择其他智能体。"
+
+#: ConvAI/templates/users/test_user_result.html:62
+msgid ""
+"No agent is configured for this client yet — the test chat will not work "
+"until one is set."
+msgstr "尚未为该患者配置智能体——设置之前测试聊天无法使用。"
+
+#: ConvAI/templates/users/test_user_result.html:64
+msgid "Edit the client to choose the agent that should handle their chat."
+msgstr "编辑患者,选择应处理其聊天的智能体。"
+
+#: ConvAI/templates/users/test_user_result.html:73
+msgid "View client"
+msgstr "查看患者"
+
+#: ConvAI/templates/users/test_user_result.html:93
+msgid "Copied"
+msgstr "已复制"
+
+#: ConvAI/templates/users/user_list.html:43
+msgid "Manage navigator and test-user accounts."
+msgstr "管理导航员和测试用户账户。"
+
+#: ConvAI/templates/users/user_list.html:49
+msgid "User types"
+msgstr "用户类型"
+
+#: ConvAI/templates/users/user_list.html:55
+msgid "Test users"
+msgstr "测试用户"
+
+#: ConvAI/templates/users/user_list.html:62
+#: ConvAI/templates/users/user_list.html:204
+msgid "Add test user"
+msgstr "添加测试用户"
+
+#: ConvAI/templates/users/user_list.html:66
+#: ConvAI/templates/users/user_list.html:177
+msgid "Add user"
+msgstr "添加用户"
+
+#: ConvAI/templates/users/user_list.html:84
+msgid "Role"
+msgstr "角色"
+
+#: ConvAI/templates/users/user_list.html:117
+msgid "No users yet."
+msgstr "暂无用户。"
+
+#: ConvAI/templates/users/user_list.html:128
+#, python-format
+msgid "Showing %(start)s-%(end)s of %(total)s"
+msgstr "显示第 %(start)s-%(end)s 条,共 %(total)s 条"
+
+#: ConvAI/templates/users/user_list.html:130
+msgid "No results"
+msgstr "无结果"
+
+#: ConvAI/templates/users/user_list.html:180
+msgid "Creates a Navigator account."
+msgstr "创建一个导航员账户。"
+
+#: ConvAI/templates/users/user_list.html:212
+msgid ""
+"Only clients without a test user are listed. A username and password will be"
+" generated and shown once."
+msgstr "仅列出尚无测试用户的患者。系统将生成用户名和密码,并只显示一次。"
+
+#: ConvAI/views/_panel.py:90
+#, python-format
+msgid "Navigator: %s"
+msgstr "导航员：%s"
+
+#: ConvAI/views/_panel.py:93
+#, python-format
+msgid "Archived as: %s"
+msgstr "归档为：%s"
+
+#: ConvAI/views/_panel.py:96
+#, python-format
+msgid "Note: %s"
+msgstr "备注：%s"
+
+#: ConvAI/views/_panel.py:130 ConvAI/views/_panel.py:135
+#: ConvAI/views/patients.py:275
+msgid "Alert"
+msgstr "警报"
+
+#: ConvAI/views/_panel.py:138
+msgid "Description"
+msgstr "描述"
+
+#: ConvAI/views/_panel.py:236 ConvAI/views/communications.py:137
+msgid "To do"
+msgstr "待办"
+
+#: ConvAI/views/_panel.py:238 ConvAI/views/communications.py:139
+msgid "In-person meeting"
+msgstr "面对面会议"
+
+#: ConvAI/views/_panel.py:238
+msgid "Meeting ended"
+msgstr "会议已结束"
+
+#: ConvAI/views/_panel.py:239 ConvAI/views/communications.py:139
+msgid "Scheduled call"
+msgstr "已安排的通话"
+
+#: ConvAI/views/_panel.py:239
+msgid "Call ended"
+msgstr "通话已结束"
+
+#: ConvAI/views/_panel.py:243
+#, python-format
+msgid "Meeting with %s"
+msgstr "与 %s 的会议"
+
+#: ConvAI/views/_panel.py:243
+#, python-format
+msgid "Call with %s"
+msgstr "与 %s 的通话"
+
+#: ConvAI/views/_panel.py:319 ConvAI/views/communications.py:172
+msgid "Call recording"
+msgstr "通话录音"
+
+#: ConvAI/views/_panel.py:325
+#, python-format
+msgid "Called %s"
+msgstr "已致电 %s"
+
+#: ConvAI/views/_panel.py:376
+msgid "Messages"
+msgstr "消息"
+
+#: ConvAI/views/_panel.py:377
+msgid "Between"
+msgstr "时间范围"
+
+#: ConvAI/views/_panel.py:380
+msgid "—"
+msgstr "—"
+
+#: ConvAI/views/_panel.py:381
+msgid "Not recorded"
+msgstr "未记录"
+
+#: ConvAI/views/_panel.py:382
+msgid "Topic"
+msgstr "主题"
+
+#: ConvAI/views/_panel.py:382
+msgid "Not classified"
+msgstr "未分类"
+
+#: ConvAI/views/_panel.py:383
+msgid "Flagged"
+msgstr "标记状态"
+
+#: ConvAI/views/_panel.py:383
+msgid "Needs attention"
+msgstr "需要关注"
+
+#: ConvAI/views/_panel.py:384
+msgid "Nothing raised automatically"
+msgstr "系统未自动标记任何内容"
+
+#: ConvAI/views/account.py:14
+msgid "Administrator"
+msgstr "管理员"
+
+#: ConvAI/views/account.py:18 ConvAI/views/users.py:19
+msgid "Test user"
+msgstr "测试用户"
+
+#: ConvAI/views/account.py:19
+msgid "User"
+msgstr "用户"
+
+#: ConvAI/views/account.py:47
+msgid "Help page updated."
+msgstr "帮助页面已更新。"
+
+#: ConvAI/views/account.py:103
+msgid "Please enter a valid e-mail address."
+msgstr "请输入有效的电子邮箱地址。"
+
+#: ConvAI/views/account.py:110
+msgid "Profile updated."
+msgstr "个人资料已更新。"
+
+#: ConvAI/views/account.py:124
+msgid "Language updated."
+msgstr "语言已更新。"
+
+#: ConvAI/views/account.py:134
+msgid ""
+"Your token has been generated. Copy it now; it will be shown only once."
+msgstr "您的令牌已生成。请立即复制,它只显示一次。"
+
+#: ConvAI/views/agents.py:22
+msgid "remote agent"
+msgstr "远程智能体"
+
+#: ConvAI/views/agents.py:23
+msgid "prompt-based agent"
+msgstr "基于提示词的智能体"
+
+#: ConvAI/views/agents.py:24
+msgid "native agent"
+msgstr "内置智能体"
+
+#: ConvAI/views/agents.py:55
+msgid "That agent kind cannot be edited here."
+msgstr "该类型的智能体无法在此编辑。"
+
+#: ConvAI/views/agents.py:58
+msgid "That agent kind cannot be created here."
+msgstr "该类型的智能体无法在此创建。"
+
+#: ConvAI/views/agents.py:69
+msgid "Agent saved."
+msgstr "智能体已保存。"
+
+#: ConvAI/views/agents.py:69
+msgid "Agent created."
+msgstr "智能体已创建。"
+
+#: ConvAI/views/agents.py:95
+msgid "Native agents cannot be deleted."
+msgstr "内置智能体不能删除。"
+
+#: ConvAI/views/agents.py:98
+msgid "Agent deleted."
+msgstr "智能体已删除。"
+
+#: ConvAI/views/agents.py:125
+msgid ""
+"Could not start a voice session. Check the Azure Realtime settings and try "
+"again."
+msgstr "无法启动语音会话。请检查 Azure Realtime 设置后重试。"
+
+#: ConvAI/views/agents.py:141 ConvAI/views/agents.py:146
+msgid "test"
+msgstr "测试"
+
+#: ConvAI/views/agents.py:173
+msgid "Conversation ended."
+msgstr "对话已结束。"
+
+#: ConvAI/views/alerts.py:51
+msgid "You do not have permission to view this alert."
+msgstr "您没有权限查看此警报。"
+
+#: ConvAI/views/alerts.py:64 ConvAI/views/alerts.py:74
+msgid "Invalid alert status."
+msgstr "警报状态无效。"
+
+#: ConvAI/views/alerts.py:182
+msgid "Alert reopened and moved back to Active Alerts."
+msgstr "警报已重新打开,并移回活动警报。"
+
+#: ConvAI/views/alerts.py:187
+msgid "Alert marked as false alarm and moved to the resolved archive."
+msgstr "警报已标记为误报,并移入已解决归档。"
+
+#: ConvAI/views/alerts.py:189
+msgid "Alert resolved and moved to the resolved archive."
+msgstr "警报已解决,并移入已解决归档。"
+
+#: ConvAI/views/alerts.py:193
+msgid "Chatbot marked as disabled for this alert. Alert moved to In Progress."
+msgstr "已为此警报将聊天机器人标记为停用。警报已移至处理中。"
+
+#: ConvAI/views/alerts.py:195
+msgid ""
+"Chatbot marked as enabled again. Alert remains In Progress until resolved."
+msgstr "聊天机器人已重新标记为启用。警报在解决前保持处理中状态。"
+
+#: ConvAI/views/alerts.py:197
+msgid "Alert moved to In Progress."
+msgstr "警报已移至处理中。"
+
+#: ConvAI/views/alerts.py:199
+msgid "Alert moved back to New."
+msgstr "警报已移回新建。"
+
+#: ConvAI/views/alerts.py:201
+msgid "Alert updated."
+msgstr "警报已更新。"
+
+#: ConvAI/views/alerts.py:224
+msgid "Internal note saved."
+msgstr "内部备注已保存。"
+
+#: ConvAI/views/alerts.py:319
+msgid "You do not have permission to act on this alert."
+msgstr "您没有权限处理此警报。"
+
+#: ConvAI/views/alerts.py:331
+msgid "No webhook is configured for this alert."
+msgstr "此警报未配置 Webhook。"
+
+#: ConvAI/views/alerts.py:367
+msgid "Webhook executed successfully."
+msgstr "Webhook 执行成功。"
+
+#: ConvAI/views/alerts.py:395
+msgid "The alert's user has no phone number."
+msgstr "该警报的用户没有电话号码。"
+
+#: ConvAI/views/alerts.py:416
+msgid "Cannot send SMS via Twilio."
+msgstr "无法通过 Twilio 发送短信。"
+
+#: ConvAI/views/alerts.py:453
+msgid "SMS sent successfully."
+msgstr "短信发送成功。"
+
+#: ConvAI/views/alerts.py:503
+msgid "High priority"
+msgstr "高优先级"
+
+#: ConvAI/views/alerts.py:503
+msgid "New chat to review"
+msgstr "有新的对话待复核"
+
+#: ConvAI/views/calls.py:30 ConvAI/views/chat.py:320 ConvAI/views/chat.py:355
+#: ConvAI/views/chat.py:386
+msgid "Not authorised."
+msgstr "未获授权。"
+
+#: ConvAI/views/calls.py:68
+msgid "There is already a meeting scheduled within this time range."
+msgstr "该时间段内已安排了其他会议。"
+
+#: ConvAI/views/calls.py:85 ConvAI/views/calls.py:364
+#: ConvAI/views/communications.py:202
+msgid "Meeting scheduled."
+msgstr "会议已安排。"
+
+#: ConvAI/views/calls.py:105
+msgid "You do not have permission to start this call."
+msgstr "您没有权限发起此通话。"
+
+#: ConvAI/views/calls.py:109
+msgid "This client has no caregiver with a valid phone number."
+msgstr "该患者没有登记电话号码有效的照护者。"
+
+#: ConvAI/views/calls.py:115
+msgid "Your own phone number is not set, so the call cannot be placed."
+msgstr "您本人的电话号码尚未设置，因此无法发起通话。"
+
+#: ConvAI/views/calls.py:163
+msgid "Invalid status."
+msgstr "状态无效。"
+
+#: ConvAI/views/calls.py:174
+msgid "You must choose an executed protocol."
+msgstr "您必须选择一个已执行的方案。"
+
+#: ConvAI/views/calls.py:180
+msgid "Meeting status updated."
+msgstr "会议状态已更新。"
+
+#: ConvAI/views/calls.py:245
+msgid "Month"
+msgstr "月"
+
+#: ConvAI/views/calls.py:245
+msgid "Week"
+msgstr "周"
+
+#: ConvAI/views/calls.py:245
+msgid "Day"
+msgstr "日"
+
+#: ConvAI/views/calls.py:361
+msgid "You already have a meeting scheduled within this time range."
+msgstr "您在该时间段内已安排了会议。"
+
+#: ConvAI/views/calls.py:366
+msgid "Please check the meeting details and try again."
+msgstr "请检查会议详情后重试。"
+
+#: ConvAI/views/calls.py:390
+msgid "Only pending meetings can be rescheduled"
+msgstr "只有待处理的会议才能重新安排"
+
+#: ConvAI/views/calls.py:406
+msgid "Meeting rescheduled successfully."
+msgstr "会议重新安排成功。"
+
+#: ConvAI/views/calls.py:433
+msgid "You do not have permission to send reminders."
+msgstr "您没有权限发送提醒。"
+
+#: ConvAI/views/calls.py:439 ConvAI/views/calls.py:444
+msgid "The reminder could not be sent."
+msgstr "无法发送提醒。"
+
+#: ConvAI/views/calls.py:447
+msgid "Reminder sent via WhatsApp."
+msgstr "提醒已通过 WhatsApp 发送。"
+
+#: ConvAI/views/calls.py:463 ConvAI/views/protocols.py:209
+msgid "You do not have permission to do this."
+msgstr "您没有权限执行此操作。"
+
+#: ConvAI/views/calls.py:492
+msgid "That call was not cancelled."
+msgstr "该通话未被取消。"
+
+#: ConvAI/views/calls.py:498
+msgid "The call is back on the schedule."
+msgstr "该通话已重新加入日程。"
+
+#: ConvAI/views/calls.py:504
+msgid "Only a scheduled call can be cancelled."
+msgstr "只有已安排的通话才能取消。"
+
+#: ConvAI/views/calls.py:511
+msgid "Call cancelled. It stays in the history."
+msgstr "通话已取消，但仍保留在历史记录中。"
+
+#: ConvAI/views/chat.py:274
+msgid "The client has no caregiver phone number."
+msgstr "该患者没有照护者电话号码。"
+
+#: ConvAI/views/chat.py:280
+#, python-format
+msgid "Share this link with the caregiver: %(url)s"
+msgstr "将此链接分享给照护者:%(url)s"
+
+#: ConvAI/views/chat.py:296
+msgid "Assistant"
+msgstr "助手"
+
+#: ConvAI/views/communications.py:67
+msgid "Overdue"
+msgstr "已逾期"
+
+#: ConvAI/views/communications.py:82
+msgid "Any time"
+msgstr "任意时间"
+
+#: ConvAI/views/communications.py:83
+msgid "Last 7 days"
+msgstr "最近 7 天"
+
+#: ConvAI/views/communications.py:84
+msgid "Last 30 days"
+msgstr "最近 30 天"
+
+#: ConvAI/views/communications.py:85
+msgid "Last 3 months"
+msgstr "最近 3 个月"
+
+#: ConvAI/views/communications.py:98 ConvAI/views/dashboard.py:49
+msgid "Tomorrow"
+msgstr "明天"
+
+#: ConvAI/views/communications.py:100 ConvAI/views/dashboard.py:31
+#: ConvAI/views/dashboard.py:51
+msgid "Yesterday"
+msgstr "昨天"
+
+#: ConvAI/views/communications.py:126
+#, python-format
+msgid "with %s"
+msgstr "与 %s"
+
+#: ConvAI/views/communications.py:133 ConvAI/views/dashboard.py:67
+#, python-format
+msgid "Due %(d)s"
+msgstr "截止 %(d)s"
+
+#: ConvAI/views/communications.py:155
+msgid "Chatbot conversation"
+msgstr "聊天机器人对话"
+
+#: ConvAI/views/communications.py:156
+#, python-format
+msgid "%(n)d message"
+msgid_plural "%(n)d messages"
+msgstr[0] "%(n)d 条消息"
+
+#: ConvAI/views/communications.py:158
+msgid "Chat"
+msgstr "对话"
+
+#: ConvAI/views/dashboard.py:27
+msgid "Just now"
+msgstr "刚刚"
+
+#: ConvAI/views/dashboard.py:29
+#, python-format
+msgid "%(h)dh ago"
+msgstr "%(h)d 小时前"
+
+#: ConvAI/views/dashboard.py:33
+#, python-format
+msgid "%(d)d days ago"
+msgstr "%(d)d 天前"
+
+#: ConvAI/views/dashboard.py:71
+msgid "in under an hour"
+msgstr "不到一小时后"
+
+#: ConvAI/views/dashboard.py:73
+#, python-format
+msgid "in %(h)dh"
+msgstr "%(h)d 小时后"
+
+#: ConvAI/views/dashboard.py:74
+msgid "scheduled"
+msgstr "已安排"
+
+#: ConvAI/views/dashboard.py:227
+msgid "Good morning"
+msgstr "早上好"
+
+#: ConvAI/views/dashboard.py:228
+msgid "Good afternoon"
+msgstr "下午好"
+
+#: ConvAI/views/dashboard.py:229
+msgid "Good evening"
+msgstr "晚上好"
+
+#: ConvAI/views/dashboard.py:271
+msgid "nothing recorded"
+msgstr "未记录任何内容"
+
+#: ConvAI/views/dashboard.py:272
+#, python-format
+msgid "%(a)d of %(t)d recorded"
+msgstr "已记录 %(a)d / %(t)d"
+
+#: ConvAI/views/feedback.py:86
+msgid "You do not have permission to update this conversation."
+msgstr "您没有权限更新此对话。"
+
+#: ConvAI/views/media.py:47
+msgid "You are not authorised to access this file."
+msgstr "您无权访问此文件。"
+
+#: ConvAI/views/media.py:94
+msgid "You are not authorised to access this audio."
+msgstr "您无权访问此音频。"
+
+#: ConvAI/views/media.py:122
+msgid "Sending the care plan is disabled."
+msgstr "护理计划的发送功能已禁用。"
+
+#: ConvAI/views/media.py:128
+msgid "You do not have permission to send this."
+msgstr "您没有权限发送此内容。"
+
+#: ConvAI/views/media.py:131 ConvAI/views/protocols.py:214
+msgid "The client has no caregiver with a valid phone number."
+msgstr "该患者没有拥有有效电话号码的照护者。"
+
+#: ConvAI/views/media.py:135 ConvAI/views/patients.py:624
+msgid "This client has no care plan uploaded."
+msgstr "该患者尚未上传护理计划。"
+
+#: ConvAI/views/media.py:140
+msgid "WHATSAPP_TEMPLATE_CARE_PLAN_SID is missing in .env."
+msgstr ".env 中缺少 WHATSAPP_TEMPLATE_CARE_PLAN_SID。"
+
+#: ConvAI/views/media.py:153
+msgid "Could not send the WhatsApp message. Check credentials/template."
+msgstr "无法发送 WhatsApp 消息。请检查凭据/模板。"
+
+#: ConvAI/views/media.py:164
+msgid "Care plan sent via WhatsApp."
+msgstr "护理计划已通过 WhatsApp 发送。"
+
+#: ConvAI/views/patients.py:192
+msgid "Client created."
+msgstr "患者已创建。"
+
+#: ConvAI/views/patients.py:195
+msgid "Could not create client."
+msgstr "无法创建患者。"
+
+#: ConvAI/views/patients.py:208
+msgid "You cannot edit this client."
+msgstr "您不能编辑该患者。"
+
+#: ConvAI/views/patients.py:231 ConvAI/views/patients.py:736
+msgid "Client updated."
+msgstr "患者已更新。"
+
+#: ConvAI/views/patients.py:392
+msgid "You do not have permission to view this client."
+msgstr "您没有权限查看该患者。"
+
+#: ConvAI/views/patients.py:429
+#, python-format
+msgid "Protocol %s"
+msgstr "方案 %s"
+
+#: ConvAI/views/patients.py:486
+msgid "You do not have permission to view this conversation."
+msgstr "您没有权限查看该对话。"
+
+#: ConvAI/views/patients.py:564 ConvAI/views/patients.py:680
+#: ConvAI/views/patients.py:698
+msgid "You do not have permission to edit this client."
+msgstr "您没有权限编辑该患者。"
+
+#: ConvAI/views/patients.py:590
+msgid "You do not have permission to edit this care plan."
+msgstr "您没有权限编辑此护理计划。"
+
+#: ConvAI/views/patients.py:597
+msgid "Care plan updated successfully."
+msgstr "护理计划更新成功。"
+
+#: ConvAI/views/patients.py:619
+msgid "You do not have permission to view this care plan."
+msgstr "您没有权限查看此护理计划。"
+
+#: ConvAI/views/patients.py:643
+msgid "You do not have permission to view this file."
+msgstr "您没有权限查看此文件。"
+
+#: ConvAI/views/patients.py:763
+msgid "You cannot change this client's agent."
+msgstr "您无法更改该患者的智能体。"
+
+#: ConvAI/views/patients.py:771
+#, python-format
+msgid ""
+"The agent is off for %s. Messages still arrive; nothing is answered "
+"automatically."
+msgstr "已为 %s 关闭智能体。消息仍会送达，但不会自动回复。"
+
+#: ConvAI/views/patients.py:777
+#, python-format
+msgid "The agent is answering %s again."
+msgstr "智能体已恢复回复 %s。"
+
+#: ConvAI/views/patients.py:795
+msgid "You cannot raise an alert for this client."
+msgstr "您无法为该患者发出警报。"
+
+#: ConvAI/views/patients.py:814
+msgid "Raised by navigator"
+msgstr "由导航员发出"
+
+#: ConvAI/views/patients.py:818
+#, python-format
+msgid "Alert raised for %s."
+msgstr "已为 %s 发出警报。"
+
+#: ConvAI/views/protocols.py:175
+msgid "Untitled protocol"
+msgstr "未命名方案"
+
+#: ConvAI/views/protocols.py:178
+msgid ""
+"New protocol created. It stays editable until answers are recorded against "
+"it."
+msgstr "新方案已创建。在记录答复之前,它保持可编辑状态。"
+
+#: ConvAI/views/protocols.py:190
+msgid "This protocol has recorded answers and cannot be deleted."
+msgstr "该方案已记录答复,不能删除。"
+
+#: ConvAI/views/protocols.py:193
+msgid "Protocol deleted."
+msgstr "方案已删除。"
+
+#: ConvAI/views/protocols.py:207
+msgid "Automations are disabled."
+msgstr "自动化功能已禁用。"
+
+#: ConvAI/views/protocols.py:251
+msgid "Automation started."
+msgstr "自动化已启动。"
+
+#: ConvAI/views/protocols.py:253
+msgid "Automation could not send the WhatsApp message."
+msgstr "自动化未能发送 WhatsApp 消息。"
+
+#: ConvAI/views/settings_views.py:92
+msgid "Hi! I want to register"
+msgstr "你好!我想注册"
+
+#: ConvAI/views/settings_views.py:134
+msgid "General"
+msgstr "常规"
+
+#: ConvAI/views/settings_views.py:136
+msgid "Messaging"
+msgstr "消息"
+
+#: ConvAI/views/settings_views.py:139
+msgid "Prompts"
+msgstr "提示词"
+
+#: ConvAI/views/settings_views.py:141
+msgid "Registrations"
+msgstr "注册"
+
+#: ConvAI/views/settings_views.py:143
+msgid "API client"
+msgstr "API 客户端"
+
+#: ConvAI/views/settings_views.py:194
+msgid "Settings saved."
+msgstr "设置已保存。"
+
+#: ConvAI/views/settings_views.py:197
+msgid "Please correct the errors below."
+msgstr "请更正下方的错误。"
+
+#: ConvAI/views/settings_views.py:271
+#, python-format
+msgid "Classification completed. Conversations processed: %(n)s."
+msgstr "分类已完成。已处理对话:%(n)s。"
+
+#: ConvAI/views/settings_views.py:282
+msgid "This self-registration is already approved."
+msgstr "此自助注册已获批准。"
+
+#: ConvAI/views/summaries.py:43
+msgid "You cannot summarize this meeting."
+msgstr "您不能总结此会议。"
+
+#: ConvAI/views/summaries.py:47
+msgid "Protocol summary generated."
+msgstr "方案摘要已生成。"
+
+#: ConvAI/views/summaries.py:49
+#, python-format
+msgid "Could not generate the summary: %(err)s"
+msgstr "无法生成摘要:%(err)s"
+
+#: ConvAI/views/summaries.py:62
+msgid "You cannot transcribe this recording."
+msgstr "您不能转写此录音。"
+
+#: ConvAI/views/summaries.py:66
+msgid "Recording transcribed and summarized."
+msgstr "录音已转写并生成摘要。"
+
+#: ConvAI/views/summaries.py:68
+#, python-format
+msgid "Could not transcribe the recording: %(err)s"
+msgstr "无法转写录音:%(err)s"
+
+#: ConvAI/views/users.py:15
+msgid "Admin"
+msgstr "管理员"
+
+#: ConvAI/views/users.py:161
+msgid "Navigator user created."
+msgstr "导航员用户已创建。"
+
+#: ConvAI/views/users.py:164
+msgid "Could not create user."
+msgstr "无法创建用户。"
+
+#: ConvAI/views/users.py:192
+msgid "Could not create test user."
+msgstr "无法创建测试用户。"
+
+#: ConvAI/views/users.py:247
+msgid "User updated."
+msgstr "用户已更新。"
+
+#: Django_CMS/settings_default.py:184
+msgid "Spanish"
+msgstr "西班牙语"
+
+#: Django_CMS/settings_default.py:185
+msgid "Portuguese"
+msgstr "葡萄牙语"
+
+#: Django_CMS/settings_default.py:186
+msgid "English"
+msgstr "英语"
+
+#: Django_CMS/settings_default.py:187
+msgid "Italian"
+msgstr "意大利语"
+
+#: Django_CMS/settings_default.py:188
+msgid "Korean"
+msgstr "韩语"
+
+#: Django_CMS/settings_default.py:189
+msgid "Chinese (Simplified)"
+msgstr "简体中文"
+
+#: Django_CMS/settings_default.py:233
+msgid "Standard"
+msgstr "标准"

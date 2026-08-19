@@ -1,0 +1,770 @@
+{% extends "base.html" %}
+{% load i18n tz custom_filters %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+  <style>
+    /* Section container: header + rows share one card */
+    .dash-card {
+      background: #ffffff;
+      border: 1px solid #e8f1fb;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .dash-acc-head {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      text-align: left;
+      padding: 15px 18px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .dash-acc.collapsed .dash-acc-head { border-bottom: 0; }
+    .dash-acc.collapsed .dash-acc-body { display: none; }
+    .dash-acc.collapsed .dash-acc-chevron { transform: rotate(-90deg); }
+    .dash-acc-chevron { transition: transform 0.15s ease; color: #94a3b8; }
+    .dash-acc-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.375rem;
+      height: 1.375rem;
+      padding: 0 0.45rem;
+      border-radius: 9999px;
+      background: #0ea5e9;
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    /* Header. Greeting by time of day, the day in one sentence, then the next
+       call. No "Your day" label: a sentence under a greeting does not need
+       telling that it is about your day. */
+    .dash-hd { margin-bottom: 6px; }
+    .dash-hello {
+      font-size: 29px; font-weight: 600; color: #1f2937; letter-spacing: -0.01em; margin: 0;
+    }
+    .dash-day { font-size: 13.5px; color: #475569; line-height: 1.55; margin: 0 0 14px; }
+    .dash-sum-em { color: #b91c1c; font-weight: 600; }
+
+    /* The next call. White on a sky border so it sits forward of the page
+       without shouting, and the middle column may shrink — without that the
+       name has nowhere to go and the button lands on top of it. */
+    .dash-next {
+      position: relative;
+      display: flex; align-items: center; gap: 14px;
+      background: #fff; border: 1px solid #bae6fd; border-radius: 12px;
+      padding: 13px 16px 13px 16px; padding-right: 38px; margin-bottom: 1.25rem;
+    }
+    .dash-next:hover { border-color: #7dd3fc; }
+    .dash-next.is-late { border-color: #fecaca; }
+    .dash-next-body { flex: 1; min-width: 0; text-decoration: none; display: block; }
+    .dash-next-lab {
+      display: block; font-size: 11px; font-weight: 700; letter-spacing: .07em;
+      text-transform: uppercase; color: #0369a1; margin-bottom: 1px;
+    }
+    .dash-next.is-late .dash-next-lab { color: #b91c1c; }
+    .dash-next-time {
+      display: block; font-size: 14.5px; font-weight: 700; color: #1e293b;
+      font-variant-numeric: tabular-nums;
+    }
+    .dash-next.is-late .dash-next-time { color: #b91c1c; }
+    .dash-next-det {
+      display: block; font-size: 12px; color: #64748b; margin-top: 1px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .dash-next-det b { color: #1e293b; font-weight: 600; }
+    .dash-next-go {
+      flex: 0 0 auto; font-size: 12.5px; font-weight: 700; color: #fff;
+      background: #0369a1; border-radius: 8px; padding: 8px 14px;
+      white-space: nowrap; text-decoration: none;
+    }
+    .dash-next-go:hover { background: #075985; color: #fff; }
+    .dash-next-x {
+      position: absolute; top: 8px; right: 8px;
+      width: 22px; height: 22px; border: 0; border-radius: 6px; background: none;
+      color: #94a3b8; font-size: 13px; line-height: 1; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .dash-next-x:hover { background: #f0f9ff; color: #0f172a; }
+
+    /* The kind of thing a row is, said the same way as on Communications:
+       one tinted square, one icon, one colour per kind. */
+    .dash-ic {
+      flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .dash-ic .material-icons-outlined { font-size: 16px; }
+    .dash-ic-call  { background: #eff6ff; color: #1d4ed8; }
+    .dash-ic-visit { background: #fff7ed; color: #c2410c; }
+    .dash-ic-chat  { background: #f0fdf4; color: #15803d; }
+    .dash-ic-alert { background: #fef2f2; color: #b91c1c; }
+
+    /* Rows inside a section container (dividers, not separate cards) */
+    .dash-row {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 12px 18px;
+      border-top: 1px solid #f4f7fb;
+      transition: background 0.12s;
+    }
+    .dash-acc-body > a:first-child .dash-row { border-top: 0; }
+    .dash-row:hover { background: #fafcff; }
+    .dash-row-bar { width: 3px; align-self: stretch; border-radius: 2px; background: #e2e8f0; flex-shrink: 0; }
+    .dash-row-bar-red { background: #ef4444; }
+    .dash-row-main { flex: 1; min-width: 0; }
+    .dash-row-l1 { display: flex; align-items: center; gap: 8px; }
+    .dash-row-name { font-weight: 600; color: #1e293b; font-size: 14px; }
+    .dash-row-l2 {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dash-utag {
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: #fef2f2;
+      color: #b91c1c;
+      white-space: nowrap;
+    }
+    .dash-utag-high { background: #fef2f2; color: #b91c1c; }
+    .dash-utag-med  { background: #fffbeb; color: #b45309; }
+    .dash-utag-low  { background: #f0f9ff; color: #0369a1; }
+    .dash-utag-prog { background: #f1f5f9; color: #475569; }
+    .dash-row-bar-amber { background: #f59e0b; }
+    .dash-row-bar-sky { background: #38bdf8; }
+    .dash-row-overdue { background: #fef2f2; }
+    .dash-row-overdue:hover { background: #fee2e2; }
+
+    /* Today's work reads differently from the reading lists around it. */
+    .dash-card-today { border-color: #bae6fd; border-left: 3px solid #0ea5e9; border-radius: 0 12px 12px 0; }
+    .dash-card-today .dash-acc-head { background: #f0f9ff; }
+    .dash-today-dot { width: 7px; height: 7px; border-radius: 9999px; background: #0ea5e9; display: inline-block; }
+
+    /* Filters live inside the box they filter. */
+    .dash-row-right { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+    .dash-time { font-size: 13px; color: #475569; font-weight: 600; white-space: nowrap; }
+    .dash-time-late { color: #b91c1c; }
+    .dash-stag { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 9999px; }
+    .dash-stag-done { background: #dcfce7; color: #166534; }
+    .dash-stag-interrupted { background: #fee2e2; color: #b91c1c; }
+    .dash-stag-noans { background: #f3f4f6; color: #4b5563; }
+    .dash-empty { padding: 14px 18px; color: #94a3b8; font-size: 13px; }
+    /* Rows are hidden by the live search. `.block` sets display:block, which
+       would otherwise win over the [hidden] attribute and show them anyway. */
+    .dash-acc-body > a[hidden] { display: none !important; }
+
+    /* Find and sort, in place of the old priority chips. */
+    .dash-tools {
+      display: flex; gap: 8px; align-items: center;
+      padding: 8px 18px; background: #f8fbfe; border-bottom: 1px solid #f1f5f9;
+    }
+    .dash-find, .dash-sort {
+      font-size: 12px; border: 1px solid #e2e8f0; border-radius: 7px;
+      padding: 4px 8px; color: #475569; background: #fff; font-family: inherit;
+    }
+    /* Draw the chevron ourselves: the native one varies by browser and is easy
+       to miss at this size, so the control can read as a plain label. */
+    .dash-sort {
+      appearance: none; -webkit-appearance: none;
+      padding-right: 24px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2364748b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+    }
+    .dash-find { flex: 1; min-width: 90px; }
+    .dash-find:focus, .dash-sort:focus { outline: 2px solid #0369a1; outline-offset: -1px; }
+    .dash-sort { flex: 0 0 auto; }
+
+    /* Right-hand columns. Fixed widths so priority and age line up down the
+       list — a column you can scan rather than labels you have to read. */
+    .dash-prio {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; color: #64748b; white-space: nowrap; width: 70px;
+    }
+    .dash-dot { width: 7px; height: 7px; border-radius: 9999px; flex: 0 0 auto; display: inline-block; }
+    .dash-dot-high { background: #ef4444; }
+    .dash-dot-med  { background: #f59e0b; }
+    .dash-dot-low  { background: #38bdf8; }
+    .dash-age {
+      font-size: 12.5px; color: #64748b; font-weight: 600; white-space: nowrap;
+      font-variant-numeric: tabular-nums; text-align: right; min-width: 76px;
+    }
+    .dash-kick { color: #94a3b8; }
+    .dash-wip {
+      font-size: 10px; font-weight: 700; letter-spacing: .05em;
+      text-transform: uppercase; color: #0369a1; white-space: nowrap;
+    }
+    .dash-row-right { flex-direction: row; align-items: center; gap: 12px; }
+
+    /* Two sizes across every row: 14px for what you scan — the client's name
+       and the hour — and 12px for everything supporting them. The uppercase
+       micro-labels are gone; colour and weight already did that work. */
+    .dash-row-l2, .dash-prio, .dash-age, .dash-late, .dash-wip { font-size: 12px; }
+    .dash-wip { text-transform: none; letter-spacing: 0; font-weight: 600; }
+    .dash-prio { width: 78px; }
+
+    /* Leading day and hour. A call is a time before it is anything else. */
+    .dash-when { flex: 0 0 auto; width: 78px; line-height: 1.3; }
+    .dash-when-d { display: block; font-size: 12px; color: #64748b; }
+    .dash-when-h { display: block; font-size: 14px; font-weight: 700; color: #1e293b;
+                   font-variant-numeric: tabular-nums; }
+    .dash-when-late .dash-when-d, .dash-when-late .dash-when-h { color: #b91c1c; }
+    /* Right-aligned as a block: the two lines are different lengths, so
+       without this they centre against each other and the column goes ragged. */
+    .dash-late { color: #64748b; white-space: nowrap; text-align: right; }
+    .dash-late-red { color: #b91c1c; font-weight: 600; }
+    /* The date states the fact; this says what has not happened, without
+       naming anyone as the reason for it. */
+    .dash-notyet { display: block; text-align: right; font-size: 10.5px; color: #94a3b8; font-weight: 400; }
+
+    /* Quiet on purpose. It sits at the foot of the page and is the one thing
+       there that is not asking for anything. */
+    .dash-digest { margin: 4px 0 8px; padding: 15px 18px; background: #fff;
+      border: 1px solid #e8f1fb; border-radius: 12px; }
+    .dash-digest h2 { font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; color: #94a3b8; margin: 0 0 10px; }
+    .dash-digest-l { display: flex; gap: 9px; align-items: flex-start;
+      font-size: 12.5px; color: #334155; line-height: 1.5; }
+    .dash-digest-l + .dash-digest-l { margin-top: 8px; }
+    .dash-digest-l b { color: #1e293b; font-weight: 600; }
+    .dash-digest-l .material-icons-outlined { font-size: 15px; color: #be123c; flex: 0 0 auto;
+      margin-top: 2px; }
+
+    .dash-dot-done { background: #16a34a; }
+    .dash-dot-int  { background: #f59e0b; }
+    .dash-dot-no   { background: #94a3b8; }
+
+    /* Section icons, matching the set the timeline and Communications use. */
+    .dash-sect-i { font-size: 19px !important; color: #0369a1; }
+
+    /* Pager: numbers with an arrow either side, both greyed at the ends
+       rather than removed, so the rows above never shift. */
+    .dash-pg { display: flex; align-items: center; gap: 4px; padding: 9px 18px; border-top: 1px solid #f4f7fb; }
+    .dash-pg-count { font-size: 12px; color: #94a3b8; margin-right: auto; font-variant-numeric: tabular-nums; }
+    .dash-pg-num {
+      min-width: 28px; height: 28px; padding: 0 6px; border-radius: 7px;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: #475569; font-size: 12px; text-decoration: none; font-variant-numeric: tabular-nums;
+    }
+    .dash-pg-num:hover { background: #f0f9ff; color: #0369a1; }
+    .dash-pg-num.is-on { background: #0369a1; color: #fff; font-weight: 700; }
+    .dash-pg-arrow {
+      width: 28px; height: 28px; border-radius: 7px; border: 1px solid #e2e8f0;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: #475569; font-size: 15px; line-height: 1; text-decoration: none;
+    }
+    .dash-pg-arrow:hover { background: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
+    .dash-pg-arrow.is-off { color: #cbd5e1; border-color: #f1f5f9; pointer-events: none; }
+    /* An ellipsis takes a full number's width, so every page draws the same
+       seven cells at the same size and the arrows never move — you can keep
+       clicking next without chasing the button. */
+    .dash-pg-dots {
+      min-width: 28px; height: 28px;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: #cbd5e1; font-size: 12px;
+    }
+  </style>
+
+  <!-- Header -->
+  {% comment %}
+    The header answers "what now" rather than describing the page to somebody
+    already on it. Greeting by time of day and first name, the day in one
+    sentence, then the next call with the button attached — which saves a
+    scroll and a click rather than costing one.
+  {% endcomment %}
+  <header class="dash-hd">
+    <h1 class="dash-hello">{{ greeting }}, {{ first_name }}</h1>
+  </header>
+
+  {% comment %}
+    A sentence, not a generated summary, and deliberately not styled as AI.
+    Every number is read from the same queryset as the box it describes, so
+    the two can never disagree.
+  {% endcomment %}
+  <p class="dash-day">
+      {% if todo_count %}
+        {% blocktrans count n=todo_count %}{{ n }} meeting pending{% plural %}{{ n }} meetings pending{% endblocktrans %}{% if carried_over_count %} —
+          {% blocktrans count t=pending_count %}{{ t }} today{% plural %}{{ t }} today{% endblocktrans %},
+          <span class="dash-sum-em">{% blocktrans count co=carried_over_count %}{{ co }} still to make{% plural %}{{ co }} still to make{% endblocktrans %}</span>{% endif %}.
+      {% else %}
+        {% trans "No meetings pending." %}
+      {% endif %}
+
+      {% if alert_counts.all %}
+        {% blocktrans count n=alert_counts.all %}{{ n }} chat flagged for review{% plural %}{{ n }} chats flagged for review{% endblocktrans %}{% if alert_counts.high %},
+          {% blocktrans count h=alert_counts.high %}{{ h }} high priority{% plural %}{{ h }} high priority{% endblocktrans %} —
+          {% if high_topics|length == 1 %}
+            <span class="dash-sum-em">{% blocktrans with topic=high_topics.0.title %}all “{{ topic }}”{% endblocktrans %}</span>{% else %}<span class="dash-sum-em">{% for t in high_topics %}{{ t.count }} × “{{ t.title }}”{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}{% endif %}.
+      {% endif %}
+
+  </p>
+
+  {% if next_meeting %}
+    {% comment %}
+      The next call, with its own way in and a way out. "Next call" is a label
+      rather than a word competing inside the time, the time is the bold line
+      because that is what you are deciding against, and the rest runs on one
+      line that truncates — so the name gives ground before the button does.
+    {% endcomment %}
+    <div class="dash-next{% if next_meeting.is_late %} is-late{% endif %}"
+         id="dashNext" data-call="{{ next_meeting.panel_token }}">
+      <a class="dash-next-body" href="?item={{ next_meeting.panel_token }}">
+        <span class="dash-next-lab">
+          {% trans "Next call" %}{% if next_meeting.is_late %} · {% trans "not yet made" %}{% endif %}
+        </span>
+        <span class="dash-next-time">{{ next_meeting.day }} · {{ next_meeting.hour }}</span>
+        <span class="dash-next-det">
+          <b>{{ next_meeting.name }}</b> · {{ next_meeting.protocol }} · {{ next_meeting.with_ }}
+        </span>
+      </a>
+      <a class="dash-next-go" href="?item={{ next_meeting.panel_token }}">{% trans "Open call" %}</a>
+      <button type="button" class="dash-next-x" id="dashNextX"
+              aria-label="{% trans 'Put this away' %}" title="{% trans 'Put this away' %}">✕</button>
+    </div>
+
+    {% comment %}
+      The ✕ asks rather than assumes. "Not this one" and "not this card at all"
+      are different intentions and used to be split across two places — the ✕
+      here and a switch in Profile — so pressing ✕ could not express the second
+      and there was nothing to tell you the second existed.
+    {% endcomment %}
+    <dialog class="dp-dialog" id="dashNextDlg">
+      <form method="post" action="{% url 'hide_next_call' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <input type="hidden" name="token" value="{{ next_meeting.panel_token }}">
+        <h3>{% trans "Put this away" %}</h3>
+        <p class="dp-dialog-sub">
+          {% blocktrans with n=next_meeting.name %}The call with {{ n }} is still scheduled either way — this only decides what sits at the top of Home.{% endblocktrans %}
+        </p>
+        <label class="dp-fld">
+          <span>{% trans "For how long" %}</span>
+          <select name="off">
+            <option value="">{% trans "Just this call — the card comes back with the next one" %}</option>
+            <option value="1">{% trans "Turn the card off — until I switch it back on in Profile" %}</option>
+          </select>
+        </label>
+        <div class="dp-dialog-f">
+          <button type="button" class="dp-btn" data-dpclose>{% trans "Keep it" %}</button>
+          <button type="submit" class="dp-btn dp-btn-pri">{% trans "Put it away" %}</button>
+        </div>
+      </form>
+    </dialog>
+    <script>
+      // Dismiss is keyed to this particular call rather than to the card, so
+      // putting it away clears today's clutter without hiding tomorrow's:
+      // make, move or finish this one and the next call brings the card back
+      // on its own.
+      //
+      // Recorded on the user rather than in localStorage — putting it away on
+      // a laptop should keep it away on a phone. The server already knows
+      // before it renders, so a dismissed card never reaches the page and
+      // there is nothing to hide on load.
+      (function () {
+        var x = document.getElementById('dashNextX');
+        var dlg = document.getElementById('dashNextDlg');
+        if (!x || !dlg) return;
+        x.addEventListener('click', function () { if (dlg.showModal) dlg.showModal(); });
+        var cancel = dlg.querySelector('[data-dpclose]');
+        if (cancel) cancel.addEventListener('click', function () { dlg.close(); });
+      })();
+    </script>
+  {% endif %}
+
+  <!-- Chats to review — alerts raised from client conversations -->
+  <section class="dash-acc dash-card mb-4" data-acc="alerts">
+    <button type="button" class="dash-acc-head" aria-expanded="true">
+      <span class="text-base font-semibold text-gray-800 flex items-center gap-3">
+        <span class="material-icons-outlined dash-sect-i">notification_important</span>
+        {% trans "Chats to review" %}
+        <span class="dash-acc-badge">{{ alert_counts.all }}</span>
+      </span>
+      <span class="material-icons-outlined dash-acc-chevron">expand_more</span>
+    </button>
+
+    <div class="dash-acc-body">
+      {% comment %}
+        Find and sort, no priority chips: priority now shows on every row, so
+        filtering by it narrowed the list to answer a question already visible.
+        Submits on change so it works without JavaScript.
+      {% endcomment %}
+      <form class="dash-tools" method="get">
+        <input type="search" name="q" value="{{ query }}"
+               class="dash-find" placeholder="{% trans 'Find a client' %}"
+               aria-label="{% trans 'Find a client' %}">
+        <select name="sort" class="dash-sort" aria-label="{% trans 'Sort' %}"
+                onchange="this.form.submit()">
+          <option value="priority" {% if sort == 'priority' %}selected{% endif %}>{% trans "Priority first" %}</option>
+          <option value="newest" {% if sort == 'newest' %}selected{% endif %}>{% trans "Newest first" %}</option>
+          <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>{% trans "Oldest first" %}</option>
+        </select>
+        <noscript><button type="submit" class="dash-sort">{% trans "Apply" %}</button></noscript>
+      </form>
+
+      {% if alerts %}
+        {% for it in alerts %}
+          <a href="{{ it.url }}" class="block">
+            <div class="dash-row{% if panel_item.token == it.panel_token %} dash-row-open{% endif %}{% if it.unread %} dash-row-new{% endif %}"
+                 {% if panel_item.token == it.panel_token %}aria-current="true"{% endif %}
+                 {% if it.unread %}title="{% trans 'Not opened yet' %}"{% endif %}>
+              <span class="dash-ic dash-ic-alert">
+                <span class="material-icons-outlined">notification_important</span>
+              </span>
+              <div class="dash-row-main">
+                <div class="dash-row-l1">
+                  <span class="dash-row-name">{% if it.patient %}{{ it.patient }}{% else %}{{ it.title }}{% endif %}</span>
+                  {% if it.status_code == 1 %}<span class="dash-wip">{{ it.status }}</span>{% endif %}
+                </div>
+                {% comment %}
+                  The title repeats across rows — a dozen alerts share "Caregiver
+                  requested respite" — so it leads quietly and the description,
+                  which is what differs, gets the room.
+                {% endcomment %}
+                <div class="dash-row-l2">
+                  {% if it.patient %}<span class="dash-kick">{{ it.title }}</span>{% if it.description %} · {{ it.description }}{% endif %}
+                  {% else %}{{ it.description }}{% endif %}
+                </div>
+              </div>
+              <div class="dash-row-right">
+                <span class="dash-prio">
+                  <i class="dash-dot {% if it.priority_level == 1 %}dash-dot-high{% elif it.priority_level == 2 %}dash-dot-med{% else %}dash-dot-low{% endif %}"></i>{{ it.priority }}
+                </span>
+                <span class="dash-age" title="{{ it.age_exact }}">{{ it.age }}</span>
+              </div>
+            </div>
+          </a>
+        {% endfor %}
+      {% else %}
+        <p class="dash-empty">{% trans "Nothing to review." %}</p>
+      {% endif %}
+      <p class="dash-empty" id="dashNoMatch" hidden>{% trans "No client matches that." %}</p>
+      <div class="dash-pg" id="dashAlertPager" data-per="{{ alerts_per_page }}" hidden></div>
+      {% if alerts_capped %}
+        {% comment %} Said out loud rather than dropped quietly. {% endcomment %}
+        <p class="dash-empty">
+          {% blocktrans with n=alerts_per_page|default:200 %}Showing the first 200 — narrow the search to see the rest.{% endblocktrans %}
+        </p>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- Pending meetings — every call still to be made, seven to a page -->
+  <section class="dash-acc dash-card mb-4" data-acc="meetings">
+    <button type="button" class="dash-acc-head" aria-expanded="true">
+      <span class="text-base font-semibold text-gray-800 flex items-center gap-3">
+        <span class="material-icons-outlined dash-sect-i">schedule</span>
+        {% trans "Pending meetings" %}
+        <span class="dash-acc-badge">{{ meetings_total }}</span>
+      </span>
+      <span class="material-icons-outlined dash-acc-chevron">expand_more</span>
+    </button>
+
+    <div class="dash-acc-body">
+      <form class="dash-tools" method="get">
+        {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+        {% if sort and sort != 'priority' %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+        <input type="search" name="mq" value="{{ mq }}" class="dash-find"
+               placeholder="{% trans 'Find a client' %}" aria-label="{% trans 'Find a client' %}">
+        <select name="msort" class="dash-sort" aria-label="{% trans 'Sort' %}" onchange="this.form.submit()">
+          <option value="soon" {% if msort == 'soon' %}selected{% endif %}>{% trans "Soonest first" %}</option>
+          <option value="late" {% if msort == 'late' %}selected{% endif %}>{% trans "Latest first" %}</option>
+        </select>
+      </form>
+
+      {% for it in call_meetings %}
+        <a href="?{% if query %}q={{ query|urlencode }}&amp;{% endif %}item={{ it.panel_token }}" class="block">
+          <div class="dash-row{% if panel_item.token == it.panel_token %} dash-row-open{% endif %}"
+               {% if panel_item.token == it.panel_token %}aria-current="true"{% endif %}>
+            {% comment %}
+              A call is a time before it is anything else, so the clock leads.
+              Day above hour, both in the row's own two sizes.
+            {% endcomment %}
+            <span class="dash-when{% if it.is_late %} dash-when-late{% endif %}">
+              <span class="dash-when-d">{{ it.day }}</span>
+              <b class="dash-when-h">{{ it.hour }}</b>
+            </span>
+            {% comment %}
+              The clock still leads — a call is a time before it is anything
+              else — and the kind sits beside it, in the same square and the
+              same colours Communications uses.
+            {% endcomment %}
+            <span class="dash-ic dash-ic-{{ it.kind }}">
+              <span class="material-icons-outlined">{% if it.in_person %}event{% else %}call{% endif %}</span>
+            </span>
+            <div class="dash-row-main">
+              <div class="dash-row-l1"><span class="dash-row-name">{{ it.name }}</span></div>
+              <div class="dash-row-l2"><span class="dash-kick">{{ it.protocol }}</span> · {% if it.in_person %}{{ it.location|default:_("Location not set") }}{% else %}{{ it.with_ }}{% endif %}</div>
+            </div>
+            <span class="dash-late{% if it.is_late %} dash-late-red{% endif %}">
+              {{ it.late_text }}{% if it.is_late %}<small class="dash-notyet">{% trans "not yet made" %}</small>{% endif %}
+            </span>
+          </div>
+        </a>
+      {% empty %}
+        <p class="dash-empty">{% if mq %}{% trans "No client matches that." %}{% else %}{% trans "Nothing pending." %}{% endif %}</p>
+      {% endfor %}
+
+      <p class="dash-empty" id="dashNoMeeting" hidden>{% trans "No client matches that." %}</p>
+      {% comment %}
+        Built by the script below from the rows above — nothing here reloads,
+        so the detail panel stays open and the page keeps its scroll.
+      {% endcomment %}
+      <div class="dash-pg" id="dashMeetPager" data-per="{{ meetings_per_page }}" hidden></div>
+    </div>
+  </section>
+
+  <!-- Calls completed today -->
+  <section class="dash-acc dash-card mb-4" data-acc="completed">
+    <button type="button" class="dash-acc-head" aria-expanded="true">
+      <span class="text-base font-semibold text-gray-800 flex items-center gap-3">
+        <span class="material-icons-outlined dash-sect-i">check_circle</span>
+        {% trans "Calls completed today" %}
+        <span class="dash-acc-badge">{{ completed_count }}</span>
+      </span>
+      <span class="material-icons-outlined dash-acc-chevron">expand_more</span>
+    </button>
+
+    <div class="dash-acc-body">
+      {% for it in completed_meetings_today %}
+        <a href="?{% if query %}q={{ query|urlencode }}&amp;{% endif %}item={{ it.panel_token }}" class="block">
+          <div class="dash-row{% if panel_item.token == it.panel_token %} dash-row-open{% endif %}"
+               {% if panel_item.token == it.panel_token %}aria-current="true"{% endif %}>
+            <span class="dash-when">
+              <span class="dash-when-d">{{ it.day }}</span>
+              <b class="dash-when-h">{{ it.hour }}</b>
+            </span>
+            {% comment %}
+              The clock still leads — a call is a time before it is anything
+              else — and the kind sits beside it, in the same square and the
+              same colours Communications uses.
+            {% endcomment %}
+            <span class="dash-ic dash-ic-{{ it.kind }}">
+              <span class="material-icons-outlined">{% if it.in_person %}event{% else %}call{% endif %}</span>
+            </span>
+            <div class="dash-row-main">
+              <div class="dash-row-l1"><span class="dash-row-name">{{ it.name }}</span></div>
+              <div class="dash-row-l2"><span class="dash-kick">{{ it.protocol }}</span> · {{ it.recorded }}</div>
+            </div>
+            <span class="dash-prio">
+              <i class="dash-dot {% if it.status_code == 1 %}dash-dot-done{% elif it.status_code == 2 %}dash-dot-int{% else %}dash-dot-no{% endif %}"></i>{{ it.status }}
+            </span>
+          </div>
+        </a>
+      {% empty %}
+        <p class="dash-empty">{% trans "Nothing completed yet today." %}</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% comment %}
+    The last thing on the page, and the only part of it that is not a demand.
+    No count, no streak, no average — the moment this is scored it stops being
+    evidence that the work mattered and becomes another thing to be measured by.
+  {% endcomment %}
+  {% if digest %}
+    <section class="dash-digest">
+      <h2>{% trans "What changed this week" %}</h2>
+      {% for d in digest %}
+        <p class="dash-digest-l">
+          <span class="material-icons-outlined">favorite</span>
+          <span>{% if d.who %}<b>{{ d.who }}</b> — {% endif %}{{ d.line }}</span>
+        </p>
+      {% endfor %}
+    </section>
+  {% endif %}
+
+  {% comment %}
+    Collapsing a section while you are near the foot of the page makes the page
+    shorter than your scroll position, and the browser hauls you upward. This
+    grows just enough to hold your place and shrinks back to nothing as you
+    scroll up, so nothing under the cursor ever moves.
+  {% endcomment %}
+  <div id="dashPad" aria-hidden="true"></div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+  // Search, sort and paging for a section, all without a round trip. A reload
+  // would close the detail panel and throw away the scroll position, for a
+  // change that only reorders rows the page already holds.
+  //
+  // One function, two boxes: the review queue and the pending calls behave
+  // identically, and a queue of sixty alerts pages rather than becoming a wall.
+  function paginate(opts) {
+    var box = document.querySelector('.dash-acc[data-acc="' + opts.section + '"]');
+    if (!box) return;
+    var pager = document.getElementById(opts.pager);
+    var none  = document.getElementById(opts.none);
+    var find  = box.querySelector('.dash-find');
+    var sort  = box.querySelector('.dash-sort');
+    var form  = find && find.form;
+    var all   = Array.prototype.slice.call(box.querySelectorAll('.dash-acc-body > a'));
+    if (!pager || !all.length) return;
+
+    var PER  = parseInt(pager.dataset.per, 10) || 7;
+    var KEY  = opts.key;
+    var page = 1;
+    try { page = parseInt(sessionStorage.getItem(KEY), 10) || 1; } catch (e) {}
+
+    // A query typed before opening an item is still the query afterwards.
+    if (find && !find.value) {
+      try { find.value = sessionStorage.getItem(KEY + ':q') || ''; } catch (e) {}
+    }
+
+    if (form) form.addEventListener('submit', function (e) { e.preventDefault(); });
+
+    function matching() {
+      var q = (find && find.value || '').trim().toLowerCase();
+      var rows = q ? all.filter(function (a) {
+        return a.textContent.toLowerCase().indexOf(q) !== -1;
+      }) : all.slice();
+      if (sort && sort.value === 'late') rows.reverse();
+      try {
+        if (q) sessionStorage.setItem(KEY + ':q', q);
+        else sessionStorage.removeItem(KEY + ':q');
+      } catch (e) {}
+      return rows;
+    }
+
+    // Same fixed-width window as the prototype: every number up to nine pages,
+    // and beyond that seven cells, so the buttons never move under the cursor.
+    function cells(cur, total) {
+      var out = [], p;
+      if (total <= 9) {
+        for (p = 1; p <= total; p++) out.push(p);
+        return out;
+      }
+      var start = Math.min(Math.max(cur - 2, 2), total - 5);
+      out = [1];
+      for (p = 0; p < 5; p++) out.push(start + p);
+      out.push(total);
+      if (start > 2) out[1] = '\u2026';
+      if (start + 4 < total - 1) out[5] = '\u2026';
+      return out;
+    }
+
+    function render() {
+      var rows = matching();
+      var total = Math.max(1, Math.ceil(rows.length / PER));
+      if (page > total) page = total;
+      if (page < 1) page = 1;
+
+      all.forEach(function (a) { a.hidden = true; });
+      rows.slice((page - 1) * PER, page * PER).forEach(function (a) { a.hidden = false; });
+      // Order can change with sort, so re-seat the visible rows.
+      rows.forEach(function (a) { a.parentNode.appendChild(a); });
+      pager.parentNode.appendChild(none);
+      pager.parentNode.appendChild(pager);
+
+      if (none) none.hidden = rows.length !== 0;
+      pager.hidden = total < 2;
+      if (total < 2) return;
+
+      var h = '<span class="dash-pg-count">' + rows.length + ' ' + opts.label + '</span>';
+      h += '<button type="button" class="dash-pg-arrow' + (page === 1 ? ' is-off' : '') +
+           '" data-go="' + (page - 1) + '" aria-label="{% trans "Previous page" %}">\u2039</button>';
+      cells(page, total).forEach(function (p) {
+        if (p === '\u2026') { h += '<span class="dash-pg-dots">\u2026</span>'; return; }
+        h += '<button type="button" class="dash-pg-num' + (p === page ? ' is-on' : '') +
+             '" data-go="' + p + '"' + (p === page ? ' aria-current="page"' : '') + '>' + p + '</button>';
+      });
+      h += '<button type="button" class="dash-pg-arrow' + (page === total ? ' is-off' : '') +
+           '" data-go="' + (page + 1) + '" aria-label="{% trans "Next page" %}">\u203a</button>';
+      pager.innerHTML = h;
+    }
+
+    pager.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-go]');
+      if (!b || b.classList.contains('is-off')) return;
+      page = parseInt(b.dataset.go, 10);
+      try { sessionStorage.setItem(KEY, String(page)); } catch (e) {}
+      render();
+    });
+    if (find) {
+      find.addEventListener('input', function () { page = 1; render(); });
+      find.addEventListener('search', function () { page = 1; render(); });
+      find.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { find.value = ''; page = 1; render(); }
+      });
+    }
+    if (sort) sort.addEventListener('change', function () { page = 1; render(); });
+    render();
+  }
+
+  paginate({ section: 'meetings', pager: 'dashMeetPager', none: 'dashNoMeeting',
+             key: 'dashMeetPage', label: '{% trans "pending" %}' });
+  paginate({ section: 'alerts', pager: 'dashAlertPager', none: 'dashNoMatch',
+             key: 'dashAlertPage', label: '{% trans "to review" %}' });
+
+  // Opening an item is a full page load, so without this every section springs
+  // back to its template default and you lose your place. Keyed per section,
+  // remembered per browser.
+  (function () {
+    var KEY = 'dashAcc';
+
+    function read() {
+      try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
+    }
+    function write(state) {
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+    }
+
+    var main = document.querySelector('main');
+    var pad = document.getElementById('dashPad');
+
+    // Only as tall as it needs to be to keep the current scroll reachable, so
+    // it melts away as you scroll back up without moving anything.
+    function fitPad() {
+      if (!pad || !main) return;
+      var natural = main.scrollHeight - pad.offsetHeight;
+      pad.style.height = Math.max(0, main.scrollTop + main.clientHeight - natural) + 'px';
+    }
+    if (main) main.addEventListener('scroll', fitPad, { passive: true });
+
+    var state = read();
+    document.querySelectorAll('.dash-acc[data-acc]').forEach(function (section) {
+      var name = section.dataset.acc;
+      var head = section.querySelector('.dash-acc-head');
+      if (name in state) {
+        section.classList.toggle('collapsed', state[name]);
+        if (head) head.setAttribute('aria-expanded', state[name] ? 'false' : 'true');
+      }
+      if (!head) return;
+      head.addEventListener('click', function () {
+        // Anchor on the header you clicked: measure where it sits, toggle,
+        // then give the scroller back exactly the difference, so opening or
+        // closing never slides the page under the cursor. The spacer is raised
+        // first because a collapse can leave the page shorter than the scroll
+        // position, and the browser clamps before we get a chance to correct.
+        var before = head.getBoundingClientRect().top;
+        // Generous on purpose: it only has to outlast the collapse, and
+        // fitPad trims it back to the minimum a moment later.
+        if (pad) pad.style.height = main.scrollHeight + 'px';
+
+        var collapsed = section.classList.toggle('collapsed');
+        head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+
+        var delta = head.getBoundingClientRect().top - before;
+        if (delta) main.scrollTop += delta;
+        fitPad();
+
+        var s = read();
+        s[name] = collapsed;
+        write(s);
+      });
+    });
+  })();
+</script>
+{% endblock %}

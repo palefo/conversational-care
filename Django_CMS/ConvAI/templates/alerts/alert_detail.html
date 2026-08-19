@@ -1,0 +1,637 @@
+{% extends "base.html" %}
+{% load i18n tz %}
+
+{% block title %}{% trans "Alert review" %} #{{ alert.id }}{% endblock %}
+
+{% block content %}
+<style>
+  .alert-summary-card {
+    border-radius: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: rgba(255, 255, 255, 0.82);
+  }
+
+  .alert-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .alert-action-button,
+  .alert-status-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.28rem;
+    padding: 0.45rem 0.65rem;
+    border-radius: 0.65rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    border: 1px solid rgba(14, 165, 233, 0.25);
+    background: white;
+    color: #075985;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+
+  .alert-action-button:hover,
+  .alert-status-button:hover {
+    background: #e0f2fe;
+  }
+
+  .alert-action-button .material-icons-outlined,
+  .alert-status-button .material-icons-outlined {
+    font-size: 1rem;
+  }
+
+  .alert-action-danger {
+    border-color: rgba(248, 113, 113, 0.35);
+    color: #b91c1c;
+  }
+
+  .alert-action-danger:hover {
+    background: #fee2e2;
+  }
+
+  .alert-action-success {
+    border-color: rgba(16, 185, 129, 0.35);
+    color: #047857;
+  }
+
+  .alert-action-success:hover {
+    background: #d1fae5;
+  }
+
+  .alert-status-button.is-current {
+    background: #0284c7;
+    border-color: #0284c7;
+    color: white;
+    box-shadow: 0 8px 16px rgba(14, 165, 233, 0.18);
+  }
+
+  .conversation-link-box {
+    border-radius: 0.85rem;
+    border: 1px solid #bae6fd;
+    background: #f0f9ff;
+    padding: 1rem;
+  }
+
+  .conversation-url-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #075985;
+    font-weight: 800;
+    word-break: break-all;
+  }
+
+  .conversation-url-link:hover {
+    text-decoration: underline;
+  }
+
+  .alert-technical-data {
+    word-break: break-word;
+  }
+
+  .feedback-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.45);
+    padding: 1rem;
+  }
+
+  .feedback-modal-backdrop.is-open {
+    display: flex;
+  }
+
+  .feedback-modal {
+    width: min(680px, 100%);
+    border-radius: 1rem;
+    background: white;
+    box-shadow: 0 24px 50px rgba(15, 23, 42, 0.22);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    padding: 1.25rem;
+  }
+
+  .feedback-progress {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.45rem;
+    margin: 1rem 0;
+  }
+
+  .feedback-progress span {
+    height: 0.35rem;
+    border-radius: 999px;
+    background: #e5e7eb;
+  }
+
+  .feedback-progress span.is-active {
+    background: #0ea5e9;
+  }
+
+  .feedback-option-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+
+  .feedback-option,
+  .feedback-option-wide {
+    border: 1px solid #d1d5db;
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    background: white;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #374151;
+    text-align: center;
+  }
+
+  .feedback-option:hover,
+  .feedback-option-wide:hover,
+  .feedback-option.is-selected,
+  .feedback-option-wide.is-selected {
+    border-color: #38bdf8;
+    background: #f0f9ff;
+    color: #075985;
+  }
+
+  .feedback-comment-box {
+    width: 100%;
+    min-height: 6rem;
+    resize: vertical;
+    border: 1px solid #d1d5db;
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+  }
+
+
+
+  .selected-action-summary {
+    margin-top: 1rem;
+    border-radius: 0.85rem;
+    border: 1px solid #bae6fd;
+    background: #f0f9ff;
+    padding: 0.85rem 1rem;
+    color: #075985;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+
+  .selected-action-summary strong {
+    color: #0f172a;
+  }
+
+  .alert-action-button.is-selected-action {
+    outline: 3px solid rgba(14, 165, 233, 0.25);
+    box-shadow: 0 10px 20px rgba(14, 165, 233, 0.14);
+    background: #f0f9ff;
+  }
+
+  @media (max-width: 720px) {
+    .feedback-option-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<header class="mb-6">
+  <a href="{% url 'dashboard' %}" class="inline-flex items-center text-sky-700 hover:text-sky-800 hover:underline text-sm font-semibold">
+    <span class="material-icons-outlined text-base mr-1">arrow_back</span>
+    {% trans "Back to home" %}
+  </a>
+</header>
+
+<!-- Alert summary header -->
+<section class="alert-summary-card p-6 mb-6">
+  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+    <div class="flex-1 min-w-0">
+      <div class="flex flex-wrap items-center gap-3 mb-3">
+        {% if alert.priority == 1 %}
+          <span class="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">{% trans "Urgent" %}</span>
+        {% elif alert.priority == 2 %}
+          <span class="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">{% trans "Review" %}</span>
+        {% else %}
+          <span class="px-3 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-700">{% trans "Low" %}</span>
+        {% endif %}
+
+        <span id="current-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+          {{ alert.get_status_display }}
+        </span>
+
+        <h1 class="text-2xl font-semibold text-gray-800">
+          {% if alert.data.trigger_category %}
+            {{ alert.data.trigger_category }}
+          {% elif alert.data.category %}
+            {{ alert.data.category }}
+          {% elif alert.data.topic %}
+            {{ alert.data.topic }}
+          {% else %}
+            {{ alert.title|default:"Alert" }}
+          {% endif %}
+        </h1>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-700 mb-4">
+        <p>
+          <span class="font-semibold">{% trans "Client:" %}</span>
+          {% if alert.patient %}{{ alert.patient.name }} {{ alert.patient.lastname }}{% else %}—{% endif %}
+        </p>
+
+        <p>
+          <span class="font-semibold">{% trans "Caregiver:" %}</span>
+          {% if alert.patient and alert.patient.caregiver %}{{ alert.patient.caregiver.name }} {{ alert.patient.caregiver.lastname }}{% else %}—{% endif %}
+        </p>
+      </div>
+
+      <p class="text-gray-700">
+        <span class="font-semibold">{% trans "Summary:" %}</span>
+        {% if alert.data.summary %}
+          {{ alert.data.summary }}
+        {% elif alert.data.short_summary %}
+          {{ alert.data.short_summary }}
+        {% elif alert.description %}
+          {{ alert.description }}
+        {% else %}
+          {% trans "No summary." %}
+        {% endif %}
+      </p>
+    </div>
+
+    <div class="lg:text-right">
+      <p class="text-sm text-gray-500">
+        {% trans "Detected" %}: {{ alert.created_at|localtime|date:"d/m/Y H:i" }}
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- Conversation URL -->
+<section class="card p-6 mb-6">
+  <div class="mb-5 pb-4 border-b border-gray-200">
+    <h2 class="text-xl font-semibold text-gray-800">{% trans "Review conversation" %}</h2>
+    <p class="text-sm text-gray-500">{% trans "Open the linked conversation for the date associated with this alert." %}</p>
+  </div>
+
+  {% if conversation_review_url %}
+    <div class="conversation-link-box">
+      <a href="{{ conversation_review_url }}" class="conversation-url-link">
+        <span class="material-icons-outlined text-lg">forum</span>
+        {% trans "Open conversation" %}
+      </a>
+      <p class="text-xs text-gray-500 mt-2">
+        {% trans "Date" %}: {{ alert.created_at|localtime|date:"d/m/Y" }}
+        {% if conversation_id %} • {% trans "Conversation" %}: {{ conversation_id }}{% endif %}
+      </p>
+    </div>
+  {% else %}
+    <div class="bg-slate-50 border border-slate-200 rounded-lg p-6 text-gray-600">
+      <p class="font-semibold text-gray-700 mb-1">{% trans "No conversation URL available" %}</p>
+      <p class="text-sm">{% trans "This alert does not currently include a linked conversation_id or thread_id, so the exact conversation URL could not be generated." %}</p>
+    </div>
+  {% endif %}
+</section>
+
+<!-- Action buttons -->
+<section class="card p-6 mb-6">
+  <h2 class="text-xl font-semibold text-gray-800 mb-2">{% trans "Actions" %}</h2>
+  <p class="text-sm text-gray-500 mb-4">
+    {% trans "Choose the next step after reviewing the alert. The selected action is saved to the alert log and updates the status shown on the alert card." %}
+  </p>
+
+  {% if alert.data.last_action_taken %}
+    <div class="selected-action-summary mb-4">
+      <strong>{% trans "Current saved action:" %}</strong>
+      {% if alert.data.last_action_taken == "reviewed" %}
+        {% trans "Reviewed - review in progress" %}
+      {% elif alert.data.last_action_taken == "chatbot_disabled" %}
+        {% trans "Chatbot disabled - review in progress" %}
+      {% elif alert.data.last_action_taken == "chatbot_enabled" %}
+        {% trans "Chatbot re-enabled - feedback submitted" %}
+      {% elif alert.data.last_action_taken == "false_alarm" %}
+        {% trans "False alarm - resolved" %}
+      {% elif alert.data.last_action_taken == "resolved" %}
+        {% trans "Resolved" %}
+      {% elif alert.data.last_action_taken == "reopened" %}
+        {% trans "Reopened - review in progress" %}
+      {% else %}
+        {{ alert.data.last_action_taken }}
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <div class="alert-action-row">
+    {% if conversation_review_url %}
+      <a href="{{ conversation_review_url }}" class="alert-action-button">
+        <span class="material-icons-outlined">forum</span>
+        {% trans "Review conversation" %}
+      </a>
+    {% endif %}
+
+    <form method="post" class="inline-block">
+      {% csrf_token %}
+      <input type="hidden" name="form_type" value="action_update">
+      <input type="hidden" name="status" value="1">
+      <input type="hidden" name="action_taken" value="reviewed">
+      <button type="submit" class="alert-action-button alert-action-success {% if alert.data.last_action_taken == 'reviewed' %}is-selected-action{% endif %}">
+        <span class="material-icons-outlined">done</span>
+        {% trans "Reviewed" %}
+      </button>
+    </form>
+
+    {% if alert.data.chatbot_status == "disabled" %}
+      <form method="post" class="inline-block">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="action_update">
+        <input type="hidden" name="status" value="1">
+        <input type="hidden" name="action_taken" value="chatbot_enabled">
+        <button type="submit" class="alert-action-button js-open-feedback {% if alert.data.last_action_taken == 'chatbot_enabled' %}is-selected-action{% endif %}" data-feedback-reason="chatbot_enabled">
+          <span class="material-icons-outlined">play_circle</span>
+          {% trans "Enable chatbot" %}
+        </button>
+      </form>
+    {% else %}
+      <form method="post" class="inline-block">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="action_update">
+        <input type="hidden" name="status" value="1">
+        <input type="hidden" name="action_taken" value="chatbot_disabled">
+        <button type="submit" class="alert-action-button alert-action-danger {% if alert.data.last_action_taken == 'chatbot_disabled' %}is-selected-action{% endif %}">
+          <span class="material-icons-outlined">block</span>
+          {% trans "Disable chatbot" %}
+        </button>
+      </form>
+    {% endif %}
+
+    <form method="post" class="inline-block">
+      {% csrf_token %}
+      <input type="hidden" name="form_type" value="action_update">
+      <input type="hidden" name="status" value="2">
+      <input type="hidden" name="action_taken" value="false_alarm">
+      <input type="hidden" name="archive_bucket" value="false_alarms">
+      <button type="submit" class="alert-action-button js-open-feedback {% if alert.data.last_action_taken == 'false_alarm' %}is-selected-action{% endif %}" data-feedback-reason="false_alarm">
+        <span class="material-icons-outlined">notifications_off</span>
+        {% trans "False alarm" %}
+      </button>
+    </form>
+
+    <form method="post" class="inline-block">
+      {% csrf_token %}
+      <input type="hidden" name="form_type" value="action_update">
+      <input type="hidden" name="status" value="2">
+      <input type="hidden" name="action_taken" value="resolved">
+      <input type="hidden" name="archive_bucket" value="resolved">
+      <button type="submit" class="alert-action-button alert-action-success js-open-feedback {% if alert.data.last_action_taken == 'resolved' %}is-selected-action{% endif %}" data-feedback-reason="resolved">
+        <span class="material-icons-outlined">check_circle</span>
+        {% trans "Resolved" %}
+      </button>
+    </form>
+
+    {% if alert.status == 2 %}
+      <form method="post" class="inline-block">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="action_update">
+        <input type="hidden" name="status" value="1">
+        <input type="hidden" name="action_taken" value="reopened">
+        <input type="hidden" name="archive_bucket" value="">
+        <button type="submit" class="alert-action-button">
+          <span class="material-icons-outlined">restore</span>
+          {% trans "Reopen alert" %}
+        </button>
+      </form>
+    {% endif %}
+  </div>
+
+  <div id="action-feedback" class="hidden mt-4 p-3 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 text-sm font-medium"></div>
+</section>
+
+<!-- Internal note -->
+<section class="card p-6 mb-6">
+  <h2 class="text-xl font-semibold text-gray-800 mb-2">{% trans "Internal note" %}</h2>
+  <p class="text-sm text-gray-500 mb-4">{% trans "Add a note about what was reviewed, decided or escalated. This must be saved to the alert log, not just kept in the browser." %}</p>
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="form_type" value="note_update">
+    <textarea
+      id="alert-note"
+      name="internal_note"
+      rows="4"
+      class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500"
+      placeholder="{% trans 'Add a brief note about what action was taken...' %}"
+    >{% if alert.internal_note %}{{ alert.internal_note }}{% elif alert.note %}{{ alert.note }}{% elif alert.notes %}{{ alert.notes }}{% elif alert.data.internal_note %}{{ alert.data.internal_note }}{% elif alert.data.notes %}{{ alert.data.notes }}{% endif %}</textarea>
+
+    <button type="submit" class="button-primary py-2 px-4 rounded-lg mt-3" id="save-note-button">
+      {% trans "Save note" %}
+    </button>
+  </form>
+</section>
+
+<!-- Technical data -->
+<section class="card p-6">
+  <details>
+    <summary class="cursor-pointer text-sm font-semibold text-gray-700">{% trans "Show technical alert data" %}</summary>
+    <div class="mt-4">
+      {% if alert.data %}
+        <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-gray-700 space-y-2 alert-technical-data">
+          {% for key, value in alert.data.items %}
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-2 border-b border-slate-200 pb-2 last:border-b-0 last:pb-0">
+              <p class="font-semibold text-gray-600">{{ key }}</p>
+              <p class="md:col-span-3 break-words">{{ value }}</p>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-gray-500 text-sm">{% trans "No additional data." %}</p>
+      {% endif %}
+    </div>
+  </details>
+</section>
+
+<!-- Feedback form modal shown before resolved / false alarm submissions -->
+<div id="feedback-modal-backdrop" class="feedback-modal-backdrop" aria-hidden="true">
+  <div class="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-modal-title">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h2 id="feedback-modal-title" class="text-xl font-semibold text-gray-800">{% trans "Feedback to improve the alert" %}</h2>
+        <p class="text-sm text-gray-500">{% trans "This helps improve future alert and chatbot decisions." %}</p>
+      </div>
+      <button type="button" id="feedback-close" class="text-gray-400 hover:text-gray-700">
+        <span class="material-icons-outlined">close</span>
+      </button>
+    </div>
+
+    <div class="feedback-progress" aria-hidden="true">
+      <span class="is-active" data-progress="1"></span>
+      <span data-progress="2"></span>
+      <span data-progress="3"></span>
+      <span data-progress="4"></span>
+      <span data-progress="5"></span>
+    </div>
+
+    <form id="feedback-form">
+      <input type="hidden" name="feedback_reason" id="feedback-reason" value="">
+      <input type="hidden" name="feedback_accuracy" id="feedback-accuracy" value="">
+      <input type="hidden" name="feedback_response" id="feedback-response" value="">
+      <input type="hidden" name="feedback_issue" id="feedback-issue" value="">
+      <input type="hidden" name="feedback_comments" id="feedback-comments-hidden" value="">
+
+      <div class="feedback-step" data-step="1">
+        <p class="text-sm font-bold text-gray-700 mb-3">{% trans "Step 1 of 5" %}</p>
+        <h3 class="font-semibold text-gray-800 mb-3">{% trans "Was the alert accurate?" %}</h3>
+        <div class="feedback-option-grid">
+          <button type="button" class="feedback-option" data-field="feedback-accuracy" data-value="accurate">{% trans "Accurate" %}</button>
+          <button type="button" class="feedback-option" data-field="feedback-accuracy" data-value="partly_accurate">{% trans "Partially accurate" %}</button>
+          <button type="button" class="feedback-option" data-field="feedback-accuracy" data-value="inaccurate">{% trans "Inaccurate" %}</button>
+        </div>
+      </div>
+
+      <div class="feedback-step hidden" data-step="2">
+        <p class="text-sm font-bold text-gray-700 mb-3">{% trans "Step 2 of 5" %}</p>
+        <h3 class="font-semibold text-gray-800 mb-3">{% trans "Was the chatbot's response appropriate?" %}</h3>
+        <div class="feedback-option-grid">
+          <button type="button" class="feedback-option" data-field="feedback-response" data-value="good_response">{% trans "Good response" %}</button>
+          <button type="button" class="feedback-option" data-field="feedback-response" data-value="needs_improvement">{% trans "Needs improvement" %}</button>
+          <button type="button" class="feedback-option" data-field="feedback-response" data-value="should_not_have_responded">{% trans "Should not have responded" %}</button>
+        </div>
+      </div>
+
+      <div class="feedback-step hidden" data-step="3">
+        <p class="text-sm font-bold text-gray-700 mb-3">{% trans "Step 3 of 5" %}</p>
+        <h3 class="font-semibold text-gray-800 mb-3">{% trans "What type of problem was this?" %}</h3>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+          <button type="button" class="feedback-option-wide" data-field="feedback-issue" data-value="wrong_risk_level">{% trans "Incorrect risk level" %}</button>
+          <button type="button" class="feedback-option-wide" data-field="feedback-issue" data-value="missed_risk">{% trans "Risk not detected" %}</button>
+          <button type="button" class="feedback-option-wide" data-field="feedback-issue" data-value="over_escalated">{% trans "Excessive escalation" %}</button>
+          <button type="button" class="feedback-option-wide" data-field="feedback-issue" data-value="wrong_action">{% trans "Incorrect action" %}</button>
+          <button type="button" class="feedback-option-wide" data-field="feedback-issue" data-value="other">{% trans "Other" %}</button>
+        </div>
+      </div>
+
+      <div class="feedback-step hidden" data-step="4">
+        <p class="text-sm font-bold text-gray-700 mb-3">{% trans "Step 4 of 5" %}</p>
+        <h3 class="font-semibold text-gray-800 mb-3">{% trans "Any additional comments?" %}</h3>
+        <textarea id="feedback-comments" class="feedback-comment-box" placeholder="{% trans 'Optional comments...' %}"></textarea>
+      </div>
+
+      <div class="feedback-step hidden" data-step="5">
+        <p class="text-sm font-bold text-gray-700 mb-3">{% trans "Step 5 of 5" %}</p>
+        <h3 class="font-semibold text-gray-800 mb-2">{% trans "Submit feedback and update the alert" %}</h3>
+        <p class="text-sm text-gray-600">{% trans "The alert update will now be sent with these comments." %}</p>
+      </div>
+
+      <div class="flex justify-between gap-3 mt-5">
+        <button type="button" id="feedback-back" class="alert-action-button">{% trans "Back" %}</button>
+        <button type="button" id="feedback-next" class="alert-action-button alert-action-success">{% trans "Next" %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const feedbackBackdrop = document.getElementById("feedback-modal-backdrop");
+    const feedbackClose = document.getElementById("feedback-close");
+    const feedbackBack = document.getElementById("feedback-back");
+    const feedbackNext = document.getElementById("feedback-next");
+    const feedbackComments = document.getElementById("feedback-comments");
+    const feedbackCommentsHidden = document.getElementById("feedback-comments-hidden");
+    const feedbackReason = document.getElementById("feedback-reason");
+    let pendingSubmitForm = null;
+    let currentStep = 1;
+
+    function setStep(step) {
+      currentStep = Math.max(1, Math.min(5, step));
+      document.querySelectorAll(".feedback-step").forEach((panel) => {
+        panel.classList.toggle("hidden", Number(panel.dataset.step) !== currentStep);
+      });
+      document.querySelectorAll("[data-progress]").forEach((bar) => {
+        bar.classList.toggle("is-active", Number(bar.dataset.progress) <= currentStep);
+      });
+      feedbackBack.classList.toggle("invisible", currentStep === 1);
+      feedbackNext.textContent = currentStep === 5 ? "{% trans 'Send' %}" : "{% trans 'Next' %}";
+    }
+
+    function openFeedbackModal(form, reason) {
+      pendingSubmitForm = form;
+      feedbackReason.value = reason || "resolved";
+      feedbackBackdrop.classList.add("is-open");
+      feedbackBackdrop.setAttribute("aria-hidden", "false");
+      setStep(1);
+    }
+
+    function closeFeedbackModal() {
+      pendingSubmitForm = null;
+      feedbackBackdrop.classList.remove("is-open");
+      feedbackBackdrop.setAttribute("aria-hidden", "true");
+    }
+
+    document.querySelectorAll(".js-open-feedback").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        const form = button.closest("form");
+        if (!form || button.dataset.feedbackConfirmed === "true") return;
+        event.preventDefault();
+        openFeedbackModal(form, button.dataset.feedbackReason);
+      });
+    });
+
+    document.querySelectorAll(".feedback-option, .feedback-option-wide").forEach((button) => {
+      button.addEventListener("click", () => {
+        const fieldId = button.dataset.field;
+        const field = document.getElementById(fieldId);
+        if (!field) return;
+        field.value = button.dataset.value || "";
+
+        document.querySelectorAll(`[data-field="${fieldId}"]`).forEach((option) => {
+          option.classList.remove("is-selected");
+        });
+        button.classList.add("is-selected");
+      });
+    });
+
+    feedbackBack.addEventListener("click", () => setStep(currentStep - 1));
+
+    feedbackNext.addEventListener("click", () => {
+      if (currentStep < 5) {
+        setStep(currentStep + 1);
+        return;
+      }
+
+      if (!pendingSubmitForm) return;
+      feedbackCommentsHidden.value = feedbackComments.value || "";
+
+      ["feedback_reason", "feedback_accuracy", "feedback_response", "feedback_issue", "feedback_comments"].forEach((name) => {
+        const modalField = document.querySelector(`#feedback-form [name="${name}"]`);
+        if (!modalField) return;
+        let hidden = pendingSubmitForm.querySelector(`[name="${name}"]`);
+        if (!hidden) {
+          hidden = document.createElement("input");
+          hidden.type = "hidden";
+          hidden.name = name;
+          pendingSubmitForm.appendChild(hidden);
+        }
+        hidden.value = modalField.value;
+      });
+
+      const submitter = pendingSubmitForm.querySelector(".js-open-feedback");
+      if (submitter) submitter.dataset.feedbackConfirmed = "true";
+      pendingSubmitForm.submit();
+    });
+
+    feedbackClose.addEventListener("click", closeFeedbackModal);
+    feedbackBackdrop.addEventListener("click", (event) => {
+      if (event.target === feedbackBackdrop) closeFeedbackModal();
+    });
+
+    setStep(1);
+  });
+</script>
+{% endblock %}

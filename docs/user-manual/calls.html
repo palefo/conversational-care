@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Schedule, run and document structured phone calls, with recordings, transcripts and summaries.">
+<title>Calls · Conversational Care User Manual</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230e7c6b%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 font-family=%22sans-serif%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>CC</text></svg>">
+</head>
+<body>
+<input type="checkbox" id="menu-toggle" aria-hidden="true">
+<div class="topbar">
+  <label for="menu-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></label>
+  <span class="t-title">Conversational Care — User Manual</span>
+</div>
+<div class="wrap">
+<aside class="sidebar">
+  <a class="brand" href="index.html">
+    <span class="brand-mark">CC</span>
+    <span><span class="brand-name">Conversational Care</span><br><span class="brand-sub">User Manual</span></span>
+  </a>
+  <nav class="nav">
+<div class="nav-group">Start here</div>
+<a href="index.html">Welcome</a>
+<a href="getting-started.html">Getting started</a>
+<div class="nav-group">Everyday work</div>
+<a href="dashboard.html">Dashboard</a>
+<a href="clients.html">Clients</a>
+<a href="calls.html" class="active">Calls</a>
+<a href="communications.html">Communications</a>
+<a href="calendar.html">Calendar</a>
+<a href="conversations.html">Conversations</a>
+<a href="alerts.html">Alerts</a>
+<div class="nav-group">Design & configuration</div>
+<a href="protocols.html">Protocols</a>
+<a href="agents.html">Agents</a>
+<a href="users.html">Users</a>
+<a href="settings.html">Settings</a>
+  </nav>
+</aside>
+<main class="content">
+<h1>Calls</h1>
+<p class="lede">Schedule, run and document structured phone calls, with recordings, transcripts and summaries.</p>
+<p>Calls live in <a href="communications.html">Communications</a>, alongside
+everything else that passes between your team and a client. Scheduled calls sit
+under <strong>Coming up</strong>; finished ones move to <strong>Happened</strong>.
+Clicking one opens it in the detail panel, where you run it and write it up
+without leaving the list.</p>
+
+<h2>Scheduling</h2>
+<p>Create appointments from <kbd class="ui">Schedule</kbd> on
+<a href="communications.html">Communications</a>, from the
+<a href="calendar.html">Calendar</a>, or by asking the navigator assistant.
+Pick the client, whether it is a <strong>phone call or an in-person
+meeting</strong> (and if in person, where it takes place), the meeting type
+(onboarding, initial, follow-up, final) and optionally the
+<a href="protocols.html">protocol</a> to run. Only <em>pending</em> meetings can
+be rescheduled.</p>
+
+<h2>Running a call</h2>
+<ol class="steps">
+<li>Open the appointment — from Communications, the Calendar, the client's
+timeline or the dashboard — and press <kbd class="ui">Start call</kbd>. The
+platform places the call to the caregiver's phone through Twilio.</li>
+<li>Work through the protocol questions in the <strong>Protocols</strong> tab,
+recording answers as you go. Answers save themselves as you type, and the panel
+tells you when it last saved.</li>
+<li>Use the <strong>Notes</strong> tab for anything the protocol has no question
+for. It autosaves the same way.</li>
+<li>If the call is not answered you can <kbd class="ui">Send reminder</kbd> to
+the caregiver on WhatsApp — attempts are counted.</li>
+<li>Press <kbd class="ui">End call</kbd> and set the outcome (complete,
+interrupted, not answered). You stay exactly where you were.</li>
+</ol>
+
+<div class="callout"><div class="c-title">Tip</div>
+<kbd class="ui">Start call</kbd> is greyed out, with an explanation, unless both
+you and the caregiver have a phone number on file. Fill those in under the
+client and your own profile.</div>
+
+<h2>Calling it off</h2>
+<p>A call that has not happened yet can be cancelled from the panel footer, with
+a reason. It leaves the queue but stays in the history, struck through, and can
+be put back. A call that already happened keeps its outcome — that is never
+overwritten. See <a href="communications.html">Communications</a> for the
+detail.</p>
+
+<h2>After the call</h2>
+<ul>
+<li><strong>Recordings</strong> — call recordings are fetched from Twilio and
+attached to the meeting (admins can trigger a fetch under
+<a href="settings.html#maintenance">Settings → Maintenance</a>).</li>
+<li><strong>Transcribe</strong> — turn a recording into text with one click;
+<kbd class="ui">Re-transcribe</kbd> replaces it.</li>
+<li><strong>Summaries</strong> — generate a <em>transcript summary</em> and a
+<em>protocol summary</em> for the meeting. The prompts behind these are
+configurable by admins (<a href="settings.html#prompts">Settings →
+Prompts</a>).</li>
+</ul>
+
+<div class="callout warn"><div class="c-title">Heads-up</div>
+Starting calls needs the Twilio integration configured (an admin task), and the
+caregiver's number must be valid — the platform will tell you if a WhatsApp
+reminder can't be delivered.</div>
+<div class="pager"><a href="clients.html"><span class="dir">&larr; Previous</span>Clients</a><a href="communications.html" style="text-align:right"><span class="dir">Next &rarr;</span>Communications</a></div>
+<p class="footer-note">Conversational Care · Wellbeing Technologies Lab, Dyson School of Design Engineering, Imperial College London · AGPL-3.0.<br>
+Developers and operators: see the <a href="../technical-manual.md">technical manual</a>.</p>
+</main>
+</div>
+</body>
+</html>

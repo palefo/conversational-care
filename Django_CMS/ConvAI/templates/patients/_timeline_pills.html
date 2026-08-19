@@ -1,0 +1,6 @@
+{% load i18n %}
+{% comment %} Per-type count pills for a group header. Expects `counts` dict. {% endcomment %}
+{% if counts.recording %}<span class="tl-pill tl-pill-recording" data-kind="recording" title="{% trans 'Calls' %}"><span class="material-icons-outlined">call</span>{{ counts.recording }}</span>{% endif %}
+{% if counts.meeting %}<span class="tl-pill tl-pill-meeting" data-kind="meeting" title="{% trans 'Meetings' %}"><span class="material-icons-outlined">event</span>{{ counts.meeting }}</span>{% endif %}
+{% if counts.alert %}<span class="tl-pill tl-pill-alert" data-kind="alert" title="{% trans 'Alerts' %}"><span class="material-icons-outlined">notification_important</span>{{ counts.alert }}</span>{% endif %}
+{% if counts.conversation %}<span class="tl-pill tl-pill-conversation" data-kind="conversation" title="{% trans 'Chats' %}"><span class="material-icons-outlined">forum</span>{{ counts.conversation }}</span>{% endif %}

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Configure the AI assistants that power every chat surface.">
+<title>Agents · Conversational Care User Manual</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230e7c6b%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 font-family=%22sans-serif%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>CC</text></svg>">
+</head>
+<body>
+<input type="checkbox" id="menu-toggle" aria-hidden="true">
+<div class="topbar">
+  <label for="menu-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></label>
+  <span class="t-title">Conversational Care — User Manual</span>
+</div>
+<div class="wrap">
+<aside class="sidebar">
+  <a class="brand" href="index.html">
+    <span class="brand-mark">CC</span>
+    <span><span class="brand-name">Conversational Care</span><br><span class="brand-sub">User Manual</span></span>
+  </a>
+  <nav class="nav">
+<div class="nav-group">Start here</div>
+<a href="index.html">Welcome</a>
+<a href="getting-started.html">Getting started</a>
+<div class="nav-group">Everyday work</div>
+<a href="dashboard.html">Dashboard</a>
+<a href="clients.html">Clients</a>
+<a href="calls.html">Calls</a>
+<a href="communications.html">Communications</a>
+<a href="calendar.html">Calendar</a>
+<a href="conversations.html">Conversations</a>
+<a href="alerts.html">Alerts</a>
+<div class="nav-group">Design & configuration</div>
+<a href="protocols.html">Protocols</a>
+<a href="agents.html" class="active">Agents</a>
+<a href="users.html">Users</a>
+<a href="settings.html">Settings</a>
+  </nav>
+</aside>
+<main class="content">
+<h1>Agents</h1>
+<p class="lede">Configure the AI assistants that power every chat surface.</p>
+<p class="lede-inline"><span class="badge admin">Admin</span></p>
+<p><strong>Agents</strong> are the AI assistants behind every chat surface —
+the client chat, the WhatsApp conversations, the navigator assistant bubble.
+The Agents page lets admins create, configure and test them.</p>
+
+<h2>Three kinds</h2>
+<div class="table-scroll"><table>
+<tr><th>Kind</th><th>What it is</th><th>You manage</th></tr>
+<tr><td><strong>Prompt-based</strong></td><td>Runs inside the platform, driven by a system prompt you write. No tools.</td><td>Create, edit, delete. The prompt and the model.</td></tr>
+<tr><td><strong>Remote</strong></td><td>Connects to an agent running on your own LangGraph server (host:port).</td><td>Create, edit, delete. The connection details.</td></tr>
+<tr><td><strong>Native</strong></td><td>Ships with the platform (e.g. Loopback, the navigator assistant, self-registration).</td><td>Edit only: the model and voice they use.</td></tr>
+</table></div>
+
+<h2>Creating and editing</h2>
+<ul>
+<li>Every agent has a <strong>name</strong>, a <strong>model</strong> (blank =
+the platform default; prefix with a provider, e.g.
+<code>anthropic/claude-sonnet-4-6</code>), and optionally a
+<strong>voice</strong> for spoken replies.</li>
+<li>Prompt-based agents store the <strong>system prompt</strong> used on every
+turn — write it as instructions to the assistant.</li>
+<li>Remote agents point at an allow-listed host — your platform admin controls
+the allow-list (a security guard).</li>
+<li><strong>Advanced: conversation classification</strong> — configure how the
+agent's conversations are summarised and flagged for human review.</li>
+</ul>
+
+<h2>Testing</h2>
+<p>Every agent has a <kbd class="ui">Test</kbd> button that opens a private
+chat (text and audio) wired to just that agent — nothing is saved. Use it after
+any prompt or model change.</p>
+
+<h2>Assigning agents</h2>
+<p>Each client points at one agent (chosen when
+<a href="clients.html">creating or editing the client</a>) — that agent handles
+their WhatsApp/web conversations and the test-user chat.</p>
+
+<div class="callout"><div class="c-title">Tip</div>
+Loopback simply echoes what it receives — handy as a safe placeholder and for
+checking connectivity end-to-end before pointing a client at a real agent.</div>
+<div class="pager"><a href="protocols.html"><span class="dir">&larr; Previous</span>Protocols</a><a href="users.html" style="text-align:right"><span class="dir">Next &rarr;</span>Users</a></div>
+<p class="footer-note">Conversational Care · Wellbeing Technologies Lab, Dyson School of Design Engineering, Imperial College London · AGPL-3.0.<br>
+Developers and operators: see the <a href="../technical-manual.md">technical manual</a>.</p>
+</main>
+</div>
+</body>
+</html>

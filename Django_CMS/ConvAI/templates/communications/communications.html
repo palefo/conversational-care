@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Communications" %}{% endblock %}
+
+{% block content %}
+{% comment %}
+  Two halves, not one timeline. Coming up counts forward and Happened counts
+  back, because a queue and a record want opposite orders and one list can only
+  have one. Rows deliberately match the dashboard's — same icons, same badges,
+  same two-line shape — so moving between the pages costs nothing.
+{% endcomment %}
+
+<header class="cm-hd">
+  <div>
+    <h1>{% trans "Communications" %}</h1>
+    {% if focus_patient %}
+      <p class="cm-sub">
+        {{ focus_patient.name }} {{ focus_patient.lastname }} ·
+        <a href="?tab={{ tab }}" style="color:#0369a1;font-weight:600">{% trans "Show all clients" %}</a>
+      </p>
+    {% else %}
+      <p class="cm-sub">
+        {% if tab == 'up' %}{% trans "What still needs doing, soonest first." %}
+        {% else %}{% trans "What has already happened, newest first." %}{% endif %}
+      </p>
+    {% endif %}
+  </div>
+  <button type="button" class="cm-new" id="cmNew">
+    <span class="material-icons-outlined">add</span>{% trans "Schedule" %}
+  </button>
+</header>
+
+{% include "communications/_list.html" %}
+
+{% comment %}
+  Scheduling as a dialog rather than a page. The form is the same MeetingForm
+  the old page used, so nothing about validation or clash detection changes —
+  only where you fill it in. It posts back to this URL, so a failure re-renders
+  the list with the dialog reopened and your answers still in it.
+{% endcomment %}
+<div class="cm-modal" id="cmModal" role="dialog" aria-modal="true"
+     aria-labelledby="cmModalTitle" {% if not schedule_form.errors %}hidden{% endif %}>
+  <div class="cm-dialog">
+    <div class="cm-dialog-h">
+      <div>
+        <h2 id="cmModalTitle">{% trans "Schedule" %}</h2>
+        <p>{% trans "A call or an in-person meeting." %}</p>
+      </div>
+      <button type="button" class="cm-dialog-x" id="cmModalX" aria-label="{% trans 'Close' %}">✕</button>
+    </div>
+    <form class="cm-form" method="post" action="{% url 'communications' %}">
+      {% csrf_token %}
+      <input type="hidden" name="schedule" value="1">
+      {% for field in schedule_form %}
+        <div class="cm-field" {% if field.name == 'location' %}data-location{% endif %}>
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% for e in field.errors %}<p class="err">{{ e }}</p>{% endfor %}
+          {% if field.help_text %}<p class="hint">{{ field.help_text }}</p>{% endif %}
+        </div>
+      {% endfor %}
+      <div class="cm-dialog-f">
+        <button type="button" class="cm-btn" id="cmModalCancel">{% trans "Cancel" %}</button>
+        <button type="submit" class="cm-btn cm-btn-pri">{% trans "Schedule" %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+  (function () {
+    var modal = document.getElementById('cmModal');
+    if (!modal) return;
+    var opener = document.getElementById('cmNew');
+    var lastFocus = null;
+
+    function open() {
+      lastFocus = document.activeElement;
+      modal.hidden = false;
+      var first = modal.querySelector('select, input, textarea');
+      if (first) first.focus();
+    }
+    function close() {
+      modal.hidden = true;
+      if (lastFocus) lastFocus.focus();
+    }
+    opener.addEventListener('click', open);
+
+    // Opened from somewhere else — the follow-up action in a call panel links
+    // here with ?schedule=<client pk>, because the dialog and its form live on
+    // this page and duplicating them into the panel would give the platform two
+    // scheduling forms to keep in step.
+    (function () {
+      var want = new URLSearchParams(location.search).get('schedule');
+      if (!want) return;
+      var sel = modal.querySelector('select[name="patient"]');
+      if (sel) sel.value = want;
+      open();
+    })();
+    document.getElementById('cmModalX').addEventListener('click', close);
+    document.getElementById('cmModalCancel').addEventListener('click', close);
+    // Clicking the backdrop closes; clicking the dialog itself must not.
+    modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.hidden) close();
+    });
+
+    // Where to be only applies to a meeting you turn up to, so the field
+    // appears with the modality rather than sitting empty for every call.
+    var modality = modal.querySelector('[name="modality"]');
+    var place = modal.querySelector('[data-location]');
+    function sync() {
+      if (!modality || !place) return;
+      var opt = modality.options[modality.selectedIndex];
+      place.hidden = !(opt && /1/.test(modality.value));
+    }
+    if (modality) { modality.addEventListener('change', sync); sync(); }
+
+    // Folding a day. Which days are folded is remembered per browser and keyed
+    // to the day itself, so collapsing a heavy Tuesday keeps it collapsed as
+    // you page around and does not fold some unrelated day next week.
+    var FKEY = 'cmFolded';
+    function folded() {
+      try { return JSON.parse(localStorage.getItem(FKEY)) || {}; } catch (e) { return {}; }
+    }
+    function setFolded(day, isFolded) {
+      var f = folded();
+      if (isFolded) { f[day] = 1; } else { delete f[day]; }
+      try { localStorage.setItem(FKEY, JSON.stringify(f)); } catch (e) {}
+    }
+    function apply(head, isFolded) {
+      head.setAttribute('aria-expanded', String(!isFolded));
+      var rows = document.querySelector('[data-rows="' + head.dataset.day + '"]');
+      if (rows) rows.hidden = isFolded;
+    }
+
+    var saved = folded();
+    document.querySelectorAll('.cm-day').forEach(function (head) {
+      if (saved[head.dataset.day]) apply(head, true);
+      head.addEventListener('click', function () {
+        // Anchor on the header so folding a day above you does not slide the
+        // list under the cursor — the same rule the dashboard sections use.
+        var main = document.querySelector('main');
+        var before = head.getBoundingClientRect().top;
+        var isFolded = head.getAttribute('aria-expanded') === 'true';
+        apply(head, isFolded);
+        setFolded(head.dataset.day, isFolded);
+        if (main) {
+          var delta = head.getBoundingClientRect().top - before;
+          if (delta) main.scrollTop += delta;
+        }
+      });
+    });
+
+    // The search submits on a pause rather than on every keystroke, so typing
+    // a client's name is one page load instead of eight.
+    var tools = document.getElementById('cmTools');
+    var find = tools.querySelector('.cm-find');
+    var t = null;
+    find.addEventListener('input', function () {
+      clearTimeout(t);
+      t = setTimeout(function () { tools.submit(); }, 450);
+    });
+  })();
+</script>
+{% endblock %}

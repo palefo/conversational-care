@@ -1,0 +1,595 @@
+{% extends "blank.html" %}
+{% load i18n static %}
+
+{% block title %}{% trans "External Chat" %}{% endblock %}
+
+{% block extra_head %}
+{# Tailwind is inherited from blank.html (built locally). #}
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<style>
+  /* NOTE: classes are prefixed `wa-` on purpose, to stay isolated from the
+     global .chat-container/.message/.message-bubble rules in app_new_design.css. */
+  :root {
+    --wa-header: #006877;          /* app primary 500 */
+    --wa-header-dark: #084e59;
+    --wa-bg: #e7ecef;              /* chat backdrop */
+    --wa-panel: #f6f8f9;           /* input/footer bar */
+    --wa-out-bubble: #d7e8ec;      /* outgoing (user) */
+    --wa-out-text: #0b3238;
+    --wa-in-bubble: #ffffff;       /* incoming (bot) */
+    --wa-in-text: #1f2937;
+    --wa-meta: #6b7b80;            /* timestamps */
+    --wa-tick: #1f7b88;
+    --wa-rec: #e11d48;             /* recording red */
+    --wa-shadow: rgba(8, 78, 89, 0.10);
+  }
+
+  html, body { height: 100%; }
+  body {
+    padding: 0 !important; margin: 0;
+    background: var(--wa-bg) !important;
+    font-family: 'DM Sans', sans-serif;
+    display: block !important;
+  }
+
+  .wa-chat {
+    display: flex; flex-direction: column;
+    height: 100vh; height: 100dvh;
+    max-width: 900px; margin: 0 auto;
+    background:
+      radial-gradient(rgba(0,54,62,0.035) 1px, transparent 1px) 0 0 / 22px 22px,
+      var(--wa-bg);
+    box-shadow: 0 0 40px rgba(0,0,0,0.06);
+  }
+
+  /* ---------- Header ---------- */
+  .wa-topbar {
+    background: linear-gradient(135deg, var(--wa-header), var(--wa-header-dark));
+    color: #fff; padding: .7rem 1rem;
+    display: flex; align-items: center; gap: .8rem;
+    flex-shrink: 0; z-index: 5;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+  }
+  .wa-avatar {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: rgba(255,255,255,0.18);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; overflow: hidden;
+  }
+  .wa-avatar .material-icons-round { font-size: 26px; }
+  .wa-headinfo { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+  .wa-headinfo .wa-title { font-size: 1.02rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wa-headinfo .wa-status { font-size: .76rem; opacity: .85; display: flex; align-items: center; gap: .3rem; }
+  .wa-headinfo .wa-status .wa-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; display: inline-block; }
+
+  /* ---------- Messages ---------- */
+  .wa-thread {
+    flex: 1; overflow-y: auto; padding: 1.1rem 1rem 1.3rem;
+    display: flex; flex-direction: column; gap: .35rem;
+    scroll-behavior: smooth;
+  }
+  .wa-empty {
+    align-self: center; margin: auto 0;
+    background: rgba(255,255,255,0.85); color: var(--wa-meta);
+    padding: .55rem 1rem; border-radius: 14px; font-size: .82rem;
+    box-shadow: 0 1px 3px var(--wa-shadow); text-align: center;
+  }
+  .wa-sysline {
+    align-self: center; margin: .35rem auto; color: var(--wa-meta);
+    font-size: .72rem; text-align: center; opacity: .85;
+  }
+  .wa-hint {
+    text-align: center; color: var(--wa-meta); font-size: .68rem;
+    opacity: .7; padding: .25rem 1rem .1rem;
+  }
+  .wa-hint code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .wa-msg {
+    display: flex; max-width: 78%; align-items: flex-start;
+    opacity: 0; transform: translateY(10px);
+    animation: waFadeIn .28s ease-out forwards;
+  }
+  @keyframes waFadeIn { to { opacity: 1; transform: translateY(0); } }
+  .wa-msg.user { align-self: flex-end; }
+  .wa-msg.bot  { align-self: flex-start; }
+  .wa-msg + .wa-msg.user,
+  .wa-msg + .wa-msg.bot { margin-top: .12rem; }
+
+  .wa-bubble {
+    position: relative;
+    padding: .45rem .65rem .4rem;
+    border-radius: 12px;
+    line-height: 1.4; font-size: .95rem;
+    word-wrap: break-word; overflow-wrap: anywhere; white-space: pre-wrap;
+    box-shadow: 0 1px 1.5px var(--wa-shadow);
+  }
+  .wa-msg.bot  .wa-bubble { background: var(--wa-in-bubble);  color: var(--wa-in-text);  border-top-left-radius: 3px; }
+  .wa-msg.user .wa-bubble { background: var(--wa-out-bubble); color: var(--wa-out-text); border-top-right-radius: 3px; }
+
+  /* Bubble tail */
+  .wa-msg.bot  .wa-bubble::before,
+  .wa-msg.user .wa-bubble::before { content: ""; position: absolute; top: 0; width: 9px; height: 12px; }
+  .wa-msg.bot  .wa-bubble::before { left: -6px;  background: radial-gradient(circle at bottom right, transparent 11px, var(--wa-in-bubble) 12px); }
+  .wa-msg.user .wa-bubble::before { right: -6px; background: radial-gradient(circle at bottom left,  transparent 11px, var(--wa-out-bubble) 12px); }
+
+  .wa-time {
+    display: flex; align-items: center; justify-content: flex-end; gap: .2rem;
+    font-size: .66rem; color: var(--wa-meta); margin-top: .1rem; line-height: 1; user-select: none;
+  }
+  .wa-msg.user .wa-time .material-icons-round { font-size: 15px; color: var(--wa-tick); }
+
+  /* ---------- Audio bubble ---------- */
+  .wa-bubble.wa-audiobubble { padding: .35rem .5rem; }
+  /* Fixed, compact row. height + overflow:hidden guarantees the bubble stays
+     short even if the browser gives the (control-less) <audio> element a box —
+     Tailwind Preflight forces `audio { display:block }`, which otherwise reveals
+     it and inflates the height. */
+  .wa-audioplayer {
+    display: flex; align-items: center; gap: .55rem;
+    width: min(320px, 60vw); height: 42px; overflow: hidden;
+  }
+  .wa-audioplayer > audio { display: none !important; width: 0; height: 0; }
+  .wa-audiobubble .wa-time { margin-top: .05rem; }
+  .wa-playbtn { background: transparent; border: none; cursor: pointer; padding: 0; line-height: 1; color: var(--wa-header); flex-shrink: 0; }
+  .wa-playbtn .material-icons-round { font-size: 38px; }
+  .wa-msg.user .wa-playbtn { color: var(--wa-header-dark); }
+  .wa-track { flex: 1; height: 4px; background: rgba(0,54,62,0.18); border-radius: 9999px; position: relative; cursor: pointer; }
+  .wa-progress { height: 100%; background: var(--wa-header); border-radius: 9999px; position: absolute; top: 0; left: 0; width: 0; }
+  .wa-track::after {
+    content: ""; position: absolute; top: 50%; left: var(--thumb, 0%);
+    width: 11px; height: 11px; border-radius: 50%; background: var(--wa-header);
+    transform: translate(-50%, -50%); box-shadow: 0 1px 2px rgba(0,0,0,.25);
+  }
+  .wa-audiodur { font-size: .68rem; color: var(--wa-meta); min-width: 30px; text-align: right; }
+
+  /* ---------- Typing indicator ---------- */
+  #wa-typing { padding: 0 1rem .4rem; }
+  .wa-typing-bubble { display: inline-flex; align-items: center; gap: .28rem; background: var(--wa-in-bubble);
+    padding: .7rem .8rem; border-radius: 12px; border-top-left-radius: 3px; box-shadow: 0 1px 1.5px var(--wa-shadow); }
+  .wa-typing-bubble span { width: 7px; height: 7px; background: #9fb4b9; border-radius: 50%; animation: waBounce 1.3s infinite ease-in-out both; }
+  .wa-typing-bubble span:nth-child(1){ animation-delay: -.32s; }
+  .wa-typing-bubble span:nth-child(2){ animation-delay: -.16s; }
+  @keyframes waBounce { 0%,80%,100%{ transform: scale(.4); opacity:.5; } 40%{ transform: scale(1); opacity:1; } }
+
+  /* ---------- Footer / input ---------- */
+  .wa-footer { padding: .55rem .7rem calc(.55rem + env(safe-area-inset-bottom)); background: var(--wa-panel); flex-shrink: 0; }
+  .wa-composer { display: flex; align-items: center; gap: .5rem; }
+  .wa-textfield {
+    flex: 1; display: flex; align-items: center;
+    background: #fff; border-radius: 24px; padding: 0 .4rem 0 1rem;
+    box-shadow: 0 1px 2px var(--wa-shadow);
+  }
+  .wa-textfield input[type="text"] {
+    flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+    font-size: 1rem; color: var(--wa-in-text); padding: .7rem 0; font-family: inherit;
+  }
+  .wa-textfield input::placeholder { color: #9aa6aa; }
+
+  .wa-iconbtn {
+    width: 48px; height: 48px; flex: 0 0 48px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--wa-header), var(--wa-header-dark));
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    border: none; cursor: pointer; transition: transform .15s, opacity .2s;
+    box-shadow: 0 3px 8px rgba(0,54,62,.28);
+  }
+  .wa-iconbtn .material-icons-round { font-size: 24px; }
+  .wa-iconbtn:hover { transform: scale(1.05); }
+  .wa-iconbtn:active { transform: scale(.96); }
+  .wa-iconbtn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .wa-fieldbtn {
+    width: 40px; height: 40px; flex: 0 0 40px; border-radius: 50%;
+    background: transparent; color: var(--wa-header); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: background .15s;
+  }
+  .wa-fieldbtn:hover { background: rgba(0,104,119,0.08); }
+  .wa-fieldbtn .material-icons-round { font-size: 25px; }
+
+  /* ---------- Recording bar ---------- */
+  .wa-recbar {
+    flex: 1; display: none; align-items: center; gap: .6rem;
+    background: #fff; border-radius: 24px; padding: .35rem .5rem .35rem 1rem;
+    box-shadow: 0 1px 2px var(--wa-shadow);
+  }
+  .wa-recdot { width: 12px; height: 12px; border-radius: 50%; background: var(--wa-rec); flex-shrink: 0; animation: waRecPulse 1.1s infinite; }
+  @keyframes waRecPulse { 0%,100%{ opacity: 1; } 50%{ opacity: .25; } }
+  .wa-rectime { font-variant-numeric: tabular-nums; color: var(--wa-in-text); font-size: .95rem; min-width: 44px; }
+  .wa-rechint { flex: 1; color: #9aa6aa; font-size: .85rem; }
+  .wa-reccancel { color: var(--wa-rec); }
+  .wa-reccancel:hover { background: rgba(225,29,72,0.1); }
+
+  .is-recording .wa-textfield,
+  .is-recording #micButton,
+  .is-recording #sendButton { display: none !important; }
+  .is-recording .wa-recbar { display: flex; }
+  .is-recording #recSendButton { display: flex !important; }
+
+  #sendButton { display: none; }
+  #recSendButton { display: none; }
+
+  @media (max-width: 768px) {
+    .wa-chat { max-width: 100%; box-shadow: none; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wa-chat">
+  <!-- Header -->
+  <header class="wa-topbar">
+    <div class="wa-avatar"><span class="material-icons-round">support_agent</span></div>
+    <div class="wa-headinfo">
+      <span class="wa-title">{{ chat_title }}</span>
+      <span class="wa-status"><span class="wa-dot"></span>{% trans "online" %}</span>
+    </div>
+  </header>
+
+  <!-- Chat history -->
+  <main id="wa-thread" class="wa-thread">
+    {% if messages %}
+      {% for row in messages %}
+        <div class="wa-msg {{ row.who }}">
+          {% if row.audio %}
+            <div class="wa-bubble wa-audiobubble">
+              <div class="wa-audioplayer">
+                <button class="wa-playbtn" title="{% trans 'Play/Pause' %}"><span class="material-icons-round">play_circle</span></button>
+                <div class="wa-track"><div class="wa-progress"></div></div>
+                <span class="wa-audiodur">0:00</span>
+                <audio src="{{ row.audio }}" preload="metadata"></audio>
+              </div>
+              <div class="wa-time">{{ row.ts|time:"H:i" }}{% if row.who == 'user' %} <span class="material-icons-round">done_all</span>{% endif %}</div>
+            </div>
+          {% else %}
+            <div class="wa-bubble"><span class="wa-text">{{ row.text }}</span><div class="wa-time">{{ row.ts|time:"H:i" }}{% if row.who == 'user' %} <span class="material-icons-round">done_all</span>{% endif %}</div></div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="wa-empty">{% trans "Type a message or tap the microphone to speak" %}</div>
+    {% endif %}
+  </main>
+
+  <!-- Typing indicator -->
+  <div id="wa-typing" class="hidden">
+    <div class="wa-typing-bubble"><span></span><span></span><span></span></div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="wa-footer">
+    <div id="inputWrapper" class="wa-composer">
+      <!-- Text field -->
+      <div class="wa-textfield">
+        <input id="messageInput" type="text" autocomplete="off"
+               placeholder="{% trans 'Type a message' %}">
+      </div>
+
+      <!-- Recording bar (replaces text field while recording) -->
+      <div class="wa-recbar">
+        <span class="wa-recdot"></span>
+        <span id="recTime" class="wa-rectime">0:00</span>
+        <button id="cancelRecButton" class="wa-fieldbtn wa-reccancel" type="button" title="{% trans 'Cancel' %}">
+          <span class="material-icons-round">delete</span>
+        </button>
+        <span class="wa-rechint">{% trans 'Recording…' %}</span>
+      </div>
+
+      <!-- Mic / Send / Send-recording -->
+      <button id="micButton" class="wa-iconbtn" type="button" title="{% trans 'Record audio' %}">
+        <span class="material-icons-round">mic</span>
+      </button>
+      <button id="sendButton" class="wa-iconbtn" type="button" title="{% trans 'Send' %}">
+        <span class="material-icons-round">send</span>
+      </button>
+      <button id="recSendButton" class="wa-iconbtn" type="button" title="{% trans 'Send audio' %}">
+        <span class="material-icons-round">send</span>
+      </button>
+    </div>
+    <div class="wa-hint">{% blocktrans %}Write a message, or type <code>/quit</code> to end the conversation.{% endblocktrans %}</div>
+  </footer>
+</div>
+
+<!-- Feedback sounds -->
+<audio id="receive-sound" preload="auto" src="{% static 'app/sounds/receive.mp3' %}"></audio>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // ---- CSRF token ----
+  // The csrftoken cookie is HttpOnly (CSRF_COOKIE_HTTPONLY=True), so JS cannot
+  // read it. Render the token straight from Django instead.
+  const CSRF_TOKEN = "{{ csrf_token }}";
+
+  // ---- Endpoints ----
+  // Defaults target the external chat; callers (e.g. the agent test page) can
+  // override send_url/audio_url and pass a thread_id.
+  const textURL   = "{{ send_url|default:'' }}" || "{% url 'send_external_message' %}";
+  const audioURL  = "{{ audio_url|default:'' }}" || "{% url 'process_audio' %}";
+  // Mutable so /quit can start a fresh client-managed session (agent test).
+  let   currentThread = "{{ thread_id|default:'' }}";
+  const QUIT_CMDS = ['/quit', '/restart'];
+  function genUUID(){
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
+      var r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8); return v.toString(16);
+    });
+  }
+
+  // ---- Elements ----
+  const chat      = document.getElementById('wa-thread');
+  const typing    = document.getElementById('wa-typing');
+  const inp        = document.getElementById('messageInput');
+  const inputWrap  = document.getElementById('inputWrapper');
+  const micBtn     = document.getElementById('micButton');
+  const sendBtn    = document.getElementById('sendButton');
+  const recSendBtn = document.getElementById('recSendButton');
+  const cancelBtn  = document.getElementById('cancelRecButton');
+  const recTime    = document.getElementById('recTime');
+  const recvSound  = document.getElementById('receive-sound');
+  let   emptyState = document.querySelector('.wa-empty');
+
+  let mediaRecorder, audioChunks = [], recStream = null;
+  let recTimer = null, recSeconds = 0, cancelled = false;
+
+  // ---- Show send vs mic depending on text ----
+  function refreshComposer(){
+    if(inp.value.trim()){
+      sendBtn.style.display = 'flex';
+      micBtn.style.display  = 'none';
+    } else {
+      sendBtn.style.display = 'none';
+      micBtn.style.display  = 'flex';
+    }
+  }
+  inp.addEventListener('input', refreshComposer);
+  refreshComposer();
+
+  // ---- Enter to send ----
+  inp.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter' && !e.shiftKey){
+      e.preventDefault();
+      if(inp.value.trim()) sendBtn.click();
+    }
+  });
+
+  // ---- Text send ----
+  sendBtn.addEventListener('click', async ()=>{
+    const txt = inp.value.trim(); if(!txt) return;
+    appendText(txt,'user');
+    inp.value=''; refreshComposer();
+
+    // /quit or /restart ends the current conversation.
+    if (QUIT_CMDS.includes(txt.toLowerCase())){
+      setBusy(true);
+      try {
+        await fetch(textURL,{
+          method:'POST',
+          headers:{ 'Content-Type':'application/json', 'X-CSRFToken':CSRF_TOKEN },
+          body:JSON.stringify({ message:txt, conversation_id: currentThread })
+        });
+      } catch(e){ /* best-effort: still reset the UI */ }
+      currentThread = genUUID();  // fresh session for client-managed threads
+      appendSystem("{% trans 'Conversation ended. Send a message to start a new one.' %}");
+      setBusy(false);
+      return;
+    }
+
+    setBusy(true); showTyping();
+    try {
+      const res = await fetch(textURL,{
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'X-CSRFToken':CSRF_TOKEN },
+        body:JSON.stringify({ message:txt, conversation_id: currentThread })
+      });
+      const j = await res.json();
+      hideTyping();
+      appendText(j.bot_message,'bot'); playSafe(recvSound);
+    } catch(e){
+      hideTyping();
+      appendText("{% trans 'Error: could not get a response.' %}",'bot');
+    }
+    setBusy(false);
+  });
+
+  // ================= Recording =================
+  micBtn.addEventListener('click', async ()=>{
+    // The microphone (getUserMedia) is only available in a secure context:
+    // HTTPS, or http://localhost. On a plain http:// origin (e.g. an IP or
+    // domain) browsers block it — Firefox even reports it as "permission
+    // denied" — regardless of the OS/browser mic permission.
+    if(!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      appendText("{% trans 'Recording needs a secure connection (HTTPS) or localhost. Open the site over HTTPS to use the microphone.' %}",'bot');
+      return;
+    }
+    try {
+      recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch(err){
+      console.error(err);
+      let msg;
+      if (err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
+        msg = "{% trans 'Microphone permission denied. Allow it in the browser to record.' %}";
+      } else if (err && (err.name === 'NotFoundError' || err.name === 'NotReadableError')) {
+        msg = "{% trans 'No microphone was found, or it is in use by another app.' %}";
+      } else {
+        msg = "{% trans 'Could not access the microphone.' %}";
+      }
+      appendText(msg,'bot');
+      return;
+    }
+
+    audioChunks = []; cancelled = false;
+    let options = {};
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported){
+      if (MediaRecorder.isTypeSupported('audio/webm')) options = { mimeType:'audio/webm' };
+      else if (MediaRecorder.isTypeSupported('audio/mp4')) options = { mimeType:'audio/mp4' };
+    }
+    try { mediaRecorder = new MediaRecorder(recStream, options); }
+    catch(e){ mediaRecorder = new MediaRecorder(recStream); }
+    mediaRecorder.ondataavailable = e=>{ if(e.data && e.data.size) audioChunks.push(e.data); };
+    mediaRecorder.onstop = ()=>onStop();
+    mediaRecorder.start();
+
+    startRecTimer();
+    inputWrap.classList.add('is-recording');
+  });
+
+  recSendBtn.addEventListener('click', ()=>{ cancelled = false; stopRecorder(); });
+  cancelBtn.addEventListener('click',  ()=>{ cancelled = true;  stopRecorder(); });
+
+  function stopRecorder(){
+    stopRecTimer();
+    inputWrap.classList.remove('is-recording');
+    if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    if(recStream){ recStream.getTracks().forEach(t=>t.stop()); recStream = null; }
+  }
+
+  function onStop(){
+    if(cancelled){ audioChunks = []; return; }
+    if(!audioChunks.length) return;
+    const type = (mediaRecorder && mediaRecorder.mimeType) || 'audio/webm';
+    uploadAudio(new Blob(audioChunks, { type }));
+  }
+
+  function startRecTimer(){
+    recSeconds = 0; recTime.textContent = '0:00';
+    recTimer = setInterval(()=>{
+      recSeconds++;
+      recTime.textContent = formatTime(recSeconds);
+      if(recSeconds >= 120) recSendBtn.click();  // 2-min cap
+    }, 1000);
+  }
+  function stopRecTimer(){ if(recTimer){ clearInterval(recTimer); recTimer = null; } }
+
+  async function uploadAudio(blob){
+    const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+    appendAudio(URL.createObjectURL(blob),'user', blob);
+    setBusy(true); showTyping();
+    try {
+      const fd = new FormData();
+      fd.append('audio_data', blob, 'rec.'+ext);
+      if(currentThread) fd.append('conversation_id', currentThread);
+      const res = await fetch(audioURL,{ method:'POST', headers:{ 'X-CSRFToken':CSRF_TOKEN }, body:fd });
+      const j = await res.json();
+      hideTyping();
+      if(j.response_audio) appendAudio(j.response_audio,'bot');
+      else appendText(j.response || "{% trans 'Error: could not process the audio.' %}",'bot');
+      playSafe(recvSound);
+    } catch(err){
+      hideTyping();
+      appendText("{% trans 'Error: could not process the audio.' %}",'bot');
+    }
+    setBusy(false);
+  }
+
+  // ================= Helpers =================
+  function nowTime(){
+    const d = new Date();
+    return d.getHours() + ':' + d.getMinutes().toString().padStart(2,'0');
+  }
+  function clearEmpty(){ if(emptyState){ emptyState.remove(); emptyState = null; } }
+
+  function appendSystem(txt){
+    clearEmpty();
+    const d = document.createElement('div');
+    d.className = 'wa-sysline';
+    d.textContent = txt;
+    chat.appendChild(d);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function appendText(txt, who){
+    clearEmpty();
+    const d = document.createElement('div');
+    d.className = `wa-msg ${who}`;
+    const tick = who==='user' ? '<span class="material-icons-round">done_all</span>' : '';
+    d.innerHTML = `<div class="wa-bubble"><span class="wa-text"></span><div class="wa-time">${nowTime()} ${tick}</div></div>`;
+    d.querySelector('.wa-text').textContent = txt;
+    chat.appendChild(d);
+    scrollToBottom();
+  }
+
+  function appendAudio(src, who, blobForDuration){
+    clearEmpty();
+    const d = document.createElement('div');
+    d.className = `wa-msg ${who}`;
+    const tick = who==='user' ? '<span class="material-icons-round">done_all</span>' : '';
+    d.innerHTML = `
+      <div class="wa-bubble wa-audiobubble">
+        <div class="wa-audioplayer">
+          <button class="wa-playbtn" title="{% trans 'Play/Pause' %}"><span class="material-icons-round">play_circle</span></button>
+          <div class="wa-track"><div class="wa-progress"></div></div>
+          <span class="wa-audiodur">0:00</span>
+          <audio src="${src}" preload="metadata"></audio>
+        </div>
+        <div class="wa-time">${nowTime()} ${tick}</div>
+      </div>`;
+    chat.appendChild(d);
+    scrollToBottom();
+    wireAudio(d, blobForDuration);
+  }
+
+  function wireAudio(container, blobForDuration){
+    const audio = container.querySelector('audio'),
+          btn   = container.querySelector('.wa-playbtn'),
+          icon  = btn.querySelector('.material-icons-round'),
+          prog  = container.querySelector('.wa-progress'),
+          track = container.querySelector('.wa-track'),
+          dur   = container.querySelector('.wa-audiodur');
+
+    const setDurationSafely = async ()=>{
+      if (isFinite(audio.duration) && !isNaN(audio.duration) && audio.duration>0){
+        dur.textContent = formatTime(audio.duration);
+      } else if (blobForDuration){
+        try { const d = await getBlobDuration(blobForDuration); if(d && isFinite(d)) dur.textContent = formatTime(d); } catch(e){}
+      }
+    };
+    if (audio.readyState >= 1) setDurationSafely();
+    audio.addEventListener('loadedmetadata', setDurationSafely);
+
+    btn.addEventListener('click', ()=>{
+      if(!audio.paused){ audio.pause(); icon.textContent='play_circle'; return; }
+      document.querySelectorAll('#wa-thread audio').forEach(a=>{ if(a!==audio) a.pause(); });
+      document.querySelectorAll('.wa-playbtn .material-icons-round').forEach(i=>{ if(i!==icon) i.textContent='play_circle'; });
+      audio.play().catch(()=>{}); icon.textContent='pause_circle';
+    });
+
+    audio.ontimeupdate = ()=>{
+      if(audio.duration){
+        const pct = audio.currentTime/audio.duration*100;
+        prog.style.width = pct+'%';
+        track.style.setProperty('--thumb', pct+'%');
+      }
+    };
+    audio.onended = ()=>{ icon.textContent='play_circle'; prog.style.width='0%'; track.style.setProperty('--thumb','0%'); };
+    track.addEventListener('click', (e)=>{
+      if(!audio.duration) return;
+      const r = track.getBoundingClientRect();
+      const pct = Math.min(Math.max((e.clientX-r.left)/r.width,0),1);
+      audio.currentTime = pct*audio.duration;
+    });
+  }
+
+  async function getBlobDuration(blob){
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    try {
+      const buf = await blob.arrayBuffer();
+      const audioBuf = await new Promise((resolve, reject)=> ctx.decodeAudioData(buf, resolve, reject));
+      const d = audioBuf.duration; await ctx.close(); return d;
+    } catch(e){ try{ await ctx.close(); }catch(_){}; return 0; }
+  }
+
+  function formatTime(s){
+    const m = Math.floor(s/60), sec = Math.floor(s%60);
+    return m+':'+sec.toString().padStart(2,'0');
+  }
+  function scrollToBottom(){ chat.scrollTop = chat.scrollHeight; }
+  function showTyping(){ typing.classList.remove('hidden'); scrollToBottom(); }
+  function hideTyping(){ typing.classList.add('hidden'); }
+  function playSafe(a){ try{ a.currentTime = 0; a.play(); }catch(e){} }
+  function setBusy(dis){ inp.disabled = dis; sendBtn.disabled = dis; micBtn.disabled = dis; }
+
+  // ---- Wire server-rendered history (audio players) and jump to newest ----
+  document.querySelectorAll('#wa-thread .wa-audioplayer').forEach(pl => wireAudio(pl.closest('.wa-msg')));
+  scrollToBottom();
+</script>
+{% endblock %}

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Sign in, find your way around, and set the interface up for you.">
+<title>Getting started · Conversational Care User Manual</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230e7c6b%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 font-family=%22sans-serif%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>CC</text></svg>">
+</head>
+<body>
+<input type="checkbox" id="menu-toggle" aria-hidden="true">
+<div class="topbar">
+  <label for="menu-toggle" aria-label="Toggle navigation"><span></span><span></span><span></span></label>
+  <span class="t-title">Conversational Care — User Manual</span>
+</div>
+<div class="wrap">
+<aside class="sidebar">
+  <a class="brand" href="index.html">
+    <span class="brand-mark">CC</span>
+    <span><span class="brand-name">Conversational Care</span><br><span class="brand-sub">User Manual</span></span>
+  </a>
+  <nav class="nav">
+<div class="nav-group">Start here</div>
+<a href="index.html">Welcome</a>
+<a href="getting-started.html" class="active">Getting started</a>
+<div class="nav-group">Everyday work</div>
+<a href="dashboard.html">Dashboard</a>
+<a href="clients.html">Clients</a>
+<a href="calls.html">Calls</a>
+<a href="communications.html">Communications</a>
+<a href="calendar.html">Calendar</a>
+<a href="conversations.html">Conversations</a>
+<a href="alerts.html">Alerts</a>
+<div class="nav-group">Design & configuration</div>
+<a href="protocols.html">Protocols</a>
+<a href="agents.html">Agents</a>
+<a href="users.html">Users</a>
+<a href="settings.html">Settings</a>
+  </nav>
+</aside>
+<main class="content">
+<h1>Getting started</h1>
+<p class="lede">Sign in, find your way around, and set the interface up for you.</p>
+<h2>Signing in</h2>
+<ol class="steps">
+<li>Open your organisation's platform address in a browser and enter the
+username and password you received.</li>
+<li>Where you land depends on your role: navigators and admins go to the
+<a href="dashboard.html">Dashboard</a>; test users go straight to the audio
+chat of their linked client.</li>
+<li>To finish a session, open <kbd class="ui">Profile</kbd> (left menu) and
+use <kbd class="ui">Log out</kbd>.</li>
+</ol>
+<div class="callout warn"><div class="c-title">Note</div>
+There is no self-service password reset yet. If you lose your password, ask
+your admin to set a new one from the <em>Users</em> page.</div>
+
+<h2>The layout</h2>
+<p>Everything hangs off the left sidebar (collapsible with the
+<kbd class="ui">☰</kbd> toggle):</p>
+<ul>
+<li><strong>Home</strong> — the dashboard.</li>
+<li><strong>Clients</strong> — your caseload.</li>
+<li><strong>Calls</strong> and <strong>Calendar</strong> — scheduled phone appointments.</li>
+<li><strong>Alerts</strong> — conversations escalated for review.</li>
+<li><strong>Users</strong>, <strong>Agents</strong>, <strong>Settings</strong> — admin-only configuration.</li>
+<li><strong>Help</strong> — your organisation's own guidance page.</li>
+<li><strong>Profile</strong> — your account, language, and API token.</li>
+</ul>
+<p>A chat bubble in the corner opens the <strong>navigator assistant</strong> —
+a built-in AI helper that can look up clients and schedule meetings for you.</p>
+
+<h2>Your profile</h2>
+<ul>
+<li><strong>Personal information</strong> — update how your name appears across
+the platform (your username itself cannot be changed here).</li>
+<li><strong>Language</strong> — the interface is available in English, Spanish,
+Portuguese, Italian, Korean and Simplified Chinese. Pick yours, or keep the
+system default chosen by your organisation.</li>
+<li><strong>API token</strong> — only needed if you script the platform with
+the Python client. The token is shown once when generated; regenerating it
+revokes the previous one. See <a href="settings.html#api-client">Settings →
+API client</a>.</li>
+</ul>
+<div class="pager"><a href="index.html"><span class="dir">&larr; Previous</span>Welcome</a><a href="dashboard.html" style="text-align:right"><span class="dir">Next &rarr;</span>Dashboard</a></div>
+<p class="footer-note">Conversational Care · Wellbeing Technologies Lab, Dyson School of Design Engineering, Imperial College London · AGPL-3.0.<br>
+Developers and operators: see the <a href="../technical-manual.md">technical manual</a>.</p>
+</main>
+</div>
+</body>
+</html>

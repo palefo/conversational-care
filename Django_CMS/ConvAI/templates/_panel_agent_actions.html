@@ -1,0 +1,99 @@
+{% load i18n %}
+{% comment %}
+  The two actions reading an agent conversation makes you want to take, shared
+  by the chat panel and the alert panel so the switch reads identically
+  wherever it appears.
+
+  Both need something from you first, so both open a dialog rather than firing
+  on click. `dialog` is used natively — the panel already lives inside a
+  scrolling column and a hand-rolled overlay would inherit its stacking.
+
+  Expects `panel_item.patient`, and the three urls the panel resolver supplies.
+{% endcomment %}
+
+{% if panel_item.patient %}
+  {# Raising the alert is the thing you came to do, so it takes the full width. #}
+  <button type="button" class="dp-btn dp-btn-pri" data-dpdialog="dpRaise">
+    {% trans "Raise an alert" %}
+  </button>
+
+  <div class="dp-acts-row">
+    {% if panel_item.bot_off %}
+      <form method="post" action="{{ panel_item.bot_toggle_url }}" class="dp-form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <input type="hidden" name="state" value="on">
+        <button type="submit" class="dp-btn">{% trans "Turn agent back on" %}</button>
+      </form>
+    {% else %}
+      <button type="button" class="dp-btn dp-btn-danger" data-dpdialog="dpBotOff">
+        {% trans "Turn agent off" %}
+      </button>
+    {% endif %}
+  </div>
+
+  <dialog class="dp-dialog" id="dpRaise">
+    <form method="post" action="{{ panel_item.raise_alert_url }}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <input type="hidden" name="source" value="{{ panel_item.token }}">
+      <h3>{% trans "Raise an alert" %}</h3>
+      <p class="dp-dialog-sub">
+        {% blocktrans with c=panel_item.patient %}For {{ c }}, from what you have just read.{% endblocktrans %}
+      </p>
+
+      <label class="dp-fld">
+        <span>{% trans "What is it" %}</span>
+        <input type="text" name="title" maxlength="200"
+               placeholder="{% trans 'A short title' %}" required>
+      </label>
+
+      <label class="dp-fld">
+        <span>{% trans "Level" %}</span>
+        <select name="priority">
+          <option value="3">{% trans "Low" %}</option>
+          <option value="2" selected>{% trans "Medium" %}</option>
+          <option value="1">{% trans "High" %}</option>
+        </select>
+      </label>
+
+      <label class="dp-fld">
+        <span>{% trans "What you saw" %}</span>
+        <textarea name="note" rows="3"
+                  placeholder="{% trans 'What the agent missed, or what worried you.' %}"></textarea>
+      </label>
+
+      <div class="dp-dialog-f">
+        <button type="button" class="dp-btn" data-dpclose>{% trans "Cancel" %}</button>
+        <button type="submit" class="dp-btn dp-btn-pri">{% trans "Raise alert" %}</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="dp-dialog" id="dpBotOff">
+    <form method="post" action="{{ panel_item.bot_toggle_url }}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <input type="hidden" name="state" value="off">
+      <h3>{% blocktrans with c=panel_item.patient %}Turn the agent off for {{ c }}{% endblocktrans %}</h3>
+      <p class="dp-dialog-sub">
+        {% trans "Messages still arrive and are recorded. What stops is the agent answering them." %}
+      </p>
+
+      <label class="dp-fld">
+        <span>{% trans "Why" %}</span>
+        <select name="reason">
+          <option>{% trans "Wrong advice" %}</option>
+          <option>{% trans "Distressing the caregiver" %}</option>
+          <option>{% trans "Handling this myself" %}</option>
+          <option>{% trans "Other" %}</option>
+        </select>
+      </label>
+
+      <div class="dp-dialog-f">
+        <button type="button" class="dp-btn" data-dpclose>{% trans "Cancel" %}</button>
+        <button type="submit" class="dp-btn dp-btn-danger">{% trans "Turn it off" %}</button>
+      </div>
+    </form>
+  </dialog>
+{% endif %}

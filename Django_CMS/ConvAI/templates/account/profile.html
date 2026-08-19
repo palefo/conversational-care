@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Profile" %}{% endblock %}
+
+{% block content %}
+<style>
+  .prof-form input:not([type=checkbox]):not([type=radio]),
+  .prof-form select {
+    width: 100%; border-radius: .5rem; border: 1px solid #d1d5db;
+    padding: .5rem .75rem; font-size: .875rem; background: #fff; color: #111827;
+  }
+  .prof-form input:focus, .prof-form select:focus {
+    outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.15);
+  }
+  .prof-avatar { width: 3.5rem; height: 3.5rem; border-radius: 9999px; display: inline-flex;
+    align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.25rem; font-weight: 600;
+    background: #e0f2fe; color: #0369a1; }
+  .prof-icon { display: inline-flex; align-items: center; justify-content: center; border-radius: .5rem; padding: .5rem; flex-shrink: 0; }
+</style>
+
+<div class="max-w-3xl">
+
+  {# ── Identity header ── #}
+  <div class="flex items-center gap-4 mb-6">
+    <span class="prof-avatar">
+      {% if user.first_name or user.last_name %}{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}{% else %}{{ user.username|first|upper }}{% endif %}
+    </span>
+    <div class="min-w-0">
+      <h1 class="text-2xl font-semibold text-gray-800 truncate">{{ user.get_full_name|default:user.username }}</h1>
+      <div class="flex items-center flex-wrap gap-x-2 gap-y-1 text-sm text-gray-500">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 text-xs font-medium">
+          <span class="material-icons-outlined text-sm">badge</span>{{ role_label }}
+        </span>
+        <span class="text-gray-400">@{{ user.username }}</span>
+      </div>
+    </div>
+  </div>
+
+  {# ── Personal information (editable) ── #}
+  <div class="card p-6 mb-6 prof-form">
+    <div class="flex items-start gap-3 mb-5">
+      <span class="prof-icon bg-sky-50 text-sky-600"><span class="material-icons-outlined">person</span></span>
+      <div>
+        <h2 class="text-lg font-semibold text-gray-800">{% trans "Personal information" %}</h2>
+        <p class="text-sm text-gray-500">{% trans "Update how your name appears across the platform." %}</p>
+      </div>
+    </div>
+    <form method="post" action="{% url 'update_profile' %}">
+      {% csrf_token %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="first_name">{% trans "First name" %}</label>
+          <input id="first_name" name="first_name" type="text" value="{{ user.first_name }}" maxlength="150" autocomplete="given-name">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="last_name">{% trans "Last name" %}</label>
+          <input id="last_name" name="last_name" type="text" value="{{ user.last_name }}" maxlength="150" autocomplete="family-name">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="email">{% trans "E-mail" %}</label>
+          <input id="email" name="email" type="email" value="{{ user.email }}" autocomplete="email">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-medium text-gray-500 mb-1">{% trans "Username" %}</label>
+          <input type="text" value="{{ user.username }}" disabled class="bg-gray-50 text-gray-500 cursor-not-allowed">
+          <p class="text-xs text-gray-500 mt-1">{% trans "Your username can't be changed here." %}</p>
+        </div>
+      </div>
+      <div class="mt-6 pt-4 border-t border-gray-100">
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Save changes" %}</button>
+      </div>
+    </form>
+  </div>
+
+  {# ── Language ── #}
+  <div class="card p-6 mb-6 prof-form">
+    <div class="flex items-start gap-3 mb-5">
+      <span class="prof-icon bg-violet-50 text-violet-600"><span class="material-icons-outlined">translate</span></span>
+      <div>
+        <h2 class="text-lg font-semibold text-gray-800">{% trans "Language" %}</h2>
+        <p class="text-sm text-gray-500">{% trans "Choose your interface language, or use the system default." %}</p>
+      </div>
+    </div>
+    <form method="post" action="{% url 'update_language' %}" class="flex flex-wrap items-end gap-3">
+      {% csrf_token %}
+      <div class="flex-1 min-w-[12rem]">
+        <label for="preferred_language" class="block text-sm font-medium text-gray-700 mb-1">{% trans "Interface language" %}</label>
+        <select name="preferred_language" id="preferred_language">
+          <option value="" {% if not user.preferred_language %}selected{% endif %}>{% trans "System default" %}</option>
+          {% for code, label in languages %}
+            <option value="{{ code }}" {% if user.preferred_language == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Save changes" %}</button>
+    </form>
+  </div>
+
+  {# ── Home ── #}
+  <div class="card p-6 mb-6">
+    <div class="flex items-start gap-3 mb-4">
+      <span class="prof-icon bg-sky-50 text-sky-600"><span class="material-icons-outlined">home</span></span>
+      <div>
+        <h2 class="text-lg font-semibold text-gray-800">{% trans "Home" %}</h2>
+        <p class="text-sm text-gray-500">
+          {% trans "The next-call card sits at the top of Home when a call is overdue or due within the week. Closing it with the ✕ puts that one call away until it is done; this switch turns the card off for good." %}
+        </p>
+      </div>
+    </div>
+    <form method="post" action="{% url 'hide_next_call' %}" class="flex flex-wrap items-center gap-3">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{% url 'profile' %}">
+      {% if user.dashboard_prefs.next_call_off %}
+        <input type="hidden" name="off" value="0">
+        <span class="text-sm text-gray-500">{% trans "The next-call card is off." %}</span>
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium">
+          {% trans "Turn it back on" %}
+        </button>
+      {% else %}
+        <input type="hidden" name="off" value="1">
+        <span class="text-sm text-gray-500">{% trans "The next-call card is on." %}</span>
+        <button type="submit" class="py-2 px-4 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 bg-white">
+          {% trans "Turn it off" %}
+        </button>
+      {% endif %}
+    </form>
+  </div>
+
+  {# ── API token ── #}
+  <div class="card p-6 mb-6">
+    <div class="flex items-start gap-3 mb-5">
+      <span class="prof-icon bg-amber-50 text-amber-600"><span class="material-icons-outlined">vpn_key</span></span>
+      <div class="flex-1">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "API token" %}</h2>
+          {% if has_token %}
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">{% trans "Active" %}</span>
+          {% else %}
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{% trans "None yet" %}</span>
+          {% endif %}
+        </div>
+        <p class="text-sm text-gray-500">{% trans "Used by the Python API client. Shown only once when generated — regenerate if you lose it." %}</p>
+      </div>
+    </div>
+
+    {% if just_issued_token %}
+      <div class="mb-4 px-4 py-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 text-sm">
+        <p class="font-medium mb-2">{% trans "Copy your token now — for security it will not be shown again." %}</p>
+        <div class="flex items-center gap-2">
+          <input id="api-token-field" type="password" value="{{ just_issued_token }}" readonly
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white font-mono text-sm" />
+          <button type="button" id="api-token-reveal" class="button-secondary py-2 px-3 rounded-lg" title="{% trans 'Show/Hide' %}">
+            <span class="material-icons-outlined align-middle text-base">visibility</span>
+          </button>
+          <button type="button" id="api-token-copy" class="button-primary py-2 px-3 rounded-lg" title="{% trans 'Copy' %}">
+            <span class="material-icons-outlined align-middle text-base">content_copy</span>
+          </button>
+        </div>
+        <p id="api-token-copied" class="text-green-700 text-sm mt-2 hidden">{% trans "Copied to clipboard!" %}</p>
+      </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'issue_api_token' %}">
+      {% csrf_token %}
+      <button type="submit" class="button-secondary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+        <span class="material-icons-outlined text-base">{% if has_token %}refresh{% else %}vpn_key{% endif %}</span>
+        {% if has_token %}{% trans "Regenerate token" %}{% else %}{% trans "Generate token" %}{% endif %}
+      </button>
+      {% if has_token %}
+        <p class="text-xs text-gray-500 mt-2">{% trans "On regenerating, the previous token will stop working." %}</p>
+      {% endif %}
+    </form>
+  </div>
+
+  {# ── Session ── #}
+  <div class="card p-6">
+    <div class="flex items-start gap-3 mb-4">
+      <span class="prof-icon bg-rose-50 text-rose-600"><span class="material-icons-outlined">logout</span></span>
+      <div>
+        <h2 class="text-lg font-semibold text-gray-800">{% trans "Session" %}</h2>
+        <p class="text-sm text-gray-500">{% trans "End your session on this device." %}</p>
+      </div>
+    </div>
+    <form method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <button type="submit" class="py-2 px-4 rounded-lg border border-red-300 text-red-600 font-medium text-sm hover:bg-red-50 inline-flex items-center gap-1">
+        <span class="material-icons-outlined text-base">logout</span>{% trans "Log out" %}
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+  (function () {
+    const field = document.getElementById('api-token-field');
+    const btnReveal = document.getElementById('api-token-reveal');
+    const btnCopy = document.getElementById('api-token-copy');
+    const copied = document.getElementById('api-token-copied');
+
+    if (btnReveal && field) {
+      btnReveal.addEventListener('click', () => {
+        field.type = field.type === 'password' ? 'text' : 'password';
+      });
+    }
+    if (btnCopy && field) {
+      btnCopy.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(field.value);
+          if (copied) { copied.classList.remove('hidden'); setTimeout(() => copied.classList.add('hidden'), 1800); }
+        } catch (e) {
+          field.type = 'text'; field.select();
+          try { document.execCommand('copy'); } catch (_e) {}
+          if (copied) { copied.classList.remove('hidden'); setTimeout(() => copied.classList.add('hidden'), 1800); }
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,589 @@
+{% load static i18n custom_filters %}
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE|default:"en" }}">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}{% brand_name %}{% endblock %}</title>
+
+  <!-- Fonts & Icons. The preconnects open the TLS connection to the font host
+       while the stylesheet is still being fetched. Without them DM Sans lands
+       late, every line of text re-measures after first paint, and the page
+       visibly settles — the judder is the font swapping in, not the layout. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link
+    href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined"
+    rel="stylesheet"
+  />
+
+  <!-- TailwindCSS (built locally, see tailwind/ + Dockerfile) -->
+  <link rel="stylesheet" href="{% static_versioned 'app/css/tailwind.css' %}"/>
+
+  <!-- Custom Styles. Version stamp comes from the file's mtime, so an edited
+       stylesheet is never served from cache under a stale ?v= number. -->
+  <link rel="stylesheet" href="{% static_versioned 'app/css/app_new_design.css' %}"/>
+
+  {% block head %}{% endblock %}
+</head>
+<body class="flex h-screen">
+  {% include "sidebar.html" %}
+  <script>
+    // Apply the saved collapsed state and panel width during parse to avoid a
+    // flash — both are read again by the handlers further down.
+    (function () {
+      try {
+        if (localStorage.getItem('sidebarCollapsed') === '1') {
+          var s = document.getElementById('sidebar');
+          if (s) {
+            s.classList.add('collapsed');
+            var b = document.getElementById('sidebarToggle');
+            if (b) b.setAttribute('aria-expanded', 'false');
+          }
+        }
+        var w = parseInt(localStorage.getItem('dpWidth'), 10);
+        if (w) {
+          document.documentElement.style.setProperty(
+            '--dp-w', Math.max(280, Math.min(560, w)) + 'px');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <main class="flex-1 p-8 overflow-y-auto">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    // Opening an item is a full page load, and the browser restores neither
+    // window scroll for a new URL nor the scroll of an inner container like
+    // <main>. Without this, clicking the fourth row in a list sends you back
+    // to the first one. Runs here rather than on DOMContentLoaded so the
+    // position is set before the first paint.
+    //
+    // Keyed by the page minus the parameters that move you *within* it, so
+    // opening an item or stepping to the next week keeps your place, while
+    // changing page, filter or calendar mode correctly starts at the top.
+    // `offset` is the calendar's week/month step and `mpage` is the meetings
+    // pager: in both, the page keeps its shape and you are looking at the
+    // control that moved you. Jumping to the top would throw you away from it.
+    (function () {
+      var main = document.querySelector('main');
+      if (!main) return;
+
+      var key;
+      try {
+        var p = new URLSearchParams(location.search);
+        ['item', 'offset', 'mpage'].forEach(function (k) { p.delete(k); });
+        var q = p.toString();
+        key = 'listScroll:' + location.pathname + (q ? '?' + q : '');
+      } catch (e) {
+        key = 'listScroll:' + location.pathname;
+      }
+
+      function save() {
+        try { sessionStorage.setItem(key, String(Math.round(main.scrollTop))); } catch (e) {}
+      }
+
+      try {
+        var y = parseInt(sessionStorage.getItem(key), 10);
+        if (y > 0) {
+          main.scrollTop = y;
+          // Rows can rewrap once fonts land, which shortens the box and clamps
+          // the value we just set — so reassert it after layout settles.
+          var again = function () { if (Math.abs(main.scrollTop - y) > 1) main.scrollTop = y; };
+          requestAnimationFrame(again);
+          window.addEventListener('load', again);
+        }
+      } catch (e) {}
+
+      // Saving on scroll (not just on unload) survives a tab being closed or
+      // restored, and costs one write per 150ms of active scrolling.
+      var t = null;
+      main.addEventListener('scroll', function () {
+        if (t) return;
+        t = setTimeout(function () { t = null; save(); }, 150);
+      }, { passive: true });
+      window.addEventListener('pagehide', save);
+    })();
+  </script>
+
+  {% comment %}
+    Right-hand detail panel: present whenever ?item= resolves to something the
+    current user is allowed to read. See views/_panel.py.
+
+    The grip is a real separator — draggable with a pointer, resizable with the
+    arrow keys, and double-click resets it. Width persists per browser.
+  {% endcomment %}
+  {% if panel_item %}
+    <div id="dpGrip" class="dp-grip"
+         role="separator" aria-orientation="vertical" tabindex="0"
+         aria-label="{% trans 'Resize details panel' %}"
+         aria-valuemin="280" aria-valuemax="560" aria-valuenow="340"
+         title="{% trans 'Drag to resize · double-click to reset' %}"></div>
+    {% include "_detail_panel.html" %}
+
+    <script>
+      // Closing the panel is a change of view, not of page. It used to follow
+      // its own href, and the reload cost you whatever you had on the left —
+      // scroll position, the tab you were on, the section you had open. Here
+      // the panel is simply removed and `item` dropped from the URL, so the
+      // left side never moves and the address stays shareable. The href stays
+      // on the link as the fallback when scripting is off.
+      (function () {
+        var close = document.querySelector('.dp-close');
+        if (!close) return;
+        var main = document.querySelector('main');
+
+        // Removing the panel gives its width back to the list, which rewraps
+        // and changes height — so even without a reload the content under the
+        // cursor would slide. Anchor on whatever is at the top of the list,
+        // and pad the foot first so a shorter page cannot clamp the scroll
+        // before the correction lands. The padding is trimmed on the next
+        // scroll, exactly like the accordion spacer.
+        // Whatever is sitting at the top of the list — skipping anything with
+        // no box of its own, since a <style> or an empty wrapper reports 0 and
+        // would make the correction a no-op.
+        function topAnchor() {
+          var r = main.getBoundingClientRect();
+          var el = document.elementFromPoint(
+            r.left + Math.min(48, r.width / 2), r.top + 6);
+          while (el && main.contains(el) && !el.getBoundingClientRect().height) {
+            el = el.parentElement;
+          }
+          if (el && main.contains(el) && el !== main) return el;
+          for (var i = 0; i < main.children.length; i++) {
+            var b = main.children[i].getBoundingClientRect();
+            if (b.height && b.bottom > r.top) return main.children[i];
+          }
+          return null;
+        }
+
+        function keepPlace(mutate) {
+          if (!main) return mutate();
+          var anchor = topAnchor();
+          var before = anchor ? anchor.getBoundingClientRect().top : 0;
+
+          main.style.paddingBottom = main.scrollHeight + 'px';
+          mutate();
+
+          if (anchor) {
+            var delta = anchor.getBoundingClientRect().top - before;
+            if (delta) main.scrollTop += delta;
+          }
+          trim();
+          main.addEventListener('scroll', trim, { passive: true });
+        }
+
+        function trim() {
+          var padded = parseFloat(main.style.paddingBottom) || 0;
+          var natural = main.scrollHeight - padded;
+          var need = Math.max(0, main.scrollTop + main.clientHeight - natural);
+          main.style.paddingBottom = need ? need + 'px' : '';
+          if (!need) main.removeEventListener('scroll', trim);
+        }
+
+        close.addEventListener('click', function (e) {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+          e.preventDefault();
+
+          keepPlace(function () {
+            var panel = document.querySelector('.dp');
+            var grip = document.getElementById('dpGrip');
+            if (panel) panel.remove();
+            if (grip) grip.remove();
+            document.body.classList.remove('dp-takeover');
+          });
+
+          // Whatever was marked as the open item is no longer open.
+          document.querySelectorAll('.dash-row-open, .tl-card-open').forEach(function (r) {
+            r.classList.remove('dash-row-open', 'tl-card-open');
+            r.removeAttribute('aria-current');
+          });
+
+          try {
+            var u = new URL(location.href);
+            u.searchParams.delete('item');
+            history.replaceState(null, '', u.pathname + u.search + u.hash);
+          } catch (err) {}
+        });
+      })();
+    </script>
+  {% endif %}
+
+  {% comment %}
+    Notifications. Django's messages are rendered here and nowhere else: a
+    message is consumed only by the template that iterates it, so while this
+    lived in a handful of leaf pages every confirmation written from the
+    dashboard or the panel sat unread in the session and then arrived in a
+    heap the next time someone opened Settings.
+
+    The same component carries alerts that arrive while you work — see the
+    poller below.
+  {% endcomment %}
+  <div class="toaster" id="toaster" role="region" aria-live="polite"
+       aria-label="{% trans 'Notifications' %}"></div>
+  {% for m in messages %}
+    <div class="dj-msg" data-tags="{{ m.tags }}" hidden>{{ m }}</div>
+  {% endfor %}
+
+  {% trans "Dismiss" as t_dismiss %}
+  {% trans "Open" as t_open %}
+  <script>
+    (function () {
+      var toaster = document.getElementById('toaster');
+      if (!toaster) return;
+
+      var ICONS = {
+        ok: '<path d="M20 6.5 9.4 17.2 4 11.8"/>',
+        err: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.2v.2"/>',
+        info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.2"/>',
+        high: '<path d="M12 3.8 21 19.5H3L12 3.8Z"/><path d="M12 10v4M12 16.6v.2"/>'
+      };
+
+      // Every page is a full load, so a toast rendered in JavaScript dies at
+      // the next click. The live ones are kept in sessionStorage with the
+      // moment they are due to expire, and re-rendered with whatever life they
+      // have left — per tab, so a notification never follows you into another.
+      var QKEY = 'toastQueue';
+      var seq = 0;
+
+      function readQ() {
+        try { return JSON.parse(sessionStorage.getItem(QKEY)) || []; } catch (e) { return []; }
+      }
+      function writeQ(q) {
+        try { sessionStorage.setItem(QKEY, JSON.stringify(q)); } catch (e) {}
+      }
+      function forget(id) {
+        writeQ(readQ().filter(function (e) { return e.id !== id; }));
+      }
+
+      // window.toast(kind, title, body, opts) — the whole public surface.
+      // `sticky` skips the timer, which is the only difference between a
+      // confirmation and a high-priority alert.
+      function toast(kind, title, body, opts) {
+        opts = opts || {};
+        if (!ICONS[kind]) kind = 'info';
+        var life = opts.sticky ? 0 : (opts.life || 6000);
+
+        var entry = {
+          id: Date.now() + '-' + (seq++),
+          kind: kind, title: title, body: body || '',
+          href: opts.href || '', action: opts.action || '',
+          sticky: !!opts.sticky,
+          until: opts.sticky ? 0 : Date.now() + life
+        };
+        var q = readQ();
+        q.push(entry);
+        writeQ(q);
+        return render(entry, life);
+      }
+
+      function render(entry, life) {
+        var kind = entry.kind, title = entry.title, body = entry.body;
+        var opts = { href: entry.href, action: entry.action };
+
+        var el = document.createElement('div');
+        el.className = 'toast toast-' + kind;
+        el.setAttribute('role', (kind === 'err' || kind === 'high') ? 'alert' : 'status');
+        el.innerHTML =
+          '<svg class="toast-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
+          ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          ICONS[kind] + '</svg>' +
+          '<div class="toast-tx"><div class="toast-t"></div>' +
+          (body ? '<div class="toast-b"></div>' : '') +
+          (opts.href ? '<a class="toast-a"></a>' : '') +
+          '</div>' +
+          '<button type="button" class="toast-x" aria-label="{{ t_dismiss|escapejs }}">✕</button>' +
+          (life ? '<span class="toast-bar"></span>' : '');
+
+        // textContent throughout: a message can carry a client's name, and
+        // innerHTML on that would be an injection waiting to happen.
+        el.querySelector('.toast-t').textContent = title;
+        if (body) el.querySelector('.toast-b').textContent = body;
+        if (opts.href) {
+          var a = el.querySelector('.toast-a');
+          a.textContent = opts.action || '{{ t_open|escapejs }}';
+          a.href = opts.href;
+        }
+
+        var closing = false;
+        function close() {
+          if (closing) return;
+          closing = true;
+          forget(entry.id);
+          el.classList.add('toast-out');
+          setTimeout(function () { el.remove(); }, 200);
+        }
+        el.querySelector('.toast-x').addEventListener('click', close);
+
+        if (life) {
+          var bar = el.querySelector('.toast-bar');
+          bar.style.animationDuration = life + 'ms';
+          bar.addEventListener('animationend', close);
+        }
+
+        toaster.appendChild(el);
+        // More than three at once is a wall of paper, not a notification.
+        var live = toaster.querySelectorAll('.toast:not(.toast-out)');
+        if (live.length > 3) live[0].querySelector('.toast-x').click();
+        return el;
+      }
+      window.toast = toast;
+
+      // Anything still alive from the page you came from, with only the time
+      // it had left. Expired entries are dropped rather than shown briefly.
+      (function () {
+        var now = Date.now();
+        var alive = readQ().filter(function (e) { return e.sticky || e.until > now; });
+        writeQ(alive);
+        alive.forEach(function (e) {
+          render(e, e.sticky ? 0 : e.until - now);
+        });
+      })();
+
+      // Django messages, rendered above and read back out of the DOM so the
+      // text stays escaped by the template rather than by hand.
+      var TAGS = { success: 'ok', error: 'err', warning: 'err', debug: 'info' };
+      document.querySelectorAll('.dj-msg').forEach(function (m) {
+        toast(TAGS[m.dataset.tags] || 'info', m.textContent.trim(), '');
+        m.remove();
+      });
+    })();
+  </script>
+
+  {% if request.user.is_authenticated %}
+  <script>
+    // Alerts that arrive while you are working. There is no Channels or Celery
+    // in this project, so nothing can be pushed — the page asks instead. One
+    // indexed query per poll, only while the tab is visible, and the first
+    // reply just sets the clock so opening a page never dumps a backlog.
+    (function () {
+      var URL_SINCE = '{% url "alerts_since" %}';
+      var EVERY = 30000, MAX_BACKOFF = 5 * 60000;
+      var since = null, wait = EVERY, timer = null;
+
+      // How loud, chosen by whoever is being interrupted. Off still polls, so
+      // the count stays right the moment you turn it back on — what changes is
+      // whether anything is put in front of you.
+      function level() {
+        try { return localStorage.getItem('notifyLevel') || 'all'; } catch (e) { return 'all'; }
+      }
+
+      function badges(n) {
+        document.querySelectorAll('[data-alert-badge]').forEach(function (b) {
+          var next = (parseInt(b.textContent, 10) || 0) + n;
+          b.textContent = String(next);
+          b.hidden = next === 0;
+        });
+      }
+
+      function poll() {
+        if (document.visibilityState !== 'visible') return schedule(EVERY);
+        fetch(URL_SINCE + (since ? '?t=' + since : ''), {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin'
+        })
+          .then(function (r) {
+            if (!r.ok) throw new Error(r.status);
+            return r.json();
+          })
+          .then(function (d) {
+            var first = since === null;
+            since = d.now;
+            wait = EVERY;
+            if (first || !d.alerts || !d.alerts.length) return schedule(wait);
+
+            var lvl = level();
+            var show = lvl === 'off' ? []
+                     : lvl === 'urgent' ? d.alerts.filter(function (a) { return a.high; })
+                     : d.alerts;
+            show.forEach(function (a) {
+              // Built here, not on the server: hanging ?item= off the current
+              // URL keeps whatever filter and sort you already had.
+              var u = new URL(location.href);
+              u.searchParams.set('item', a.token);
+              window.toast(a.high ? 'high' : 'info', a.title, a.body,
+                           { sticky: !!a.high, href: u.pathname + u.search });
+            });
+            // The badge still counts everything: a count you cannot trust is
+            // worse than one you would rather not see.
+            badges(d.alerts.length + (d.more || 0));
+            schedule(wait);
+          })
+          .catch(function () {
+            // Back off rather than hammer a server that is already unhappy.
+            wait = Math.min(wait * 2, MAX_BACKOFF);
+            schedule(wait);
+          });
+      }
+
+      function schedule(ms) {
+        clearTimeout(timer);
+        timer = setTimeout(poll, ms);
+      }
+
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') schedule(1000);
+      });
+      schedule(EVERY);
+    })();
+  </script>
+  {% endif %}
+
+  {% block scripts %}
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Sidebar collapse toggle (persisted in localStorage).
+      const sidebar = document.getElementById('sidebar');
+      const toggle  = document.getElementById('sidebarToggle');
+      if (sidebar && toggle) {
+        toggle.addEventListener('click', () => {
+          const collapsed = sidebar.classList.toggle('collapsed');
+          toggle.setAttribute('aria-expanded', String(!collapsed));
+          try { localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+        });
+      }
+
+      // ── Detail panel resize ───────────────────────────────────────────
+      // The panel is the thing that gives ground: MAX is capped so the list
+      // it sits beside always keeps at least MIN_LIST of readable width.
+      const grip = document.getElementById('dpGrip');
+      if (grip) {
+        const MIN = 280, MAX = 560, MIN_LIST = 360, DEFAULT = 340;
+        const root = document.documentElement;
+
+        // The width the user actually asked for, which is not the same as the
+        // width currently on screen: a narrow window can force the panel below
+        // it. Keeping them apart is what lets the panel grow back when the
+        // window widens again, instead of ratcheting down to MIN and staying.
+        let preferred = DEFAULT;
+        try {
+          const saved = parseInt(localStorage.getItem('dpWidth'), 10);
+          if (saved) preferred = Math.max(MIN, Math.min(MAX, saved));
+        } catch (e) {}
+
+        const railWidth = () => sidebar ? sidebar.getBoundingClientRect().width : 0;
+        const ceiling = () =>
+          Math.max(MIN, Math.min(MAX, window.innerWidth - railWidth() - MIN_LIST));
+
+        // Below the point where rail + list + panel all fit, there is no split
+        // worth having: the panel takes the viewport and close acts as back.
+        const takeover = () =>
+          (window.innerWidth - railWidth()) < (MIN + MIN_LIST + 9);
+        const current = () =>
+          parseInt(getComputedStyle(root).getPropertyValue('--dp-w'), 10) || DEFAULT;
+
+        function setWidth(px, save) {
+          const w = Math.round(Math.max(MIN, Math.min(ceiling(), px)));
+          root.style.setProperty('--dp-w', w + 'px');
+          grip.setAttribute('aria-valuenow', String(w));
+          grip.setAttribute('aria-valuemax', String(ceiling()));
+          if (save) {
+            preferred = w;
+            try { localStorage.setItem('dpWidth', String(w)); } catch (e) {}
+          }
+          return w;
+        }
+
+        grip.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          const x0 = e.clientX, w0 = current();
+          grip.setPointerCapture(e.pointerId);
+          grip.classList.add('dp-grip-live');
+          document.body.classList.add('dp-resizing');
+
+          // Panel is on the right, so dragging left widens it.
+          const move = (ev) => setWidth(w0 - (ev.clientX - x0), false);
+          const up = () => {
+            grip.classList.remove('dp-grip-live');
+            document.body.classList.remove('dp-resizing');
+            grip.removeEventListener('pointermove', move);
+            grip.removeEventListener('pointerup', up);
+            grip.removeEventListener('pointercancel', up);
+            setWidth(current(), true);
+          };
+          grip.addEventListener('pointermove', move);
+          grip.addEventListener('pointerup', up);
+          grip.addEventListener('pointercancel', up);
+        });
+
+        grip.addEventListener('dblclick', () => setWidth(DEFAULT, true));
+
+        grip.addEventListener('keydown', (e) => {
+          const step = e.shiftKey ? 48 : 16;
+          let w = null;
+          if (e.key === 'ArrowLeft')       w = current() + step;
+          else if (e.key === 'ArrowRight') w = current() - step;
+          else if (e.key === 'Home')       w = MIN;
+          else if (e.key === 'End')        w = ceiling();
+          else if (e.key === 'Enter')      w = DEFAULT;
+          if (w === null) return;
+          e.preventDefault();
+          setWidth(w, true);
+        });
+
+        // Re-fit from `preferred`, never from the width currently showing, so
+        // space taken by a narrow window is handed back when it widens again.
+        const refit = () => {
+          document.body.classList.toggle('dp-takeover', takeover());
+          setWidth(preferred, false);
+        };
+        window.addEventListener('resize', refit);
+        if (toggle) {
+          sidebar.addEventListener('transitionend', (e) => {
+            if (e.propertyName === 'width') refit();
+          });
+        }
+        refit();
+      }
+
+      // Alert level, in the profile menu.
+      const nl = document.getElementById('notifyLevel');
+      if (nl) {
+        let current = 'all';
+        try { current = localStorage.getItem('notifyLevel') || 'all'; } catch (e) {}
+        const paint = () => nl.querySelectorAll('.nl-opt').forEach(
+          (o) => o.setAttribute('aria-pressed', String(o.dataset.level === current)));
+        paint();
+        nl.addEventListener('click', (e) => {
+          const o = e.target.closest('.nl-opt');
+          if (!o) return;
+          e.stopPropagation();
+          current = o.dataset.level;
+          try { localStorage.setItem('notifyLevel', current); } catch (err) {}
+          paint();
+        });
+      }
+
+      const btn  = document.getElementById('profileMenuBtn');
+      const menu = document.getElementById('profileMenu');
+
+      function closeMenu(e){
+        if (!menu.contains(e.target) && !btn.contains(e.target)) {
+          menu.classList.add('hidden');
+        }
+      }
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menu.classList.toggle('hidden');
+      });
+
+      document.addEventListener('click', closeMenu);
+      window.addEventListener('blur', () => menu.classList.add('hidden'));
+    });
+  </script>
+  
+  {% endblock %}
+
+  {% if request.user.is_authenticated and request.user.agent %}
+    {% include "chatbot.html" %}
+  {% endif %}
+</body>
+</html>

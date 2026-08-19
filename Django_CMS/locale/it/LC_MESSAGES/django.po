@@ -1,0 +1,4167 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Conversational Care 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-10 11:10+0100\n"
+"PO-Revision-Date: 2026-07-07 08:57\n"
+"Last-Translator: Conversational Care <team@conversational-care.ai>\n"
+"Language-Team: Italian <team@conversational-care.ai>\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: ConvAI/forms.py:16
+msgid "Scheduled time"
+msgstr "Ora programmata"
+
+#: ConvAI/forms.py:28
+msgid "Address or place"
+msgstr "Indirizzo o luogo"
+
+#: ConvAI/forms.py:34 ConvAI/forms.py:515
+#: ConvAI/templates/patients/edit_care_plan.html:13
+#: ConvAI/templates/patients/patient_detail.html:7
+#: ConvAI/templates/patients/patient_list.html:557
+#: ConvAI/templates/users/user_list.html:81
+msgid "Client"
+msgstr "Paziente"
+
+#: ConvAI/forms.py:35 ConvAI/templates/_detail_panel.html:320
+msgid "How"
+msgstr "Come"
+
+#: ConvAI/forms.py:36 ConvAI/templates/_detail_panel.html:83
+#: ConvAI/templates/_detail_panel.html:329
+msgid "Where"
+msgstr "Dove"
+
+#: ConvAI/forms.py:37 ConvAI/templates/_detail_panel.html:335
+#: ConvAI/templates/_detail_panel.html:619
+msgid "Type"
+msgstr "Tipo"
+
+#: ConvAI/forms.py:38
+msgid "Scheduled protocol"
+msgstr "Protocollo programmato"
+
+#: ConvAI/forms.py:69
+msgid "Say where the meeting takes place."
+msgstr "Indica dove si svolge la riunione."
+
+#: ConvAI/forms.py:78
+msgid "Client – Caregiver"
+msgstr "Paziente – Caregiver"
+
+#: ConvAI/forms.py:83 ConvAI/templates/alerts/alert_detail.html:288
+msgid "Date"
+msgstr "Data"
+
+#: ConvAI/forms.py:91
+msgid "State"
+msgstr "Stato"
+
+#: ConvAI/forms.py:92 ConvAI/forms.py:99
+#: ConvAI/templates/patients/patient_list.html:497
+#: ConvAI/templates/sidebar.html:131 ConvAI/views/communications.py:66
+#: ConvAI/views/communications.py:72
+msgid "All"
+msgstr "Tutti"
+
+#: ConvAI/forms.py:98
+msgid "Call type"
+msgstr "Tipo di chiamata"
+
+#: ConvAI/forms.py:121
+msgid "Write the details here in Markdown..."
+msgstr "Scrivi qui i dettagli in Markdown..."
+
+#: ConvAI/forms.py:126
+msgid "Supports Markdown syntax."
+msgstr "Supporta la sintassi Markdown."
+
+#: ConvAI/forms.py:137
+msgid "Care plan (PDF)"
+msgstr "Piano di cura (PDF)"
+
+#: ConvAI/forms.py:140
+msgid "PDF files only, maximum 5 MB."
+msgstr "Solo file PDF, massimo 5 MB."
+
+#: ConvAI/forms.py:150
+msgid "The file must have a .pdf extension."
+msgstr "Il file deve avere estensione .pdf."
+
+#: ConvAI/forms.py:154
+msgid "The file must be a valid PDF."
+msgstr "Il file deve essere un PDF valido."
+
+#: ConvAI/forms.py:158
+msgid "The PDF cannot exceed 5 MB."
+msgstr "Il PDF non può superare i 5 MB."
+
+#: ConvAI/forms.py:247
+msgid "•••• set (leave blank to keep)"
+msgstr "•••• impostato (lascia vuoto per mantenere)"
+
+#: ConvAI/forms.py:267
+msgid "Hide meeting steps"
+msgstr "Nascondi i passaggi dell'incontro"
+
+#: ConvAI/forms.py:268
+msgid "Enable automations"
+msgstr "Abilita automazioni"
+
+#: ConvAI/forms.py:269
+msgid "Enable self-registration"
+msgstr "Abilita auto-registrazione"
+
+#: ConvAI/forms.py:270 ConvAI/forms.py:291
+msgid "Self-registration agent"
+msgstr "Agente di auto-registrazione"
+
+#: ConvAI/forms.py:271
+msgid "Send care plan"
+msgstr "Invia piano di cura"
+
+#: ConvAI/forms.py:272
+msgid "Enable WhatsApp audio"
+msgstr "Abilita audio WhatsApp"
+
+#: ConvAI/forms.py:286 ConvAI/models.py:706
+msgid "Use .env default"
+msgstr "Usa il valore predefinito di .env"
+
+#: ConvAI/forms.py:307
+msgid "Twilio Account SID"
+msgstr "SID account Twilio"
+
+#: ConvAI/forms.py:308
+msgid "Twilio Auth Token"
+msgstr "Token di autenticazione Twilio"
+
+#: ConvAI/forms.py:309
+msgid "Platform phone number"
+msgstr "Numero di telefono della piattaforma"
+
+#: ConvAI/forms.py:310
+msgid "OpenAI API key"
+msgstr "Chiave API OpenAI"
+
+#: ConvAI/forms.py:311
+msgid "ElevenLabs API key"
+msgstr "Chiave API ElevenLabs"
+
+#: ConvAI/forms.py:312
+msgid "ElevenLabs voice ID"
+msgstr "ID voce ElevenLabs"
+
+#: ConvAI/forms.py:328
+msgid "SMS sender number"
+msgstr "Numero mittente SMS"
+
+#: ConvAI/forms.py:329
+msgid "Infection alert SMS template SID"
+msgstr "SID del modello SMS di allerta infezione"
+
+#: ConvAI/forms.py:330
+msgid "Infection alert SMS text"
+msgstr "Testo SMS di allerta infezione"
+
+#: ConvAI/forms.py:331
+msgid "Care plan WhatsApp template SID"
+msgstr "SID del modello WhatsApp del piano di cura"
+
+#: ConvAI/forms.py:350
+msgid "Meeting protocol summary prompt"
+msgstr "Prompt di riepilogo del protocollo della riunione"
+
+#: ConvAI/forms.py:351
+msgid "Call transcript summary prompt"
+msgstr "Prompt di riepilogo della trascrizione della chiamata"
+
+#: ConvAI/forms.py:355
+msgid ""
+"Base prompt for summarizing a meeting's protocol answers. Leave blank to use"
+" the built-in default. The meeting's protocol(s) and answers are appended "
+"automatically."
+msgstr ""
+"Prompt di base per riepilogare le risposte del protocollo di una riunione. "
+"Lascia vuoto per usare quello predefinito. I protocolli e le risposte della "
+"riunione vengono aggiunti automaticamente."
+
+#: ConvAI/forms.py:360
+msgid ""
+"Base prompt for post-processing a Whisper call transcript into a summary. "
+"Leave blank to use the built-in default. The transcript is appended "
+"automatically."
+msgstr ""
+"Prompt di base per trasformare una trascrizione di chiamata di Whisper in un"
+" riepilogo. Lascia vuoto per usare quello predefinito. La trascrizione viene"
+" aggiunta automaticamente."
+
+#: ConvAI/forms.py:373 ConvAI/forms.py:559
+msgid "Caregiver first name"
+msgstr "Nome del caregiver"
+
+#: ConvAI/forms.py:374 ConvAI/forms.py:560
+msgid "Caregiver last name"
+msgstr "Cognome del caregiver"
+
+#: ConvAI/forms.py:375 ConvAI/forms.py:561
+#: ConvAI/templates/patients/patient_detail.html:93
+msgid "Caregiver phone"
+msgstr "Telefono del caregiver"
+
+#: ConvAI/forms.py:381 ConvAI/forms.py:567
+#: ConvAI/templates/account/profile.html:52
+msgid "First name"
+msgstr "Nome"
+
+#: ConvAI/forms.py:381 ConvAI/forms.py:567
+#: ConvAI/templates/account/profile.html:56
+msgid "Last name"
+msgstr "Cognome"
+
+#: ConvAI/forms.py:381 ConvAI/forms.py:567
+#: ConvAI/templates/settings/config.html:460
+msgid "Phone"
+msgstr "Telefono"
+
+#: ConvAI/forms.py:382 ConvAI/forms.py:568
+#: ConvAI/templates/patients/patient_detail.html:95 ConvAI/views/users.py:17
+msgid "Navigator"
+msgstr "Navigatore"
+
+#: ConvAI/forms.py:382 ConvAI/forms.py:568
+#: ConvAI/templates/patients/patient_detail.html:99 ConvAI/views/_panel.py:381
+msgid "Agent"
+msgstr "Agente"
+
+#: ConvAI/forms.py:446 ConvAI/templates/agents/_agent_card.html:50
+msgid "Real-time voice agent"
+msgstr "Agente vocale in tempo reale"
+
+#: ConvAI/forms.py:450
+msgid ""
+"Converse by live voice (GPT Realtime over Azure) instead of the text chat. "
+"The model above is ignored; the Realtime deployment from Settings → Agents "
+"is used."
+msgstr ""
+"Conversa a voce dal vivo (GPT Realtime tramite Azure) invece della chat "
+"testuale. Il modello sopra viene ignorato; si usa il deployment Realtime di "
+"Impostazioni → Agenti."
+
+#: ConvAI/forms.py:490 ConvAI/forms.py:536
+#: ConvAI/templates/account/profile.html:64
+#: ConvAI/templates/users/test_user_result.html:25
+#: ConvAI/templates/users/user_list.html:76
+msgid "Username"
+msgstr "Nome utente"
+
+#: ConvAI/forms.py:491 ConvAI/templates/users/test_user_result.html:36
+msgid "Password"
+msgstr "Password"
+
+#: ConvAI/forms.py:496 ConvAI/forms.py:552
+msgid "A user with that username already exists."
+msgstr "Esiste già un utente con questo nome."
+
+#: ConvAI/forms.py:526
+msgid "This client already has a test user."
+msgstr "Questo paziente ha già un utente di prova."
+
+#: ConvAI/forms.py:537 ConvAI/templates/account/profile.html:60
+#: ConvAI/templates/settings/config.html:461
+#: ConvAI/templates/users/user_list.html:78
+msgid "E-mail"
+msgstr "E-mail"
+
+#: ConvAI/forms.py:538 ConvAI/templates/account/profile.html:137
+#: ConvAI/templates/settings/config.html:518
+#: ConvAI/templates/users/user_list.html:105
+msgid "Active"
+msgstr "Attivo"
+
+#: ConvAI/forms.py:608
+msgid "Help page content (Markdown)"
+msgstr "Contenuto della pagina di aiuto (Markdown)"
+
+#: ConvAI/forms.py:610
+msgid "Supports Markdown. Leave blank to restore the shipped default content."
+msgstr ""
+"Supporta Markdown. Lascia vuoto per ripristinare il contenuto predefinito "
+"incluso."
+
+#: ConvAI/forms.py:622
+msgid "Brand name"
+msgstr "Nome del marchio"
+
+#: ConvAI/forms.py:623
+msgid "Brand logo (upload)"
+msgstr "Logo del marchio (caricamento)"
+
+#: ConvAI/forms.py:624
+msgid "Brand logo (static path)"
+msgstr "Logo del marchio (percorso statico)"
+
+#: ConvAI/forms.py:627
+msgid "PNG, JPG or SVG, max 2 MB. Overrides the static path below."
+msgstr ""
+"PNG, JPG o SVG, massimo 2 MB. Sostituisce il percorso statico "
+"sottostante.PNG, JPG o SVG, massimo 2 MB. Sostituisce il percorso statico "
+"sottostante."
+
+#: ConvAI/forms.py:628
+msgid "Fallback used when no logo file is uploaded."
+msgstr "Usato quando non è stato caricato alcun file logo."
+
+#: ConvAI/forms.py:640
+msgid "The logo cannot exceed 2 MB."
+msgstr "Il logo non può superare i 2 MB."
+
+#: ConvAI/forms.py:672
+msgid "Default agent model"
+msgstr "Modello agente predefinito"
+
+#: ConvAI/forms.py:673
+msgid "Anthropic API key"
+msgstr "Chiave API Anthropic"
+
+#: ConvAI/forms.py:674
+msgid "Google API key"
+msgstr "Chiave API Google"
+
+#: ConvAI/forms.py:675
+msgid "Mistral API key"
+msgstr "Chiave API Mistral"
+
+#: ConvAI/forms.py:676
+msgid "DeepSeek API key"
+msgstr "Chiave API DeepSeek"
+
+#: ConvAI/forms.py:677
+msgid "Allowed agent hosts (comma-separated)"
+msgstr "Host degli agenti consentiti (separati da virgole)"
+
+#: ConvAI/forms.py:678
+msgid "Use Azure"
+msgstr "Usa Azure"
+
+#: ConvAI/forms.py:679
+msgid "Azure OpenAI endpoint"
+msgstr "Endpoint Azure OpenAI"
+
+#: ConvAI/forms.py:680
+msgid "Azure OpenAI key"
+msgstr "Chiave Azure OpenAI"
+
+#: ConvAI/forms.py:681
+msgid "Azure OpenAI API version"
+msgstr "Versione API Azure OpenAI"
+
+#: ConvAI/forms.py:682
+msgid "Azure Anthropic endpoint"
+msgstr "Endpoint Azure Anthropic"
+
+#: ConvAI/forms.py:683
+msgid "Azure Anthropic key"
+msgstr "Chiave Azure Anthropic"
+
+#: ConvAI/forms.py:684
+msgid "Azure Mistral endpoint"
+msgstr "Endpoint Azure Mistral"
+
+#: ConvAI/forms.py:685
+msgid "Azure Mistral key"
+msgstr "Chiave Azure Mistral"
+
+#: ConvAI/forms.py:686
+msgid "Azure DeepSeek endpoint"
+msgstr "Endpoint Azure DeepSeek"
+
+#: ConvAI/forms.py:687
+msgid "Azure DeepSeek key"
+msgstr "Chiave Azure DeepSeek"
+
+#: ConvAI/forms.py:688
+msgid "Azure Realtime endpoint"
+msgstr "Endpoint Azure Realtime"
+
+#: ConvAI/forms.py:689
+msgid "Azure Realtime key"
+msgstr "Chiave Azure Realtime"
+
+#: ConvAI/forms.py:690
+msgid "Realtime deployment"
+msgstr "Deployment Realtime"
+
+#: ConvAI/forms.py:691
+msgid "Realtime voice"
+msgstr "Voce Realtime"
+
+#: ConvAI/forms.py:692
+msgid "Realtime WebRTC region"
+msgstr "Regione WebRTC Realtime"
+
+#: ConvAI/forms.py:695
+msgid ""
+"Used when an agent has no explicit model, e.g. 'openai/gpt-4.1-mini'. Blank "
+"uses the .env default."
+msgstr ""
+"Usato quando un agente non ha un modello esplicito, ad es. "
+"'openai/gpt-4.1-mini'. Vuoto usa il valore predefinito di .env."
+
+#: ConvAI/forms.py:697
+msgid "Route models to Azure instead of the public provider APIs."
+msgstr "Instrada i modelli su Azure anziché sulle API pubbliche dei provider."
+
+#: ConvAI/forms.py:698
+msgid "Blank reuses the Azure Mistral endpoint/key."
+msgstr "Vuoto riutilizza l'endpoint/la chiave di Azure Mistral."
+
+#: ConvAI/forms.py:699
+msgid "Blank reuses the Azure OpenAI endpoint/key."
+msgstr "Vuoto riutilizza endpoint/chiave di Azure OpenAI."
+
+#: ConvAI/forms.py:700
+msgid "Deployment used by real-time voice agents, e.g. 'gpt-realtime'."
+msgstr ""
+"Deployment usato dagli agenti vocali in tempo reale, es. 'gpt-realtime'."
+
+#: ConvAI/forms.py:702
+msgid "Output voice for real-time voice agents. Blank uses 'marin'."
+msgstr "Voce di uscita degli agenti vocali in tempo reale. Vuoto usa 'marin'."
+
+#: ConvAI/forms.py:704
+msgid ""
+"Only for resources on the preview Realtime API: the resource's region, e.g. "
+"'swedencentral' or 'eastus2'."
+msgstr ""
+"Solo per risorse con l'API Realtime in anteprima: la regione della risorsa, "
+"es. 'swedencentral' o 'eastus2'."
+
+#: ConvAI/models.py:29
+msgid "Optional default LangGraph agent for this user (used for testing/API)."
+msgstr ""
+"Agente LangGraph predefinito opzionale per questo utente (usato per "
+"test/API)."
+
+#: ConvAI/models.py:52
+msgid "Preferred interface language; blank uses the system default."
+msgstr ""
+"Lingua preferita dell'interfaccia; vuoto usa l'impostazione predefinita del "
+"sistema."
+
+#: ConvAI/models.py:299 ConvAI/templates/_detail_panel.html:344
+msgid "Protocol"
+msgstr "Protocollo"
+
+#: ConvAI/models.py:300
+msgid "Onboarding"
+msgstr "Onboarding"
+
+#: ConvAI/models.py:301
+msgid "Final"
+msgstr "Finale"
+
+#: ConvAI/models.py:302
+msgid "Initial"
+msgstr "Iniziale"
+
+#: ConvAI/models.py:303
+msgid "Follow-up"
+msgstr "Follow-up"
+
+#: ConvAI/models.py:306 ConvAI/templates/calls/calendar.html:144
+msgid "Pending"
+msgstr "In sospeso"
+
+#: ConvAI/models.py:307 ConvAI/templates/_detail_panel.html:98
+#: ConvAI/templates/_detail_panel.html:406
+#: ConvAI/templates/calls/calendar.html:145
+msgid "Complete"
+msgstr "Completo"
+
+#: ConvAI/models.py:308 ConvAI/templates/_detail_panel.html:408
+#: ConvAI/templates/calls/calendar.html:146
+msgid "Interrupted"
+msgstr "Interrotta"
+
+#: ConvAI/models.py:309 ConvAI/templates/calls/calendar.html:147
+msgid "Not answered"
+msgstr "Senza risposta"
+
+#: ConvAI/models.py:313 ConvAI/templates/communications/_list.html:79
+msgid "Cancelled"
+msgstr "Annullata"
+
+#: ConvAI/models.py:326 ConvAI/templates/patients/_timeline_event.html:34
+#: ConvAI/views/_panel.py:317
+msgid "Phone call"
+msgstr "Telefonata"
+
+#: ConvAI/models.py:327
+msgid "In person"
+msgstr "Di persona"
+
+#: ConvAI/models.py:330
+msgid "1. Protocol 1"
+msgstr "1. Protocollo 1"
+
+#: ConvAI/models.py:331
+msgid "2. Protocol 2"
+msgstr "2. Protocollo 2"
+
+#: ConvAI/models.py:332
+msgid "3. Protocol 3"
+msgstr "3. Protocollo 3"
+
+#: ConvAI/models.py:333
+msgid "4. Protocol 4"
+msgstr "4. Protocollo 4"
+
+#: ConvAI/models.py:334
+msgid "5. Protocol 5"
+msgstr "5. Protocollo 5"
+
+#: ConvAI/models.py:335
+msgid "6. Protocol 6"
+msgstr "6. Protocollo 6"
+
+#: ConvAI/models.py:336
+msgid "7. Protocol 7"
+msgstr "7. Protocollo 7"
+
+#: ConvAI/models.py:337
+msgid "8. Protocol 8"
+msgstr "8. Protocollo 8"
+
+#: ConvAI/models.py:338
+msgid "9. Final call"
+msgstr "9. Chiamata finale"
+
+#: ConvAI/models.py:339
+msgid "10. Follow-up"
+msgstr "10. Follow-up"
+
+#: ConvAI/models.py:474 ConvAI/templates/agents/_agent_card.html:19
+#: ConvAI/templates/agents/agent_list.html:47
+msgid "Remote"
+msgstr "Remoto"
+
+#: ConvAI/models.py:476 ConvAI/templates/agents/_agent_card.html:21
+#: ConvAI/templates/agents/agent_list.html:51
+msgid "Native"
+msgstr "Nativo"
+
+#: ConvAI/models.py:479 ConvAI/templates/agents/agent_list.html:43
+msgid "Prompt-based"
+msgstr "Basato su prompt"
+
+#: ConvAI/models.py:485
+msgid ""
+"Remote = runs on a LangGraph server (host:port). Native = ships with the "
+"platform. Prompt-based = in-process agent driven by a stored prompt."
+msgstr ""
+"Remoto = eseguito su un server LangGraph (host:porta). Nativo = fornito con "
+"la piattaforma. Basato su prompt = agente in-process guidato da un prompt "
+"memorizzato."
+
+#: ConvAI/models.py:491
+msgid ""
+"For native agents: which built-in graph to run (e.g. 'loopback', "
+"'link_worker')."
+msgstr ""
+"Per gli agenti nativi: quale grafo integrato eseguire (ad es. 'loopback', "
+"'link_worker')."
+
+#: ConvAI/models.py:498
+msgid ""
+"System prompt for prompt-based agents. Used as the system message on every "
+"turn."
+msgstr ""
+"Prompt di sistema per gli agenti basati su prompt. Usato come messaggio di "
+"sistema a ogni turno."
+
+#: ConvAI/models.py:508
+msgid ""
+"Prompt-based agents only: chat through the real-time voice API (live speech "
+"in/out) instead of the text chat."
+msgstr ""
+"Solo agenti basati su prompt: conversa tramite l'API vocale in tempo reale "
+"(voce dal vivo in ingresso e uscita) invece della chat testuale."
+
+#: ConvAI/models.py:518
+msgid ""
+"Model behind this agent, e.g. 'openai/gpt-4.1-mini' or 'anthropic/claude-"
+"sonnet-4-6'. Blank uses the platform default. Not used by remote agents."
+msgstr ""
+"Modello dietro questo agente, ad es. 'openai/gpt-4.1-mini' o "
+"'anthropic/claude-sonnet-4-6'. Vuoto usa il valore predefinito della "
+"piattaforma. Non usato dagli agenti remoti."
+
+#: ConvAI/models.py:698
+msgid "Must be a Twilio SID like HX + 32 hex characters."
+msgstr "Deve essere un SID Twilio come HX + 32 caratteri esadecimali."
+
+#: ConvAI/models.py:699
+msgid "Enter a phone number in E.164 format, e.g. +447700900000."
+msgstr "Inserisci un numero in formato E.164, ad es. +447700900000."
+
+#: ConvAI/models.py:707
+msgid "On"
+msgstr "Attivato"
+
+#: ConvAI/models.py:708 ConvAI/templates/sidebar.html:133
+msgid "Off"
+msgstr "Disattivato"
+
+#: ConvAI/templates/_detail_panel.html:18
+msgid "Call details"
+msgstr "Dettagli della chiamata"
+
+#: ConvAI/templates/_detail_panel.html:42
+#: ConvAI/templates/_detail_panel.html:464
+#: ConvAI/templates/patients/patient_detail.html:32
+#, python-format
+msgid "Last contact %(t)s ago"
+msgstr "Ultimo contatto %(t)s fa"
+
+#: ConvAI/templates/_detail_panel.html:45
+#: ConvAI/templates/_detail_panel.html:100
+#: ConvAI/templates/_detail_panel.html:825
+#: ConvAI/templates/_detail_panel.html:982
+msgid "of"
+msgstr "di"
+
+#: ConvAI/templates/_detail_panel.html:45
+msgid "answered"
+msgstr "risposte"
+
+#: ConvAI/templates/_detail_panel.html:58
+#: ConvAI/templates/_detail_panel.html:469
+#: ConvAI/templates/communications/communications.html:50
+msgid "Close"
+msgstr "Chiudi"
+
+#: ConvAI/templates/_detail_panel.html:70
+#: ConvAI/templates/_detail_panel.html:91
+#: ConvAI/templates/settings/config.html:374
+#: ConvAI/views/settings_views.py:140
+msgid "Protocols"
+msgstr "Protocolli"
+
+#: ConvAI/templates/_detail_panel.html:73
+#: ConvAI/templates/_detail_panel.html:160
+msgid "Notes"
+msgstr "Note"
+
+#: ConvAI/templates/_detail_panel.html:75
+#: ConvAI/templates/_detail_panel.html:182 ConvAI/views/communications.py:174
+msgid "Recording"
+msgstr "Registrazione"
+
+#: ConvAI/templates/_detail_panel.html:83
+#: ConvAI/templates/dashboard/dashboard.html:515
+#: ConvAI/views/communications.py:124
+msgid "Location not set"
+msgstr "Luogo non indicato"
+
+#: ConvAI/templates/_detail_panel.html:87
+msgid "To address"
+msgstr "Da affrontare"
+
+#: ConvAI/templates/_detail_panel.html:102
+#, python-format
+msgid "%(n)s question"
+msgid_plural "%(n)s questions"
+msgstr[0] "%(n)s domanda"
+msgstr[1] "%(n)s domande"
+
+#: ConvAI/templates/_detail_panel.html:118
+msgid "Type what they said"
+msgstr "Scrivi quello che hanno detto"
+
+#: ConvAI/templates/_detail_panel.html:131
+msgid "Send by text"
+msgstr "Invia per messaggio"
+
+#: ConvAI/templates/_detail_panel.html:139
+msgid "No protocols have questions yet."
+msgstr "Nessun protocollo ha ancora domande."
+
+#: ConvAI/templates/_detail_panel.html:168
+msgid "Anything else worth recording from this meeting"
+msgstr "Qualsiasi altra cosa che valga la pena annotare di questa riunione"
+
+#: ConvAI/templates/_detail_panel.html:168
+msgid "Anything else worth recording from this call"
+msgstr "Qualsiasi altra cosa che valga la pena annotare di questa chiamata"
+
+#: ConvAI/templates/_detail_panel.html:186
+#, python-format
+msgid "Attached to this meeting · %(d)s"
+msgstr "Allegata a questa riunione · %(d)s"
+
+#: ConvAI/templates/_detail_panel.html:202
+#: ConvAI/templates/_detail_panel.html:735
+msgid "Transcribe again"
+msgstr "Trascrivi di nuovo"
+
+#: ConvAI/templates/_detail_panel.html:203
+msgid "Transcribe this recording"
+msgstr "Trascrivi questa registrazione"
+
+#: ConvAI/templates/_detail_panel.html:207
+msgid "Nothing was recorded."
+msgstr "Non è stato registrato nulla."
+
+#: ConvAI/templates/_detail_panel.html:215
+#: ConvAI/templates/_detail_panel.html:489
+#: ConvAI/templates/_detail_panel.html:496 ConvAI/views/_panel.py:368
+msgid "Summary"
+msgstr "Riepilogo"
+
+#: ConvAI/templates/_detail_panel.html:219
+msgid "The protocol answers have not been summarised."
+msgstr "Le risposte del protocollo non sono state riepilogate."
+
+#: ConvAI/templates/_detail_panel.html:226
+msgid "Summarise again"
+msgstr "Riepiloga di nuovo"
+
+#: ConvAI/templates/_detail_panel.html:227
+msgid "Summarise the answers"
+msgstr "Riepiloga le risposte"
+
+#: ConvAI/templates/_detail_panel.html:248
+msgid "Edit meeting"
+msgstr "Modifica riunione"
+
+#: ConvAI/templates/_detail_panel.html:251
+#: ConvAI/templates/_detail_panel.html:254
+msgid "Start call"
+msgstr "Avvia chiamata"
+
+#: ConvAI/templates/_detail_panel.html:254
+msgid "A phone number is missing for you or the caregiver."
+msgstr "Manca un numero di telefono tuo o del caregiver."
+
+#: ConvAI/templates/_detail_panel.html:262
+msgid "Send reminder"
+msgstr "Invia promemoria"
+
+#: ConvAI/templates/_detail_panel.html:273
+msgid "Reschedule"
+msgstr "Riprogramma"
+
+#: ConvAI/templates/_detail_panel.html:287
+#: ConvAI/templates/_detail_panel.html:370
+msgid "Cancel this call"
+msgstr "Annulla questa chiamata"
+
+#: ConvAI/templates/_detail_panel.html:294
+msgid "End call"
+msgstr "Termina chiamata"
+
+#: ConvAI/templates/_detail_panel.html:308
+msgid "Edit this meeting"
+msgstr "Modifica questa riunione"
+
+#: ConvAI/templates/_detail_panel.html:308
+msgid "Reschedule this call"
+msgstr "Riprogramma questa chiamata"
+
+#: ConvAI/templates/_detail_panel.html:310
+#, python-format
+msgid ""
+"For %(c)s. Everyone keeps the same appointment; only the details change."
+msgstr ""
+"Per %(c)s. Tutti mantengono lo stesso appuntamento; cambiano solo i "
+"dettagli."
+
+#: ConvAI/templates/_detail_panel.html:314
+#: ConvAI/templates/communications/_list.html:47
+msgid "When"
+msgstr "Quando"
+
+#: ConvAI/templates/_detail_panel.html:331
+msgid "Only for an in-person meeting"
+msgstr "Solo per una riunione di persona"
+
+#: ConvAI/templates/_detail_panel.html:353
+#: ConvAI/templates/_detail_panel.html:717
+#: ConvAI/templates/_panel_agent_actions.html:67
+#: ConvAI/templates/_panel_agent_actions.html:94
+#: ConvAI/templates/account/help_edit.html:37
+#: ConvAI/templates/agents/agent_form.html:93
+#: ConvAI/templates/calls/calendar.html:255
+#: ConvAI/templates/chat/external_chat_with_audio.html:270
+#: ConvAI/templates/communications/communications.html:64
+#: ConvAI/templates/patients/edit_care_plan.html:73
+#: ConvAI/templates/patients/edit_patient.html:93
+#: ConvAI/templates/patients/edit_patient_details.html:39
+#: ConvAI/templates/patients/patient_detail.html:165
+#: ConvAI/templates/patients/patient_list.html:1369
+#: ConvAI/templates/users/edit_user.html:55
+#: ConvAI/templates/users/user_list.html:192
+#: ConvAI/templates/users/user_list.html:215
+msgid "Cancel"
+msgstr "Annulla"
+
+#: ConvAI/templates/_detail_panel.html:354
+#: ConvAI/templates/account/profile.html:70
+#: ConvAI/templates/account/profile.html:95
+#: ConvAI/templates/agents/agent_form.html:92
+#: ConvAI/templates/patients/edit_patient.html:92
+#: ConvAI/templates/settings/config.html:88
+#: ConvAI/templates/settings/config.html:132
+#: ConvAI/templates/settings/config.html:151
+#: ConvAI/templates/settings/config.html:174
+#: ConvAI/templates/settings/config.html:240
+#: ConvAI/templates/settings/config.html:270
+#: ConvAI/templates/users/edit_user.html:54
+msgid "Save changes"
+msgstr "Salva modifiche"
+
+#: ConvAI/templates/_detail_panel.html:372
+msgid ""
+"It leaves the queue but stays in the history, struck through, so the record "
+"still shows it was arranged. You can put it back."
+msgstr ""
+"Esce dalla coda ma resta nello storico, barrata, così il registro mostra "
+"ancora che era stata fissata. Puoi ripristinarla."
+
+#: ConvAI/templates/_detail_panel.html:375
+#: ConvAI/templates/_detail_panel.html:708
+#: ConvAI/templates/_panel_agent_actions.html:84
+msgid "Why"
+msgstr "Perché"
+
+#: ConvAI/templates/_detail_panel.html:377
+msgid "The client asked to stop"
+msgstr "Il paziente ha chiesto di interrompere"
+
+#: ConvAI/templates/_detail_panel.html:378
+msgid "No longer needed"
+msgstr "Non è più necessario"
+
+#: ConvAI/templates/_detail_panel.html:379
+msgid "Covered another way"
+msgstr "Gestito in altro modo"
+
+#: ConvAI/templates/_detail_panel.html:380
+msgid "Arranged in error"
+msgstr "Fissato per errore"
+
+#: ConvAI/templates/_detail_panel.html:381
+#: ConvAI/templates/_detail_panel.html:713
+#: ConvAI/templates/_panel_agent_actions.html:89
+#: ConvAI/templates/alerts/alert_detail.html:512
+msgid "Other"
+msgstr "Altro"
+
+#: ConvAI/templates/_detail_panel.html:385
+#: ConvAI/templates/dashboard/dashboard.html:362
+msgid "Keep it"
+msgstr "Mantieni"
+
+#: ConvAI/templates/_detail_panel.html:386
+msgid "Cancel the call"
+msgstr "Annulla la chiamata"
+
+#: ConvAI/templates/_detail_panel.html:392
+msgid "How did the call go?"
+msgstr "Com'è andata la chiamata?"
+
+#: ConvAI/templates/_detail_panel.html:409
+msgid "No answer"
+msgstr "Nessuna risposta"
+
+#: ConvAI/templates/_detail_panel.html:414
+#, python-format
+msgid "Recording <b>%(p)s</b> as covered."
+msgstr "Registro <b>%(p)s</b> come affrontato."
+
+#: ConvAI/templates/_detail_panel.html:415
+#: ConvAI/templates/_detail_panel.html:1143
+msgid "Change"
+msgstr "Cambia"
+
+#: ConvAI/templates/_detail_panel.html:431
+msgid "Put it back on the schedule"
+msgstr "Rimettila in calendario"
+
+#: ConvAI/templates/_detail_panel.html:443
+msgid "Schedule a follow-up"
+msgstr "Programma un follow-up"
+
+#: ConvAI/templates/_detail_panel.html:456
+#: ConvAI/templates/patients/patient_detail.html:44
+msgid "Details"
+msgstr "Dettagli"
+
+#: ConvAI/templates/_detail_panel.html:464
+#, python-format
+msgid "from %(s)s"
+msgstr "da %(s)s"
+
+#: ConvAI/templates/_detail_panel.html:484
+msgid "Overview"
+msgstr "Panoramica"
+
+#: ConvAI/templates/_detail_panel.html:485
+msgid "Technical"
+msgstr "Tecnico"
+
+#: ConvAI/templates/_detail_panel.html:490
+#: ConvAI/templates/alerts/alert_detail.html:289 ConvAI/views/_panel.py:365
+msgid "Conversation"
+msgstr "Conversazione"
+
+#: ConvAI/templates/_detail_panel.html:497
+msgid "Transcript"
+msgstr "Trascrizione"
+
+#: ConvAI/templates/_detail_panel.html:523
+msgid "Detail"
+msgstr "Dettaglio"
+
+#: ConvAI/templates/_detail_panel.html:543
+msgid "No messages recorded that day."
+msgstr "Nessun messaggio registrato quel giorno."
+
+#: ConvAI/templates/_detail_panel.html:559
+msgid "Your review of this conversation"
+msgstr "La tua valutazione di questa conversazione"
+
+#: ConvAI/templates/_detail_panel.html:563
+msgid "Rating"
+msgstr "Valutazione"
+
+#: ConvAI/templates/_detail_panel.html:566
+#: ConvAI/templates/_detail_panel.html:569
+#, python-format
+msgid "%(n)s of 5"
+msgstr "%(n)s su 5"
+
+#: ConvAI/templates/_detail_panel.html:570
+msgid "Not rated"
+msgstr "Non valutata"
+
+#: ConvAI/templates/_detail_panel.html:575
+msgid "What was good or wrong about how the agent handled this?"
+msgstr "Che cosa ha fatto bene o male l'agente in questo caso?"
+
+#: ConvAI/templates/_detail_panel.html:578
+msgid "Did these actually come up?"
+msgstr "Si sono verificati davvero?"
+
+#: ConvAI/templates/_detail_panel.html:588
+msgid ""
+"The agent flags these automatically. Your yes/no is what it is measured "
+"against."
+msgstr ""
+"L'agente li segnala automaticamente. Il tuo sì/no è il riferimento con cui "
+"viene valutato."
+
+#: ConvAI/templates/_detail_panel.html:604
+msgid "Not transcribed yet."
+msgstr "Non ancora trascritta."
+
+#: ConvAI/templates/_detail_panel.html:618
+msgid "Raised"
+msgstr "Segnalato"
+
+#: ConvAI/templates/_detail_panel.html:620
+#: ConvAI/templates/settings/config.html:395
+#: ConvAI/templates/settings/config.html:462
+#: ConvAI/templates/users/user_list.html:86
+msgid "Status"
+msgstr "Stato"
+
+#: ConvAI/templates/_detail_panel.html:621
+msgid "Priority"
+msgstr "Priorità"
+
+#: ConvAI/templates/_detail_panel.html:623
+msgid "Raised by"
+msgstr "Segnalato da"
+
+#: ConvAI/templates/_detail_panel.html:626
+msgid "Last acted"
+msgstr "Ultima azione"
+
+#: ConvAI/templates/_detail_panel.html:628
+msgid "Reference"
+msgstr "Riferimento"
+
+#: ConvAI/templates/_detail_panel.html:631
+msgid "Recorded with the alert"
+msgstr "Registrato con l'avviso"
+
+#: ConvAI/templates/_detail_panel.html:671
+msgid "What changed for them? (optional)"
+msgstr "Che cosa è cambiato per loro? (facoltativo)"
+
+#: ConvAI/templates/_detail_panel.html:672
+msgid "Resolve"
+msgstr "Risolvi"
+
+#: ConvAI/templates/_detail_panel.html:674
+#: ConvAI/templates/alerts/alert_detail.html:379 ConvAI/views/_panel.py:94
+msgid "False alarm"
+msgstr "Falso allarme"
+
+#: ConvAI/templates/_detail_panel.html:675
+msgid "Add note"
+msgstr "Aggiungi nota"
+
+#: ConvAI/templates/_detail_panel.html:678
+msgid "Reopen"
+msgstr "Riapri"
+
+#: ConvAI/templates/_detail_panel.html:689
+#: ConvAI/templates/_panel_agent_actions.html:26
+msgid "Turn agent back on"
+msgstr "Riattiva l'agente"
+
+#: ConvAI/templates/_detail_panel.html:693
+#: ConvAI/templates/_panel_agent_actions.html:30
+msgid "Turn agent off"
+msgstr "Disattiva l'agente"
+
+#: ConvAI/templates/_detail_panel.html:703
+#: ConvAI/templates/_panel_agent_actions.html:78
+#, python-format
+msgid "Turn the agent off for %(c)s"
+msgstr "Disattiva l'agente per %(c)s"
+
+#: ConvAI/templates/_detail_panel.html:705
+#: ConvAI/templates/_panel_agent_actions.html:80
+msgid ""
+"Messages still arrive and are recorded. What stops is the agent answering "
+"them."
+msgstr ""
+"I messaggi continuano ad arrivare e vengono registrati. Ciò che si "
+"interrompe è la risposta dell'agente."
+
+#: ConvAI/templates/_detail_panel.html:710
+#: ConvAI/templates/_panel_agent_actions.html:86
+msgid "Wrong advice"
+msgstr "Consiglio sbagliato"
+
+#: ConvAI/templates/_detail_panel.html:711
+#: ConvAI/templates/_panel_agent_actions.html:87
+msgid "Distressing the caregiver"
+msgstr "Turba il caregiver"
+
+#: ConvAI/templates/_detail_panel.html:712
+#: ConvAI/templates/_panel_agent_actions.html:88
+msgid "Handling this myself"
+msgstr "Me ne occupo io"
+
+#: ConvAI/templates/_detail_panel.html:718
+#: ConvAI/templates/_panel_agent_actions.html:95
+#: ConvAI/templates/account/profile.html:123
+msgid "Turn it off"
+msgstr "Disattivalo"
+
+#: ConvAI/templates/_detail_panel.html:735
+#: ConvAI/templates/patients/_timeline_event.html:48
+msgid "Transcribe"
+msgstr "Trascrivi"
+
+#: ConvAI/templates/_detail_panel.html:800
+#: ConvAI/templates/_detail_panel.html:986
+#: ConvAI/templates/_detail_panel.html:1013
+msgid "saving…"
+msgstr "salvataggio…"
+
+#: ConvAI/templates/_detail_panel.html:813
+#: ConvAI/templates/_detail_panel.html:996
+#: ConvAI/templates/_detail_panel.html:1024
+msgid "saved"
+msgstr "salvato"
+
+#: ConvAI/templates/_detail_panel.html:816
+#: ConvAI/templates/_detail_panel.html:1000
+#: ConvAI/templates/_detail_panel.html:1028
+msgid "not saved — retrying"
+msgstr "non salvato — nuovo tentativo"
+
+#: ConvAI/templates/_detail_panel.html:1106
+msgid "attempt"
+msgstr "tentativo"
+
+#: ConvAI/templates/_detail_panel.html:1117
+msgid "Could not start the call."
+msgstr "Impossibile avviare la chiamata."
+
+#: ConvAI/templates/_detail_panel.html:1143
+msgid "Keep as planned"
+msgstr "Mantieni come previsto"
+
+#: ConvAI/templates/_panel_agent_actions.html:17
+#: ConvAI/templates/_panel_agent_actions.html:40
+msgid "Raise an alert"
+msgstr "Segnala un avviso"
+
+#: ConvAI/templates/_panel_agent_actions.html:42
+#, python-format
+msgid "For %(c)s, from what you have just read."
+msgstr "Per %(c)s, in base a quanto hai appena letto."
+
+#: ConvAI/templates/_panel_agent_actions.html:46
+msgid "What is it"
+msgstr "Di che si tratta"
+
+#: ConvAI/templates/_panel_agent_actions.html:48
+msgid "A short title"
+msgstr "Un titolo breve"
+
+#: ConvAI/templates/_panel_agent_actions.html:52
+msgid "Level"
+msgstr "Livello"
+
+#: ConvAI/templates/_panel_agent_actions.html:54
+#: ConvAI/templates/alerts/alert_detail.html:220
+msgid "Low"
+msgstr "Bassa"
+
+#: ConvAI/templates/_panel_agent_actions.html:55
+msgid "Medium"
+msgstr "Media"
+
+#: ConvAI/templates/_panel_agent_actions.html:56
+msgid "High"
+msgstr "Alta"
+
+#: ConvAI/templates/_panel_agent_actions.html:61
+msgid "What you saw"
+msgstr "Che cosa hai osservato"
+
+#: ConvAI/templates/_panel_agent_actions.html:63
+msgid "What the agent missed, or what worried you."
+msgstr "Che cosa ha tralasciato l'agente, o che cosa ti ha preoccupato."
+
+#: ConvAI/templates/_panel_agent_actions.html:68
+msgid "Raise alert"
+msgstr "Segnala avviso"
+
+#: ConvAI/templates/_panel_open.html:19
+#, python-format
+msgid "Open %(c)s"
+msgstr "Apri %(c)s"
+
+#: ConvAI/templates/_panel_open.html:21
+msgid "Open client"
+msgstr "Apri paziente"
+
+#: ConvAI/templates/account/help.html:3 ConvAI/templates/account/help.html:9
+#: ConvAI/templates/sidebar.html:95 ConvAI/templates/sidebar.html:100
+msgid "Help"
+msgstr "Aiuto"
+
+#: ConvAI/templates/account/help.html:10
+msgid "Guidance for using the platform."
+msgstr "Guida all'uso della piattaforma."
+
+#: ConvAI/templates/account/help.html:15
+#: ConvAI/templates/agents/_agent_actions.html:10
+#: ConvAI/templates/protocols/protocol_form.html:125
+#: ConvAI/templates/settings/config.html:419
+#: ConvAI/templates/users/user_list.html:111
+msgid "Edit"
+msgstr "Modifica"
+
+#: ConvAI/templates/account/help.html:22
+msgid ""
+"This page is showing the default placeholder content. Use Edit to replace it"
+" with guidance for your team."
+msgstr ""
+"Questa pagina mostra il contenuto predefinito di esempio. Usa Modifica per "
+"sostituirlo con indicazioni per il tuo team."
+
+#: ConvAI/templates/account/help_edit.html:4
+#: ConvAI/templates/account/help_edit.html:8
+msgid "Edit help page"
+msgstr "Modifica pagina di aiuto"
+
+#: ConvAI/templates/account/help_edit.html:12
+msgid "Back to help"
+msgstr "Torna all'aiuto"
+
+#: ConvAI/templates/account/help_edit.html:34
+#: ConvAI/templates/patients/edit_care_plan.html:67
+#: ConvAI/templates/patients/edit_patient_details.html:38
+#: ConvAI/templates/patients/patient_detail.html:166
+#: ConvAI/templates/protocols/protocol_editor.html:135
+#: ConvAI/templates/protocols/protocol_form.html:60
+msgid "Save"
+msgstr "Salva"
+
+#: ConvAI/templates/account/profile.html:3 ConvAI/templates/sidebar.html:106
+#: ConvAI/templates/sidebar.html:110
+msgid "Profile"
+msgstr "Profilo"
+
+#: ConvAI/templates/account/profile.html:44
+msgid "Personal information"
+msgstr "Informazioni personali"
+
+#: ConvAI/templates/account/profile.html:45
+msgid "Update how your name appears across the platform."
+msgstr "Aggiorna come appare il tuo nome sulla piattaforma."
+
+#: ConvAI/templates/account/profile.html:66
+msgid "Your username can't be changed here."
+msgstr "Il tuo nome utente non può essere modificato qui."
+
+#: ConvAI/templates/account/profile.html:80
+#: ConvAI/templates/settings/config.html:105
+msgid "Language"
+msgstr "Lingua"
+
+#: ConvAI/templates/account/profile.html:81
+msgid "Choose your interface language, or use the system default."
+msgstr ""
+"Scegli la lingua dell'interfaccia oppure usa quella predefinita del "
+"sistema.Scegli la lingua dell'interfaccia o usa quella predefinita del "
+"sistema."
+
+#: ConvAI/templates/account/profile.html:87
+msgid "Interface language"
+msgstr "Lingua dell'interfaccia"
+
+#: ConvAI/templates/account/profile.html:89
+msgid "System default"
+msgstr "Predefinito del sistema"
+
+#: ConvAI/templates/account/profile.html:104 ConvAI/templates/sidebar.html:19
+#: ConvAI/templates/sidebar.html:24
+msgid "Home"
+msgstr "Home"
+
+#: ConvAI/templates/account/profile.html:106
+msgid ""
+"The next-call card sits at the top of Home when a call is overdue or due "
+"within the week. Closing it with the ✕ puts that one call away until it is "
+"done; this switch turns the card off for good."
+msgstr ""
+"La scheda della prossima chiamata compare in cima alla Home quando una "
+"chiamata è in ritardo o scade entro la settimana. Chiuderla con la ✕ la "
+"nasconde finché non viene effettuata; questo interruttore disattiva la "
+"scheda in modo permanente."
+
+#: ConvAI/templates/account/profile.html:115
+msgid "The next-call card is off."
+msgstr "La scheda della prossima chiamata è disattivata."
+
+#: ConvAI/templates/account/profile.html:117
+msgid "Turn it back on"
+msgstr "Riattivala"
+
+#: ConvAI/templates/account/profile.html:121
+msgid "The next-call card is on."
+msgstr "La scheda della prossima chiamata è attiva."
+
+#: ConvAI/templates/account/profile.html:135
+msgid "API token"
+msgstr "Token API"
+
+#: ConvAI/templates/account/profile.html:139
+msgid "None yet"
+msgstr "Nessuno per ora"
+
+#: ConvAI/templates/account/profile.html:142
+msgid ""
+"Used by the Python API client. Shown only once when generated — regenerate "
+"if you lose it."
+msgstr ""
+"Usato dal client API Python. Viene mostrato solo una volta alla generazione:"
+" rigeneralo se lo perdi."
+
+#: ConvAI/templates/account/profile.html:148
+msgid "Copy your token now — for security it will not be shown again."
+msgstr "Copia il token adesso: per sicurezza non verrà mostrato di nuovo."
+
+#: ConvAI/templates/account/profile.html:152
+msgid "Show/Hide"
+msgstr "Mostra/Nascondi"
+
+#: ConvAI/templates/account/profile.html:155
+#: ConvAI/templates/settings/config.html:569
+#: ConvAI/templates/users/test_user_result.html:31
+#: ConvAI/templates/users/test_user_result.html:42
+msgid "Copy"
+msgstr "Copia"
+
+#: ConvAI/templates/account/profile.html:159
+msgid "Copied to clipboard!"
+msgstr "Copiato negli appunti!"
+
+#: ConvAI/templates/account/profile.html:167
+msgid "Regenerate token"
+msgstr "Rigenera token"
+
+#: ConvAI/templates/account/profile.html:167
+msgid "Generate token"
+msgstr "Genera token"
+
+#: ConvAI/templates/account/profile.html:170
+msgid "On regenerating, the previous token will stop working."
+msgstr "Rigenerando, il token precedente smetterà di funzionare."
+
+#: ConvAI/templates/account/profile.html:180
+msgid "Session"
+msgstr "Sessione"
+
+#: ConvAI/templates/account/profile.html:181
+msgid "End your session on this device."
+msgstr "Termina la sessione su questo dispositivo."
+
+#: ConvAI/templates/account/profile.html:187 ConvAI/templates/sidebar.html:139
+msgid "Log out"
+msgstr "Esci"
+
+#: ConvAI/templates/agents/_agent_actions.html:6
+msgid "Test"
+msgstr "Prova"
+
+#: ConvAI/templates/agents/_agent_actions.html:15
+msgid "Delete this agent? This cannot be undone."
+msgstr "Eliminare questo agente? L'operazione non può essere annullata."
+
+#: ConvAI/templates/agents/_agent_actions.html:18
+#: ConvAI/templates/protocols/protocol_editor.html:249
+#: ConvAI/templates/settings/config.html:427
+msgid "Delete"
+msgstr "Elimina"
+
+#: ConvAI/templates/agents/_agent_card.html:17
+msgid "Prompt"
+msgstr "Prompt"
+
+#: ConvAI/templates/agents/_agent_card.html:26
+msgid "No prompt set"
+msgstr "Nessun prompt impostato"
+
+#: ConvAI/templates/agents/_agent_card.html:28
+msgid "Remote LangGraph agent"
+msgstr "Agente LangGraph remoto"
+
+#: ConvAI/templates/agents/_agent_card.html:39
+msgid "Host"
+msgstr "Host"
+
+#: ConvAI/templates/agents/_agent_card.html:44
+msgid "Model"
+msgstr "Modello"
+
+#: ConvAI/templates/agents/_agent_card.html:46
+msgid "default"
+msgstr "predefinito"
+
+#: ConvAI/templates/agents/_agent_card.html:52
+msgid "Real-time voice"
+msgstr "Voce in tempo reale"
+
+#: ConvAI/templates/agents/_agent_card.html:56
+msgid "Voice ID"
+msgstr "ID voce"
+
+#: ConvAI/templates/agents/agent_form.html:3
+msgid "Edit agent"
+msgstr "Modifica agente"
+
+#: ConvAI/templates/agents/agent_form.html:3
+msgid "Add agent"
+msgstr "Aggiungi agente"
+
+#: ConvAI/templates/agents/agent_form.html:25
+msgid "Back to agents"
+msgstr "Torna agli agenti"
+
+#: ConvAI/templates/agents/agent_form.html:38
+#, python-format
+msgid "Edit %(kind)s"
+msgstr "Modifica %(kind)s"
+
+#: ConvAI/templates/agents/agent_form.html:38
+#, python-format
+msgid "New %(kind)s"
+msgstr "Nuovo %(kind)s"
+
+#: ConvAI/templates/agents/agent_form.html:41
+msgid "Runs in-process, driven by your system prompt. No tools."
+msgstr ""
+"Viene eseguito in-process, guidato dal tuo prompt di sistema. Nessuno "
+"strumento."
+
+#: ConvAI/templates/agents/agent_form.html:43
+msgid "Connects to an agent on a LangGraph server (host:port)."
+msgstr "Si connette a un agente su un server LangGraph (host:porta)."
+
+#: ConvAI/templates/agents/agent_form.html:45
+msgid "Built-in agent — set the model and voice it uses."
+msgstr "Agente integrato — imposta il modello e la voce che usa."
+
+#: ConvAI/templates/agents/agent_form.html:73
+msgid "Advanced: conversation classification"
+msgstr "Avanzate: classificazione delle conversazioni"
+
+#: ConvAI/templates/agents/agent_form.html:75
+msgid ""
+"How this agent's conversations are summarised and flagged for human review. "
+"Optional."
+msgstr ""
+"Come le conversazioni di questo agente vengono riassunte e segnalate per la "
+"revisione umana. Facoltativo."
+
+#: ConvAI/templates/agents/agent_list.html:3
+#: ConvAI/templates/agents/agent_list.html:35
+#: ConvAI/templates/settings/config.html:185 ConvAI/templates/sidebar.html:68
+#: ConvAI/templates/sidebar.html:73 ConvAI/views/settings_views.py:138
+msgid "Agents"
+msgstr "Agenti"
+
+#: ConvAI/templates/agents/agent_list.html:36
+msgid ""
+"The assistants that power every chat surface — pick their kind, model, and "
+"voice."
+msgstr ""
+"Gli assistenti che alimentano ogni superficie di chat: scegli tipo, modello "
+"e voce."
+
+#: ConvAI/templates/agents/agent_list.html:41
+msgid "Agent types"
+msgstr "Tipi di agente"
+
+#: ConvAI/templates/agents/agent_list.html:59
+msgid ""
+"Custom in-process agents driven by a system prompt you write. No tools."
+msgstr ""
+"Agenti personalizzati in-process, guidati da un prompt di sistema che scrivi"
+" tu. Nessuno strumento."
+
+#: ConvAI/templates/agents/agent_list.html:65
+#: ConvAI/templates/agents/agent_list.html:74
+msgid "New prompt agent"
+msgstr "Nuovo agente prompt"
+
+#: ConvAI/templates/agents/agent_list.html:71
+msgid "No prompt-based agents yet."
+msgstr "Nessun agente basato su prompt per ora."
+
+#: ConvAI/templates/agents/agent_list.html:72
+msgid "Create one and drive it with your own system prompt."
+msgstr "Creane uno e guidalo con il tuo prompt di sistema."
+
+#: ConvAI/templates/agents/agent_list.html:83
+msgid "External agents running on a LangGraph server (host:port)."
+msgstr "Agenti esterni in esecuzione su un server LangGraph (host:porta)."
+
+#: ConvAI/templates/agents/agent_list.html:89
+#: ConvAI/templates/agents/agent_list.html:98
+msgid "New remote agent"
+msgstr "Nuovo agente remoto"
+
+#: ConvAI/templates/agents/agent_list.html:95
+msgid "No remote agents yet."
+msgstr "Nessun agente remoto per ora."
+
+#: ConvAI/templates/agents/agent_list.html:96
+msgid "Connect an agent running on your own LangGraph server."
+msgstr "Collega un agente in esecuzione sul tuo server LangGraph."
+
+#: ConvAI/templates/agents/agent_list.html:108
+msgid ""
+"Built-in agents that ship with the platform and run in-process. You can "
+"change their model and voice."
+msgstr ""
+"Agenti integrati forniti con la piattaforma ed eseguiti in-process. Puoi "
+"cambiarne il modello e la voce."
+
+#: ConvAI/templates/agents/agent_list.html:117
+msgid "No native agents."
+msgstr "Nessun agente nativo."
+
+#: ConvAI/templates/alerts/alert_detail.html:4
+msgid "Alert review"
+msgstr "Revisione avviso"
+
+#: ConvAI/templates/alerts/alert_detail.html:206
+msgid "Back to home"
+msgstr "Torna alla home"
+
+#: ConvAI/templates/alerts/alert_detail.html:216
+#: ConvAI/templates/patients/patient_conversation_detail.html:124
+msgid "Urgent"
+msgstr "Urgente"
+
+#: ConvAI/templates/alerts/alert_detail.html:218
+#: ConvAI/templates/patients/patient_conversation_detail.html:126
+msgid "Review"
+msgstr "Rivedi"
+
+#: ConvAI/templates/alerts/alert_detail.html:242
+msgid "Client:"
+msgstr "Paziente:"
+
+#: ConvAI/templates/alerts/alert_detail.html:247
+msgid "Caregiver:"
+msgstr "Caregiver:"
+
+#: ConvAI/templates/alerts/alert_detail.html:253
+msgid "Summary:"
+msgstr "Riepilogo:"
+
+#: ConvAI/templates/alerts/alert_detail.html:261
+msgid "No summary."
+msgstr "Nessun riepilogo."
+
+#: ConvAI/templates/alerts/alert_detail.html:268
+msgid "Detected"
+msgstr "Rilevato"
+
+#: ConvAI/templates/alerts/alert_detail.html:277
+#: ConvAI/templates/alerts/alert_detail.html:332
+msgid "Review conversation"
+msgstr "Rivedi conversazione"
+
+#: ConvAI/templates/alerts/alert_detail.html:278
+msgid "Open the linked conversation for the date associated with this alert."
+msgstr ""
+"Apri la conversazione collegata per la data associata a questo avviso."
+
+#: ConvAI/templates/alerts/alert_detail.html:285
+msgid "Open conversation"
+msgstr "Apri conversazione"
+
+#: ConvAI/templates/alerts/alert_detail.html:294
+msgid "No conversation URL available"
+msgstr "Nessun URL di conversazione disponibile"
+
+#: ConvAI/templates/alerts/alert_detail.html:295
+msgid ""
+"This alert does not currently include a linked conversation_id or thread_id,"
+" so the exact conversation URL could not be generated."
+msgstr ""
+"Questo avviso non include attualmente un conversation_id o thread_id "
+"collegato, quindi non è stato possibile generare l'URL esatto della "
+"conversazione."
+
+#: ConvAI/templates/alerts/alert_detail.html:302
+#: ConvAI/templates/settings/config.html:396
+#: ConvAI/templates/settings/config.html:464
+#: ConvAI/templates/users/user_list.html:88
+msgid "Actions"
+msgstr "Azioni"
+
+#: ConvAI/templates/alerts/alert_detail.html:304
+msgid ""
+"Choose the next step after reviewing the alert. The selected action is saved"
+" to the alert log and updates the status shown on the alert card."
+msgstr ""
+"Scegli il passo successivo dopo aver esaminato l'avviso. L'azione "
+"selezionata viene salvata nel registro degli avvisi e aggiorna lo stato "
+"mostrato sulla scheda dell'avviso."
+
+#: ConvAI/templates/alerts/alert_detail.html:309
+msgid "Current saved action:"
+msgstr "Azione salvata attuale:"
+
+#: ConvAI/templates/alerts/alert_detail.html:311
+msgid "Reviewed - review in progress"
+msgstr "Rivisto - revisione in corso"
+
+#: ConvAI/templates/alerts/alert_detail.html:313
+msgid "Chatbot disabled - review in progress"
+msgstr "Chatbot disattivato - revisione in corso"
+
+#: ConvAI/templates/alerts/alert_detail.html:315
+msgid "Chatbot re-enabled - feedback submitted"
+msgstr "Chatbot riattivato - feedback inviato"
+
+#: ConvAI/templates/alerts/alert_detail.html:317
+msgid "False alarm - resolved"
+msgstr "Falso allarme - risolto"
+
+#: ConvAI/templates/alerts/alert_detail.html:319
+#: ConvAI/templates/alerts/alert_detail.html:391 ConvAI/views/_panel.py:94
+msgid "Resolved"
+msgstr "Risolto"
+
+#: ConvAI/templates/alerts/alert_detail.html:321
+msgid "Reopened - review in progress"
+msgstr "Riaperto - revisione in corso"
+
+#: ConvAI/templates/alerts/alert_detail.html:343
+msgid "Reviewed"
+msgstr "Rivisto"
+
+#: ConvAI/templates/alerts/alert_detail.html:355
+msgid "Enable chatbot"
+msgstr "Attiva chatbot"
+
+#: ConvAI/templates/alerts/alert_detail.html:366
+msgid "Disable chatbot"
+msgstr "Disattiva chatbot"
+
+#: ConvAI/templates/alerts/alert_detail.html:404
+msgid "Reopen alert"
+msgstr "Riapri avviso"
+
+#: ConvAI/templates/alerts/alert_detail.html:415
+msgid "Internal note"
+msgstr "Nota interna"
+
+#: ConvAI/templates/alerts/alert_detail.html:416
+msgid ""
+"Add a note about what was reviewed, decided or escalated. This must be saved"
+" to the alert log, not just kept in the browser."
+msgstr ""
+"Aggiungi una nota su ciò che è stato esaminato, deciso o inoltrato. Deve "
+"essere salvata nel registro degli avvisi, non solo mantenuta nel browser."
+
+#: ConvAI/templates/alerts/alert_detail.html:426
+msgid "Add a brief note about what action was taken..."
+msgstr "Aggiungi una breve nota sull'azione intrapresa..."
+
+#: ConvAI/templates/alerts/alert_detail.html:430
+msgid "Save note"
+msgstr "Salva nota"
+
+#: ConvAI/templates/alerts/alert_detail.html:438
+msgid "Show technical alert data"
+msgstr "Mostra dati tecnici dell'avviso"
+
+#: ConvAI/templates/alerts/alert_detail.html:450
+msgid "No additional data."
+msgstr "Nessun dato aggiuntivo."
+
+#: ConvAI/templates/alerts/alert_detail.html:461
+msgid "Feedback to improve the alert"
+msgstr "Feedback per migliorare l'avviso"
+
+#: ConvAI/templates/alerts/alert_detail.html:462
+msgid "This helps improve future alert and chatbot decisions."
+msgstr "Questo aiuta a migliorare le future decisioni di avvisi e chatbot."
+
+#: ConvAI/templates/alerts/alert_detail.html:485
+msgid "Step 1 of 5"
+msgstr "Passaggio 1 di 5"
+
+#: ConvAI/templates/alerts/alert_detail.html:486
+msgid "Was the alert accurate?"
+msgstr "L'avviso era accurato?"
+
+#: ConvAI/templates/alerts/alert_detail.html:488
+msgid "Accurate"
+msgstr "Accurato"
+
+#: ConvAI/templates/alerts/alert_detail.html:489
+msgid "Partially accurate"
+msgstr "Parzialmente accurato"
+
+#: ConvAI/templates/alerts/alert_detail.html:490
+msgid "Inaccurate"
+msgstr "Impreciso"
+
+#: ConvAI/templates/alerts/alert_detail.html:495
+msgid "Step 2 of 5"
+msgstr "Passaggio 2 di 5"
+
+#: ConvAI/templates/alerts/alert_detail.html:496
+msgid "Was the chatbot's response appropriate?"
+msgstr "La risposta del chatbot era appropriata?"
+
+#: ConvAI/templates/alerts/alert_detail.html:498
+msgid "Good response"
+msgstr "Buona risposta"
+
+#: ConvAI/templates/alerts/alert_detail.html:499
+msgid "Needs improvement"
+msgstr "Da migliorare"
+
+#: ConvAI/templates/alerts/alert_detail.html:500
+msgid "Should not have responded"
+msgstr "Non avrebbe dovuto rispondere"
+
+#: ConvAI/templates/alerts/alert_detail.html:505
+msgid "Step 3 of 5"
+msgstr "Passaggio 3 di 5"
+
+#: ConvAI/templates/alerts/alert_detail.html:506
+msgid "What type of problem was this?"
+msgstr "Che tipo di problema era questo?"
+
+#: ConvAI/templates/alerts/alert_detail.html:508
+msgid "Incorrect risk level"
+msgstr "Livello di rischio errato"
+
+#: ConvAI/templates/alerts/alert_detail.html:509
+msgid "Risk not detected"
+msgstr "Rischio non rilevato"
+
+#: ConvAI/templates/alerts/alert_detail.html:510
+msgid "Excessive escalation"
+msgstr "Escalation eccessiva"
+
+#: ConvAI/templates/alerts/alert_detail.html:511
+msgid "Incorrect action"
+msgstr "Azione errata"
+
+#: ConvAI/templates/alerts/alert_detail.html:517
+msgid "Step 4 of 5"
+msgstr "Passaggio 4 di 5"
+
+#: ConvAI/templates/alerts/alert_detail.html:518
+msgid "Any additional comments?"
+msgstr "Altri commenti?"
+
+#: ConvAI/templates/alerts/alert_detail.html:519
+msgid "Optional comments..."
+msgstr "Commenti facoltativi..."
+
+#: ConvAI/templates/alerts/alert_detail.html:523
+msgid "Step 5 of 5"
+msgstr "Passaggio 5 di 5"
+
+#: ConvAI/templates/alerts/alert_detail.html:524
+msgid "Submit feedback and update the alert"
+msgstr "Invia feedback e aggiorna l'avviso"
+
+#: ConvAI/templates/alerts/alert_detail.html:525
+msgid "The alert update will now be sent with these comments."
+msgstr "L'aggiornamento dell'avviso verrà ora inviato con questi commenti."
+
+#: ConvAI/templates/alerts/alert_detail.html:529
+#: ConvAI/templates/protocols/protocol_editor.html:65
+msgid "Back"
+msgstr "Indietro"
+
+#: ConvAI/templates/alerts/alert_detail.html:530
+#: ConvAI/templates/alerts/alert_detail.html:560
+#: ConvAI/templates/calls/calendar.html:138
+#: ConvAI/templates/communications/_list.html:138
+msgid "Next"
+msgstr "Avanti"
+
+#: ConvAI/templates/alerts/alert_detail.html:560
+#: ConvAI/templates/chat/external_chat_with_audio.html:280
+msgid "Send"
+msgstr "Invia"
+
+#: ConvAI/templates/base.html:126
+msgid "Resize details panel"
+msgstr "Ridimensiona il pannello dei dettagli"
+
+#: ConvAI/templates/base.html:128
+msgid "Drag to resize · double-click to reset"
+msgstr "Trascina per ridimensionare · doppio clic per reimpostare"
+
+#: ConvAI/templates/base.html:231
+msgid "Notifications"
+msgstr "Notifiche"
+
+#: ConvAI/templates/base.html:236
+msgid "Dismiss"
+msgstr "Ignora"
+
+#: ConvAI/templates/base.html:237
+#: ConvAI/templates/patients/patient_detail.html:217
+msgid "Open"
+msgstr "Apri"
+
+#: ConvAI/templates/calls/calendar.html:4
+#: ConvAI/templates/calls/calendar.html:109 ConvAI/templates/sidebar.html:56
+#: ConvAI/templates/sidebar.html:61
+msgid "Calendar"
+msgstr "Calendario"
+
+#: ConvAI/templates/calls/calendar.html:110
+msgid "See your scheduled meetings at a glance and book new ones."
+msgstr ""
+"Consulta a colpo d'occhio le riunioni programmate e prenotane di nuove."
+
+#: ConvAI/templates/calls/calendar.html:113
+msgid "Calendar view"
+msgstr "Vista calendario"
+
+#: ConvAI/templates/calls/calendar.html:134 ConvAI/views/communications.py:96
+#: ConvAI/views/dashboard.py:47
+msgid "Today"
+msgstr "Oggi"
+
+#: ConvAI/templates/calls/calendar.html:135
+#: ConvAI/templates/communications/_list.html:125
+msgid "Previous"
+msgstr "Precedente"
+
+#: ConvAI/templates/calls/calendar.html:154
+msgid "Mon"
+msgstr "Lun"
+
+#: ConvAI/templates/calls/calendar.html:155
+msgid "Tue"
+msgstr "Mar"
+
+#: ConvAI/templates/calls/calendar.html:156
+msgid "Wed"
+msgstr "Mer"
+
+#: ConvAI/templates/calls/calendar.html:157
+msgid "Thu"
+msgstr "Gio"
+
+#: ConvAI/templates/calls/calendar.html:158
+msgid "Fri"
+msgstr "Ven"
+
+#: ConvAI/templates/calls/calendar.html:159
+msgid "Sat"
+msgstr "Sab"
+
+#: ConvAI/templates/calls/calendar.html:160
+msgid "Sun"
+msgstr "Dom"
+
+#: ConvAI/templates/calls/calendar.html:178
+msgid "more"
+msgstr "altro"
+
+#: ConvAI/templates/calls/calendar.html:194
+msgid "Click any empty slot to schedule a meeting."
+msgstr "Fai clic su uno spazio libero per programmare una riunione."
+
+#: ConvAI/templates/calls/calendar.html:229
+msgid "New meeting"
+msgstr "Nuovo incontro"
+
+#: ConvAI/templates/calls/calendar.html:230
+msgid "Pick a client and meeting type."
+msgstr "Scegli un paziente e un tipo di riunione."
+
+#: ConvAI/templates/calls/calendar.html:257
+#: ConvAI/templates/communications/communications.html:30
+#: ConvAI/templates/communications/communications.html:47
+#: ConvAI/templates/communications/communications.html:65
+msgid "Schedule"
+msgstr "Programma"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:4
+msgid "External Chat"
+msgstr "Chat esterna"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:223
+msgid "online"
+msgstr "online"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:235
+#: ConvAI/templates/chat/external_chat_with_audio.html:518
+msgid "Play/Pause"
+msgstr "Riproduci/Pausa"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:248
+msgid "Type a message or tap the microphone to speak"
+msgstr "Scrivi un messaggio o tocca il microfono per parlare"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:263
+msgid "Type a message"
+msgstr "Scrivi un messaggio"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:273
+msgid "Recording…"
+msgstr "Registrazione…"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:277
+msgid "Record audio"
+msgstr "Registra audio"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:283
+msgid "Send audio"
+msgstr "Invia audio"
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:287
+msgid "Write a message, or type <code>/quit</code> to end the conversation."
+msgstr ""
+"Scrivi un messaggio, oppure digita <code>/quit</code> per terminare la "
+"conversazione."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:371
+#: ConvAI/templates/chatbot.html:145 ConvAI/views/chat.py:240
+msgid "Conversation ended. Send a message to start a new one."
+msgstr "Conversazione terminata. Invia un messaggio per iniziarne una nuova."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:388
+msgid "Error: could not get a response."
+msgstr "Errore: impossibile ottenere una risposta."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:400
+msgid ""
+"Recording needs a secure connection (HTTPS) or localhost. Open the site over"
+" HTTPS to use the microphone."
+msgstr ""
+"La registrazione richiede una connessione sicura (HTTPS) o localhost. Apri "
+"il sito in HTTPS per usare il microfono."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:409
+msgid "Microphone permission denied. Allow it in the browser to record."
+msgstr ""
+"Permesso per il microfono negato. Consentilo nel browser per registrare."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:411
+msgid "No microphone was found, or it is in use by another app."
+msgstr "Nessun microfono trovato, oppure è in uso da un'altra app."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:413
+#: ConvAI/templates/chat/realtime_voice.html:260
+msgid "Could not access the microphone."
+msgstr "Impossibile accedere al microfono."
+
+#: ConvAI/templates/chat/external_chat_with_audio.html:474
+#: ConvAI/templates/chat/external_chat_with_audio.html:478
+msgid "Error: could not process the audio."
+msgstr "Errore: impossibile elaborare l'audio."
+
+#: ConvAI/templates/chat/realtime_voice.html:4
+msgid "Voice chat"
+msgstr "Chat vocale"
+
+#: ConvAI/templates/chat/realtime_voice.html:185
+#: ConvAI/templates/chat/realtime_voice.html:256
+msgid "voice agent"
+msgstr "agente vocale"
+
+#: ConvAI/templates/chat/realtime_voice.html:194
+msgid ""
+"Real-time voice is not configured yet. Set the Azure Realtime endpoint, key "
+"and deployment under Settings → Agents."
+msgstr ""
+"La voce in tempo reale non è ancora configurata. Imposta endpoint, chiave e "
+"deployment di Azure Realtime in Impostazioni → Agenti."
+
+#: ConvAI/templates/chat/realtime_voice.html:203
+#: ConvAI/templates/chat/realtime_voice.html:249
+msgid "Tap the button to start talking"
+msgstr "Tocca il pulsante per iniziare a parlare"
+
+#: ConvAI/templates/chat/realtime_voice.html:213
+#: ConvAI/templates/chat/realtime_voice.html:264
+msgid "Mute microphone"
+msgstr "Disattiva microfono"
+
+#: ConvAI/templates/chat/realtime_voice.html:218
+#: ConvAI/templates/chat/realtime_voice.html:262
+msgid "Start conversation"
+msgstr "Avvia conversazione"
+
+#: ConvAI/templates/chat/realtime_voice.html:250
+msgid "Connecting…"
+msgstr "Connessione…"
+
+#: ConvAI/templates/chat/realtime_voice.html:251
+msgid "Listening…"
+msgstr "In ascolto…"
+
+#: ConvAI/templates/chat/realtime_voice.html:252
+msgid "Speaking…"
+msgstr "Parlando…"
+
+#: ConvAI/templates/chat/realtime_voice.html:253
+msgid "Microphone muted"
+msgstr "Microfono disattivato"
+
+#: ConvAI/templates/chat/realtime_voice.html:254
+msgid "Conversation ended"
+msgstr "Conversazione terminata"
+
+#: ConvAI/templates/chat/realtime_voice.html:255
+msgid "Ended after inactivity — tap to resume"
+msgstr "Terminata per inattività — tocca per riprendere"
+
+#: ConvAI/templates/chat/realtime_voice.html:257
+msgid "live"
+msgstr "in linea"
+
+#: ConvAI/templates/chat/realtime_voice.html:258
+msgid "Could not start the voice session."
+msgstr "Impossibile avviare la sessione vocale."
+
+#: ConvAI/templates/chat/realtime_voice.html:259
+msgid "Microphone permission denied. Allow it in the browser to talk."
+msgstr "Permesso del microfono negato. Consentilo nel browser per parlare."
+
+#: ConvAI/templates/chat/realtime_voice.html:261
+msgid "Voice needs a secure connection (HTTPS) or localhost."
+msgstr "La voce richiede una connessione sicura (HTTPS) o localhost."
+
+#: ConvAI/templates/chat/realtime_voice.html:263
+#: ConvAI/templates/chatbot.html:14
+msgid "End conversation"
+msgstr "Termina conversazione"
+
+#: ConvAI/templates/chat/realtime_voice.html:265
+msgid "Unmute microphone"
+msgstr "Riattiva microfono"
+
+#: ConvAI/templates/chatbot.html:12
+msgid "Virtual Assistant"
+msgstr "Assistente virtuale"
+
+#: ConvAI/templates/chatbot.html:24
+msgid "Type your message..."
+msgstr "Scrivi il tuo messaggio..."
+
+#: ConvAI/templates/chatbot.html:29
+msgid "Type a message, or <code>/quit</code> to end the conversation."
+msgstr ""
+"Scrivi un messaggio, oppure <code>/quit</code> per terminare la "
+"conversazione."
+
+#: ConvAI/templates/communications/_list.html:15
+msgid "Coming up"
+msgstr "In arrivo"
+
+#: ConvAI/templates/communications/_list.html:20
+msgid "Happened"
+msgstr "Già avvenuto"
+
+#: ConvAI/templates/communications/_list.html:29
+msgid "Find a protocol, alert or place"
+msgstr "Cerca un protocollo, un avviso o un luogo"
+
+#: ConvAI/templates/communications/_list.html:29
+msgid "Find a client, protocol or place"
+msgstr "Cerca un paziente, un protocollo o un luogo"
+
+#: ConvAI/templates/communications/_list.html:79
+#: ConvAI/templates/dashboard/dashboard.html:424
+msgid "Not opened yet"
+msgstr "Non ancora aperto"
+
+#: ConvAI/templates/communications/_list.html:110
+msgid "Nothing matches that search."
+msgstr "Nessun risultato per questa ricerca."
+
+#: ConvAI/templates/communications/_list.html:111
+msgid "Nothing scheduled."
+msgstr "Nulla in programma."
+
+#: ConvAI/templates/communications/_list.html:112
+msgid "Nothing has happened yet."
+msgstr "Non è ancora successo nulla."
+
+#: ConvAI/templates/communications/_list.html:119
+#, python-format
+msgid "%(a)s–%(b)s of %(t)s"
+msgstr "%(a)s–%(b)s di %(t)s"
+
+#: ConvAI/templates/communications/_list.html:122
+msgid "Pages"
+msgstr "Pagine"
+
+#: ConvAI/templates/communications/communications.html:4
+#: ConvAI/templates/communications/communications.html:16
+#: ConvAI/templates/patients/patient_detail.html:46
+#: ConvAI/templates/sidebar.html:32 ConvAI/templates/sidebar.html:37
+msgid "Communications"
+msgstr "Comunicazioni"
+
+#: ConvAI/templates/communications/communications.html:20
+msgid "Show all clients"
+msgstr "Mostra tutti i pazienti"
+
+#: ConvAI/templates/communications/communications.html:24
+msgid "What still needs doing, soonest first."
+msgstr "Ciò che resta da fare, prima le scadenze più vicine."
+
+#: ConvAI/templates/communications/communications.html:25
+msgid "What has already happened, newest first."
+msgstr "Ciò che è già avvenuto, prima il più recente."
+
+#: ConvAI/templates/communications/communications.html:48
+msgid "A call or an in-person meeting."
+msgstr "Una chiamata o una riunione di persona."
+
+#: ConvAI/templates/dashboard/dashboard.html:298
+#, python-format
+msgid "%(n)s meeting pending"
+msgid_plural "%(n)s meetings pending"
+msgstr[0] "%(n)s riunione in sospeso"
+msgstr[1] "%(n)s riunioni in sospeso"
+
+#: ConvAI/templates/dashboard/dashboard.html:299
+#, python-format
+msgid "%(t)s today"
+msgid_plural "%(t)s today"
+msgstr[0] "%(t)s oggi"
+msgstr[1] "%(t)s oggi"
+
+#: ConvAI/templates/dashboard/dashboard.html:300
+#, python-format
+msgid "%(co)s still to make"
+msgid_plural "%(co)s still to make"
+msgstr[0] "%(co)s ancora da fare"
+msgstr[1] "%(co)s ancora da fare"
+
+#: ConvAI/templates/dashboard/dashboard.html:302
+msgid "No meetings pending."
+msgstr "Nessuna riunione in sospeso."
+
+#: ConvAI/templates/dashboard/dashboard.html:306
+#, python-format
+msgid "%(n)s chat flagged for review"
+msgid_plural "%(n)s chats flagged for review"
+msgstr[0] "%(n)s conversazione segnalata da rivedere"
+msgstr[1] "%(n)s conversazioni segnalate da rivedere"
+
+#: ConvAI/templates/dashboard/dashboard.html:307
+#, python-format
+msgid "%(h)s high priority"
+msgid_plural "%(h)s high priority"
+msgstr[0] "%(h)s ad alta priorità"
+msgstr[1] "%(h)s ad alta priorità"
+
+#: ConvAI/templates/dashboard/dashboard.html:309
+#, python-format
+msgid "all “%(topic)s”"
+msgstr "tutte su “%(topic)s”"
+
+#: ConvAI/templates/dashboard/dashboard.html:326
+#: ConvAI/templates/patients/patient_detail.html:28
+#: ConvAI/templates/patients/patient_list.html:479
+#: ConvAI/templates/patients/patient_list.html:581
+msgid "Next call"
+msgstr "Prossima chiamata"
+
+#: ConvAI/templates/dashboard/dashboard.html:326
+#: ConvAI/templates/dashboard/dashboard.html:518
+msgid "not yet made"
+msgstr "non ancora effettuata"
+
+#: ConvAI/templates/dashboard/dashboard.html:333
+msgid "Open call"
+msgstr "Apri chiamata"
+
+#: ConvAI/templates/dashboard/dashboard.html:335
+#: ConvAI/templates/dashboard/dashboard.html:350
+msgid "Put this away"
+msgstr "Metti via"
+
+#: ConvAI/templates/dashboard/dashboard.html:352
+#, python-format
+msgid ""
+"The call with %(n)s is still scheduled either way — this only decides what "
+"sits at the top of Home."
+msgstr ""
+"La chiamata con %(n)s resta comunque in programma: questo decide solo che "
+"cosa compare in cima alla Home."
+
+#: ConvAI/templates/dashboard/dashboard.html:355
+msgid "For how long"
+msgstr "Per quanto tempo"
+
+#: ConvAI/templates/dashboard/dashboard.html:357
+msgid "Just this call — the card comes back with the next one"
+msgstr "Solo questa chiamata: la scheda torna con la successiva"
+
+#: ConvAI/templates/dashboard/dashboard.html:358
+msgid "Turn the card off — until I switch it back on in Profile"
+msgstr "Disattiva la scheda: finché non la riattivo nel Profilo"
+
+#: ConvAI/templates/dashboard/dashboard.html:363
+msgid "Put it away"
+msgstr "Mettila via"
+
+#: ConvAI/templates/dashboard/dashboard.html:393
+msgid "Chats to review"
+msgstr "Conversazioni da rivedere"
+
+#: ConvAI/templates/dashboard/dashboard.html:408
+#: ConvAI/templates/dashboard/dashboard.html:409
+#: ConvAI/templates/dashboard/dashboard.html:484
+msgid "Find a client"
+msgstr "Cerca un paziente"
+
+#: ConvAI/templates/dashboard/dashboard.html:410
+#: ConvAI/templates/dashboard/dashboard.html:485
+msgid "Sort"
+msgstr "Ordina"
+
+#: ConvAI/templates/dashboard/dashboard.html:412
+msgid "Priority first"
+msgstr "Prima per priorità"
+
+#: ConvAI/templates/dashboard/dashboard.html:413
+msgid "Newest first"
+msgstr "Prima i più recenti"
+
+#: ConvAI/templates/dashboard/dashboard.html:414
+msgid "Oldest first"
+msgstr "Prima i meno recenti"
+
+#: ConvAI/templates/dashboard/dashboard.html:416
+msgid "Apply"
+msgstr "Applica"
+
+#: ConvAI/templates/dashboard/dashboard.html:454
+msgid "Nothing to review."
+msgstr "Niente da rivedere."
+
+#: ConvAI/templates/dashboard/dashboard.html:456
+#: ConvAI/templates/dashboard/dashboard.html:523
+#: ConvAI/templates/dashboard/dashboard.html:526
+msgid "No client matches that."
+msgstr "Nessun paziente corrisponde."
+
+#: ConvAI/templates/dashboard/dashboard.html:462
+msgid "Showing the first 200 — narrow the search to see the rest."
+msgstr "Mostrati i primi 200: affina la ricerca per vedere il resto."
+
+#: ConvAI/templates/dashboard/dashboard.html:473
+msgid "Pending meetings"
+msgstr "Riunioni in sospeso"
+
+#: ConvAI/templates/dashboard/dashboard.html:486
+msgid "Soonest first"
+msgstr "Prima le più vicine"
+
+#: ConvAI/templates/dashboard/dashboard.html:487
+msgid "Latest first"
+msgstr "Prima le più lontane"
+
+#: ConvAI/templates/dashboard/dashboard.html:523
+msgid "Nothing pending."
+msgstr "Nulla in sospeso."
+
+#: ConvAI/templates/dashboard/dashboard.html:541
+msgid "Calls completed today"
+msgstr "Chiamate completate oggi"
+
+#: ConvAI/templates/dashboard/dashboard.html:575
+msgid "Nothing completed yet today."
+msgstr "Ancora nulla completato oggi."
+
+#: ConvAI/templates/dashboard/dashboard.html:588
+msgid "What changed this week"
+msgstr "Che cosa è cambiato questa settimana"
+
+#: ConvAI/templates/dashboard/dashboard.html:690
+msgid "Previous page"
+msgstr "Pagina precedente"
+
+#: ConvAI/templates/dashboard/dashboard.html:697
+msgid "Next page"
+msgstr "Pagina successiva"
+
+#: ConvAI/templates/dashboard/dashboard.html:720
+msgid "pending"
+msgstr "in sospeso"
+
+#: ConvAI/templates/dashboard/dashboard.html:722
+msgid "to review"
+msgstr "da rivedere"
+
+#: ConvAI/templates/patients/_timeline_event.html:39
+msgid "To"
+msgstr "A"
+
+#: ConvAI/templates/patients/_timeline_event.html:43
+msgid "Listen"
+msgstr "Ascolta"
+
+#: ConvAI/templates/patients/_timeline_event.html:48
+msgid "Re-transcribe"
+msgstr "Trascrivi di nuovo"
+
+#: ConvAI/templates/patients/_timeline_event.html:55
+#: ConvAI/views/_panel.py:322
+msgid "Transcript summary"
+msgstr "Riepilogo della trascrizione"
+
+#: ConvAI/templates/patients/_timeline_event.html:60
+msgid "Show full transcript"
+msgstr "Mostra trascrizione completa"
+
+#: ConvAI/templates/patients/_timeline_event.html:70
+msgid "Meeting"
+msgstr "Riunione"
+
+#: ConvAI/templates/patients/_timeline_event.html:88
+msgid "Open meeting"
+msgstr "Apri riunione"
+
+#: ConvAI/templates/patients/_timeline_event.html:93
+msgid "Re-summarize"
+msgstr "Riepiloga di nuovo"
+
+#: ConvAI/templates/patients/_timeline_event.html:93
+msgid "Summarize protocols"
+msgstr "Riepiloga protocolli"
+
+#: ConvAI/templates/patients/_timeline_event.html:101
+msgid "Protocol summary"
+msgstr "Riepilogo del protocollo"
+
+#: ConvAI/templates/patients/_timeline_event.html:110
+#: ConvAI/views/_panel.py:363
+msgid "Chatbot"
+msgstr "Chatbot"
+
+#: ConvAI/templates/patients/_timeline_event.html:112
+#: ConvAI/templates/patients/patient_conversation_detail.html:137
+#, python-format
+msgid "%(counter)s message"
+msgid_plural "%(counter)s messages"
+msgstr[0] "%(counter)s messaggio"
+msgstr[1] "%(counter)s messaggi"
+
+#: ConvAI/templates/patients/_timeline_event.html:120
+msgid "View conversation"
+msgstr "Visualizza conversazione"
+
+#: ConvAI/templates/patients/_timeline_pills.html:4
+#: ConvAI/views/communications.py:68 ConvAI/views/communications.py:73
+msgid "Calls"
+msgstr "Chiamate"
+
+#: ConvAI/templates/patients/_timeline_pills.html:5
+#: ConvAI/views/communications.py:69 ConvAI/views/communications.py:74
+msgid "Meetings"
+msgstr "Riunioni"
+
+#: ConvAI/templates/patients/_timeline_pills.html:6
+#: ConvAI/templates/sidebar.html:128 ConvAI/views/communications.py:76
+msgid "Alerts"
+msgstr "Avvisi"
+
+#: ConvAI/templates/patients/_timeline_pills.html:7
+#: ConvAI/views/communications.py:75
+msgid "Chats"
+msgstr "Chat"
+
+#: ConvAI/templates/patients/_timeline_script.html:90
+msgid "Working…"
+msgstr "Elaborazione…"
+
+#: ConvAI/templates/patients/edit_care_plan.html:7
+#: ConvAI/templates/patients/edit_care_plan.html:12
+msgid "Edit Care Plan"
+msgstr "Modifica piano di cura"
+
+#: ConvAI/templates/patients/edit_care_plan.html:15
+#: ConvAI/templates/patients/edit_patient.html:70
+#: ConvAI/templates/patients/edit_patient_details.html:22
+#: ConvAI/templates/patients/patient_detail.html:24
+#: ConvAI/templates/patients/patient_detail.html:65
+#: ConvAI/templates/patients/patient_list.html:564
+#: ConvAI/templates/patients/patient_list.html:1353
+msgid "Caregiver"
+msgstr "Caregiver"
+
+#: ConvAI/templates/patients/edit_care_plan.html:27
+#: ConvAI/templates/patients/edit_patient.html:21
+#: ConvAI/templates/patients/edit_patient_details.html:14
+#: ConvAI/templates/patients/patient_conversation_detail.html:90
+#: ConvAI/templates/patients/view_care_plan.html:17
+msgid "Back to client"
+msgstr "Torna al paziente"
+
+#: ConvAI/templates/patients/edit_care_plan.html:53
+msgid "Current file:"
+msgstr "File attuale:"
+
+#: ConvAI/templates/patients/edit_patient.html:3
+#: ConvAI/templates/patients/edit_patient.html:27
+#: ConvAI/templates/users/test_user_result.html:70
+msgid "Edit client"
+msgstr "Modifica cliente"
+
+#: ConvAI/templates/patients/edit_patient.html:64
+msgid ""
+"The agent that handles this client's chat (including the test-user chatbot)."
+msgstr ""
+"L'agente che gestisce la chat di questo cliente (incluso il chatbot "
+"dell'utente di prova)."
+
+#: ConvAI/templates/patients/edit_patient.html:71
+msgid "The caregiver's phone is the number called when you start a call."
+msgstr ""
+"Il telefono del caregiver è il numero chiamato quando avvii una chiamata."
+
+#: ConvAI/templates/patients/edit_patient_details.html:5
+#: ConvAI/templates/patients/patient_detail.html:37
+msgid "Edit details"
+msgstr "Modifica dettagli"
+
+#: ConvAI/templates/patients/edit_patient_details.html:20
+msgid "Edit details of"
+msgstr "Modifica dettagli di"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:6
+msgid "Conversation with"
+msgstr "Conversazione con"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:98
+msgid "Conversation history"
+msgstr "Cronologia delle conversazioni"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:103
+msgid "Previous day"
+msgstr "Giorno precedente"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:107
+msgid "Next day"
+msgstr "Giorno successivo"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:132
+msgid ""
+"This conversation has not been analysed yet. It may take a few moments."
+msgstr ""
+"Questa conversazione non è ancora stata analizzata. Potrebbe richiedere "
+"qualche istante."
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:133
+msgid "Analysis pending"
+msgstr "Analisi in attesa"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:155
+msgid "Voice message"
+msgstr "Messaggio vocale"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:173
+msgid "Voice reply"
+msgstr "Risposta vocale"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:184
+msgid "Like"
+msgstr "Mi piace"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:187
+msgid "Dislike"
+msgstr "Non mi piace"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:190
+msgid "Flag as warning"
+msgstr "Segnala come avvertimento"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:193
+msgid "Flag as dangerous"
+msgstr "Segnala come pericoloso"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:207
+msgid "Conversation feedback"
+msgstr "Feedback sulla conversazione"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:208
+#: ConvAI/templates/patients/patient_detail.html:204
+#: ConvAI/views/settings_views.py:35
+msgid "Saved"
+msgstr "Salvato"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:213
+msgid "Conversation rating"
+msgstr "Valutazione della conversazione"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:224
+msgid "Feedback"
+msgstr "Feedback"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:226
+msgid "Enter your feedback here..."
+msgstr "Inserisci qui il tuo feedback..."
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:232
+msgid "Human validation"
+msgstr "Validazione umana"
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:255
+msgid "No messages recorded on this day."
+msgstr "Nessun messaggio registrato in questo giorno."
+
+#: ConvAI/templates/patients/patient_conversation_detail.html:256
+msgid "Use the arrows above to browse other days."
+msgstr "Usa le frecce in alto per sfogliare gli altri giorni."
+
+#: ConvAI/templates/patients/patient_detail.html:74
+msgid "Relationship not recorded"
+msgstr "Relazione non registrata"
+
+#: ConvAI/templates/patients/patient_detail.html:79
+msgid "Daughter, neighbour, paid carer…"
+msgstr "Figlia, vicino, badante…"
+
+#: ConvAI/templates/patients/patient_detail.html:82
+msgid "Usually on the call"
+msgstr "Di solito presente alla chiamata"
+
+#: ConvAI/templates/patients/patient_detail.html:87
+#: ConvAI/views/dashboard.py:258
+msgid "No caregiver"
+msgstr "Nessun caregiver"
+
+#: ConvAI/templates/patients/patient_detail.html:101
+#: ConvAI/templates/patients/patient_detail.html:106
+msgid "No agent"
+msgstr "Nessun agente"
+
+#: ConvAI/templates/patients/patient_detail.html:102
+msgid "Answers this client's chats"
+msgstr "Risponde alle conversazioni di questo paziente"
+
+#: ConvAI/templates/patients/patient_detail.html:102
+msgid "Chats are not answered automatically"
+msgstr "Le conversazioni non ricevono risposta automatica"
+
+#: ConvAI/templates/patients/patient_detail.html:116
+msgid "Client since"
+msgstr "Paziente dal"
+
+#: ConvAI/templates/patients/patient_detail.html:128
+msgid "How they want to be contacted"
+msgstr "Come preferiscono essere contattati"
+
+#: ConvAI/templates/patients/patient_detail.html:145
+msgid "Add another…"
+msgstr "Aggiungine un altro…"
+
+#: ConvAI/templates/patients/patient_detail.html:146
+msgid "Add a contact preference"
+msgstr "Aggiungi una preferenza di contatto"
+
+#: ConvAI/templates/patients/patient_detail.html:152
+msgid "Background"
+msgstr "Contesto"
+
+#: ConvAI/templates/patients/patient_detail.html:157
+msgid "Nothing recorded yet."
+msgstr "Non è stato ancora registrato nulla."
+
+#: ConvAI/templates/patients/patient_detail.html:161
+msgid "Who they live with, how they get about, what to avoid. Markdown."
+msgstr "Con chi vivono, come si spostano, che cosa evitare. Markdown."
+
+#: ConvAI/templates/patients/patient_detail.html:172
+msgid "Protocols completed"
+msgstr "Protocolli completati"
+
+#: ConvAI/templates/patients/patient_detail.html:198
+msgid "Handover note"
+msgstr "Nota di passaggio"
+
+#: ConvAI/templates/patients/patient_detail.html:202
+msgid ""
+"What the next person should know to make the first call feel like continuity"
+msgstr ""
+"Che cosa deve sapere la persona successiva perché la prima chiamata dia un "
+"senso di continuità"
+
+#: ConvAI/templates/patients/patient_detail.html:208
+#: ConvAI/templates/patients/view_care_plan.html:6
+#: ConvAI/templates/patients/view_care_plan.html:11
+msgid "Care plan"
+msgstr "Piano di cura"
+
+#: ConvAI/templates/patients/patient_detail.html:218
+msgid "Replace"
+msgstr "Sostituisci"
+
+#: ConvAI/templates/patients/patient_detail.html:234
+msgid "Send to caregiver on WhatsApp"
+msgstr "Invia al caregiver su WhatsApp"
+
+#: ConvAI/templates/patients/patient_detail.html:238
+#, python-format
+msgid "Goes to %(n)s as a single-use link."
+msgstr "Va a %(n)s come link monouso."
+
+#: ConvAI/templates/patients/patient_detail.html:240
+msgid "No caregiver number on file."
+msgstr "Nessun numero del caregiver in archivio."
+
+#: ConvAI/templates/patients/patient_detail.html:251
+msgid "Upload a care plan"
+msgstr "Carica un piano di cura"
+
+#: ConvAI/templates/patients/patient_detail.html:252
+msgid "PDF"
+msgstr "PDF"
+
+#: ConvAI/templates/patients/patient_detail.html:254
+msgid "Choose file"
+msgstr "Scegli file"
+
+#: ConvAI/templates/patients/patient_list.html:6
+#: ConvAI/templates/patients/patient_list.html:446
+#: ConvAI/templates/sidebar.html:45 ConvAI/templates/sidebar.html:50
+msgid "Clients"
+msgstr "Pazienti"
+
+#: ConvAI/templates/patients/patient_list.html:447
+msgid "clients"
+msgstr "pazienti"
+
+#: ConvAI/templates/patients/patient_list.html:450
+#: ConvAI/templates/patients/patient_list.html:1324
+msgid "Add client"
+msgstr "Aggiungi paziente"
+
+#: ConvAI/templates/patients/patient_list.html:463
+msgid "Search by ID, client, caregiver or counsellor..."
+msgstr "Cerca per ID, paziente, caregiver o consulente..."
+
+#: ConvAI/templates/patients/patient_list.html:465
+msgid "Search by ID, client, caregiver..."
+msgstr "Cerca per ID, paziente, caregiver..."
+
+#: ConvAI/templates/patients/patient_list.html:488
+#: ConvAI/templates/patients/patient_list.html:1171
+msgid "Showing"
+msgstr "Visualizzazione"
+
+#: ConvAI/templates/patients/patient_list.html:488
+msgid "all"
+msgstr "tutti"
+
+#: ConvAI/templates/patients/patient_list.html:493
+msgid "Filter by next call"
+msgstr "Filtra per prossima chiamata"
+
+#: ConvAI/templates/patients/patient_list.html:502
+msgid "Scheduled"
+msgstr "Programmate"
+
+#: ConvAI/templates/patients/patient_list.html:507
+msgid "Not scheduled"
+msgstr "Non programmato"
+
+#: ConvAI/templates/patients/patient_list.html:521
+#: ConvAI/templates/patients/patient_list.html:530
+#: ConvAI/templates/patients/patient_list.html:573 ConvAI/views/account.py:16
+msgid "Counsellor"
+msgstr "Consulente"
+
+#: ConvAI/templates/patients/patient_list.html:531
+msgid "Search counsellor"
+msgstr "Cerca consulente"
+
+#: ConvAI/templates/patients/patient_list.html:550
+msgid "Id"
+msgstr "Id"
+
+#: ConvAI/templates/patients/patient_list.html:588
+msgid "Last call"
+msgstr "Ultima chiamata"
+
+#: ConvAI/templates/patients/patient_list.html:600
+msgid "No clients match the current filters."
+msgstr "Nessun paziente corrisponde ai filtri attuali."
+
+#: ConvAI/templates/patients/patient_list.html:611
+#: ConvAI/templates/users/user_list.html:162
+msgid "Records"
+msgstr "Record"
+
+#: ConvAI/templates/patients/patient_list.html:1370
+#: ConvAI/templates/users/user_list.html:193
+#: ConvAI/templates/users/user_list.html:216
+msgid "Create"
+msgstr "Crea"
+
+#: ConvAI/templates/patients/view_care_plan.html:29
+msgid "Update Care Plan"
+msgstr "Aggiorna piano di cura"
+
+#: ConvAI/templates/patients/view_care_plan.html:42
+msgid "No Care Plan uploaded for this client."
+msgstr "Nessun piano di cura caricato per questo paziente."
+
+#: ConvAI/templates/patients/view_care_plan.html:48
+msgid "Upload Care Plan"
+msgstr "Carica piano di cura"
+
+#: ConvAI/templates/protocols/protocol_editor.html:5
+#: ConvAI/templates/protocols/protocol_editor.html:69
+msgid "Protocol editor"
+msgstr "Editor del protocollo"
+
+#: ConvAI/templates/protocols/protocol_editor.html:71
+#: ConvAI/templates/protocols/protocol_form.html:78
+#: ConvAI/templates/settings/config.html:375
+msgid "Beta"
+msgstr "Beta"
+
+#: ConvAI/templates/protocols/protocol_editor.html:74
+#, python-format
+msgid "Protocol #%(n)s — design its questions as in a form."
+msgstr "Protocollo #%(n)s — progetta le sue domande come in un modulo."
+
+#: ConvAI/templates/protocols/protocol_editor.html:84
+msgid "Read-only. Protocols are edited in Settings by an administrator."
+msgstr ""
+"Sola lettura. I protocolli vengono modificati nelle Impostazioni da un "
+"amministratore."
+
+#: ConvAI/templates/protocols/protocol_editor.html:86
+msgid ""
+"This protocol already has recorded answers, so its structure cannot be "
+"modified. It is shown in read-only mode."
+msgstr ""
+"Questo protocollo ha già risposte registrate, quindi la sua struttura non "
+"può essere modificata. È mostrato in modalità di sola lettura."
+
+#: ConvAI/templates/protocols/protocol_editor.html:98
+msgid "Protocol title"
+msgstr "Titolo del protocollo"
+
+#: ConvAI/templates/protocols/protocol_editor.html:104
+msgid "Protocol name"
+msgstr "Nome del protocollo"
+
+#: ConvAI/templates/protocols/protocol_editor.html:107
+msgid "Description (Markdown, optional)"
+msgstr "Descrizione (Markdown, facoltativa)"
+
+#: ConvAI/templates/protocols/protocol_editor.html:112
+msgid "Describe the goal of this protocol…"
+msgstr "Descrivi l'obiettivo di questo protocollo…"
+
+#: ConvAI/templates/protocols/protocol_editor.html:117
+#: ConvAI/templates/settings/config.html:394
+msgid "Questions"
+msgstr "Domande"
+
+#: ConvAI/templates/protocols/protocol_editor.html:124
+msgid "No questions yet. Add the first one."
+msgstr "Ancora nessuna domanda. Aggiungi la prima."
+
+#: ConvAI/templates/protocols/protocol_editor.html:131
+msgid "Add question"
+msgstr "Aggiungi domanda"
+
+#: ConvAI/templates/protocols/protocol_editor.html:191
+msgid "bold text"
+msgstr "testo in grassetto"
+
+#: ConvAI/templates/protocols/protocol_editor.html:192
+msgid "italic text"
+msgstr "testo in corsivo"
+
+#: ConvAI/templates/protocols/protocol_editor.html:193
+msgid "code"
+msgstr "codice"
+
+#: ConvAI/templates/protocols/protocol_editor.html:199
+msgid "text"
+msgstr "testo"
+
+#: ConvAI/templates/protocols/protocol_editor.html:219
+msgid "Drag to reorder"
+msgstr "Trascina per riordinare"
+
+#: ConvAI/templates/protocols/protocol_editor.html:227
+msgid "Bold"
+msgstr "Grassetto"
+
+#: ConvAI/templates/protocols/protocol_editor.html:228
+msgid "Italic"
+msgstr "Corsivo"
+
+#: ConvAI/templates/protocols/protocol_editor.html:230
+#: ConvAI/templates/settings/config.html:393
+msgid "Title"
+msgstr "Titolo"
+
+#: ConvAI/templates/protocols/protocol_editor.html:231
+msgid "List"
+msgstr "Elenco"
+
+#: ConvAI/templates/protocols/protocol_editor.html:232
+msgid "Numbered list"
+msgstr "Elenco numerato"
+
+#: ConvAI/templates/protocols/protocol_editor.html:233
+msgid "Appointment"
+msgstr "Appuntamento"
+
+#: ConvAI/templates/protocols/protocol_editor.html:235
+msgid "Link"
+msgstr "Link"
+
+#: ConvAI/templates/protocols/protocol_editor.html:236
+msgid "Code"
+msgstr "Codice"
+
+#: ConvAI/templates/protocols/protocol_editor.html:239
+msgid "Write the question or guide in Markdown…"
+msgstr "Scrivi la domanda o la guida in Markdown…"
+
+#: ConvAI/templates/protocols/protocol_editor.html:241
+msgid "Preview"
+msgstr "Anteprima"
+
+#: ConvAI/templates/protocols/protocol_editor.html:246
+msgid "Upload"
+msgstr "Carica"
+
+#: ConvAI/templates/protocols/protocol_editor.html:247
+msgid "Move down"
+msgstr "Sposta giù"
+
+#: ConvAI/templates/protocols/protocol_editor.html:248
+msgid "Duplicate"
+msgstr "Duplica"
+
+#: ConvAI/templates/protocols/protocol_editor.html:320
+msgid "Question"
+msgstr "Domanda"
+
+#: ConvAI/templates/protocols/protocol_editor.html:326
+msgid "question(s)"
+msgstr "domanda/e"
+
+#: ConvAI/templates/protocols/protocol_editor.html:353
+msgid "The title is required."
+msgstr "Il titolo è obbligatorio."
+
+#: ConvAI/templates/protocols/protocol_editor.html:376
+msgid "Protocol saved."
+msgstr "Protocollo salvato."
+
+#: ConvAI/templates/protocols/protocol_editor.html:379
+msgid "Could not save."
+msgstr "Impossibile salvare."
+
+#: ConvAI/templates/protocols/protocol_editor.html:383
+msgid "Network error while saving."
+msgstr "Errore di rete durante il salvataggio."
+
+#: ConvAI/templates/protocols/protocol_form.html:13
+msgid "Answers saved successfully."
+msgstr "Risposte salvate correttamente."
+
+#: ConvAI/templates/protocols/protocol_form.html:20
+msgid "An error occurred while saving the answers."
+msgstr "Si è verificato un errore durante il salvataggio delle risposte."
+
+#: ConvAI/templates/protocols/protocol_form.html:48
+#: ConvAI/templates/protocols/protocol_form.html:49
+msgid "Reload"
+msgstr "Ricarica"
+
+#: ConvAI/templates/protocols/protocol_form.html:75
+msgid "Edit protocol structure"
+msgstr "Modifica struttura del protocollo"
+
+#: ConvAI/templates/protocols/protocol_form.html:77
+msgid "Edit protocol"
+msgstr "Modifica protocollo"
+
+#: ConvAI/templates/settings/config.html:5
+#: ConvAI/templates/settings/config.html:50 ConvAI/templates/sidebar.html:79
+#: ConvAI/templates/sidebar.html:84
+msgid "Settings"
+msgstr "Impostazioni"
+
+#: ConvAI/templates/settings/config.html:51
+msgid "Configure how the platform behaves, connects, and looks."
+msgstr "Configura come la piattaforma si comporta, si connette e appare."
+
+#: ConvAI/templates/settings/config.html:54
+#: ConvAI/templates/users/user_list.html:3
+#: ConvAI/templates/users/user_list.html:42
+#: ConvAI/templates/users/user_list.html:51
+msgid "Users"
+msgstr "Utenti"
+
+#: ConvAI/templates/settings/config.html:80
+msgid "Behaviour"
+msgstr "Comportamento"
+
+#: ConvAI/templates/settings/config.html:81
+msgid "Feature flags and defaults that take effect immediately."
+msgstr ""
+"Flag delle funzionalità e valori predefiniti che hanno effetto immediato."
+
+#: ConvAI/templates/settings/config.html:98
+msgid "System"
+msgstr "Sistema"
+
+#: ConvAI/templates/settings/config.html:99
+msgid "Restart required"
+msgstr "Riavvio richiesto"
+
+#: ConvAI/templates/settings/config.html:101
+msgid "These are read at server start and managed in .env."
+msgstr "Vengono letti all'avvio del server e gestiti in .env."
+
+#: ConvAI/templates/settings/config.html:106
+msgid "Timezone"
+msgstr "Fuso orario"
+
+#: ConvAI/templates/settings/config.html:107
+msgid "Async WhatsApp reply"
+msgstr "Risposta WhatsApp asincrona"
+
+#: ConvAI/templates/settings/config.html:107
+#: ConvAI/templates/settings/config.html:108
+msgid "On,Off"
+msgstr "Attivato,Disattivato"
+
+#: ConvAI/templates/settings/config.html:108
+msgid "Debug mode"
+msgstr "Modalità debug"
+
+#: ConvAI/templates/settings/config.html:111
+msgid "Twilio webhook URL"
+msgstr "URL webhook Twilio"
+
+#: ConvAI/templates/settings/config.html:113
+msgid ""
+"Configure this URL in the Twilio console. Change the path with "
+"TWILIO_WEBHOOK_PATH in .env."
+msgstr ""
+"Configura questo URL nella console di Twilio. Cambia il percorso con "
+"TWILIO_WEBHOOK_PATH nel file .env."
+
+#: ConvAI/templates/settings/config.html:124
+msgid "Integration credentials"
+msgstr "Credenziali di integrazione"
+
+#: ConvAI/templates/settings/config.html:125
+msgid ""
+"Secrets are stored securely and never shown again after saving. Leave blank "
+"to keep the current value."
+msgstr ""
+"I segreti vengono archiviati in modo sicuro e non vengono più mostrati dopo "
+"il salvataggio. Lascia vuoto per mantenere il valore attuale."
+
+#: ConvAI/templates/settings/config.html:143
+msgid "Messaging templates"
+msgstr "Modelli di messaggistica"
+
+#: ConvAI/templates/settings/config.html:144
+msgid "SMS/WhatsApp sender numbers and template identifiers."
+msgstr "Numeri mittente SMS/WhatsApp e identificatori dei modelli."
+
+#: ConvAI/templates/settings/config.html:162
+#: ConvAI/views/settings_views.py:137
+msgid "Branding"
+msgstr "Marchio"
+
+#: ConvAI/templates/settings/config.html:163
+msgid "The name and logo shown across the app and on the login page."
+msgstr "Il nome e il logo mostrati nell'app e nella pagina di accesso."
+
+#: ConvAI/templates/settings/config.html:170
+msgid "Current logo"
+msgstr "Logo attuale"
+
+#: ConvAI/templates/settings/config.html:186
+msgid ""
+"The model behind in-process agents, provider keys, and Azure routing. These "
+"override .env."
+msgstr ""
+"Il modello dietro gli agenti in-process, le chiavi dei provider e "
+"l’instradamento su Azure. Questi hanno la precedenza su .env."
+
+#: ConvAI/templates/settings/config.html:193
+msgid "Default model"
+msgstr "Modello predefinito"
+
+#: ConvAI/templates/settings/config.html:197
+msgid "Provider API keys"
+msgstr "Chiavi API dei provider"
+
+#: ConvAI/templates/settings/config.html:207
+msgid "Security"
+msgstr "Sicurezza"
+
+#: ConvAI/templates/settings/config.html:212
+msgid "Azure"
+msgstr "Azure"
+
+#: ConvAI/templates/settings/config.html:228
+msgid "Azure OpenAI Realtime (voice agents)"
+msgstr "Azure OpenAI Realtime (agenti vocali)"
+
+#: ConvAI/templates/settings/config.html:229
+msgid ""
+"Used by prompt-based agents with real-time voice enabled. Speech goes "
+"straight between the browser and this deployment; a short-lived key is "
+"minted per conversation."
+msgstr ""
+"Usato dagli agenti basati su prompt con voce in tempo reale abilitata. La "
+"voce passa direttamente tra il browser e questo deployment; per ogni "
+"conversazione viene generata una chiave a breve scadenza."
+
+#: ConvAI/templates/settings/config.html:262
+msgid "Summarization prompts"
+msgstr "Prompt di riepilogo"
+
+#: ConvAI/templates/settings/config.html:263
+msgid ""
+"Base prompts used to summarize meeting protocols and call transcripts. Leave"
+" a field blank to use the built-in default. The relevant protocol answers or"
+" transcript are appended automatically."
+msgstr ""
+"Prompt di base usati per riepilogare i protocolli delle riunioni e le "
+"trascrizioni delle chiamate. Lascia un campo vuoto per usare quello "
+"predefinito. Le risposte del protocollo o la trascrizione vengono aggiunte "
+"automaticamente."
+
+#: ConvAI/templates/settings/config.html:282
+msgid "Python API client"
+msgstr "Client API Python"
+
+#: ConvAI/templates/settings/config.html:284
+msgid "The REST API is exposed, so the client can connect."
+msgstr "L'API REST è esposta, quindi il client può connettersi."
+
+#: ConvAI/templates/settings/config.html:285
+msgid "API enabled"
+msgstr "API abilitata"
+
+#: ConvAI/templates/settings/config.html:288
+msgid "Set ENABLE_API=1 in .env and restart to expose the REST API."
+msgstr "Imposta ENABLE_API=1 in .env e riavvia per esporre l'API REST."
+
+#: ConvAI/templates/settings/config.html:289
+msgid "API disabled"
+msgstr "API disabilitata"
+
+#: ConvAI/templates/settings/config.html:293
+msgid ""
+"Install the client package to script the platform — list clients and "
+"schedule meetings — using your personal API token. Permissions match the web"
+" app."
+msgstr ""
+"Installa il pacchetto client per automatizzare la piattaforma (elencare i "
+"pazienti e programmare riunioni) usando il tuo token API personale. I "
+"permessi corrispondono a quelli dell'app web."
+
+#: ConvAI/templates/settings/config.html:299
+msgid ""
+"The REST API is currently <b>disabled</b>, so the client cannot connect. Set"
+" <code>ENABLE_API=1</code> in <code>.env</code> and restart the server to "
+"turn it on."
+msgstr ""
+"L'API REST è attualmente <b>disabilitata</b>, quindi il client non può "
+"connettersi. Imposta <code>ENABLE_API=1</code> in <code>.env</code> e "
+"riavvia il server per attivarla."
+
+#: ConvAI/templates/settings/config.html:307
+msgid "Get your API token"
+msgstr "Ottieni il tuo token API"
+
+#: ConvAI/templates/settings/config.html:310
+msgid ""
+"Open your <b>Profile</b> page and click <b>Generate API token</b>. Copy it "
+"immediately — it is shown only once, and generating a new one revokes the "
+"old one."
+msgstr ""
+"Apri la pagina del tuo <b>Profilo</b> e fai clic su <b>Genera token API</b>."
+" Copialo subito: viene mostrato solo una volta e generarne uno nuovo revoca "
+"il precedente."
+
+#: ConvAI/templates/settings/config.html:313
+msgid "Go to Profile → API token"
+msgstr "Vai a Profilo → Token API"
+
+#: ConvAI/templates/settings/config.html:321
+msgid "Download & install with pip"
+msgstr "Scarica e installa con pip"
+
+#: ConvAI/templates/settings/config.html:323
+msgid "Download the package and install it into your Python environment:"
+msgstr "Scarica il pacchetto e installalo nel tuo ambiente Python:"
+
+#: ConvAI/templates/settings/config.html:330
+msgid ""
+"No <code>wget</code>? Use the button below or <code>curl -L -o "
+"conversationalcare_api.zip \"URL\"</code>. The zip installs directly — no "
+"need to unzip."
+msgstr ""
+"Non hai <code>wget</code>? Usa il pulsante qui sotto oppure <code>curl -L -o"
+" conversationalcare_api.zip \"URL\"</code>. Lo zip si installa direttamente,"
+" senza bisogno di estrarlo."
+
+#: ConvAI/templates/settings/config.html:333
+msgid "Download client (.zip)"
+msgstr "Scarica client (.zip)"
+
+#: ConvAI/templates/settings/config.html:341
+msgid "Use it in Python"
+msgstr "Usalo in Python"
+
+#: ConvAI/templates/settings/config.html:380
+msgid "New protocol"
+msgstr "Nuovo protocollo"
+
+#: ConvAI/templates/settings/config.html:384
+msgid ""
+"A new protocol stays fully editable until answers are recorded against it, "
+"after which it locks to protect collected data."
+msgstr ""
+"Un nuovo protocollo rimane completamente modificabile finché non vengono "
+"registrate risposte, dopodiché si blocca per proteggere i dati raccolti."
+
+#: ConvAI/templates/settings/config.html:408
+msgid "With answers"
+msgstr "Con risposte"
+
+#: ConvAI/templates/settings/config.html:411
+msgid "Editable"
+msgstr "Modificabile"
+
+#: ConvAI/templates/settings/config.html:419
+msgid "View"
+msgstr "Visualizza"
+
+#: ConvAI/templates/settings/config.html:423
+msgid "Delete this protocol? This cannot be undone."
+msgstr "Eliminare questo protocollo? L'operazione non può essere annullata."
+
+#: ConvAI/templates/settings/config.html:439
+msgid "No protocols yet."
+msgstr "Ancora nessun protocollo."
+
+#: ConvAI/templates/settings/config.html:450
+msgid "Pre-registrations (Self Registration)"
+msgstr "Pre-registrazioni (auto-registrazione)"
+
+#: ConvAI/templates/settings/config.html:451
+msgid ""
+"People who self-registered and are waiting to be approved and assigned an "
+"agent."
+msgstr ""
+"Persone che si sono auto-registrate e attendono di essere approvate e "
+"assegnate a un agente."
+
+#: ConvAI/templates/settings/config.html:459
+msgid "Name"
+msgstr "Nome"
+
+#: ConvAI/templates/settings/config.html:463
+msgid "Created"
+msgstr "Creato"
+
+#: ConvAI/templates/settings/config.html:475
+msgid "Registered"
+msgstr "Registrato"
+
+#: ConvAI/templates/settings/config.html:477
+msgid "Approved"
+msgstr "Approvato"
+
+#: ConvAI/templates/settings/config.html:486
+msgid "— No agent —"
+msgstr "— Nessun agente —"
+
+#: ConvAI/templates/settings/config.html:491
+msgid "Approve"
+msgstr "Approva"
+
+#: ConvAI/templates/settings/config.html:494
+msgid "Already approved"
+msgstr "Già approvato"
+
+#: ConvAI/templates/settings/config.html:503
+msgid "No pre-registrations yet."
+msgstr "Ancora nessuna pre-registrazione."
+
+#: ConvAI/templates/settings/config.html:515
+#: ConvAI/views/settings_views.py:142
+msgid "Self registration"
+msgstr "Autoregistrazione"
+
+#: ConvAI/templates/settings/config.html:522
+#: ConvAI/templates/users/user_list.html:107
+msgid "Inactive"
+msgstr "Inattivo"
+
+#: ConvAI/templates/settings/config.html:526
+msgid ""
+"Share this QR in demos so people can start a WhatsApp chat that registers "
+"them. Scanning opens WhatsApp with a pre-filled message in the platform "
+"language."
+msgstr ""
+"Condividi questo QR nelle demo perché le persone avviino una chat WhatsApp "
+"che le registra. La scansione apre WhatsApp con un messaggio precompilato "
+"nella lingua della piattaforma."
+
+#: ConvAI/templates/settings/config.html:534
+msgid ""
+"Self-registration is currently <b>off</b>, so scans won't be answered "
+"automatically. Turn it on and pick the <b>Self Registration Agent</b> under"
+msgstr ""
+"L'autoregistrazione è attualmente <b>disattivata</b>, quindi le scansioni "
+"non riceveranno risposta automatica. Attivala e scegli l'<b>Agente di "
+"Autoregistrazione</b> in"
+
+#: ConvAI/templates/settings/config.html:535
+msgid "General settings"
+msgstr "Impostazioni generali"
+
+#: ConvAI/templates/settings/config.html:549
+msgid "Download"
+msgstr "Scarica"
+
+#: ConvAI/templates/settings/config.html:552
+msgid "Copy image"
+msgstr "Copia immagine"
+
+#: ConvAI/templates/settings/config.html:560
+msgid "Pre-filled message"
+msgstr "Messaggio precompilato"
+
+#: ConvAI/templates/settings/config.html:565
+msgid "WhatsApp link"
+msgstr "Link WhatsApp"
+
+#: ConvAI/templates/settings/config.html:576
+msgid "Platform number"
+msgstr "Numero della piattaforma"
+
+#: ConvAI/templates/settings/config.html:580
+msgid "Handled by"
+msgstr "Gestito da"
+
+#: ConvAI/templates/settings/config.html:581
+msgid "— not selected —"
+msgstr "— non selezionato —"
+
+#: ConvAI/templates/settings/config.html:586
+msgid "Test the link"
+msgstr "Prova il link"
+
+#: ConvAI/templates/settings/config.html:594
+msgid ""
+"No <b>platform phone number</b> is configured, so a WhatsApp link can't be "
+"built. Add it under"
+msgstr ""
+"Non è configurato alcun <b>numero di telefono della piattaforma</b>, quindi "
+"non è possibile creare un link WhatsApp. Aggiungilo in"
+
+#: ConvAI/templates/settings/config.html:595
+#: ConvAI/views/settings_views.py:135
+msgid "Integrations"
+msgstr "Integrazioni"
+
+#: ConvAI/templates/settings/config.html:608
+#: ConvAI/views/settings_views.py:144
+msgid "Maintenance"
+msgstr "Manutenzione"
+
+#: ConvAI/templates/settings/config.html:609
+msgid "One-off background jobs you can trigger by hand."
+msgstr "Attività in background occasionali che puoi avviare manualmente."
+
+#: ConvAI/templates/settings/config.html:615
+#: ConvAI/templates/settings/config.html:620
+msgid "Update recordings"
+msgstr "Aggiorna registrazioni"
+
+#: ConvAI/templates/settings/config.html:616
+msgid "Fetch new call recordings from Twilio."
+msgstr "Recupera le nuove registrazioni delle chiamate da Twilio."
+
+#: ConvAI/templates/settings/config.html:629
+#: ConvAI/templates/settings/config.html:634
+msgid "Classify conversations"
+msgstr "Classifica le conversazioni"
+
+#: ConvAI/templates/settings/config.html:630
+msgid "Processes only conversations that have not yet been analysed."
+msgstr "Elabora solo le conversazioni non ancora analizzate."
+
+#: ConvAI/templates/settings/config.html:723
+msgid "This browser cannot copy images. Use Download instead."
+msgstr "Questo browser non può copiare immagini. Usa Scarica in alternativa."
+
+#: ConvAI/templates/settings/config.html:729
+msgid "Could not copy the image. Use Download instead."
+msgstr "Impossibile copiare l'immagine. Usa Scarica in alternativa."
+
+#: ConvAI/templates/sidebar.html:10
+msgid "Toggle sidebar"
+msgstr "Attiva/disattiva barra laterale"
+
+#: ConvAI/templates/sidebar.html:117
+msgid "View profile"
+msgstr "Visualizza profilo"
+
+#: ConvAI/templates/sidebar.html:132
+msgid "Urgent only"
+msgstr "Solo urgente"
+
+#: ConvAI/templates/users/edit_user.html:3
+#: ConvAI/templates/users/edit_user.html:27
+msgid "Edit user"
+msgstr "Modifica utente"
+
+#: ConvAI/templates/users/edit_user.html:21
+#: ConvAI/templates/users/test_user_result.html:80
+msgid "Back to users"
+msgstr "Torna agli utenti"
+
+#: ConvAI/templates/users/test_user_result.html:3
+#: ConvAI/templates/users/test_user_result.html:11
+msgid "Test user created"
+msgstr "Utente di prova creato"
+
+#: ConvAI/templates/users/test_user_result.html:13
+#, python-format
+msgid "Account for %(name)s %(last)s."
+msgstr "Account per %(name)s %(last)s."
+
+#: ConvAI/templates/users/test_user_result.html:19
+msgid ""
+"Copy these credentials now — the password is shown only once and cannot be "
+"recovered. You can reset it later by editing the user."
+msgstr ""
+"Copia queste credenziali ora — la password viene mostrata una sola volta e "
+"non può essere recuperata. Puoi reimpostarla in seguito modificando "
+"l'utente."
+
+#: ConvAI/templates/users/test_user_result.html:53
+msgid "Agent for this client"
+msgstr "Agente per questo cliente"
+
+#: ConvAI/templates/users/test_user_result.html:56
+msgid "This client's chat is handled by:"
+msgstr "La chat di questo cliente è gestita da:"
+
+#: ConvAI/templates/users/test_user_result.html:59
+msgid "To change it, edit the client and pick a different agent."
+msgstr "Per cambiarlo, modifica il cliente e scegli un altro agente."
+
+#: ConvAI/templates/users/test_user_result.html:62
+msgid ""
+"No agent is configured for this client yet — the test chat will not work "
+"until one is set."
+msgstr ""
+"Questo cliente non ha ancora un agente configurato — la chat di prova non "
+"funzionerà finché non ne verrà impostato uno."
+
+#: ConvAI/templates/users/test_user_result.html:64
+msgid "Edit the client to choose the agent that should handle their chat."
+msgstr "Modifica il cliente per scegliere l'agente che gestirà la sua chat."
+
+#: ConvAI/templates/users/test_user_result.html:73
+msgid "View client"
+msgstr "Visualizza cliente"
+
+#: ConvAI/templates/users/test_user_result.html:93
+msgid "Copied"
+msgstr "Copiato"
+
+#: ConvAI/templates/users/user_list.html:43
+msgid "Manage navigator and test-user accounts."
+msgstr "Gestisci gli account di navigatori e utenti di prova."
+
+#: ConvAI/templates/users/user_list.html:49
+msgid "User types"
+msgstr "Tipi di utente"
+
+#: ConvAI/templates/users/user_list.html:55
+msgid "Test users"
+msgstr "Utenti di prova"
+
+#: ConvAI/templates/users/user_list.html:62
+#: ConvAI/templates/users/user_list.html:204
+msgid "Add test user"
+msgstr "Aggiungi utente di prova"
+
+#: ConvAI/templates/users/user_list.html:66
+#: ConvAI/templates/users/user_list.html:177
+msgid "Add user"
+msgstr "Aggiungi utente"
+
+#: ConvAI/templates/users/user_list.html:84
+msgid "Role"
+msgstr "Ruolo"
+
+#: ConvAI/templates/users/user_list.html:117
+msgid "No users yet."
+msgstr "Ancora nessun utente."
+
+#: ConvAI/templates/users/user_list.html:128
+#, python-format
+msgid "Showing %(start)s-%(end)s of %(total)s"
+msgstr "Visualizzazione %(start)s-%(end)s di %(total)s"
+
+#: ConvAI/templates/users/user_list.html:130
+msgid "No results"
+msgstr "Nessun risultato"
+
+#: ConvAI/templates/users/user_list.html:180
+msgid "Creates a Navigator account."
+msgstr "Crea un account Navigator."
+
+#: ConvAI/templates/users/user_list.html:212
+msgid ""
+"Only clients without a test user are listed. A username and password will be"
+" generated and shown once."
+msgstr ""
+"Sono elencati solo i clienti senza utente di prova. Verranno generati un "
+"nome utente e una password, mostrati una sola volta."
+
+#: ConvAI/views/_panel.py:90
+#, python-format
+msgid "Navigator: %s"
+msgstr "Navigatore: %s"
+
+#: ConvAI/views/_panel.py:93
+#, python-format
+msgid "Archived as: %s"
+msgstr "Archiviato come: %s"
+
+#: ConvAI/views/_panel.py:96
+#, python-format
+msgid "Note: %s"
+msgstr "Nota: %s"
+
+#: ConvAI/views/_panel.py:130 ConvAI/views/_panel.py:135
+#: ConvAI/views/patients.py:275
+msgid "Alert"
+msgstr "Avviso"
+
+#: ConvAI/views/_panel.py:138
+msgid "Description"
+msgstr "Descrizione"
+
+#: ConvAI/views/_panel.py:236 ConvAI/views/communications.py:137
+msgid "To do"
+msgstr "Da fare"
+
+#: ConvAI/views/_panel.py:238 ConvAI/views/communications.py:139
+msgid "In-person meeting"
+msgstr "Riunione di persona"
+
+#: ConvAI/views/_panel.py:238
+msgid "Meeting ended"
+msgstr "Riunione conclusa"
+
+#: ConvAI/views/_panel.py:239 ConvAI/views/communications.py:139
+msgid "Scheduled call"
+msgstr "Chiamata programmata"
+
+#: ConvAI/views/_panel.py:239
+msgid "Call ended"
+msgstr "Chiamata conclusa"
+
+#: ConvAI/views/_panel.py:243
+#, python-format
+msgid "Meeting with %s"
+msgstr "Riunione con %s"
+
+#: ConvAI/views/_panel.py:243
+#, python-format
+msgid "Call with %s"
+msgstr "Chiamata con %s"
+
+#: ConvAI/views/_panel.py:319 ConvAI/views/communications.py:172
+msgid "Call recording"
+msgstr "Registrazione della chiamata"
+
+#: ConvAI/views/_panel.py:325
+#, python-format
+msgid "Called %s"
+msgstr "Ha chiamato %s"
+
+#: ConvAI/views/_panel.py:376
+msgid "Messages"
+msgstr "Messaggi"
+
+#: ConvAI/views/_panel.py:377
+msgid "Between"
+msgstr "Tra"
+
+#: ConvAI/views/_panel.py:380
+msgid "—"
+msgstr "—"
+
+#: ConvAI/views/_panel.py:381
+msgid "Not recorded"
+msgstr "Non registrato"
+
+#: ConvAI/views/_panel.py:382
+msgid "Topic"
+msgstr "Argomento"
+
+#: ConvAI/views/_panel.py:382
+msgid "Not classified"
+msgstr "Non classificato"
+
+#: ConvAI/views/_panel.py:383
+msgid "Flagged"
+msgstr "Segnalato"
+
+#: ConvAI/views/_panel.py:383
+msgid "Needs attention"
+msgstr "Richiede attenzione"
+
+#: ConvAI/views/_panel.py:384
+msgid "Nothing raised automatically"
+msgstr "Niente segnalato automaticamente"
+
+#: ConvAI/views/account.py:14
+msgid "Administrator"
+msgstr "Amministratore"
+
+#: ConvAI/views/account.py:18 ConvAI/views/users.py:19
+msgid "Test user"
+msgstr "Utente di prova"
+
+#: ConvAI/views/account.py:19
+msgid "User"
+msgstr "Utente"
+
+#: ConvAI/views/account.py:47
+msgid "Help page updated."
+msgstr "Pagina di aiuto aggiornata."
+
+#: ConvAI/views/account.py:103
+msgid "Please enter a valid e-mail address."
+msgstr "Inserisci un indirizzo e-mail valido."
+
+#: ConvAI/views/account.py:110
+msgid "Profile updated."
+msgstr "Profilo aggiornato."
+
+#: ConvAI/views/account.py:124
+msgid "Language updated."
+msgstr "Lingua aggiornata."
+
+#: ConvAI/views/account.py:134
+msgid ""
+"Your token has been generated. Copy it now; it will be shown only once."
+msgstr ""
+"Il tuo token è stato generato. Copialo adesso; verrà mostrato solo una "
+"volta."
+
+#: ConvAI/views/agents.py:22
+msgid "remote agent"
+msgstr "agente remoto"
+
+#: ConvAI/views/agents.py:23
+msgid "prompt-based agent"
+msgstr "agente basato su prompt"
+
+#: ConvAI/views/agents.py:24
+msgid "native agent"
+msgstr "agente nativo"
+
+#: ConvAI/views/agents.py:55
+msgid "That agent kind cannot be edited here."
+msgstr "Questo tipo di agente non può essere modificato qui."
+
+#: ConvAI/views/agents.py:58
+msgid "That agent kind cannot be created here."
+msgstr "Questo tipo di agente non può essere creato qui."
+
+#: ConvAI/views/agents.py:69
+msgid "Agent saved."
+msgstr "Agente salvato."
+
+#: ConvAI/views/agents.py:69
+msgid "Agent created."
+msgstr "Agente creato."
+
+#: ConvAI/views/agents.py:95
+msgid "Native agents cannot be deleted."
+msgstr "Gli agenti nativi non possono essere eliminati."
+
+#: ConvAI/views/agents.py:98
+msgid "Agent deleted."
+msgstr "Agente eliminato."
+
+#: ConvAI/views/agents.py:125
+msgid ""
+"Could not start a voice session. Check the Azure Realtime settings and try "
+"again."
+msgstr ""
+"Impossibile avviare una sessione vocale. Controlla le impostazioni di Azure "
+"Realtime e riprova."
+
+#: ConvAI/views/agents.py:141 ConvAI/views/agents.py:146
+msgid "test"
+msgstr "prova"
+
+#: ConvAI/views/agents.py:173
+msgid "Conversation ended."
+msgstr "Conversazione terminata."
+
+#: ConvAI/views/alerts.py:51
+msgid "You do not have permission to view this alert."
+msgstr "Non hai il permesso di vedere questo avviso."
+
+#: ConvAI/views/alerts.py:64 ConvAI/views/alerts.py:74
+msgid "Invalid alert status."
+msgstr "Stato dell'avviso non valido."
+
+#: ConvAI/views/alerts.py:182
+msgid "Alert reopened and moved back to Active Alerts."
+msgstr "Avviso riaperto e riportato tra gli Avvisi attivi."
+
+#: ConvAI/views/alerts.py:187
+msgid "Alert marked as false alarm and moved to the resolved archive."
+msgstr ""
+"Avviso contrassegnato come falso allarme e spostato nell'archivio dei "
+"risolti."
+
+#: ConvAI/views/alerts.py:189
+msgid "Alert resolved and moved to the resolved archive."
+msgstr "Avviso risolto e spostato nell'archivio dei risolti."
+
+#: ConvAI/views/alerts.py:193
+msgid "Chatbot marked as disabled for this alert. Alert moved to In Progress."
+msgstr ""
+"Chatbot contrassegnato come disattivato per questo avviso. Avviso spostato "
+"in In corso."
+
+#: ConvAI/views/alerts.py:195
+msgid ""
+"Chatbot marked as enabled again. Alert remains In Progress until resolved."
+msgstr ""
+"Chatbot contrassegnato come riattivato. L'avviso resta In corso fino alla "
+"risoluzione."
+
+#: ConvAI/views/alerts.py:197
+msgid "Alert moved to In Progress."
+msgstr "Avviso spostato in In corso."
+
+#: ConvAI/views/alerts.py:199
+msgid "Alert moved back to New."
+msgstr "Avviso riportato a Nuovo."
+
+#: ConvAI/views/alerts.py:201
+msgid "Alert updated."
+msgstr "Avviso aggiornato."
+
+#: ConvAI/views/alerts.py:224
+msgid "Internal note saved."
+msgstr "Nota interna salvata."
+
+#: ConvAI/views/alerts.py:319
+msgid "You do not have permission to act on this alert."
+msgstr "Non hai il permesso di agire su questo avviso."
+
+#: ConvAI/views/alerts.py:331
+msgid "No webhook is configured for this alert."
+msgstr "Nessun webhook configurato per questo avviso."
+
+#: ConvAI/views/alerts.py:367
+msgid "Webhook executed successfully."
+msgstr "Webhook eseguito correttamente."
+
+#: ConvAI/views/alerts.py:395
+msgid "The alert's user has no phone number."
+msgstr "L'utente dell'avviso non ha un numero di telefono."
+
+#: ConvAI/views/alerts.py:416
+msgid "Cannot send SMS via Twilio."
+msgstr "Impossibile inviare l'SMS tramite Twilio."
+
+#: ConvAI/views/alerts.py:453
+msgid "SMS sent successfully."
+msgstr "SMS inviato correttamente."
+
+#: ConvAI/views/alerts.py:503
+msgid "High priority"
+msgstr "Priorità alta"
+
+#: ConvAI/views/alerts.py:503
+msgid "New chat to review"
+msgstr "Nuova conversazione da rivedere"
+
+#: ConvAI/views/calls.py:30 ConvAI/views/chat.py:320 ConvAI/views/chat.py:355
+#: ConvAI/views/chat.py:386
+msgid "Not authorised."
+msgstr "Non autorizzato."
+
+#: ConvAI/views/calls.py:68
+msgid "There is already a meeting scheduled within this time range."
+msgstr "C'è già una riunione programmata in questo intervallo di tempo."
+
+#: ConvAI/views/calls.py:85 ConvAI/views/calls.py:364
+#: ConvAI/views/communications.py:202
+msgid "Meeting scheduled."
+msgstr "Incontro programmato."
+
+#: ConvAI/views/calls.py:105
+msgid "You do not have permission to start this call."
+msgstr "Non hai il permesso di avviare questa chiamata."
+
+#: ConvAI/views/calls.py:109
+msgid "This client has no caregiver with a valid phone number."
+msgstr "Questo paziente non ha un caregiver con un numero di telefono valido."
+
+#: ConvAI/views/calls.py:115
+msgid "Your own phone number is not set, so the call cannot be placed."
+msgstr ""
+"Il tuo numero di telefono non è impostato, quindi la chiamata non può essere"
+" effettuata."
+
+#: ConvAI/views/calls.py:163
+msgid "Invalid status."
+msgstr "Stato non valido."
+
+#: ConvAI/views/calls.py:174
+msgid "You must choose an executed protocol."
+msgstr "Devi scegliere un protocollo eseguito."
+
+#: ConvAI/views/calls.py:180
+msgid "Meeting status updated."
+msgstr "Stato della riunione aggiornato."
+
+#: ConvAI/views/calls.py:245
+msgid "Month"
+msgstr "Mese"
+
+#: ConvAI/views/calls.py:245
+msgid "Week"
+msgstr "Settimana"
+
+#: ConvAI/views/calls.py:245
+msgid "Day"
+msgstr "Giorno"
+
+#: ConvAI/views/calls.py:361
+msgid "You already have a meeting scheduled within this time range."
+msgstr "Hai già un incontro programmato in questo intervallo di tempo."
+
+#: ConvAI/views/calls.py:366
+msgid "Please check the meeting details and try again."
+msgstr "Controlla i dettagli dell'incontro e riprova."
+
+#: ConvAI/views/calls.py:390
+msgid "Only pending meetings can be rescheduled"
+msgstr "Solo le riunioni in attesa possono essere riprogrammate"
+
+#: ConvAI/views/calls.py:406
+msgid "Meeting rescheduled successfully."
+msgstr "Riunione riprogrammata con successo."
+
+#: ConvAI/views/calls.py:433
+msgid "You do not have permission to send reminders."
+msgstr "Non hai il permesso di inviare promemoria."
+
+#: ConvAI/views/calls.py:439 ConvAI/views/calls.py:444
+msgid "The reminder could not be sent."
+msgstr "Non è stato possibile inviare il promemoria."
+
+#: ConvAI/views/calls.py:447
+msgid "Reminder sent via WhatsApp."
+msgstr "Promemoria inviato via WhatsApp."
+
+#: ConvAI/views/calls.py:463 ConvAI/views/protocols.py:209
+msgid "You do not have permission to do this."
+msgstr "Non hai il permesso di farlo."
+
+#: ConvAI/views/calls.py:492
+msgid "That call was not cancelled."
+msgstr "Quella chiamata non è stata annullata."
+
+#: ConvAI/views/calls.py:498
+msgid "The call is back on the schedule."
+msgstr "La chiamata è tornata in calendario."
+
+#: ConvAI/views/calls.py:504
+msgid "Only a scheduled call can be cancelled."
+msgstr "Solo una chiamata programmata può essere annullata."
+
+#: ConvAI/views/calls.py:511
+msgid "Call cancelled. It stays in the history."
+msgstr "Chiamata annullata. Resta nello storico."
+
+#: ConvAI/views/chat.py:274
+msgid "The client has no caregiver phone number."
+msgstr "Il paziente non ha il numero di telefono del caregiver."
+
+#: ConvAI/views/chat.py:280
+#, python-format
+msgid "Share this link with the caregiver: %(url)s"
+msgstr "Condividi questo link con il caregiver: %(url)s"
+
+#: ConvAI/views/chat.py:296
+msgid "Assistant"
+msgstr "Assistente"
+
+#: ConvAI/views/communications.py:67
+msgid "Overdue"
+msgstr "In ritardo"
+
+#: ConvAI/views/communications.py:82
+msgid "Any time"
+msgstr "Qualsiasi periodo"
+
+#: ConvAI/views/communications.py:83
+msgid "Last 7 days"
+msgstr "Ultimi 7 giorni"
+
+#: ConvAI/views/communications.py:84
+msgid "Last 30 days"
+msgstr "Ultimi 30 giorni"
+
+#: ConvAI/views/communications.py:85
+msgid "Last 3 months"
+msgstr "Ultimi 3 mesi"
+
+#: ConvAI/views/communications.py:98 ConvAI/views/dashboard.py:49
+msgid "Tomorrow"
+msgstr "Domani"
+
+#: ConvAI/views/communications.py:100 ConvAI/views/dashboard.py:31
+#: ConvAI/views/dashboard.py:51
+msgid "Yesterday"
+msgstr "Ieri"
+
+#: ConvAI/views/communications.py:126
+#, python-format
+msgid "with %s"
+msgstr "con %s"
+
+#: ConvAI/views/communications.py:133 ConvAI/views/dashboard.py:67
+#, python-format
+msgid "Due %(d)s"
+msgstr "Scade %(d)s"
+
+#: ConvAI/views/communications.py:155
+msgid "Chatbot conversation"
+msgstr "Conversazione con il chatbot"
+
+#: ConvAI/views/communications.py:156
+#, python-format
+msgid "%(n)d message"
+msgid_plural "%(n)d messages"
+msgstr[0] "%(n)d messaggio"
+msgstr[1] "%(n)d messaggi"
+
+#: ConvAI/views/communications.py:158
+msgid "Chat"
+msgstr "Conversazione"
+
+#: ConvAI/views/dashboard.py:27
+msgid "Just now"
+msgstr "Proprio ora"
+
+#: ConvAI/views/dashboard.py:29
+#, python-format
+msgid "%(h)dh ago"
+msgstr "%(h)d h fa"
+
+#: ConvAI/views/dashboard.py:33
+#, python-format
+msgid "%(d)d days ago"
+msgstr "%(d)d giorni fa"
+
+#: ConvAI/views/dashboard.py:71
+msgid "in under an hour"
+msgstr "tra meno di un'ora"
+
+#: ConvAI/views/dashboard.py:73
+#, python-format
+msgid "in %(h)dh"
+msgstr "tra %(h)d h"
+
+#: ConvAI/views/dashboard.py:74
+msgid "scheduled"
+msgstr "programmata"
+
+#: ConvAI/views/dashboard.py:227
+msgid "Good morning"
+msgstr "Buongiorno"
+
+#: ConvAI/views/dashboard.py:228
+msgid "Good afternoon"
+msgstr "Buon pomeriggio"
+
+#: ConvAI/views/dashboard.py:229
+msgid "Good evening"
+msgstr "Buonasera"
+
+#: ConvAI/views/dashboard.py:271
+msgid "nothing recorded"
+msgstr "nulla registrato"
+
+#: ConvAI/views/dashboard.py:272
+#, python-format
+msgid "%(a)d of %(t)d recorded"
+msgstr "%(a)d di %(t)d registrate"
+
+#: ConvAI/views/feedback.py:86
+msgid "You do not have permission to update this conversation."
+msgstr "Non hai il permesso di aggiornare questa conversazione."
+
+#: ConvAI/views/media.py:47
+msgid "You are not authorised to access this file."
+msgstr "Non sei autorizzato ad accedere a questo file."
+
+#: ConvAI/views/media.py:94
+msgid "You are not authorised to access this audio."
+msgstr "Non sei autorizzato ad accedere a questo audio."
+
+#: ConvAI/views/media.py:122
+msgid "Sending the care plan is disabled."
+msgstr "L'invio del piano di cura è disattivato."
+
+#: ConvAI/views/media.py:128
+msgid "You do not have permission to send this."
+msgstr "Non hai il permesso di inviare questo."
+
+#: ConvAI/views/media.py:131 ConvAI/views/protocols.py:214
+msgid "The client has no caregiver with a valid phone number."
+msgstr "Il paziente non ha un caregiver con un numero di telefono valido."
+
+#: ConvAI/views/media.py:135 ConvAI/views/patients.py:624
+msgid "This client has no care plan uploaded."
+msgstr "Questo paziente non ha un piano di cura caricato."
+
+#: ConvAI/views/media.py:140
+msgid "WHATSAPP_TEMPLATE_CARE_PLAN_SID is missing in .env."
+msgstr "WHATSAPP_TEMPLATE_CARE_PLAN_SID manca in .env."
+
+#: ConvAI/views/media.py:153
+msgid "Could not send the WhatsApp message. Check credentials/template."
+msgstr ""
+"Impossibile inviare il messaggio WhatsApp. Controlla credenziali/modello."
+
+#: ConvAI/views/media.py:164
+msgid "Care plan sent via WhatsApp."
+msgstr "Piano di cura inviato via WhatsApp."
+
+#: ConvAI/views/patients.py:192
+msgid "Client created."
+msgstr "Paziente creato."
+
+#: ConvAI/views/patients.py:195
+msgid "Could not create client."
+msgstr "Impossibile creare il paziente."
+
+#: ConvAI/views/patients.py:208
+msgid "You cannot edit this client."
+msgstr "Non puoi modificare questo cliente."
+
+#: ConvAI/views/patients.py:231 ConvAI/views/patients.py:736
+msgid "Client updated."
+msgstr "Cliente aggiornato."
+
+#: ConvAI/views/patients.py:392
+msgid "You do not have permission to view this client."
+msgstr "Non hai il permesso di visualizzare questo paziente."
+
+#: ConvAI/views/patients.py:429
+#, python-format
+msgid "Protocol %s"
+msgstr "Protocollo %s"
+
+#: ConvAI/views/patients.py:486
+msgid "You do not have permission to view this conversation."
+msgstr "Non hai il permesso di visualizzare questa conversazione."
+
+#: ConvAI/views/patients.py:564 ConvAI/views/patients.py:680
+#: ConvAI/views/patients.py:698
+msgid "You do not have permission to edit this client."
+msgstr "Non hai il permesso di modificare questo paziente."
+
+#: ConvAI/views/patients.py:590
+msgid "You do not have permission to edit this care plan."
+msgstr "Non hai il permesso di modificare questo piano di cura."
+
+#: ConvAI/views/patients.py:597
+msgid "Care plan updated successfully."
+msgstr "Piano di cura aggiornato correttamente."
+
+#: ConvAI/views/patients.py:619
+msgid "You do not have permission to view this care plan."
+msgstr "Non hai il permesso di vedere questo piano di cura."
+
+#: ConvAI/views/patients.py:643
+msgid "You do not have permission to view this file."
+msgstr "Non hai il permesso di visualizzare questo file."
+
+#: ConvAI/views/patients.py:763
+msgid "You cannot change this client's agent."
+msgstr "Non puoi modificare l'agente di questo paziente."
+
+#: ConvAI/views/patients.py:771
+#, python-format
+msgid ""
+"The agent is off for %s. Messages still arrive; nothing is answered "
+"automatically."
+msgstr ""
+"L'agente è disattivato per %s. I messaggi continuano ad arrivare; nulla "
+"riceve risposta automatica."
+
+#: ConvAI/views/patients.py:777
+#, python-format
+msgid "The agent is answering %s again."
+msgstr "L'agente risponde di nuovo a %s."
+
+#: ConvAI/views/patients.py:795
+msgid "You cannot raise an alert for this client."
+msgstr "Non puoi segnalare un avviso per questo paziente."
+
+#: ConvAI/views/patients.py:814
+msgid "Raised by navigator"
+msgstr "Segnalato dal navigatore"
+
+#: ConvAI/views/patients.py:818
+#, python-format
+msgid "Alert raised for %s."
+msgstr "Avviso segnalato per %s."
+
+#: ConvAI/views/protocols.py:175
+msgid "Untitled protocol"
+msgstr "Protocollo senza titolo"
+
+#: ConvAI/views/protocols.py:178
+msgid ""
+"New protocol created. It stays editable until answers are recorded against "
+"it."
+msgstr ""
+"Nuovo protocollo creato. Rimane modificabile finché non vengono registrate "
+"risposte."
+
+#: ConvAI/views/protocols.py:190
+msgid "This protocol has recorded answers and cannot be deleted."
+msgstr "Questo protocollo ha risposte registrate e non può essere eliminato."
+
+#: ConvAI/views/protocols.py:193
+msgid "Protocol deleted."
+msgstr "Protocollo eliminato."
+
+#: ConvAI/views/protocols.py:207
+msgid "Automations are disabled."
+msgstr "Le automazioni sono disattivate."
+
+#: ConvAI/views/protocols.py:251
+msgid "Automation started."
+msgstr "Automazione avviata."
+
+#: ConvAI/views/protocols.py:253
+msgid "Automation could not send the WhatsApp message."
+msgstr "L'automazione non è riuscita a inviare il messaggio WhatsApp."
+
+#: ConvAI/views/settings_views.py:92
+msgid "Hi! I want to register"
+msgstr "Ciao! Vorrei registrarmi"
+
+#: ConvAI/views/settings_views.py:134
+msgid "General"
+msgstr "Generale"
+
+#: ConvAI/views/settings_views.py:136
+msgid "Messaging"
+msgstr "Messaggistica"
+
+#: ConvAI/views/settings_views.py:139
+msgid "Prompts"
+msgstr "Prompt"
+
+#: ConvAI/views/settings_views.py:141
+msgid "Registrations"
+msgstr "Registrazioni"
+
+#: ConvAI/views/settings_views.py:143
+msgid "API client"
+msgstr "Client API"
+
+#: ConvAI/views/settings_views.py:194
+msgid "Settings saved."
+msgstr "Impostazioni salvate."
+
+#: ConvAI/views/settings_views.py:197
+msgid "Please correct the errors below."
+msgstr "Correggi gli errori qui sotto."
+
+#: ConvAI/views/settings_views.py:271
+#, python-format
+msgid "Classification completed. Conversations processed: %(n)s."
+msgstr "Classificazione completata. Conversazioni elaborate: %(n)s."
+
+#: ConvAI/views/settings_views.py:282
+msgid "This self-registration is already approved."
+msgstr "Questa autoregistrazione è già stata approvata."
+
+#: ConvAI/views/summaries.py:43
+msgid "You cannot summarize this meeting."
+msgstr "Non puoi riepilogare questa riunione."
+
+#: ConvAI/views/summaries.py:47
+msgid "Protocol summary generated."
+msgstr "Riepilogo del protocollo generato."
+
+#: ConvAI/views/summaries.py:49
+#, python-format
+msgid "Could not generate the summary: %(err)s"
+msgstr "Impossibile generare il riepilogo: %(err)s"
+
+#: ConvAI/views/summaries.py:62
+msgid "You cannot transcribe this recording."
+msgstr "Non puoi trascrivere questa registrazione."
+
+#: ConvAI/views/summaries.py:66
+msgid "Recording transcribed and summarized."
+msgstr "Registrazione trascritta e riepilogata."
+
+#: ConvAI/views/summaries.py:68
+#, python-format
+msgid "Could not transcribe the recording: %(err)s"
+msgstr "Impossibile trascrivere la registrazione: %(err)s"
+
+#: ConvAI/views/users.py:15
+msgid "Admin"
+msgstr "Amministratore"
+
+#: ConvAI/views/users.py:161
+msgid "Navigator user created."
+msgstr "Utente navigatore creato."
+
+#: ConvAI/views/users.py:164
+msgid "Could not create user."
+msgstr "Impossibile creare l'utente."
+
+#: ConvAI/views/users.py:192
+msgid "Could not create test user."
+msgstr "Impossibile creare l'utente di prova."
+
+#: ConvAI/views/users.py:247
+msgid "User updated."
+msgstr "Utente aggiornato."
+
+#: Django_CMS/settings_default.py:184
+msgid "Spanish"
+msgstr "Spagnolo"
+
+#: Django_CMS/settings_default.py:185
+msgid "Portuguese"
+msgstr "Portoghese"
+
+#: Django_CMS/settings_default.py:186
+msgid "English"
+msgstr "Inglese"
+
+#: Django_CMS/settings_default.py:187
+msgid "Italian"
+msgstr "Italiano"
+
+#: Django_CMS/settings_default.py:188
+msgid "Korean"
+msgstr "Coreano"
+
+#: Django_CMS/settings_default.py:189
+msgid "Chinese (Simplified)"
+msgstr "Cinese (semplificato)"
+
+#: Django_CMS/settings_default.py:233
+msgid "Standard"
+msgstr "Standard"

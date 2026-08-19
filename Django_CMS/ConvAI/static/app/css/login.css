@@ -1,0 +1,161 @@
+body {
+    margin: 0px;
+}
+.login,
+.login * {
+  box-sizing: border-box;
+}
+.login {
+  background: linear-gradient(
+    160deg,
+    var(--app-primary-color-50, #f3f8fb) 0%,
+    var(--app-primary-color-100, #d7e8ec) 100%
+  );
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100vw;
+  position: relative;
+  overflow: hidden;
+  font-family: "DM Sans", sans-serif;
+}
+.login-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 40px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: stretch;
+  justify-content: center;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 24px 60px -20px rgba(0, 54, 62, 0.25),
+              0 4px 12px rgba(0, 54, 62, 0.06);
+  position: relative;
+}
+.login-title {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.brand-logo {
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+  max-height: 96px;
+  object-fit: contain;
+  margin-bottom: 8px;
+  display: block;
+}
+.login-subtitle {
+  margin: 0;
+  color: var(--app-neutral-500, #767777);
+  font-family: "DM Sans", sans-serif;
+  font-size: var(--minder-body-medium-font-size, 14px);
+  line-height: var(--minder-body-medium-line-height, 20px);
+  font-weight: 400;
+}
+.login-error {
+  background: #fdecec;
+  color: var(--app-red-500, #ba1a1a);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  text-align: center;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 18px;
+  margin-block-end: 0px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field label {
+  color: var(--app-neutral-700, #464747);
+  font-family: "DM Sans", sans-serif;
+  font-size: var(--minder-label-large-font-size, 14px);
+  line-height: var(--minder-label-large-line-height, 20px);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+input {
+    background: #ffffff;
+    border-radius: 12px;
+    border-style: solid;
+    border-color: var(--app-neutral-200);
+    border-width: 1px;
+    padding: 0 14px;
+    display: block;
+    flex-shrink: 0;
+    height: 52px;
+    width: 100%;
+    position: relative;
+    color: var(--app-neutral-800, #2f3131);
+    text-align: left;
+    font-family: "DM Sans", sans-serif;
+    font-size: var(--minder-title-medium-font-size, 16px);
+    line-height: var(--minder-title-medium-line-height, 24px);
+    letter-spacing: 0.3px;
+    font-weight: 500;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input::placeholder {
+    color: var(--app-neutral-400);
+    text-align: left;
+    font-family: "DM Sans", sans-serif;
+    font-size: var(--minder-title-medium-font-size, 16px);
+    line-height: var(--minder-title-medium-line-height, 24px);
+    letter-spacing: 0.3px;
+    font-weight: 400;
+}
+input:focus {
+    border-color: var(--app-primary-color-500);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--app-primary-color-100, #d7e8ec);
+}
+.submit-button {
+  margin-top: 4px;
+  background: var(--app-primary-color-500, #006877);
+  border-radius: var(--rounded-full, 999px);
+  border: none;
+  padding: 0 16px;
+  height: 52px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--palette-white-900, #ffffff);
+  font-family: "DM Sans", sans-serif;
+  font-size: var(--minder-label-large-font-size, 14px);
+  line-height: var(--minder-label-large-line-height, 20px);
+  letter-spacing: 0.2px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+.submit-button:hover {
+  background: var(--app-primary-color-600, #084e59);
+}
+.submit-button:active {
+  transform: translateY(1px);
+}
+.submit-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--app-primary-color-200, #9cc5cc);
+}

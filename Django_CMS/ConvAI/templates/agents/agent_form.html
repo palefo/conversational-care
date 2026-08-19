@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% if agent %}{% trans "Edit agent" %}{% else %}{% trans "Add agent" %}{% endif %}{% endblock %}
+
+{% block content %}
+<style>
+  .agent-form input:not([type=checkbox]):not([type=radio]),
+  .agent-form select, .agent-form textarea {
+    width: 100%; border-radius: .5rem; border: 1px solid #d1d5db;
+    padding: .5rem .75rem; font-size: .875rem; background: #fff; color: #111827;
+  }
+  .agent-form input:focus, .agent-form select:focus, .agent-form textarea:focus {
+    outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.15);
+  }
+  .agent-form .fld { margin-bottom: 1.1rem; }
+  .agent-avatar { width: 2.75rem; height: 2.75rem; border-radius: .6rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .agent-form details > summary { list-style: none; cursor: pointer; }
+  .agent-form details > summary::-webkit-details-marker { display: none; }
+  .agent-form details[open] .stg-chevron { transform: rotate(90deg); }
+  .stg-chevron { transition: transform .15s; }
+</style>
+
+<div class="max-w-2xl">
+  <a href="{% url 'agents' %}" class="text-sm text-sky-600 hover:text-sky-800 inline-flex items-center gap-1 mb-4">
+    <span class="material-icons-outlined text-sm">arrow_back</span>{% trans "Back to agents" %}
+  </a>
+
+  <div class="flex items-start gap-3 mb-6">
+    {% if kind == 'prompt' %}
+      <span class="agent-avatar bg-indigo-50 text-indigo-600"><span class="material-icons-outlined">chat</span></span>
+    {% elif kind == 'remote' %}
+      <span class="agent-avatar bg-sky-50 text-sky-600"><span class="material-icons-outlined">cloud</span></span>
+    {% else %}
+      <span class="agent-avatar bg-emerald-50 text-emerald-600"><span class="material-icons-outlined">bolt</span></span>
+    {% endif %}
+    <div>
+      <h1 class="text-2xl font-semibold text-gray-800">
+        {% if agent %}{% blocktrans with kind=kind_label %}Edit {{ kind }}{% endblocktrans %}{% else %}{% blocktrans with kind=kind_label %}New {{ kind }}{% endblocktrans %}{% endif %}
+      </h1>
+      {% if kind == 'prompt' %}
+        <p class="text-sm text-gray-500">{% trans "Runs in-process, driven by your system prompt. No tools." %}</p>
+      {% elif kind == 'remote' %}
+        <p class="text-sm text-gray-500">{% trans "Connects to an agent on a LangGraph server (host:port)." %}</p>
+      {% else %}
+        <p class="text-sm text-gray-500">{% trans "Built-in agent — set the model and voice it uses." %}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <form method="post" class="agent-form card p-6">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-300 text-red-800 text-sm">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    {# ── primary fields ── #}
+    {% for field in form %}
+      {% if field.name not in classification_fields %}
+        <div class="fld">
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<p class="text-xs text-gray-500 mt-1">{{ field.help_text }}</p>{% endif %}
+          {% for e in field.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+        </div>
+      {% endif %}
+    {% endfor %}
+
+    {# ── advanced: classification ── #}
+    {% if show_classification %}
+      <details class="border-t border-gray-100 pt-4 mt-2">
+        <summary class="flex items-center gap-2 text-sm font-medium text-gray-700 select-none">
+          <span class="material-icons-outlined text-base stg-chevron">chevron_right</span>
+          {% trans "Advanced: conversation classification" %}
+        </summary>
+        <p class="text-xs text-gray-500 mt-2 mb-4 ml-6">{% trans "How this agent's conversations are summarised and flagged for human review. Optional." %}</p>
+        <div class="ml-6">
+          {% for field in form %}
+            {% if field.name in classification_fields %}
+              <div class="fld">
+                <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<p class="text-xs text-gray-500 mt-1">{{ field.help_text }}</p>{% endif %}
+                {% for e in field.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </details>
+    {% endif %}
+
+    <div class="flex gap-2 mt-6 pt-4 border-t border-gray-100">
+      <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Save changes" %}</button>
+      <a href="{% url 'agents' %}" class="button-secondary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Cancel" %}</a>
+    </div>
+  </form>
+</div>
+
+{% comment %} Suggestions for the model field (free text; type any provider-prefixed id). {% endcomment %}
+<datalist id="model-suggestions">
+  <option value="openai/gpt-4.1-mini"></option>
+  <option value="openai/gpt-4.1"></option>
+  <option value="openai/gpt-4o"></option>
+  <option value="anthropic/claude-sonnet-4-6"></option>
+  <option value="anthropic/claude-opus-4-8"></option>
+  <option value="anthropic/claude-haiku-4-5-20251001"></option>
+  <option value="google/gemini-2.0-flash"></option>
+  <option value="mistral/mistral-large-latest"></option>
+  <option value="deepseek/deepseek-chat"></option>
+</datalist>
+{% endblock %}

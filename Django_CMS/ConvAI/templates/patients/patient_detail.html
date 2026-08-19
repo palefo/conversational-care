@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+{% load i18n tz %}
+{% load static %}
+{% load custom_filters %}
+{% load markdownify %}
+
+{% block title %}{% trans "Client" %}: {{ patient }}{% endblock %}
+
+{% block content %}
+
+  {% comment %}
+    Who they are, then the two or three facts you came for. One edit button —
+    the record used to carry four, all worded differently, and each opened
+    something else. This one turns the block below into fields in place.
+  {% endcomment %}
+  <header class="pd-hd">
+    <span class="pd-avatar bg-sky-50 text-sky-600"><span class="material-icons-outlined">person</span></span>
+    <div class="pd-hd-main">
+      <h1 class="pd-hd-name">{{ patient.name }} {{ patient.lastname }}</h1>
+      <div class="pd-hd-meta">
+        {% if patient.caregiver %}
+          <span><span class="material-icons-outlined">person</span>
+            {% trans "Caregiver" %} <b>{{ patient.caregiver }}</b></span>
+        {% endif %}
+        {% if next_call %}
+          <span><span class="material-icons-outlined">event</span>
+            {% trans "Next call" %} <b>{{ next_call.scheduled_time|localtime|date:"D j M · H:i" }}</b></span>
+        {% endif %}
+        {% if last_contact %}
+          <span><span class="material-icons-outlined">schedule</span>
+            {% blocktrans with t=last_contact|localtime|timesince|first_unit %}Last contact {{ t }} ago{% endblocktrans %}</span>
+        {% endif %}
+      </div>
+    </div>
+    <button type="button" class="pd-btn pd-hd-edit" id="pdEdit">
+      <span class="material-icons-outlined">edit</span>{% trans "Edit details" %}
+    </button>
+  </header>
+
+
+  <!-- Tabs: the record splits into who they are, and what has happened with them. -->
+  <div class="pd-tabs" role="tablist">
+    <button type="button" class="pd-tab-btn active" data-tab="details" role="tab" aria-selected="true">{% trans "Details" %}</button>
+    <button type="button" class="pd-tab-btn" data-tab="comms" role="tab" aria-selected="false">
+      {% trans "Communications" %}<span class="pd-tab-n">{{ timeline_count }}</span>
+    </button>
+  </div>
+
+  <div class="pd-panel" id="pd-panel-details" role="tabpanel">
+
+  {% comment %}
+    Who this person is, in one block. The caregiver, the numbers, the agent and
+    the background all answer the same question, so they share a container
+    rather than sitting in four headed boxes of equal weight. Everything here is
+    stored; nothing is inferred.
+  {% endcomment %}
+  <form class="pd-about" method="post" action="{% url 'update_client_terms' patient.pk %}" id="pdAbout">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+    <dl class="pd-dl">
+      <div>
+        <dt>{% trans "Caregiver" %}</dt>
+        <dd>
+          {% if patient.caregiver %}
+            <span class="pd-cg">
+              <span class="pd-cg-tx">
+                <span class="pd-cg-nm">{{ patient.caregiver }}</span>
+                <span class="pd-cg-rel" data-view>
+                  {% if patient.caregiver.relationship or patient.caregiver.involvement %}
+                    {{ patient.caregiver.relationship }}{% if patient.caregiver.relationship and patient.caregiver.involvement %} · {% endif %}{{ patient.caregiver.involvement }}
+                  {% else %}<i>{% trans "Relationship not recorded" %}</i>{% endif %}
+                </span>
+                <span class="pd-cg-edit" data-edit hidden>
+                  <input type="text" name="relationship" class="pd-in" maxlength="60"
+                         value="{{ patient.caregiver.relationship }}"
+                         placeholder="{% trans 'Daughter, neighbour, paid carer…' %}">
+                  <input type="text" name="involvement" class="pd-in" maxlength="120"
+                         value="{{ patient.caregiver.involvement }}"
+                         placeholder="{% trans 'Usually on the call' %}">
+                </span>
+              </span>
+            </span>
+          {% else %}
+            <span class="pd-none">{% trans "No caregiver" %}</span>
+          {% endif %}
+        </dd>
+      </div>
+
+      {% if patient.caregiver.phone_number %}
+        <div><dt>{% trans "Caregiver phone" %}</dt><dd>{{ patient.caregiver.phone_number }}</dd></div>
+      {% endif %}
+      {% comment %}
+        Patient.navigator is null=True / SET_NULL, so it really can be absent.
+        The fallback has to be a conditional: a chained lookup used as a filter
+        *argument* is resolved without the usual silent-failure handling, so
+        `|default:patient.navigator.username` raises once navigator is None.
+      {% endcomment %}
+      <div><dt>{% trans "Navigator" %}</dt>
+        <dd>{% if patient.navigator %}{{ patient.navigator.get_full_name|default:patient.navigator.username }}{% else %}—{% endif %}</dd></div>
+
+      <div>
+        <dt>{% trans "Agent" %}</dt>
+        <dd>
+          <span data-view>{{ patient.agent.name|default:_("No agent") }}
+            <small>{% if patient.agent %}{% trans "Answers this client's chats" %}{% else %}{% trans "Chats are not answered automatically" %}{% endif %}</small>
+          </span>
+          <span data-edit hidden>
+            <select name="agent" class="pd-sel">
+              <option value="">{% trans "No agent" %}</option>
+              {% for a in agents %}
+                <option value="{{ a.pk }}" {% if patient.agent_id == a.pk %}selected{% endif %}>{{ a.name }}</option>
+              {% endfor %}
+            </select>
+          </span>
+        </dd>
+      </div>
+
+      {% if client_since %}
+        <div><dt>{% trans "Client since" %}</dt>
+          <dd>{{ client_since|localtime|date:"j M Y" }}</dd></div>
+      {% endif %}
+    </dl>
+
+    {% comment %}
+      The client's own terms. These are only worth showing because scheduling
+      reads them — the line underneath says what honouring them means, so the
+      chips never imply a promise the system does not keep.
+    {% endcomment %}
+    <div class="pd-terms">
+      <p class="pd-terms-h">{% trans "How they want to be contacted" %}</p>
+      <div class="pd-chips">
+        {% for t in contact_terms %}
+          <label class="pd-chip {% if t.on %}on{% endif %}">
+            <input type="checkbox" name="terms" value="{{ t.key }}" {% if t.on %}checked{% endif %}>
+            <span class="material-icons-outlined">check</span>{{ t.label }}
+          </label>
+        {% endfor %}
+        {% comment %}
+          Five ship with the platform, but people say things the five do not
+          cover. A term written here joins the shared list, so the next
+          navigator with the same situation finds it rather than writing a
+          near-duplicate of it.
+        {% endcomment %}
+        <span class="pd-chip-add" data-edit hidden>
+          <input type="text" name="new_term" class="pd-newterm" maxlength="40"
+                 placeholder="{% trans 'Add another…' %}"
+                 aria-label="{% trans 'Add a contact preference' %}">
+        </span>
+      </div>
+    </div>
+
+    <div class="pd-bg">
+      <p class="pd-bg-h">{% trans "Background" %}</p>
+      <div data-view>
+        {% if patient.details %}
+          <div class="markdown-content">{{ patient.details|markdownify }}</div>
+        {% else %}
+          <p class="pd-none">{% trans "Nothing recorded yet." %}</p>
+        {% endif %}
+      </div>
+      <textarea class="pd-ta" name="details" rows="5" data-edit hidden
+        placeholder="{% trans 'Who they live with, how they get about, what to avoid. Markdown.' %}">{{ patient.details }}</textarea>
+    </div>
+
+    <div class="pd-about-f" data-edit hidden>
+      <button type="button" class="pd-btn" id="pdCancel">{% trans "Cancel" %}</button>
+      <button type="submit" class="pd-btn pd-btn-pri">{% trans "Save" %}</button>
+    </div>
+  </form>
+
+  {% if protocols_executed %}
+    <div class="pd-sec">
+      <p class="pd-sect">{% trans "Protocols completed" %}</p>
+      <div class="pd-box">
+        {% comment %}
+          A link, because seeing that a protocol ran three times and not what it
+          asked is the wrong half of the information.
+        {% endcomment %}
+        {% for p in protocols_executed %}
+          <a class="pd-pr" href="{% url 'protocol_editor' p.number %}">
+            <span class="pd-pr-n">{{ p.number }}</span>
+            <span class="pd-pr-nm">{{ p.title }}</span>
+            <span class="pd-pr-ct">{{ p.count }}</span>
+            <span class="material-icons-outlined pd-pr-go">chevron_right</span>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% comment %}
+    The handover note. Same field as before — details_editable — but named for
+    the job it does and reachable where it is read, because a field behind its
+    own page is a field nobody fills in.
+  {% endcomment %}
+  <div class="pd-sec">
+    <p class="pd-sect">{% trans "Handover note" %}</p>
+    <form id="pdNoteForm" method="post" action="{% url 'save_client_note' patient.pk %}">
+      {% csrf_token %}
+      <textarea class="pd-ta" name="note" rows="3" id="pdNote"
+        placeholder="{% trans 'What the next person should know to make the first call feel like continuity' %}">{{ patient.details_editable }}</textarea>
+    </form>
+    <p class="pd-saved" id="pdNoteSaved" hidden>{% trans "Saved" %}</p>
+  </div>
+
+  <div class="pd-sec">
+    <p class="pd-sect">{% trans "Care plan" %}</p>
+    {% if patient.care_plan %}
+      <div class="pd-file">
+        <span class="pd-pdf">PDF</span>
+        <span class="pd-file-tx">
+          <span class="pd-file-n">{{ patient.care_plan.name|cut:"care_plans/" }}</span>
+          <span class="pd-file-s">{{ patient.care_plan.size|filesizeformat }}</span>
+        </span>
+        <span class="pd-file-a">
+          <a class="pd-btn" href="{% url 'view_care_plan' patient.pk %}" target="_blank" rel="noopener">{% trans "Open" %}</a>
+          <a class="pd-btn" href="{% url 'edit_care_plan' patient.pk %}">{% trans "Replace" %}</a>
+        </span>
+      </div>
+
+      {% comment %}
+        Sending it is the point of having it, and until now the endpoint had no
+        button anywhere. Hidden rather than disabled when SEND_CARE_PLAN is off:
+        the view returns 403, so a visible button would only ever fail.
+      {% endcomment %}
+      {% if can_send_care_plan %}
+        <form method="post" action="{% url 'send_care_plan_whatsapp' patient.pk %}"
+              class="pd-cp-send" id="pdSendCp">
+          {% csrf_token %}
+          <button type="submit" class="pd-btn">
+            <span class="material-icons-outlined">send</span>
+            {% trans "Send to caregiver on WhatsApp" %}
+          </button>
+          <span class="pd-cp-note">
+            {% if patient.caregiver.phone_number %}
+              {% blocktrans with n=patient.caregiver.phone_number %}Goes to {{ n }} as a single-use link.{% endblocktrans %}
+            {% else %}
+              {% trans "No caregiver number on file." %}
+            {% endif %}
+          </span>
+        </form>
+      {% endif %}
+    {% else %}
+      <form method="post" action="{% url 'edit_care_plan' patient.pk %}" enctype="multipart/form-data" id="pdCpForm">
+        {% csrf_token %}
+        <label class="pd-drop">
+          <span class="material-icons-outlined">upload_file</span>
+          <span class="pd-drop-tx">
+            <span class="pd-drop-1">{% trans "Upload a care plan" %}</span>
+            <span class="pd-drop-2">{% trans "PDF" %}</span>
+          </span>
+          <span class="pd-btn">{% trans "Choose file" %}</span>
+          <input type="file" name="care_plan" accept="application/pdf" id="pdCpFile" hidden>
+        </label>
+      </form>
+    {% endif %}
+  </div>
+
+  </div>
+
+  <div class="pd-panel" id="pd-panel-comms" role="tabpanel" hidden>
+
+  {% comment %}
+    The same list as the Communications page, scoped to this client — one
+    partial, one builder, so the two cannot drift apart. What changes is the
+    headline: across clients a row leads with the name, here it leads with what
+    the entry is, because the name is the page you are already on.
+  {% endcomment %}
+  {% include "communications/_list.html" %}
+
+  </div>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+  (function () {
+    // The chips are real checkboxes so the block posts without JavaScript; the
+    // class only mirrors their state.
+    var chips = document.querySelectorAll('.pd-chip');
+    function paintChips() {
+      chips.forEach(function (c) {
+        c.classList.toggle('on', c.querySelector('input').checked);
+      });
+    }
+    chips.forEach(function (c) {
+      c.querySelector('input').addEventListener('change', paintChips);
+    });
+    paintChips();
+
+    // ── Read, then edit ───────────────────────────────────────────────────
+    // The block is a form, but it reads as a record until you ask to change it.
+    var about = document.getElementById('pdAbout');
+    if (about) {
+      var show = function (editing) {
+        about.querySelectorAll('[data-view]').forEach(function (e) { e.hidden = editing; });
+        about.querySelectorAll('[data-edit]').forEach(function (e) { e.hidden = !editing; });
+      };
+      show(false);
+      var edit = document.getElementById('pdEdit');
+      var cancel = document.getElementById('pdCancel');
+      if (edit) edit.addEventListener('click', function () {
+        show(true);
+        edit.hidden = true;
+        about.scrollIntoView({ block: 'nearest' });
+      });
+      if (cancel) cancel.addEventListener('click', function () {
+        // Nothing is kept: cancelling has to mean the record is as it was.
+        window.location = window.location.pathname + window.location.search;
+      });
+    }
+
+    // ── Handover note ─────────────────────────────────────────────────────
+    var form = document.getElementById('pdNoteForm');
+    var ta = document.getElementById('pdNote');
+    var saved = document.getElementById('pdNoteSaved');
+    if (form && ta) {
+      var timer = null;
+      ta.addEventListener('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+          fetch(form.action, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+            body: new FormData(form)
+          }).then(function (r) {
+            if (!r.ok) return;
+            saved.hidden = false;
+            setTimeout(function () { saved.hidden = true; }, 1600);
+          }).catch(function () {});
+        }, 700);
+      });
+    }
+
+    // Choosing a file uploads it — a second "submit" click after choosing is
+    // a step nobody expects on a single-field form.
+    var cp = document.getElementById('pdCpFile');
+    if (cp) cp.addEventListener('change', function () {
+      if (cp.files && cp.files.length) document.getElementById('pdCpForm').submit();
+    });
+  })();
+</script>
+<script>
+  function tlLoadAudio(btn) {
+    // Render a full-width player on its own row so the scrubber is as wide as
+    // possible — important for seeking within hour-long calls.
+    var audio = document.createElement('audio');
+    audio.controls = true;
+    audio.preload = 'none';
+    audio.autoplay = true;
+    audio.className = 'tl-audio';
+    audio.src = btn.dataset.src;
+    var wrap = document.createElement('div');
+    wrap.className = 'tl-audio-wrap';
+    wrap.appendChild(audio);
+    // Place the player directly below the action-button row.
+    var row = btn.parentElement;
+    row.parentNode.insertBefore(wrap, row.nextSibling);
+    btn.disabled = true;               // prevent a second player
+    audio.focus();
+  }
+
+
+  // Client tabs. The tab is kept in the URL hash so a deep link into the
+  // timeline — and a page reload after acting on something — lands back here.
+  (function () {
+    var btns = Array.prototype.slice.call(document.querySelectorAll('.pd-tab-btn'));
+    if (!btns.length) return;
+
+    function show(name) {
+      btns.forEach(function (b) {
+        var on = b.dataset.tab === name;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      ['details', 'comms'].forEach(function (t) {
+        var panel = document.getElementById('pd-panel-' + t);
+        if (panel) panel.hidden = (t !== name);
+      });
+    }
+
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        show(b.dataset.tab);
+        history.replaceState(null, '', '#' + b.dataset.tab);
+      });
+    });
+
+    // Arriving with a panel open means you came from the timeline (or a deep
+    // link into it), so show that tab rather than dropping you on Details.
+    if (location.hash === '#comms' || /[?&]item=/.test(location.search)) show('comms');
+  })();
+</script>
+<style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+{% endblock %}

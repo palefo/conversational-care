@@ -1,0 +1,30 @@
+{# templates/blank.html #}
+{% load static i18n custom_filters %}
+
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE|default:"en" }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{% block title %}{% endblock %} · {% brand_name %}</title>
+
+    <!-- Fonts / Icons -->
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined">
+    <link rel="stylesheet"
+      href="https://fonts.googleapis.com/icon?family=Material+Icons">
+      
+    <!-- Tailwind (built locally, see tailwind/ + Dockerfile) -->
+    <link rel="stylesheet" href="{% static 'app/css/tailwind.css' %}">
+    <!-- Optional: your main CSS bundle -->
+    <link rel="stylesheet" href="{% static 'app/css/app_new_design.css' %}">
+    {% block extra_head %}{% endblock %}
+  </head>
+
+  <body class="min-h-screen bg-slate-50 flex items-start justify-center py-12">
+    {% block content %}{% endblock %}
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

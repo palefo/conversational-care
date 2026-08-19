@@ -1,0 +1,124 @@
+{% load i18n %}
+{% comment %} One timeline event. Expects `e` (event dict) and `patient` in context. {% endcomment %}
+<div class="tl-item" data-kind="{{ e.kind }}">
+  <span class="tl-dot">
+    {% if e.kind == 'alert' %}<span class="material-icons-outlined">notification_important</span>
+    {% elif e.kind == 'recording' %}<span class="material-icons-outlined">call</span>
+    {% elif e.kind == 'meeting' %}<span class="material-icons-outlined">event</span>
+    {% else %}<span class="material-icons-outlined">forum</span>{% endif %}
+  </span>
+  {% comment %}
+    The whole card opens the detail panel in place. Buttons and forms inside it
+    still work — the timeline script ignores clicks that land on one.
+  {% endcomment %}
+  <div class="tl-card tl-clickable{% if panel_item.token == e.panel_token %} tl-card-open{% endif %}"
+       id="tlitem-{{ e.panel_token }}"
+       data-href="{% querystring item=e.panel_token %}">
+
+    {% if e.kind == 'alert' %}
+      <div class="flex items-start justify-between gap-2">
+        <p class="font-medium text-gray-800">{{ e.title }}</p>
+        <span class="tl-time">{{ e.ts|date:"D d M · H:i" }}</span>
+      </div>
+      {% if e.description %}<p class="text-sm text-gray-600 mt-0.5">{{ e.description|truncatechars:160 }}</p>{% endif %}
+      <div class="flex flex-wrap items-center gap-1.5 mt-2">
+        <span class="tl-badge {% if e.priority_level == 1 %}bg-red-100 text-red-700{% elif e.priority_level == 2 %}bg-amber-100 text-amber-700{% else %}bg-gray-100 text-gray-600{% endif %}">{{ e.priority }}</span>
+        <span class="tl-badge {% if e.status_code == 2 %}bg-green-100 text-green-700{% elif e.status_code == 1 %}bg-sky-100 text-sky-700{% else %}bg-gray-100 text-gray-600{% endif %}">{{ e.status }}</span>
+      </div>
+
+    {% elif e.kind == 'recording' %}
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="tl-badge bg-sky-100 text-sky-700">{% trans "Phone call" %}</span>
+          <span class="font-medium text-gray-800">{{ e.duration_str }}</span>
+        </div>
+        <span class="tl-time">{{ e.ts|date:"D d M · H:i" }}</span>
+      </div>
+      <p class="text-xs text-gray-500 mt-1">{% trans "To" %}: {{ e.to_number }}</p>
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        <button type="button" class="button-secondary py-1.5 px-3 rounded-lg text-xs inline-flex items-center gap-1"
+                data-src="{% url 'serve_protected_file' e.recording_sid %}" onclick="tlLoadAudio(this)">
+          <span class="material-icons-outlined text-sm">play_arrow</span>{% trans "Listen" %}
+        </button>
+        <form method="post" action="{% url 'transcribe_recording' e.recording_sid %}" class="tl-async">
+          {% csrf_token %}
+          <button type="submit" class="button-secondary py-1.5 px-3 rounded-lg text-xs inline-flex items-center gap-1">
+            <span class="material-icons-outlined text-sm">subtitles</span>{% if e.transcribed %}{% trans "Re-transcribe" %}{% else %}{% trans "Transcribe" %}{% endif %}
+          </button>
+        </form>
+      </div>
+      {% if e.transcript_summary %}
+        <div class="tl-summary mt-2">
+          <div class="flex items-center gap-1 text-xs font-semibold text-sky-700 mb-1">
+            <span class="material-icons-outlined text-sm">summarize</span>{% trans "Transcript summary" %}
+          </div>
+          <div class="text-sm text-gray-700 whitespace-pre-line">{{ e.transcript_summary }}</div>
+          {% if e.transcript %}
+            <details class="mt-1">
+              <summary class="text-xs text-sky-600 cursor-pointer">{% trans "Show full transcript" %}</summary>
+              <div class="text-xs text-gray-600 whitespace-pre-line mt-1">{{ e.transcript }}</div>
+            </details>
+          {% endif %}
+        </div>
+      {% endif %}
+
+    {% elif e.kind == 'meeting' %}
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="tl-badge bg-indigo-100 text-indigo-700">{% trans "Meeting" %}</span>
+          <span class="font-medium text-gray-800">{{ e.meeting_type }}{% if e.protocol %} · {{ e.protocol }}{% endif %}</span>
+        </div>
+        <span class="tl-time">{{ e.ts|date:"D d M · H:i" }}</span>
+      </div>
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        {% if e.status_code == 0 %}
+          <span class="tag-pending text-xs font-medium px-2.5 py-0.5 rounded-full">{{ e.status }}</span>
+        {% elif e.status_code == 1 %}
+          <span class="tag-completed text-xs font-medium px-2.5 py-0.5 rounded-full">{{ e.status }}</span>
+        {% elif e.status_code == 2 %}
+          <span class="tag-interrupted text-xs font-medium px-2.5 py-0.5 rounded-full">{{ e.status }}</span>
+        {% else %}
+          <span class="tag-not-answered text-xs font-medium px-2.5 py-0.5 rounded-full">{{ e.status }}</span>
+        {% endif %}
+        {% if e.protocol_num %}
+          <a href="{% url 'protocol_view' e.pk e.protocol_num %}"
+             class="button-secondary py-1.5 px-3 rounded-lg text-xs inline-flex items-center gap-1">
+            <span class="material-icons-outlined text-sm">open_in_new</span>{% trans "Open meeting" %}
+          </a>
+          <form method="post" action="{% url 'summarize_meeting' e.pk %}" class="tl-async">
+            {% csrf_token %}
+            <button type="submit" class="button-secondary py-1.5 px-3 rounded-lg text-xs inline-flex items-center gap-1">
+              <span class="material-icons-outlined text-sm">summarize</span>{% if e.protocol_summary %}{% trans "Re-summarize" %}{% else %}{% trans "Summarize protocols" %}{% endif %}
+            </button>
+          </form>
+        {% endif %}
+      </div>
+      {% if e.protocol_summary %}
+        <div class="tl-summary mt-2">
+          <div class="flex items-center gap-1 text-xs font-semibold text-indigo-700 mb-1">
+            <span class="material-icons-outlined text-sm">summarize</span>{% trans "Protocol summary" %}
+          </div>
+          <div class="text-sm text-gray-700 whitespace-pre-line">{{ e.protocol_summary }}</div>
+        </div>
+      {% endif %}
+
+    {% else %}
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="tl-badge bg-emerald-100 text-emerald-700">{% trans "Chatbot" %}</span>
+          <span class="font-medium text-gray-800">
+            {% blocktrans count counter=e.msg_count %}{{ counter }} message{% plural %}{{ counter }} messages{% endblocktrans %}
+          </span>
+        </div>
+        <span class="tl-time">{{ e.ts|date:"D d M · H:i" }}</span>
+      </div>
+      <div class="mt-2">
+        <a href="{% url 'patient_conversation_detail' patient.pk e.day_str %}"
+           class="button-secondary py-1.5 px-3 rounded-lg text-xs inline-flex items-center gap-1">
+          <span class="material-icons-outlined text-sm">open_in_new</span>{% trans "View conversation" %}
+        </a>
+      </div>
+    {% endif %}
+
+  </div>
+</div>

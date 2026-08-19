@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Edit user" %}{% endblock %}
+
+{% block content %}
+<style>
+  .acct-form input:not([type=checkbox]):not([type=radio]),
+  .acct-form select, .acct-form textarea {
+    width: 100%; border-radius: .5rem; border: 1px solid #d1d5db;
+    padding: .5rem .75rem; font-size: .875rem; background: #fff; color: #111827;
+  }
+  .acct-form input:focus, .acct-form select:focus, .acct-form textarea:focus {
+    outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.15);
+  }
+  .acct-form .fld { margin-bottom: 1.1rem; }
+  .acct-avatar { width: 2.75rem; height: 2.75rem; border-radius: .6rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+</style>
+
+<div class="max-w-2xl">
+  <a href="{% url 'users' %}" class="text-sm text-sky-600 hover:text-sky-800 inline-flex items-center gap-1 mb-4">
+    <span class="material-icons-outlined text-sm">arrow_back</span>{% trans "Back to users" %}
+  </a>
+
+  <div class="flex items-start gap-3 mb-6">
+    <span class="acct-avatar bg-sky-50 text-sky-600"><span class="material-icons-outlined">person</span></span>
+    <div>
+      <h1 class="text-2xl font-semibold text-gray-800">{% trans "Edit user" %}</h1>
+      <p class="text-sm text-gray-500">{{ edited_user.username }} · {{ role }}</p>
+    </div>
+  </div>
+
+  <form method="post" class="acct-form card p-6">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-300 text-red-800 text-sm">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="fld">
+      <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+      {{ form.username }}
+      {% for e in form.username.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+    </div>
+    <div class="fld">
+      <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+      {{ form.email }}
+      {% for e in form.email.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+    </div>
+    <div class="fld flex items-center gap-2">
+      {{ form.is_active }}
+      <label class="text-sm font-medium text-gray-700" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+    </div>
+
+    <div class="flex gap-2 mt-6 pt-4 border-t border-gray-100">
+      <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Save changes" %}</button>
+      <a href="{% url 'users' %}" class="button-secondary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Cancel" %}</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

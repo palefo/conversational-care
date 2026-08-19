@@ -1,0 +1,20 @@
+{% load i18n %}
+{% comment %} Actions for one agent. Flags: can_edit (Edit), can_delete (Delete). {% endcomment %}
+<a href="{% url 'agent_test' a.pk %}" target="_blank" rel="noopener"
+   class="button-secondary py-1.5 px-3 rounded-lg text-xs inline-flex items-center gap-1">
+  <span class="material-icons-outlined text-sm">chat</span>{% trans "Test" %}
+</a>
+{% if can_edit %}
+  <a href="{% url 'agent_edit' a.pk %}" class="button-secondary py-1.5 px-3 rounded-lg text-xs inline-flex items-center gap-1">
+    <span class="material-icons-outlined text-sm">edit</span>{% trans "Edit" %}
+  </a>
+{% endif %}
+{% if can_delete %}
+  <form method="post" action="{% url 'agent_delete' a.pk %}"
+        onsubmit="return confirm('{% trans "Delete this agent? This cannot be undone." %}');">
+    {% csrf_token %}
+    <button type="submit" class="py-1.5 px-3 rounded-lg text-xs inline-flex items-center gap-1 text-red-600 border border-red-200 hover:bg-red-50">
+      <span class="material-icons-outlined text-sm">delete</span>{% trans "Delete" %}
+    </button>
+  </form>
+{% endif %}

@@ -1,0 +1,142 @@
+{% load i18n %}
+{% comment %}
+  The Communications list, shared by the cross-client page and the tab on a
+  client's own page.
+
+  The one difference between them is what a row leads with. Across clients the
+  question is "who", so the name is the headline. On one client's page you
+  already know who — the whole page is that person — so the name would repeat on
+  every row and say nothing, and the headline becomes what the entry actually
+  is: the protocol, the alert, the topic. `scoped` picks between the two.
+{% endcomment %}
+<div class="cm-box">
+  <nav class="cm-tabs">
+    <a class="cm-tab {% if tab == 'up' %}on{% endif %}" href="?{{ qs_tab_up }}">
+      {% trans "Coming up" %}
+      {% if overdue_count %}<span class="cm-warn" title="{{ overdue_count }}"></span>{% endif %}
+      <span class="c">{{ up_count }}</span>
+    </a>
+    <a class="cm-tab {% if tab == 'past' %}on{% endif %}" href="?{{ qs_tab_past }}">
+      {% trans "Happened" %}<span class="c">{{ past_count }}</span>
+    </a>
+  </nav>
+
+  <form class="cm-tools" method="get" id="cmTools">
+    {% for k, v in request.GET.items %}
+      {% if k != 'q' and k != 'page' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}
+    {% endfor %}
+    <input class="cm-find" type="search" name="q" value="{{ q }}"
+           placeholder="{% if scoped %}{% trans 'Find a protocol, alert or place' %}{% else %}{% trans 'Find a client, protocol or place' %}{% endif %}">
+    {% for value, label, count in chips %}
+      <a class="cm-chip {% if kind == value %}on{% endif %}"
+         href="?{{ qs_base }}{% if value != 'all' %}&amp;kind={{ value }}{% endif %}">
+        {{ label }}<span class="n">{{ count }}</span>
+      </a>
+    {% endfor %}
+  </form>
+
+  {% comment %}
+    How far back, on Happened only. Coming up is a queue you work to the end of,
+    so cutting it by age could only ever hide work. Each group of chips counts
+    what you would get given the other group's choice, so the two stay honest
+    about each other.
+  {% endcomment %}
+  {% if tab == 'past' %}
+    <div class="cm-tools cm-tools-when">
+      <span class="cm-when-lab">{% trans "When" %}</span>
+      {% for value, label, count in when_chips %}
+        <a class="cm-chip {% if when == value %}on{% endif %}"
+           href="?{{ qs_when }}{% if value != 'all' %}&amp;when={{ value }}{% endif %}">
+          {{ label }}<span class="n">{{ count }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% for g in groups %}
+    <button type="button" class="cm-day" data-day="{{ g.day|date:'Y-m-d' }}" aria-expanded="true">
+      <span class="material-icons-outlined cm-chev">expand_more</span>
+      {{ g.label }}{% if g.rel %}<span class="rel">{{ g.rel }}</span>{% endif %}
+      <span class="n">{{ g.count }}</span>
+    </button>
+    <div class="cm-dayrows" data-rows="{{ g.day|date:'Y-m-d' }}">
+    {% for r in g.rows %}
+      {% comment %}
+        `cm-row-new` marks something the system produced that nobody has opened
+        yet — alerts and chatbot conversations only. Weight alone, the way an
+        inbox does it: a tint or a left edge would read as selection, which is
+        what `cm-row-open` already means two attributes along.
+
+        `cm-row-off` is a cancelled call: struck through and greyed, still in
+        the list because it was arranged and calling it off is part of the
+        record.
+      {% endcomment %}
+      <a class="cm-row {% if panel_item.token == r.token %}cm-row-open{% endif %}{% if r.unread %} cm-row-new{% endif %}{% if r.cancelled %} cm-row-off{% endif %}"
+         href="?{{ qs_base }}{% if kind != 'all' %}&amp;kind={{ kind }}{% endif %}&amp;item={{ r.token }}{% if scoped %}#comms{% endif %}"
+         {% if panel_item.token == r.token %}aria-current="true"{% endif %}
+         {% if r.unread %}title="{% trans 'Not opened yet' %}"{% elif r.cancelled %}title="{% trans 'Cancelled' %}"{% endif %}>
+        <span class="cm-ic cm-ic-{{ r.kind }}">
+          <span class="material-icons-outlined">
+            {% if r.kind == 'call' %}call
+            {% elif r.kind == 'visit' %}event
+            {% elif r.kind == 'chat' %}forum
+            {% elif r.kind == 'alert' %}notification_important
+            {% else %}graphic_eq{% endif %}
+          </span>
+        </span>
+        <span class="cm-main">
+          <span class="cm-l1">
+            <span class="cm-who">{% if scoped %}{{ r.line2 }}{% else %}{{ r.who }}{% endif %}</span>
+            {% if r.badge %}<span class="cm-tag cm-tag-{{ r.badge_class }}">{{ r.badge }}</span>{% endif %}
+          </span>
+          <span class="cm-l2">
+            {% if scoped %}{{ r.detail|default:r.sub }}
+            {% else %}<b>{{ r.line2 }}</b>{% if r.detail %} · {{ r.detail }}{% endif %}{% endif %}
+          </span>
+        </span>
+        <span class="cm-right">
+          <span class="cm-when {% if r.is_late %}cm-when-late{% endif %}">{{ r.time }}</span>
+          <span class="cm-sub2">
+            {% if r.dot %}<i class="cm-dot cm-dot-{{ r.dot }}"></i>{% endif %}{{ r.sub }}
+          </span>
+        </span>
+      </a>
+    {% endfor %}
+    </div>
+  {% empty %}
+    <p class="cm-empty">
+      {% if q %}{% trans "Nothing matches that search." %}
+      {% elif tab == 'up' %}{% trans "Nothing scheduled." %}
+      {% else %}{% trans "Nothing has happened yet." %}{% endif %}
+    </p>
+  {% endfor %}
+
+  {% if total %}
+    <div class="cm-foot">
+      <span class="cm-count">
+        {% blocktrans with a=first_shown b=last_shown t=total %}{{ a }}–{{ b }} of {{ t }}{% endblocktrans %}
+      </span>
+      {% if pages > 1 %}
+        <nav class="cm-pg" aria-label="{% trans 'Pages' %}">
+          {% if page > 1 %}
+            <a class="cm-pg-a" href="?{{ qs_page }}&amp;page={{ page|add:'-1' }}"
+               aria-label="{% trans 'Previous' %}">‹</a>
+          {% else %}<span class="cm-pg-a is-off">‹</span>{% endif %}
+          {% for c in page_cells %}
+            {% if c %}
+              <a class="cm-pg-n {% if c == page %}on{% endif %}"
+                 href="?{{ qs_page }}&amp;page={{ c }}"
+                 {% if c == page %}aria-current="page"{% endif %}>{{ c }}</a>
+            {% else %}
+              <span class="cm-pg-dots">…</span>
+            {% endif %}
+          {% endfor %}
+          {% if page < pages %}
+            <a class="cm-pg-a" href="?{{ qs_page }}&amp;page={{ page|add:'1' }}"
+               aria-label="{% trans 'Next' %}">›</a>
+          {% else %}<span class="cm-pg-a is-off">›</span>{% endif %}
+        </nav>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

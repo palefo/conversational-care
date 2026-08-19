@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load static custom_filters %}
+
+{% block title %}{% trans "Edit details" %} – {{ patient }}{% endblock %}
+
+{% block content %}
+<style>
+  .details-avatar { width: 2.75rem; height: 2.75rem; border-radius: .6rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+</style>
+
+<div class="max-w-3xl">
+  <a href="{% url 'patient_detail' patient.pk %}" class="text-sm text-sky-600 hover:text-sky-800 inline-flex items-center gap-1 mb-4">
+    <span class="material-icons-outlined text-sm">arrow_back</span>{% trans "Back to client" %}
+  </a>
+
+  <div class="flex items-start gap-3 mb-6">
+    <span class="details-avatar bg-sky-50 text-sky-600"><span class="material-icons-outlined">edit_note</span></span>
+    <div>
+      <h1 class="text-2xl font-semibold text-gray-800">{% trans "Edit details of" %} {{ patient.name }} {{ patient.lastname }}</h1>
+      <p class="text-sm text-gray-500">
+        {% trans "Caregiver" %}:
+        {% if patient.caregiver %}{{ patient.caregiver.name }} {{ patient.caregiver.lastname }}{% else %}—{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <form method="post" class="card p-6">
+    {% csrf_token %}
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1" for="id_details">{{ form.details_editable.label }}</label>
+      {{ form.details_editable }}
+      {% if form.details_editable.help_text %}<p class="text-xs text-gray-500 mt-1">{{ form.details_editable.help_text }}</p>{% endif %}
+      {% for error in form.details_editable.errors %}<p class="text-red-600 text-xs mt-1">{{ error }}</p>{% endfor %}
+    </div>
+
+    <div class="flex gap-2 mt-6 pt-4 border-t border-gray-100">
+      <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Save" %}</button>
+      <a href="{% url 'patient_detail' patient.pk %}" class="button-secondary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Cancel" %}</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+  <!-- SimpleMDE Markdown Editor -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <script src="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      new SimpleMDE({
+        element: document.querySelector('#id_details_editable'),
+        spellChecker: false,
+        toolbar: ["bold", "italic", "heading", "|", "quote", "unordered-list", "ordered-list", "|", "preview"]
+      });
+    });
+  </script>
+{% endblock %}
