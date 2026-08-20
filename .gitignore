@@ -1,0 +1,59 @@
+.env
+venv
+venv/*
+
+dummy_issue.csv
+
+credentials.json
+token.json
+
+documents_r
+
+db.sqlite3
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.env
+
+__pycache__
+
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+q
+ Editor directories and files
+### VisualStudioCode ###
+.vscode/*
+!.vscode/settings.example.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.venv/lib/python3.12/site-packages/tzdata/zoneinfo/Asia/Ashkhabad
+/.venv
+/Server
+media/care_plans/*.pdf
+.claude/settings.local.json
+
+# Generated Tailwind build artifact
+Django_CMS/ConvAI/static/app/css/tailwind.css
+
+# Fixture dumps that have carried credentials in the past
+users.json
