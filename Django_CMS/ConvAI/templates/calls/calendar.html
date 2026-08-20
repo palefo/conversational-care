@@ -31,7 +31,7 @@
   .cal-legend .swatch { width:.7rem; height:.7rem; border-radius:9999px; flex-shrink:0; }
 
   /* Status colours (solid chips = week/day) */
-  .sw-pending{ background:#0ea5e9; }
+  .sw-pending{ background:var(--brand-primary); }
   .sw-completed{ background:#22c55e; }
   .sw-interrupted{ background:#ef4444; }
   .sw-missed{ background:#94a3b8; }
@@ -48,14 +48,14 @@
   .cal-cell:not(.empty):hover { background:#f0f9ff; }
   .cal-daynum { display:inline-flex; align-items:center; justify-content:center; min-width:1.6rem; height:1.6rem;
     padding:0 .35rem; font-size:.78rem; font-weight:600; color:#475569; border-radius:9999px; align-self:flex-start; }
-  .cal-cell.is-today .cal-daynum { background:#0ea5e9; color:#fff; }
+  .cal-cell.is-today .cal-daynum { background:var(--brand-primary); color:#fff; }
 
   /* Month meeting pill (tinted by status) */
   .m-pill { display:flex; align-items:center; gap:.3rem; font-size:.7rem; line-height:1.2; padding:.15rem .4rem;
     border-radius:.35rem; border-left:3px solid; text-decoration:none; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
   .m-pill .m-time { font-weight:600; flex-shrink:0; }
   .m-pill .m-name { overflow:hidden; text-overflow:ellipsis; }
-  .m-pending{ background:#f0f9ff; color:#0369a1; border-color:#0ea5e9; }
+  .m-pending{ background:#f0f9ff; color:#0369a1; border-color:var(--brand-primary); }
   .m-pending:hover{ background:#e0f2fe; }
   .m-completed{ background:#f0fdf4; color:#15803d; border-color:#22c55e; }
   .m-completed:hover{ background:#dcfce7; }
@@ -74,7 +74,7 @@
   .cal-gh .dow { font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; }
   .cal-gh .dnum { font-size:.95rem; font-weight:600; color:#334155; margin-top:.05rem; line-height:1.1; }
   .cal-gh.is-today .dnum { display:inline-flex; align-items:center; justify-content:center; width:1.7rem; height:1.7rem;
-    background:#0ea5e9; color:#fff; border-radius:9999px; }
+    background:var(--brand-primary); color:#fff; border-radius:9999px; }
   .cal-time { border-bottom:1px solid #f1f5f9; font-size:.65rem; color:#94a3b8; text-align:right; padding:.15rem .4rem 0 0;
     white-space:nowrap; }
   .cal-time.hour { color:#64748b; font-weight:500; }
@@ -86,7 +86,7 @@
   .cal-slot.today:hover { background:#eff6ff; }
   .cal-chip { display:block; font-size:.66rem; line-height:1.2; color:#fff; border-radius:.3rem; padding:.14rem .35rem;
     margin-bottom:1px; text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; box-shadow:0 1px 1px rgba(0,0,0,.12); }
-  .cal-chip.is-pending{ background:#0ea5e9; } .cal-chip.is-pending:hover{ background:#0284c7; }
+  .cal-chip.is-pending{ background:var(--brand-primary); } .cal-chip.is-pending:hover{ background:var(--brand-secondary); }
   .cal-chip.is-completed{ background:#22c55e; } .cal-chip.is-completed:hover{ background:#16a34a; }
   .cal-chip.is-interrupted{ background:#ef4444; } .cal-chip.is-interrupted:hover{ background:#dc2626; }
   .cal-chip.is-missed{ background:#94a3b8; } .cal-chip.is-missed:hover{ background:#64748b; }
@@ -94,11 +94,18 @@
   .cal-now { position:absolute; left:0; right:0; height:2px; background:#ef4444; z-index:5; pointer-events:none; }
   .cal-now::before { content:""; position:absolute; left:-3px; top:-3px; width:8px; height:8px; border-radius:9999px; background:#ef4444; }
 
+  /* The header carries the way in as well as the view switcher. */
+  .cal-hd-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .cal-add {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: .5rem .875rem; border-radius: .5rem; font-size: .875rem; font-weight: 500;
+  }
+
   /* ───────── Schedule modal ───────── */
   .cal-modal-card input:not([type=hidden]), .cal-modal-card select {
     width:100%; border-radius:.5rem; border:1px solid #d1d5db; padding:.5rem .7rem; font-size:.875rem; background:#fff; color:#111827; }
   .cal-modal-card input:focus, .cal-modal-card select:focus {
-    outline:none; border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.15); }
+    outline:none; border-color:var(--brand-primary); box-shadow:0 0 0 3px rgba(3,105,161,.15); }
 </style>
 {% endblock %}
 
@@ -109,6 +116,16 @@
       <h1 class="text-3xl font-semibold text-gray-800">{% trans "Calendar" %}</h1>
       <p class="text-gray-500">{% trans "See your scheduled meetings at a glance and book new ones." %}</p>
     </div>
+    {% comment %}
+      Booking one was only reachable by clicking an empty slot, and only in week
+      or day view — so on the month, which is where people land, the calendar
+      said it was for booking and offered no way to do it.
+    {% endcomment %}
+    <div class="cal-hd-acts">
+      <button type="button" class="button-primary cal-add" onclick="calOpen()">
+        <span class="material-icons-outlined text-base">add</span>{% trans "Schedule" %}
+      </button>
+
     <!-- View switcher -->
     <div class="cal-views" role="tablist" aria-label="{% trans 'Calendar view' %}">
       {% comment %}
@@ -119,22 +136,23 @@
         stop looking at it.
       {% endcomment %}
       {% for v, label in view_options %}
-        <a href="?view={{ v }}" class="cal-view {% if view == v %}active{% endif %}" role="tab" aria-selected="{% if view == v %}true{% else %}false{% endif %}">
+        <a href="?view={{ v }}{{ cal_item_qs }}" class="cal-view {% if view == v %}active{% endif %}" role="tab" aria-selected="{% if view == v %}true{% else %}false{% endif %}">
           <span class="material-icons-outlined">{% if v == 'month' %}calendar_view_month{% elif v == 'week' %}view_week{% else %}calendar_view_day{% endif %}</span>
           {{ label }}
         </a>
       {% endfor %}
+    </div>
     </div>
   </header>
 
   <div class="card p-6">
     <!-- Toolbar -->
     <div class="cal-toolbar">
-      <a href="?view={{ view }}&amp;offset=0" class="cal-today {% if offset == 0 %}disabled{% endif %}">{% trans "Today" %}</a>
-      <a href="?view={{ view }}&amp;offset={{ offset|add:'-1' }}" class="cal-navbtn {% if at_min %}disabled{% endif %}" aria-label="{% trans 'Previous' %}">
+      <a href="?view={{ view }}&amp;offset=0{{ cal_item_qs }}" class="cal-today {% if offset == 0 %}disabled{% endif %}">{% trans "Today" %}</a>
+      <a href="?view={{ view }}&amp;offset={{ offset|add:'-1' }}{{ cal_item_qs }}" class="cal-navbtn {% if at_min %}disabled{% endif %}" aria-label="{% trans 'Previous' %}">
         <span class="material-icons-outlined">chevron_left</span>
       </a>
-      <a href="?view={{ view }}&amp;offset={{ offset|add:'1' }}" class="cal-navbtn {% if at_max %}disabled{% endif %}" aria-label="{% trans 'Next' %}">
+      <a href="?view={{ view }}&amp;offset={{ offset|add:'1' }}{{ cal_item_qs }}" class="cal-navbtn {% if at_max %}disabled{% endif %}" aria-label="{% trans 'Next' %}">
         <span class="material-icons-outlined">chevron_right</span>
       </a>
       <h2 class="cal-period">{{ period_label }}</h2>
@@ -166,7 +184,7 @@
                   {% if day_meetings %}
                     <div class="flex flex-col gap-1 overflow-hidden">
                       {% for meeting in day_meetings|slice:":3" %}
-                        <a href="?{{ cal_qs }}item=meeting-{{ meeting.id }}"
+                        <a href="?{{ cal_qs }}item=meeting-{{ meeting.id }}" data-dp-open
                            class="m-pill {% if meeting.status == 1 %}m-completed{% elif meeting.status == 2 %}m-interrupted{% elif meeting.status == 3 %}m-missed{% else %}m-pending{% endif %}{% if panel_item.token == meeting.panel_token %} cal-ev-open{% endif %}{% if meeting.status == 4 %} cal-ev-off{% endif %}"
                            title="{{ meeting.scheduled_time|time:'H:i' }} · {{ meeting.patient.name }} {{ meeting.patient.lastname }} · {{ meeting.get_type_display }} ({{ meeting.get_status_display }})">
                           <span class="m-time">{{ meeting.scheduled_time|time:"H:i" }}</span>
@@ -206,7 +224,7 @@
             {% for c in row.cells %}
               <div class="cal-slot{% if ':30' in row.label %} half{% endif %}{% if c.is_today %} today{% endif %}" data-dt="{{ c.datetime }}" onclick="calOpen(this)">
                 {% for m in c.meetings %}
-                  <a href="?{{ cal_qs }}item=meeting-{{ m.id }}"
+                  <a href="?{{ cal_qs }}item=meeting-{{ m.id }}" data-dp-open
                      class="cal-chip {% if m.status == 1 %}is-completed{% elif m.status == 2 %}is-interrupted{% elif m.status == 3 %}is-missed{% else %}is-pending{% endif %}{% if panel_item.token == m.panel_token %} cal-ev-open{% endif %}{% if m.status == 4 %} cal-chip-off{% endif %}"
                      onclick="event.stopPropagation()"
                      title="{{ m.scheduled_time|time:'H:i' }} · {{ m.patient.name }} {{ m.patient.lastname }} · {{ m.get_type_display }} ({{ m.get_status_display }})">{{ m.scheduled_time|time:"H:i" }} {{ m.patient.name }}</a>
@@ -219,14 +237,14 @@
     {% endif %}
   </div>
 
-  {% if view != 'month' %}
   <div id="calModal" style="display:none;position:fixed;inset:0;z-index:50;background:rgba(15,23,42,.5);align-items:center;justify-content:center;padding:1rem;">
     <div class="cal-modal-card bg-white rounded-xl shadow-xl w-full max-w-md p-6">
       <div class="flex items-start gap-3 mb-5">
         <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">event</span>
         <div class="flex-1">
           <h3 class="text-lg font-semibold text-gray-800">{% trans "New meeting" %}</h3>
-          <p class="text-sm text-gray-500" id="calModalWhen">{% trans "Pick a client and meeting type." %}</p>
+          <p class="text-sm text-gray-500" id="calModalWhen"
+             data-prompt="{% trans 'Pick a time, a client and a meeting type.' %}">{% trans "Pick a time, a client and a meeting type." %}</p>
         </div>
         <button type="button" onclick="calClose()" class="text-gray-400 hover:text-gray-600"><span class="material-icons-outlined">close</span></button>
       </div>
@@ -241,6 +259,20 @@
         <div class="mb-3">
           <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.patient.label }}</label>
           {{ meeting_form.patient }}
+        </div>
+        {% comment %}
+          Modality is required by MeetingForm and was never rendered here, so
+          every booking made from this modal failed validation and returned a
+          redirect with nothing created. Location travels with it, shown only
+          for an in-person meeting.
+        {% endcomment %}
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.modality.label }}</label>
+          {{ meeting_form.modality }}
+        </div>
+        <div class="mb-3" id="calModalWhere" hidden>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.location.label }}</label>
+          {{ meeting_form.location }}
         </div>
         <div class="mb-3">
           <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.type.label }}</label>
@@ -259,7 +291,6 @@
       </form>
     </div>
   </div>
-  {% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -274,16 +305,35 @@
   }
   function calOpen(el){
     var m = document.getElementById('calModal');
-    var dt = el.getAttribute('data-dt');
+    if (!m) return;
+    // Called from a slot, which carries the time it represents, or from the
+    // header button, which carries none — then the field is left for the
+    // person to fill and the subtitle stays as the prompt.
+    var dt = el && el.getAttribute ? el.getAttribute('data-dt') : null;
     var i = m.querySelector('[name="scheduled_time"]');
-    if (i) { i.value = dt; }
+    if (i) { i.value = dt || ''; }
     var when = document.getElementById('calModalWhen');
-    if (when) { when.textContent = calFmt(dt); }
+    if (when) { when.textContent = dt ? calFmt(dt) : when.dataset.prompt; }
     m.style.display = 'flex';
-    var sel = m.querySelector('[name="patient"]');
-    if (sel) { setTimeout(function(){ sel.focus(); }, 30); }
+    var first = m.querySelector(dt ? '[name="patient"]' : '[name="scheduled_time"]');
+    if (first) { setTimeout(function(){ first.focus(); }, 30); }
   }
   function calClose(){ var m = document.getElementById('calModal'); if (m) m.style.display = 'none'; }
+  // Where only matters for an in-person meeting; asking for it on a phone call
+  // is a field nobody can fill.
+  (function () {
+    var m = document.getElementById('calModal');
+    if (!m) return;
+    var mod = m.querySelector('[name="modality"]');
+    var where = document.getElementById('calModalWhere');
+    if (!mod || !where) return;
+    var sync = function () {
+      var label = (mod.options[mod.selectedIndex] || {}).text || '';
+      where.hidden = !/person/i.test(label);
+    };
+    mod.addEventListener('change', sync);
+    sync();
+  })();
   (function(){
     var m = document.getElementById('calModal');
     if (m) { m.addEventListener('click', function(e){ if (e.target === this) calClose(); }); }

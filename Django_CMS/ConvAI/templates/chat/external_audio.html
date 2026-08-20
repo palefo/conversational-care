@@ -52,6 +52,16 @@
     #recordButton.pulsating {
       animation: pulsate 1s ease-in-out infinite;
     }
+    /* Recording still has to be unmistakable when the animation is gone, and a
+       button that only differs from idle while it moves is one a glance misses.
+       A ring holds the state in a still frame. */
+    @media (prefers-reduced-motion: reduce) {
+      #recordButton { transition: none; }
+      #recordButton.pulsating {
+        animation: none;
+        box-shadow: 0 0 0 5px rgba(229, 62, 62, .3);
+      }
+    }
     #overlay {
       position: absolute; inset: 0;
       background: rgba(0,0,0,0.2);

@@ -203,25 +203,17 @@ def alert_detail(request, pk: int):
             return _after_action(request, alert, default="alert_detail")
 
         if form_type == "note_update":
-            internal_note = (request.POST.get("internal_note") or "").strip()
-            data["internal_note"] = internal_note
-            data["internal_note_updated_at"] = timezone.now().isoformat()
-            data["internal_note_updated_by"] = request.user.get_username()
-
-            note_log = data.get("note_log", [])
-            if not isinstance(note_log, list):
-                note_log = []
-            if internal_note:
-                note_log.append({
-                    "note": internal_note,
-                    "at": timezone.now().isoformat(),
-                    "by": request.user.get_username(),
-                })
-                data["note_log"] = note_log[-25:]
-
-            alert.data = data
-            alert.save(update_fields=["data", "updated_at"])
-            messages.success(request, _("Internal note saved."))
+            # A note is a Note row, the same record the detail panel writes and
+            # reads. It used to be a single string overwritten inside the
+            # alert's JSON, with a parallel `note_log` list that nothing ever
+            # displayed — so a note written here was invisible in the panel, and
+            # the previous one was gone.
+            body = (request.POST.get("internal_note") or "").strip()
+            if body:
+                Note.objects.create(alert=alert, body=body, author=request.user)
+                messages.success(request, _("Note saved."))
+            else:
+                messages.warning(request, _("Write something first."))
             return redirect("alert_detail", pk=alert.pk)
 
     conversation_review_url = None
@@ -304,6 +296,10 @@ def alert_detail(request, pk: int):
         "conversation_review_url": conversation_review_url,
         "conversation_messages": conversation_messages,
         "conversation_id": conversation_id,
+        # The same rows the detail panel's Notes tab shows, so the two surfaces
+        # cannot disagree about what was written on an alert.
+        "notes_list": (Note.objects.filter(alert=alert)
+                       .select_related("author").order_by("-created_at")),
         "active_page": "alerts",
     })
 

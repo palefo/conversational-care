@@ -5,16 +5,21 @@ admins can edit in Settings → Prompts (falling back to the shipped defaults in
 ``default_prompts``). The model is the platform's configured default agent
 model, resolved through ``llm_factory.make_llm``.
 """
+import logging
 import os
 
 from django.utils import timezone
 
 from .default_prompts import (
     DEFAULT_MEETING_SUMMARY_PROMPT,
+    DEFAULT_TRANSCRIPT_MOMENTS_PROMPT,
     DEFAULT_TRANSCRIPT_SUMMARY_PROMPT,
 )
 from .models import Answer, Meeting, Protocol
 from .site_config import get_setting
+
+
+logger = logging.getLogger(__name__)
 
 
 def _run_llm(system_prompt: str, user_text: str) -> str:
@@ -98,10 +103,12 @@ def transcribe_recording(recording) -> str:
     path = recording.filename
     if not path or not os.path.exists(path):
         raise FileNotFoundError("Recording audio file not found on disk.")
-    transcript = (transcribe_audio(path) or "").strip()
+    transcript, segments = transcribe_audio(path, with_segments=True)
+    transcript = (transcript or "").strip()
     recording.transcript = transcript
+    recording.transcript_segments = segments
     recording.transcribed_at = timezone.now()
-    recording.save(update_fields=["transcript", "transcribed_at"])
+    recording.save(update_fields=["transcript", "transcript_segments", "transcribed_at"])
     return transcript
 
 
@@ -118,6 +125,52 @@ def summarize_transcript(recording) -> str:
     return summary
 
 
+def extract_moments(recording) -> list:
+    """Pull the moments worth jumping to out of an already-segmented transcript.
+
+    Each moment names a segment rather than writing its own timestamp. That is
+    the whole point: a model asked for "key moments" will cheerfully invent one,
+    and an invented moment has no segment to attach to, so it is dropped here
+    rather than appearing in a clinical record pointing at silence.
+    """
+    segments = recording.transcript_segments or []
+    if not segments:
+        recording.transcript_moments = []
+        recording.save(update_fields=["transcript_moments"])
+        return []
+
+    numbered = "\n".join(
+        f"{i}. {seg.get('text', '')}" for i, seg in enumerate(segments)
+    )
+    prompt = get_setting("TRANSCRIPT_MOMENTS_PROMPT") or DEFAULT_TRANSCRIPT_MOMENTS_PROMPT
+    raw = _run_llm(prompt, numbered) or ""
+
+    moments = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or "|" not in line:
+            continue
+        head, _, text = line.partition("|")
+        digits = "".join(ch for ch in head if ch.isdigit())
+        if not digits:
+            continue
+        index = int(digits)
+        if not (0 <= index < len(segments)):
+            continue  # a moment pointing at audio that is not there
+        text = text.strip()
+        if not text:
+            continue
+        moments.append({
+            "text": text,
+            "segment": index,
+            "start": segments[index].get("start", 0.0),
+        })
+
+    recording.transcript_moments = moments
+    recording.save(update_fields=["transcript_moments"])
+    return moments
+
+
 def transcribe_and_summarize_recording(recording):
     """Transcribe a recording, then post-process it into a summary.
 
@@ -125,4 +178,10 @@ def transcribe_and_summarize_recording(recording):
     """
     transcript = transcribe_recording(recording)
     summary = summarize_transcript(recording)
+    # Best-effort: a transcript and a summary are worth keeping even if the
+    # moments pass fails, so it must not take the other two down with it.
+    try:
+        extract_moments(recording)
+    except Exception:
+        logger.exception("Could not extract key moments for recording %s", recording.pk)
     return transcript, summary

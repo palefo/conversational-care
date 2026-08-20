@@ -63,8 +63,8 @@
   }
 
   .alert-status-button.is-current {
-    background: #0284c7;
-    border-color: #0284c7;
+    background: var(--brand-secondary);
+    border-color: var(--brand-secondary);
     color: white;
     box-shadow: 0 8px 16px rgba(14, 165, 233, 0.18);
   }
@@ -131,7 +131,7 @@
   }
 
   .feedback-progress span.is-active {
-    background: #0ea5e9;
+    background: var(--brand-primary);
   }
 
   .feedback-option-grid {
@@ -410,10 +410,16 @@
   <div id="action-feedback" class="hidden mt-4 p-3 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 text-sm font-medium"></div>
 </section>
 
-<!-- Internal note -->
+{% comment %}
+  Notes. Each one is a record with an author and a time, the same rows the
+  detail panel's Notes tab writes and reads — so a note added here is visible
+  there and the other way round. It used to be a single string inside the
+  alert's JSON blob, overwritten on every save: no author, no history, and
+  invisible to the panel.
+{% endcomment %}
 <section class="card p-6 mb-6">
-  <h2 class="text-xl font-semibold text-gray-800 mb-2">{% trans "Internal note" %}</h2>
-  <p class="text-sm text-gray-500 mb-4">{% trans "Add a note about what was reviewed, decided or escalated. This must be saved to the alert log, not just kept in the browser." %}</p>
+  <h2 class="text-xl font-semibold text-gray-800 mb-2">{% trans "Notes" %}</h2>
+  <p class="text-sm text-gray-500 mb-4">{% trans "Add a note about what was reviewed, decided or escalated. Notes are kept on the alert with your name and the time." %}</p>
 
   <form method="post">
     {% csrf_token %}
@@ -423,13 +429,26 @@
       name="internal_note"
       rows="4"
       class="w-full p-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500"
-      placeholder="{% trans 'Add a brief note about what action was taken...' %}"
-    >{% if alert.internal_note %}{{ alert.internal_note }}{% elif alert.note %}{{ alert.note }}{% elif alert.notes %}{{ alert.notes }}{% elif alert.data.internal_note %}{{ alert.data.internal_note }}{% elif alert.data.notes %}{{ alert.data.notes }}{% endif %}</textarea>
+      placeholder="{% trans 'Add a brief note about what action was taken...' %}"></textarea>
 
     <button type="submit" class="button-primary py-2 px-4 rounded-lg mt-3" id="save-note-button">
       {% trans "Save note" %}
     </button>
   </form>
+
+  {% if notes_list %}
+    <ul class="mt-6 space-y-4">
+      {% for note in notes_list %}
+        <li class="border-t border-slate-200 pt-4 first:border-t-0 first:pt-0">
+          <p class="text-sm text-gray-700 whitespace-pre-line">{{ note.body }}</p>
+          <p class="mt-1 text-xs text-gray-500">
+            {% if note.author %}{{ note.author.get_full_name|default:note.author.username }}{% else %}{% trans "Unknown" %}{% endif %}
+            · {{ note.created_at|date:"j M Y · H:i" }}
+          </p>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
 </section>
 
 <!-- Technical data -->

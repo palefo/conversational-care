@@ -305,7 +305,10 @@ def build_patient_events(patient, protocol_numbers=None):
             'transcribed': bool(rec.transcribed_at),
         }
 
-    meetings = list(patient.meetings.all())
+    # Annotated rather than counted per row: `has_notes` is read once for every
+    # meeting on the timeline, and a note is a row now, so asking per meeting
+    # would be one query each.
+    meetings = list(patient.meetings.annotate(note_count=Count('notes_list')))
     claimed = {}
     for rec in recordings:
         best, gap = None, None
@@ -332,7 +335,15 @@ def build_patient_events(patient, protocol_numbers=None):
         rec = claimed.get(mt.pk)
         events.append({
             'kind': 'meeting',
-            'ts': mt.scheduled_time,
+            # When it happened, not when it was booked. A call recorded from a
+            # diary entry days ahead used to land in Happened under a future
+            # date, which is a list of what has happened containing something
+            # that has not.
+            'ts': mt.happened_at,
+            'scheduled_ts': mt.scheduled_time,
+            # A call that went out and was never closed. Carried onto the row so
+            # it can be seen without opening it, and counted.
+            'outcome_missing': mt.retries > 0 and mt.status == Meeting.Status.PENDING,
             'pk': mt.pk,
             'panel_token': f'meeting-{mt.pk}',
             'patient': patient,
@@ -351,7 +362,7 @@ def build_patient_events(patient, protocol_numbers=None):
             ),
             'protocol_num': proto_num if proto_num in protocol_numbers else None,
             'protocol_summary': mt.protocol_summary,
-            'has_notes': bool(mt.notes),
+            'has_notes': bool(mt.note_count),
             'recording': _rec_dict(rec) if rec else None,
         })
 

@@ -438,6 +438,10 @@ def dashboard(request):
         'high_topics': high_topics,
         'next_meeting': next_row,
         'greeting': greeting,
+        # The date under the greeting. Formatted here rather than in the
+        # template so it follows the active locale like every other date on the
+        # page, instead of an English format baked into the markup.
+        'today_label': formats.date_format(now.date(), "l, j F Y"),
         'first_name': first_name,
         'query': query,
         'sort': sort,

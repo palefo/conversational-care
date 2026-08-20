@@ -57,3 +57,4 @@ Django_CMS/ConvAI/static/app/css/tailwind.css
 
 # Fixture dumps that have carried credentials in the past
 users.json
+STYLING.md

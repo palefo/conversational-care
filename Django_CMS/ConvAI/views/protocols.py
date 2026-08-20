@@ -1,4 +1,5 @@
 from ._base import *  # noqa: F401,F403
+from django.utils.http import url_has_allowed_host_and_scheme
 
 __all__ = ['_may_edit', 'protocol_create', 'protocol_delete', 'protocol_editor', 'protocol_editor_save', 'protocol_view', 'start_protocol_automation']
 
@@ -237,21 +238,39 @@ def start_protocol_automation(request, meeting_id, protocol_num):
 
     # Send via WhatsApp and persist ONLY the assistant reply
     to_e164 = str(caregiver.phone_number)
+
     sent_ok = send_whatsapp_text(to_e164, reply_text)
 
-    save_message(
-        phone=to_e164,
-        user_message="",
-        response_message=reply_text,
-        thread_id=new_thread_id,
-        patient=patient,
-    )
-
-    if sent_ok:
-        messages.success(request, _("Automation started."))
+    if not sent_ok:
+        # Nothing reached the caregiver, so nothing should behave as if it had.
+        # Left as it was, the client stayed switched to the protocol agent for
+        # the next three hours and the panel showed the protocol as out with
+        # them — over a question they were never asked. Their next message,
+        # about anything at all, would have been read as an answer to it.
+        end_automation(patient)
+        messages.warning(
+            request,
+            _("The message could not be sent, so %s was not asked anything.")
+            % caregiver.name,
+        )
     else:
-        messages.warning(request, _("Automation could not send the WhatsApp message."))
+        # Only what actually went out is written to the conversation.
+        save_message(
+            phone=to_e164,
+            user_message="",
+            response_message=reply_text,
+            thread_id=new_thread_id,
+            patient=patient,
+        )
+        messages.success(request, _("Sent to %s by text.") % caregiver.name)
 
+    # Back where it was pressed. Sending is now something you do from the panel
+    # while working the call, so landing on a page of its own afterwards loses
+    # the list, the filters and the panel underneath.
+    nxt = request.POST.get("next")
+    if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()},
+                                               require_https=request.is_secure()):
+        return redirect(nxt)
     return redirect("protocol_view", meeting_id=meeting.id, protocol_num=protocol.number)
 
 

@@ -106,12 +106,16 @@ def _save_answer(protocol_num: int, meeting_id: int, question_id: int, response:
     ans = Answer.objects.filter(meeting_id=meeting_id, question_id=question_id).first()
 
     if response:
+        # Written by the automation, so it is marked as having come back by text.
+        # A navigator editing it afterwards clears the mark — see protocol_view.
         if ans:
             ans.response = response
-            ans.save(update_fields=["response"])
+            ans.by_text = True
+            ans.save(update_fields=["response", "by_text"])
         else:
             Answer.objects.create(
-                meeting_id=meeting_id, question_id=question_id, response=response
+                meeting_id=meeting_id, question_id=question_id,
+                response=response, by_text=True,
             )
         return {"ok": True, "question_id": question_id, "saved": True}
 

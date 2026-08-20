@@ -101,6 +101,18 @@ class CallRecording(models.Model):
     transcript = models.TextField(blank=True, default="", help_text="Whisper transcription of the call audio")
     transcript_summary = models.TextField(blank=True, default="", help_text="LLM summary of the transcript")
     transcribed_at = models.DateTimeField(null=True, blank=True)
+    # Whisper returns every segment with a start and an end; the plain text
+    # above threw them away. Kept as [{"start": 12.4, "end": 18.1, "text": "…",
+    # "speaker": 1|2|null}] so the panel can run a timestamp down the side and
+    # jump the player to a line. `speaker` is only filled when the recording
+    # has two channels to tell the parties apart — see utils.transcribe_audio.
+    transcript_segments = models.JSONField(blank=True, default=list,
+                                           help_text="Whisper segments: start, end, text, speaker")
+    # Moments worth jumping to, each anchored to a segment rather than to a
+    # timestamp the model wrote itself, so a moment cannot point at audio that
+    # is not there. [{"text": "…", "segment": 4, "start": 132.0}]
+    transcript_moments = models.JSONField(blank=True, default=list,
+                                          help_text="Key moments, each anchored to a segment")
 
 
 class Caregiver(models.Model):
@@ -314,6 +326,11 @@ class Meeting(models.Model):
 
     cancel_reason = models.CharField(max_length=200, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    # When someone recorded how the call went. Distinct from scheduled_time,
+    # which is when it was meant to happen: a call recorded late — or early,
+    # from a diary entry days ahead — would otherwise sit in Happened under a
+    # date it did not happen on, sometimes one still in the future.
+    ended_at = models.DateTimeField(null=True, blank=True)
 
     class Modality(models.IntegerChoices):
         """How the meeting happens.
@@ -398,11 +415,19 @@ class Meeting(models.Model):
     protocol_summary = models.TextField(blank=True, default="", help_text="LLM summary of this meeting's protocol answers")
     protocol_summarized_at = models.DateTimeField(null=True, blank=True)
 
-    # Free-text notes taken during the call. Deliberately separate from the
-    # protocol answers: not everything worth recording belongs to a question,
-    # and protocol_summary above is written by the LLM, not by a person.
-    notes = models.TextField(blank=True, default="", help_text="Navigator's own notes for this call")
-    notes_updated_at = models.DateTimeField(null=True, blank=True)
+    # Free-text notes are Note rows (see the Note model), not a field here. The
+    # single overwritten blob that used to live at Meeting.notes was migrated
+    # away in 0067 and the columns dropped in 0072.
+
+    @property
+    def happened_at(self):
+        """When this meeting actually became a past event.
+
+        Lists of what has happened order and date themselves by this. The panel
+        still shows scheduled_time, because when it was meant to be is a
+        different fact and worth keeping.
+        """
+        return self.ended_at or self.cancelled_at or self.scheduled_time
 
     @property
     def panel_token(self):
@@ -456,6 +481,13 @@ class Answer(models.Model):
     One answer per (meeting, question) pair.
     Blank answers are not stored (view logic deletes row if left empty).
     """
+    # Whether the caregiver texted this back or a navigator typed it. The panel
+    # tints the two differently: on a call half answered by text, whose words
+    # these are changes what you do with them.
+    by_text = models.BooleanField(
+        default=False,
+        help_text="True when the protocol_qa automation captured this from a message",
+    )
     meeting  = models.ForeignKey(
         "Meeting", related_name="answers", on_delete=models.CASCADE
     )
@@ -780,6 +812,7 @@ class SiteConfiguration(models.Model):
     # Blank falls back to the shipped defaults in ConvAI.default_prompts.
     meeting_summary_prompt = models.TextField(blank=True, default="", help_text="Base prompt for summarizing a meeting's protocol answers")
     transcript_summary_prompt = models.TextField(blank=True, default="", help_text="Base prompt for summarizing a call transcript")
+    transcript_moments_prompt = models.TextField(blank=True, default="", help_text="Base prompt for pulling key moments out of a call transcript")
 
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -853,3 +886,70 @@ class SeenMark(models.Model):
             cls.objects.filter(user=user, token__in=list(tokens))
             .values_list("token", flat=True)
         )
+
+
+class Note(models.Model):
+    """Something a person wrote about one call, meeting, alert or conversation.
+
+    Before this there was a single ``Meeting.notes`` text field, overwritten on
+    every save: no author, no time, one note per meeting and none at all for the
+    other three kinds. A note is a small record with a person attached, so it is
+    a row.
+
+    The parent is an explicit nullable FK per kind rather than a generic
+    relation. It is more columns, but the queries stay simple, the database
+    keeps the integrity, and permission checks can follow the parent object
+    through code that already knows how to authorise it.
+    """
+
+    body = models.TextField()
+    author = models.ForeignKey(
+        'ConvAIUser', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="notes_written",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    meeting = models.ForeignKey(
+        Meeting, null=True, blank=True, on_delete=models.CASCADE, related_name="notes_list")
+    recording = models.ForeignKey(
+        CallRecording, null=True, blank=True, on_delete=models.CASCADE, related_name="notes_list")
+    alert = models.ForeignKey(
+        Alert, null=True, blank=True, on_delete=models.CASCADE, related_name="notes_list")
+    conversation = models.ForeignKey(
+        Conversation, null=True, blank=True, on_delete=models.CASCADE, related_name="notes_list")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Note {self.pk} by {self.author or 'unknown'}"
+
+    @property
+    def parent(self):
+        return self.meeting or self.recording or self.alert or self.conversation
+
+    @property
+    def patient(self):
+        """The client a note belongs to, whichever kind it hangs off.
+
+        Permissions are decided per client, so every note has to be able to name
+        one without the caller knowing which parent it has.
+        """
+        parent = self.parent
+        if parent is None:
+            return None
+        if isinstance(parent, CallRecording):
+            # A recording carries phone numbers rather than a client FK, so it
+            # is matched the same way views/summaries.py matches it.
+            nums = {str(parent.to_number or ""), str(parent.from_number or "")}
+            nums.discard("")
+            if not nums:
+                return None
+            return Patient.objects.filter(
+                models.Q(phone_number__in=nums) | models.Q(caregiver__phone_number__in=nums)
+            ).first()
+        return getattr(parent, "patient", None)

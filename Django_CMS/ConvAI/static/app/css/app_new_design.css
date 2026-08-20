@@ -1,3 +1,64 @@
+/* ── Fonts, served from here ───────────────────────────────────────────────
+   These used to come from fonts.googleapis.com as two render-blocking
+   stylesheets, which meant every page in the app waited on two round-trips to
+   Google before it could paint anything. That is what made navigation feel
+   heavy, and what turned a view transition into a stall: the browser holds the
+   outgoing page until the incoming one is ready, and "ready" included those
+   requests.
+
+   DM Sans ships as a variable font, so the four weights the app asks for are
+   one file per subset rather than eight. Ranges are Google's own, so the
+   browser still only fetches latin-ext when a page actually contains those
+   characters. */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 100 1000;
+  font-display: swap;
+  src: url(../fonts/dm-sans-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+                 U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF,
+                 U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 100 1000;
+  font-display: swap;
+  src: url(../fonts/dm-sans-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                 U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* The icon font came with its own class from Google's stylesheet; dropping the
+   stylesheet means bringing the class with it, or every icon in the app renders
+   as its ligature text ("home", "settings"). `liga` is what turns that text
+   into the glyph. */
+@font-face {
+  font-family: 'Material Icons Outlined';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url(../fonts/material-icons-outlined.woff2) format('woff2');
+}
+.material-icons-outlined {
+  font-family: 'Material Icons Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+
 /* Base styles */
 body {
   font-family: 'DM Sans', sans-serif;
@@ -7,7 +68,7 @@ body {
 /* Sidebar */
 .sidebar {
   background-color: #e0f2fe;
-  transition: width 0.2s ease;
+  transition: width .22s cubic-bezier(.2, .8, .3, 1);
 }
 .sidebar-item.active {
   background-color: #bae6fd;
@@ -22,25 +83,73 @@ body {
 .sidebar-toggle {
   flex: 0 0 auto;
 }
+
+/* Which chevron shows is decided by the rail's own class, not by script, so the
+   correct one is painted on the first frame — the collapsed state is restored
+   during parse, and an icon that corrected itself afterwards would flicker.
+   Both glyphs ship in the local icon font (checked). */
+.sidebar-toggle .sb-ico-expand { display: none; }
+.sidebar.collapsed .sidebar-toggle .sb-ico-collapse { display: none; }
+.sidebar.collapsed .sidebar-toggle .sb-ico-expand { display: inline-block; }
 .sidebar.collapsed {
   width: 5rem;
 }
 .sidebar.collapsed .sidebar-header {
   justify-content: center;
 }
+
+/* The rail folds; it does not re-render.
+   These used to be `display: none`, which took every label, badge and the logo
+   out in one frame while the rail spent 200ms sliding shut. The text vanished,
+   and only then did the panel move — which reads as the page having been
+   rebuilt rather than as one thing folding away. Collapsing the space they
+   occupy on the same curve as the rail keeps it a single movement.
+
+   max-width rather than width: these are flex items whose width is their text,
+   and there is no fixed number to animate to. Opacity leads slightly, so the
+   words are gone before the gap finishes closing rather than being squeezed
+   illegibly thin on the way out. */
+.sidebar-logo,
+.sidebar-label,
+.sidebar-badge,
+.sidebar-caret {
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity .12s ease,
+              max-width .22s cubic-bezier(.2, .8, .3, 1),
+              margin .22s cubic-bezier(.2, .8, .3, 1);
+}
+.sidebar-logo, .sidebar-label { max-width: 12rem; }
+.sidebar-badge, .sidebar-caret { max-width: 3rem; }
+
 .sidebar.collapsed .sidebar-logo,
 .sidebar.collapsed .sidebar-label,
 .sidebar.collapsed .sidebar-badge,
 .sidebar.collapsed .sidebar-caret {
-  display: none;
+  max-width: 0;
+  opacity: 0;
+  margin-left: 0;
+  margin-right: 0;
 }
+
 .sidebar.collapsed .sidebar-item {
   justify-content: center;
   padding-left: 0;
   padding-right: 0;
 }
+/* The gap the icon keeps for its label closes with the label, not before it. */
+.sidebar-item .material-icons-outlined {
+  transition: margin-right .22s cubic-bezier(.2, .8, .3, 1);
+}
 .sidebar.collapsed .sidebar-item .material-icons-outlined {
   margin-right: 0 !important;
+}
+
+/* The fold is travel, so under reduced motion it simply happens. */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebar-logo, .sidebar-label, .sidebar-badge, .sidebar-caret,
+  .sidebar-item .material-icons-outlined { transition: none; }
 }
 
 /* Card */
@@ -54,11 +163,11 @@ body {
 
 /* Primary button */
 .button-primary {
-  background-color: #0ea5e9;
+  background-color: var(--brand-primary);
   color: white;
 }
 .button-primary:hover {
-  background-color: #0284c7;
+  background-color: var(--brand-secondary);
 }
 
 /* Secondary button */
@@ -115,7 +224,7 @@ body {
 }
 .calendar-day.today {
   background-color: #bfdbfe;
-  border: 2px solid #3b82f6;
+  border: 2px solid var(--brand-primary);
 }
 .calendar-day.empty {
   background-color: #f9fafb;
@@ -175,33 +284,68 @@ body {
     }
 
     /* ——— Chatbot Bubble ——— */
+/* Scale is a registered custom property so it can be transitioned on its own.
+   Position and scale share one `transform`, and the drag writes position every
+   frame — so a plain `transition: transform` would drag the pointer tracking
+   through the easing as well, which is the one thing a 1:1 gesture cannot have.
+   Splitting them lets the press and hover keep their easing while the drag
+   stays glued to the finger. Without @property the scale still changes, it just
+   changes in one step; the feedback survives, only its softness is lost. */
+@property --cb-scale {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
 #chatbot-bubble {
   position: fixed;
-  /* initial corner placement */
+  /* The resting corner, and the anchor the drag measures from: --cb-x/--cb-y
+     are offsets from here, so the bubble follows the corner when the window is
+     resized without anything having to recompute it. Keeping the rest position
+     in CSS also means there is no first-paint jump before the script runs. */
   bottom: 1rem;
   right: 1rem;
-  /* allow JS to take over left/top once dragged */
   left: auto;
   top: auto;
+  --cb-x: 0px;
+  --cb-y: 0px;
   width: 3.5rem;
   height: 3.5rem;
-  background-color: #0ea5e9;
+  background-color: var(--brand-primary);
   color: white;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: grab;
-  touch-action: none;              /* prevent text selection while dragging */
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-  transition: transform 0.2s ease;
+  touch-action: none;              /* the gesture is ours, not the page's */
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, .2);
+  transform: translate3d(var(--cb-x), var(--cb-y), 0) scale(var(--cb-scale));
+  transition: --cb-scale 120ms ease-out, box-shadow 160ms ease-out;
   z-index: 1001;
 }
-#chatbot-bubble:hover {
-  transform: scale(1.1);
+#chatbot-bubble:hover { --cb-scale: 1.06; }
+#chatbot-bubble:focus-visible {
+  outline: 2px solid var(--brand-secondary);
+  outline-offset: 3px;
 }
-#chatbot-bubble:active {
+/* Feedback on the press, like every other control in the app. */
+#chatbot-bubble:active { --cb-scale: .97; }
+/* Then it lifts as you carry it — the press gives, the drag picks up. Declared
+   after :active on purpose: same specificity, and this is the state that wins
+   once the drag has actually committed. */
+#chatbot-bubble.is-dragging,
+#chatbot-bubble.is-settling {
+  --cb-scale: 1.04;
   cursor: grabbing;
+  box-shadow: 0 12px 22px rgba(0, 0, 0, .26);
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  #chatbot-bubble { transition: none; }
+  #chatbot-bubble:hover { --cb-scale: 1; }
 }
 
 /* ——— Chatbot Window ——— */
@@ -228,10 +372,18 @@ body {
   transform: translateY(1rem) scale(0.95);
   pointer-events: none;
 }
+/* The window belongs to the bubble that opened it, so it grows out of it rather
+   than out of its own middle. The script sets transform-origin to wherever the
+   bubble is sitting at the time — which, since the bubble can be dragged
+   anywhere, is not a value that can be written here. */
+@media (prefers-reduced-motion: reduce) {
+  #chatbot-window { transition: opacity 160ms ease; }
+  #chatbot-window.hidden { transform: none; }
+}
 
 /* ——— Header ——— */
 .chatbot-header {
-  background-color: #0ea5e9;
+  background-color: var(--brand-primary);
   color: white;
   padding: 0.75rem 1rem;
   display: flex;
@@ -263,7 +415,7 @@ body {
   word-wrap: break-word;
 }
 .message.user {
-  background-color: #0ea5e9;
+  background-color: var(--brand-primary);
   color: white;
   align-self: flex-end;
 }
@@ -288,11 +440,11 @@ body {
 }
 .chatbot-input input:focus {
   outline: none;
-  border-color: #0ea5e9;
-  box-shadow: 0 0 0 2px rgba(14,165,233,0.2);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 2px rgba(3,105,161,.2);
 }
 .chatbot-input button {
-  background-color: #0ea5e9;
+  background-color: var(--brand-primary);
   color: white;
   border: none;
   padding: 0 0.75rem;
@@ -300,7 +452,7 @@ body {
   cursor: pointer;
 }
 .chatbot-input button:hover {
-  background-color: #0284c7;
+  background-color: var(--brand-secondary);
 }
 /* Chat bubbles */
 .chat-bubble {
@@ -310,7 +462,7 @@ body {
   word-wrap: break-word;
 }
 .user-bubble {
-  background-color: #0ea5e9;
+  background-color: var(--brand-primary);
   color: white;
   border-bottom-right-radius: 0;
 }
@@ -333,7 +485,7 @@ body {
   flex-shrink: 0;
 }
 .user-avatar {
-  background-color: #0ea5e9;
+  background-color: var(--brand-primary);
 }
 .chatbot-avatar {
   background-color: #64748b;
@@ -351,18 +503,34 @@ body {
   margin-right: 0.5rem;
 }
 .feedback-icon:hover {
-  color: #0ea5e9;
+  color: var(--brand-primary);
 }
 .feedback-icon.active {
-  color: #0ea5e9;
+  color: var(--brand-primary);
 }
 .feedback-icon.warning.active {
   color: #dc2626;
 }
 /* ───────── CSS Variables (shared colour palette) ───────── */
 :root{
-  --brand-primary:   #0ea5e9;   /* sky-500  */
-  --brand-secondary: #0284c7;   /* sky-600  */
+  /* The product runs two palettes on purpose, split by audience, not by
+     accident:
+
+       teal #006877 — the surfaces a client or the public sees: the login page
+                      (vars.css / login.css) and the client-facing chat and
+                      voice pages, which set it locally as --wa-header and
+                      --rtc-header.
+       blue         — everything a care team sees, which is this file.
+
+     Inside the staff app there was no such reason for two. The redesign work
+     (panel, communications, call bar, toasts) settled on #0369a1 while the
+     older chrome stayed on sky-500, so one screen carried both. #0369a1 wins
+     the merge: it is what the newest work already uses, and it clears 4.5:1 on
+     white where sky-500 reaches about 2.7:1 — which is why every piece of small
+     text in here already had to reach for a darker blue of its own. The
+     sky-50/100/200 tints are the same hue family and stay as they are. */
+  --brand-primary:   #0369a1;   /* sky-700 — 5.7:1 on white */
+  --brand-secondary: #075985;   /* sky-800 — hover / pressed */
   --brand-light:     #f0f9ff;   /* sky-50   */
   --surface-background:#f8fafc; /* slate-50 */
   --card-background: #ffffff;
@@ -453,8 +621,8 @@ body {
 }
 .form-section:focus-within{
   border-color:var(--brand-primary);
-  box-shadow:0 0 0 3px rgba(14,165,233,.2),
-             0 4px 12px rgba(14,165,233,.1);
+  box-shadow:0 0 0 3px rgba(3,105,161,.2),
+             0 4px 12px rgba(3,105,161,.1);
 }
 
 /* prompts & markdown */
@@ -489,7 +657,7 @@ body {
 .form-section textarea:focus{
   background:#fff;
   border-color:var(--brand-primary);
-  box-shadow:0 0 0 2px rgba(14,165,233,.2);
+  box-shadow:0 0 0 2px rgba(3,105,161,.2);
   outline:none;
 }
 
@@ -510,16 +678,17 @@ body {
   margin-bottom: .75rem;
 }
 
-/* mobile-first sizes */
-.markdown-content h1 { font-size: 1.5rem; }   /* ≈ 24 px */
-.markdown-content h2 { font-size: 1.375rem; } /* ≈ 22 px */
-.markdown-content h3 { font-size: 1.25rem; }  /* ≈ 20 px */
+/* mobile-first sizes. Tracking tightens with size for the same reason the
+   page titles do; h3 is close enough to body text to leave alone. */
+.markdown-content h1 { font-size: 1.5rem;   letter-spacing: -.02em;  line-height: 1.2; }
+.markdown-content h2 { font-size: 1.375rem; letter-spacing: -.015em; }
+.markdown-content h3 { font-size: 1.25rem;  letter-spacing: -.01em;  }
 
 /* bump sizes on ≥ 640 px screens */
 @media (min-width: 640px) {
-  .markdown-content h1 { font-size: 1.875rem; }  /* ≈ 30 px */
-  .markdown-content h2 { font-size: 1.5rem;   }  /* ≈ 24 px */
-  .markdown-content h3 { font-size: 1.375rem; }  /* ≈ 22 px */
+  .markdown-content h1 { font-size: 1.875rem; letter-spacing: -.025em; line-height: 1.15; }
+  .markdown-content h2 { font-size: 1.5rem;   letter-spacing: -.02em;  }
+  .markdown-content h3 { font-size: 1.375rem; letter-spacing: -.015em; }
 }
 
 /* ─── External Chat ─── */
@@ -537,7 +706,7 @@ body {
 }
 
 .chat-header {
-  background: linear-gradient(135deg, var(--primary-start,#4f46e5) 0%, var(--primary-end,#3b82f6) 100%);
+  background: linear-gradient(135deg, var(--primary-start,#0369a1) 0%, var(--primary-end,#075985) 100%);
   color: white;
   padding: 1.5rem;
   display: flex;
@@ -562,21 +731,34 @@ body {
   background-color: transparent;
 }
 
+/* NOTE: `.message` is also what the floating assistant builds its rows from
+   (chatbot.html: `d.className = 'message ' + cls`), so this rule is live even
+   though the rest of this external-chat block is not rendered by any template.
+   Declared visible, with the animation supplying the arrival — the old
+   `opacity: 0` + `forwards` pairing meant anything that suppressed animations
+   left the conversation blank. */
 .message {
   display: flex;
   align-items: flex-end;
   gap: 0.75rem;
   max-width: 80%;
-  opacity: 0;
-  transform: translateY(20px);
-  animation: fadeIn 0.5s ease-out forwards;
+  animation: fadeIn 0.5s ease-out both;
 }
 
 @keyframes fadeIn {
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  from {
+    opacity: 0;
+    transform: translateY(20px);
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The travel goes, the arrival stays. */
+  .message { animation-name: fadeInSoft; }
+  @keyframes fadeInSoft { from { opacity: 0; } }
+  /* The typing dots are inside a bubble that is itself the "composing" signal,
+     so stopping them loses nothing a still frame needed. */
+  .typing-indicator span { animation: none; transform: scale(1); opacity: .55; }
 }
 
 .message.user {
@@ -597,11 +779,11 @@ body {
 }
 
 .bot-avatar {
-  background-color: var(--primary-end,#3b82f6);
+  background-color: var(--primary-end,#075985);
 }
 
 .user-avatar {
-  background-color: var(--primary-start,#4f46e5);
+  background-color: var(--primary-start,#0369a1);
 }
 
 .message-bubble {
@@ -618,7 +800,7 @@ body {
 }
 
 .message.user .message-bubble {
-  background: linear-gradient(135deg, var(--primary-start,#4f46e5) 0%, var(--primary-end,#3b82f6) 100%);
+  background: linear-gradient(135deg, var(--primary-start,#0369a1) 0%, var(--primary-end,#075985) 100%);
   color: white;
   border-bottom-right-radius: 0.3125rem;
 }
@@ -665,7 +847,7 @@ body {
 
 .input-wrapper:focus-within {
   box-shadow: 0 0 0 3px var(--input-focus-ring,rgba(79,70,229,0.4));
-  border-color: var(--primary-start,#4f46e5);
+  border-color: var(--primary-start,#0369a1);
 }
 
 .input-wrapper input {
@@ -685,7 +867,7 @@ body {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary-start,#4f46e5) 0%, var(--primary-end,#3b82f6) 100%);
+  background: linear-gradient(135deg, var(--primary-start,#0369a1) 0%, var(--primary-end,#075985) 100%);
   color: white;
   display: flex;
   align-items: center;
@@ -753,8 +935,8 @@ body {
 .chat-messages .message.user .message-bubble {
   background: linear-gradient(
                135deg,
-               var(--primary-start,#4f46e5) 0%,
-               var(--primary-end,#3b82f6)   100%
+               var(--primary-start,#0369a1) 0%,
+               var(--primary-end,#075985)   100%
              ) !important;
   color:      white !important;
 }
@@ -857,6 +1039,92 @@ body .chat-input {
    truncating its own row summaries. */
 body > main { min-width: 0; }
 
+/* ── The panel arriving ──────────────────────────────────────────────────
+   Two different arrivals, because two different things are arriving.
+
+   Opening from nothing: the column itself is new, so it comes in from the edge
+   it lives on — the same edge it will be dismissed to.
+
+   Swapping between items: the column is already there and does not move. Only
+   what is inside it changed, so only that arrives. Sliding the whole panel here
+   would claim a movement that did not happen.
+
+   Opacity alone on the swap, deliberately. `position: sticky` on the open
+   protocol's header is load-bearing in a call panel, and a transform on any
+   ancestor gives it a new containing block and silently breaks it — the same
+   trap the card's missing overflow:hidden avoids further down. Opacity makes a
+   stacking context, which sticky does not mind.
+
+   Both classes are removed once they have played (base.html), so returning to a
+   panel never replays its arrival and no transform outlives its animation. */
+/* ── Moving between pages ──────────────────────────────────────────────────
+   Every tab, chip, filter and menu item here is a real link, so each click
+   tears the document down and paints the next from blank. That blank frame is
+   the flash between Happened and Coming up, and it is why the detail panel
+   looked like it disappeared on a tab switch — the same panel is on both
+   pages, but you watch the whole screen go and come back.
+
+   A cross-document view transition holds the outgoing frame and dissolves it
+   into the incoming one. The catch, learned the hard way: it holds that frame
+   until the new document is READY TO PAINT. While the fonts came from Google
+   that included two third-party round-trips, so the transition turned a short
+   flash into a long freeze. It is only worth having now that nothing
+   render-blocking is left in <head> — see the font faces at the top of this
+   file. If navigation ever starts feeling held again, look there first.
+
+   Root-only on purpose. Naming individual elements would let them be matched
+   and morphed separately, but `view-transition-name` also makes an element
+   capture its own containing block, and this panel's sticky footer and drag
+   handle are exactly the kind of thing that breaks under that. Anything on
+   both sides cross-fades into itself and so appears to stay put, which is all
+   the panel needs.
+
+   Browsers without support navigate exactly as they do today. */
+@view-transition { navigation: auto; }
+
+/* Short enough to read as the page updating, not as a slideshow. */
+::view-transition-group(root) { animation-duration: .15s; }
+
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+}
+
+.dp-enter { animation: dp-enter .26s cubic-bezier(.2, .8, .3, 1) both; }
+@keyframes dp-enter { from { opacity: 0; transform: translateX(14px); } }
+
+/* Out the way it came in, on the entry curve inverted — the pairing the call
+   strip uses. Kept quicker than the arrival: opening reveals something and can
+   afford a beat, closing is "get this out of my way" and should not be made to
+   wait. The column holds its width until the animation ends, so the list
+   reclaims the space in one step rather than sliding under the cursor. */
+.dp-exit { animation: dp-exit .18s cubic-bezier(.7, 0, .8, .2) forwards; }
+@keyframes dp-exit { to { opacity: 0; transform: translateX(14px); } }
+
+.dp-swap > * { animation: ui-arrive .22s ease-out both; }
+
+/* ── Content arriving in place ───────────────────────────────────────────
+   One device, for a container that does not itself move: a tab panel, an
+   accordion body, the detail panel between items. The box settles instantly —
+   which is what keeps the scroll-anchoring around it honest, since that maths
+   measures the change the moment it happens — and what is inside it arrives.
+
+   Opacity only, and deliberately. `position: sticky` is load-bearing in three
+   places under these containers (the day headers in Communications, the open
+   protocol's header in a call panel), and a transform on any ancestor gives it
+   a new containing block and silently breaks it. Opacity makes a stacking
+   context, which sticky does not mind. */
+.ui-arrive { animation: ui-arrive .2s ease-out both; }
+@keyframes ui-arrive { from { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The travel goes; the arrival stays, because something still has to mark
+     that what you are looking at has changed. */
+  .dp-enter { animation: ui-arrive .16s ease both; }
+  .dp-exit { animation: dp-fade-out .12s ease forwards; }
+  @keyframes dp-fade-out { to { opacity: 0; } }
+  .dp-swap > *, .ui-arrive { animation-duration: .12s; }
+}
+
 /* Drag handle. Sits between <main> and .dp, so it only exists when a panel
    does. Keyboard-operable: it is a real separator, not a decorative bar. */
 .dp-grip {
@@ -879,22 +1147,48 @@ body > main { min-width: 0; }
    the pointer happens to be over the 9px handle. */
 body.dp-resizing { cursor: col-resize; user-select: none; }
 
+/* Only for the moment after a rubber-banded drag is released — never during
+   one, where it would put the panel edge behind the pointer. base.html adds the
+   class only when the release is actually out of bounds, and takes it off once
+   the return has played. */
+body.dp-settling .dp {
+  transition: flex-basis .18s cubic-bezier(.2, .8, .3, 1),
+              width      .18s cubic-bezier(.2, .8, .3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  body.dp-settling .dp { transition: none; }
+}
+
 .dp-head { display: flex; align-items: flex-start; gap: .5rem; margin-bottom: .6rem; }
 .dp-kick {
   font-size: .59375rem; letter-spacing: .07em; text-transform: uppercase;
-  font-weight: 700; color: #0284c7;
+  font-weight: 700; color: var(--brand-secondary);
 }
 .dp-kick-crit { color: #b91c1c; }
 .dp-kick-warn { color: #b45309; }
 .dp-title { font-size: .875rem; font-weight: 700; color: #1e293b; margin: .06rem 0 0; line-height: 1.35; }
 .dp-meta { font-size: .6875rem; color: #64748b; margin-top: .05rem; }
+/* The dated facts Rongqi kept at the top of her sidebars, made identical on
+   every kind of panel: label, colon, value, wrapping as the panel narrows. */
+.dp-facts { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 8px; }
+.dp-facts > div { font-size: .6875rem; color: #64748b; }
+.dp-facts b { color: #334155; font-weight: 600; }
+.dp-facts b::after { content: ":"; }
 .dp-close {
   margin-left: auto; color: #94a3b8; font-size: .9375rem; line-height: 1;
   padding: .1rem .25rem; text-decoration: none;
 }
 .dp-close:hover { color: #0f172a; }
 
-.dp-player { display: block; width: 100%; height: 34px; margin-bottom: .6rem; }
+.dp-player { display: block; width: 100%; height: 34px; }
+/* The recording sits between the header and the tabs rather than inside one of
+   them, so it stays reachable whichever tab you are reading. Pinned for the
+   same reason the header and the actions are. */
+.dpc-ctl {
+  flex: 0 0 auto; padding: 9px 16px;
+  border-bottom: 1px solid #e2e8f0; background: #fbfdff;
+}
+.dpc-ctl .dpc-attach { margin-top: .25rem; }
 /* Tabs, ported from the panel prototype. Pinned between the header and the
    scrolling body — the point of them is that the header above and the actions
    below never move, so they cannot live inside the part that scrolls.
@@ -911,7 +1205,7 @@ body.dp-resizing { cursor: col-resize; user-select: none; }
 }
 .dp-tabs::-webkit-scrollbar { display: none; }
 .dp-tab {
-  font: inherit; font-size: 12px; font-weight: 600; color: #64748b;
+  font: inherit; font-size: 0.75rem; font-weight: 600; color: #64748b;
   background: none; border: 0; border-bottom: 2px solid transparent;
   padding: 7px 9px; margin-bottom: -1px;
   cursor: pointer; white-space: nowrap;
@@ -921,46 +1215,152 @@ body.dp-resizing { cursor: col-resize; user-select: none; }
 .dp-tab.on { color: #0369a1; border-bottom-color: #0369a1; font-weight: 700; }
 /* Same count pill as the section badges and the filter chips. */
 .dp-tab-n {
-  font-size: 10px; font-weight: 700; background: #f1f5f9; color: #64748b;
+  font-size: 0.625rem; font-weight: 700; background: #f1f5f9; color: #64748b;
   border-radius: 9999px; padding: 1px 7px;
 }
 .dp-tab.on .dp-tab-n { background: #e0f2fe; color: #0369a1; }
 
+/* The overview callout, taken from Rongqi's sidebars. Violet rather than the
+   product blue on purpose: everything else in the panel is something a person
+   wrote or answered, and this one block is written by the model. It is the only
+   place the palette breaks, which is what makes the break mean something.
+
+   The mark is set through the icon font already loaded in base.html, from CSS
+   rather than markup, so every template that renders .dp-ov gets it without
+   being touched. */
 .dp-ov {
-  background: #f0f9ff; border-left: 3px solid #0ea5e9;
-  border-radius: 0 .45rem .45rem 0; padding: .5rem .625rem; margin-bottom: .55rem;
+  display: grid; grid-template-columns: 28px minmax(0, 1fr);
+  gap: 2px 10px; align-items: start;
+  background: #f8f7ff; border: 1px solid #dddafe; border-left: 3px solid #6863ee;
+  border-radius: 0 .45rem .45rem 0; padding: .625rem .7rem; margin-bottom: .55rem;
+}
+.dp-ov::before {
+  content: "auto_awesome"; font-family: "Material Icons Outlined";
+  grid-column: 1; grid-row: 1 / span 2;
+  display: grid; place-items: center; width: 28px; height: 28px;
+  border-radius: .4rem; background: #ecebff; color: #6863ee;
+  font-size: 17px; line-height: 1;
 }
 .dp-ov-h {
+  grid-column: 2;
   font-size: .59375rem; font-weight: 700; letter-spacing: .06em;
-  text-transform: uppercase; color: #0369a1;
+  text-transform: uppercase; color: #615bdc;
 }
-.dp-ov-t { font-size: .71875rem; color: #334155; line-height: 1.45; margin-top: .1rem; white-space: pre-line; }
+.dp-ov-t {
+  grid-column: 2;
+  font-size: .71875rem; color: #354c63; line-height: 1.5;
+  margin-top: .1rem; white-space: pre-line;
+}
 
+/* Beats are rows on hairlines rather than boxes: the number sits in a small
+   gutter and the stamp closes the row, which is the same left-gutter /
+   right-marker rhythm the transcript uses, so the two lists in a panel read as
+   one family. A bordered card per beat put three borders where one rule does
+   the same work. */
 .dp-pt {
-  display: flex; gap: .45rem; align-items: flex-start;
-  border: 1px solid #eef2f7; border-radius: .45rem;
-  padding: .375rem .5rem; margin-bottom: .25rem;
-  font-size: .71875rem; line-height: 1.4;
+  display: flex; gap: .5rem; align-items: baseline;
+  border: 0; border-top: 1px solid #f1f5f9; border-radius: 0;
+  padding: .4375rem 0; margin: 0;
+  font-size: .71875rem; line-height: 1.45;
 }
+.dp-pt:first-of-type { border-top: 0; padding-top: .25rem; }
 .dp-ptn {
-  flex: 0 0 auto; width: .9375rem; height: .9375rem; border-radius: .25rem;
-  background: #e0f2fe; color: #0369a1; font-size: .59375rem; font-weight: 700;
-  display: flex; align-items: center; justify-content: center; margin-top: .06rem;
+  flex: 0 0 auto; width: 14px; color: #94a3b8;
+  font-size: .625rem; font-weight: 600; font-variant-numeric: tabular-nums;
 }
 .dp-ptt { flex: 1; min-width: 0; color: #334155; overflow-wrap: anywhere; }
+/* A button where it seeks the recording, a span where there is nothing to seek. */
 .dp-stamp {
-  margin-left: auto; font-size: .625rem; color: #0c4a6e; background: #e0f2fe;
-  border-radius: 9999px; padding: .05rem .375rem; white-space: nowrap;
+  margin-left: auto; flex: 0 0 auto; font-size: .625rem; color: #0369a1;
+  background: none; border: 0; padding: 0; white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+button.dp-stamp { cursor: pointer; }
+button.dp-stamp:hover { color: #075985; text-decoration: underline; }
 
-.dp-msgs { margin-top: .5rem; display: flex; flex-direction: column; gap: .25rem; }
-.dp-msg { font-size: .6875rem; line-height: 1.45; padding: .35rem .5rem; border-radius: .4rem; }
-.dp-msg-in { background: #f1f5f9; color: #334155; }
-.dp-msg-out { background: #e0f2fe; color: #0c4a6e; }
+/* Who said what is carried by the side of the column as well as the tint, so
+   a thread can be skimmed without reading the words. dp-msg-in is the client,
+   dp-msg-out the agent. */
+.dp-msgs { margin-top: .5rem; display: flex; flex-direction: column; gap: .5rem; }
+.dp-msg { max-width: 86%; display: flex; flex-direction: column; gap: 2px; }
+.dp-msg-in { align-self: flex-end; align-items: flex-end; }
+.dp-msg-out { align-self: flex-start; align-items: flex-start; }
+.dp-msg-b { font-size: .75rem; line-height: 1.5; padding: 7px 9px; border-radius: .55rem; }
+.dp-msg-in .dp-msg-b { background: #0369a1; color: #fff; border-bottom-right-radius: 2px; }
+.dp-msg-out .dp-msg-b { background: #f1f5f9; color: #0f172a; border-bottom-left-radius: 2px; }
+.dp-msg time { font-size: .625rem; color: #94a3b8; font-variant-numeric: tabular-nums; }
 
 .dp-transcript { font-size: .6875rem; color: #475569; white-space: pre-line; line-height: 1.5; }
+
+/* ── Transcript, as turns ────────────────────────────────────────────────
+   No container: rows on hairlines with the timestamp in a fixed gutter, so the
+   eye can run the column. Same rhythm as the key moments above it. */
+.dp-tr-tools { display: flex; gap: 6px; align-items: center; padding-bottom: .5rem;
+  border-bottom: 1px solid #e2e8f0; margin-bottom: .25rem; }
+.dp-find {
+  flex: 1; min-width: 0; font: inherit; font-size: .6875rem; color: #0f172a;
+  border: 1px solid #e6edf5; border-radius: .375rem; padding: 5px 8px; background: #fff;
+}
+.dp-find:focus { outline: 2px solid #bae6fd; outline-offset: -1px; border-color: #7dd3fc; }
+.dp-tr { display: flex; flex-direction: column; }
+.dp-tr-turn {
+  display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 0 10px;
+  padding: .5rem 0; border-top: 1px solid #f1f5f9;
+}
+.dp-tr-turn:first-child { border-top: 0; }
+.dp-tr-turn[hidden] { display: none; }
+.dp-tr-at {
+  grid-row: 1 / span 2; align-self: start; font: inherit; font-size: .625rem;
+  font-variant-numeric: tabular-nums; color: #94a3b8; background: none; border: 0;
+  padding: 2px 0 0; text-align: left; cursor: pointer;
+}
+.dp-tr-at:hover { color: #0369a1; }
+/* Only shown when the recording had two channels to tell the parties apart. */
+.dp-tr-who {
+  font-size: .625rem; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: #0369a1;
+}
+.dp-tr-them .dp-tr-who { color: #166534; }
+.dp-tr-turn p { grid-column: 2; margin: 1px 0 0; font-size: .75rem; line-height: 1.55; color: #334155; }
+.dp-tr-them p { color: #0f172a; }
+.dp-tr-turn mark { background: #fef08a; color: inherit; border-radius: 2px; }
+
+/* ── Notes ───────────────────────────────────────────────────────────────
+   Each note is a row with the person and the time on it, and its own Edit and
+   Delete — which is the whole reason a note became a record instead of a blob. */
+.dp-notebar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.dp-notebar .dpc-saved { margin-right: auto; }
+.dp-notelist { display: flex; flex-direction: column; gap: .375rem; margin-top: .5rem; }
+.dp-note { border: 1px solid #e2e8f0; border-radius: .45rem; padding: .5rem .625rem; }
+.dp-note[hidden] { display: none; }
+.dp-note > p { margin: 0 0 .375rem; font-size: .75rem; line-height: 1.5; color: #334155; white-space: pre-line; }
+.dp-note footer { display: flex; align-items: center; gap: 8px; font-size: .625rem; color: #94a3b8; }
+.dp-note footer b { color: #64748b; font-weight: 600; }
+.dp-note footer time { margin-right: auto; }
+.dp-note-act {
+  font: inherit; font-size: .625rem; font-weight: 600; border: 0; background: none;
+  color: #0369a1; cursor: pointer; padding: 2px 5px; border-radius: .25rem;
+}
+.dp-note-act:hover { background: #f0f9ff; }
+.dp-note-act.dp-note-del { color: #b91c1c; }
+.dp-note-act.dp-note-del:hover { background: #fef2f2; }
+.dp-note-edit[hidden] { display: none; }
+.dp-note-editrow { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
+.dp-undo {
+  display: flex; align-items: center; gap: 8px; font-size: .625rem; color: #64748b;
+  border: 1px dashed #cbd5e1; border-radius: .45rem; padding: .5rem .625rem;
+}
+.dp-undo[hidden] { display: none; }
+.dp-undo button { margin-left: auto; }
 .dp-empty { font-size: .71875rem; color: #94a3b8; }
+/* A tab with nothing in it yet.
+   Rongqi's framed placeholder was drawn for a 600px drawer; in a 380px panel
+   the dashed frame became most of the tab and drew a box around the fact that
+   there was nothing in it. A line says the same thing and stops taking up room.
+   The headline carries the state, the sentence after it says when it fills. */
+.dp-blank { font-size: .75rem; color: #64748b; line-height: 1.55; }
+.dp-blank b { display: block; color: #334155; font-weight: 600; }
+.dp-blank-act { margin-top: .5rem; }
 
 /* Actions, at the foot of every panel and nowhere else. Stacked, not abreast:
    three buttons across a 360px panel gives each about 110px, which is not
@@ -980,6 +1380,16 @@ body.dp-resizing { cursor: col-resize; user-select: none; }
   text-decoration: none; white-space: nowrap; display: inline-flex; align-items: center;
 }
 .dp-btn:hover { background: #f0f9ff; color: #0f172a; }
+/* display:inline-flex above outranks the user-agent rule for [hidden], so a
+   button hidden from script stayed on screen. */
+.dp-btn[hidden] { display: none; }
+/* Feedback belongs on the press, not on the release. Start call cannot do its
+   real work on pointer-down — that would place the call — but the
+   acknowledgement of being pressed can happen there, and a Twilio round trip
+   is long enough that the press deserves an answer of its own. Applied to
+   every panel button rather than just the call ones: buttons sitting in the
+   same row that look alike have to behave alike. */
+.dp-btn:active { transform: scale(.97); transition: transform 100ms ease-out; }
 .dp-btn-pri { background: #0369a1; border-color: #0369a1; color: #fff; font-weight: 700; }
 .dp-btn-pri:hover { background: #075985; color: #fff; }
 .dp-btn-ghost { border-style: dashed; color: #64748b; }
@@ -1022,6 +1432,7 @@ body.dp-resizing { cursor: col-resize; user-select: none; }
 .dp-outcome:focus { outline: 2px solid #0369a1; outline-offset: -1px; }
 .dp-outcome::placeholder { color: #b6c2d0; }
 .dpc-sect {
+  display: flex; align-items: center; gap: 8px;
   font-size: .59375rem; font-weight: 700; letter-spacing: .06em;
   text-transform: uppercase; color: #94a3b8; margin: .8rem 0 .375rem;
 }
@@ -1032,13 +1443,168 @@ body.dp-resizing { cursor: col-resize; user-select: none; }
 .dpc-stop { background: #dc2626; border-color: #dc2626; color: #fff; font-weight: 700; }
 .dpc-stop:hover { background: #b91c1c; color: #fff; }
 
+/* Dialling, carried by the button that was pressed. Placing a call rings two
+   real phones, so the press is a commitment and has to be acknowledged where
+   it happened — not only at the top of the panel, which on a long protocol
+   list is off screen. */
+.dpc-go { justify-content: center; gap: .4375rem; }
+.dpc-go-dot {
+  display: none; width: 7px; height: 7px; border-radius: 9999px;
+  background: currentColor; flex: 0 0 auto;
+}
+/* Amber, not a darker green. Green means go and amber means going, and the
+   distinction has to survive a still frame: a state that differs from idle
+   only while it animates is a state that someone glancing down mid-sentence
+   will miss. #b45309 carries white at about 5.2:1.
+
+   Working, not unavailable: the generic [disabled] grey would say the button
+   had stopped being a button, when in fact it is mid-request. `disabled` is
+   still what blocks the second press — the guard has to hold for the keyboard
+   too, not just the mouse. */
+.dpc-go.is-dialling[disabled] {
+  opacity: 1; cursor: progress;
+  background: #b45309; border-color: #b45309; color: #fff;
+}
+.dpc-go.is-dialling .dpc-go-dot { display: block; animation: dpc-pulse 1s ease-in-out infinite; }
+@keyframes dpc-pulse { 50% { opacity: .2; transform: scale(.6); } }
+
+/* A call that never went out. Sits under the button rather than in an alert(),
+   which is dismissed on reflex and takes the reason with it. */
+/* A call that never went out. It sits under the button that failed rather than
+   in an alert(), which is dismissed on reflex and takes the reason with it —
+   and it is a block, not a stray red line, because a sentence set in 11px grey-
+   red under a large green button is the kind of thing an eye skips on the way
+   back to pressing the button again. */
+.dpc-dialerr {
+  font-size: .71875rem; color: #991b1b; line-height: 1.45;
+  margin: .4375rem 0 0; padding: .5rem .625rem;
+  background: #fef2f2; border: 1px solid #fecaca;
+  border-left: 3px solid #dc2626; border-radius: .375rem;
+}
+.dpc-dialerr-a {
+  color: #b91c1c; font-weight: 700; text-decoration: underline;
+  text-underline-offset: 2px; white-space: nowrap;
+}
+.dpc-dialerr-a:hover { color: #7f1d1d; }
+
 .dpc-live {
   display: flex; align-items: center; gap: .5rem;
   background: #0369a1; color: #fff; padding: .5rem .875rem; flex: 0 0 auto;
 }
 .dpc-dot { width: 7px; height: 7px; border-radius: 9999px; background: #4ade80; flex: 0 0 auto; }
+/* The dot is the only thing on the strip that says "now" — a stopwatch alone
+   reads as a record of something finished. */
+.dpc-oncall .dpc-dot { animation: dpc-pulse 2s ease-in-out infinite; }
+.dpc-live-t { font-size: .6875rem; font-weight: 600; opacity: .9; }
 .dpc-timer { font-weight: 700; font-size: .84375rem; font-variant-numeric: tabular-nums; }
-.dpc-live small { opacity: .88; font-size: .65625rem; }
+.dpc-live small { opacity: .88; font-size: .65625rem; margin-left: auto; }
+
+/* Only the transition itself. `.dpc-enter` is added in the success handler and
+   removed a beat later, so returning to a call already in progress does not
+   replay the arrival — that would read as a second call going out. */
+.dpc-live.dpc-enter { animation: dpc-live-in .3s cubic-bezier(.2, .8, .3, 1); }
+@keyframes dpc-live-in { from { opacity: 0; transform: translateY(-100%); } }
+.dp-acts.dpc-enter { animation: dpc-acts-in .3s cubic-bezier(.2, .8, .3, 1); }
+@keyframes dpc-acts-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* While a call is out the panel is a working surface, not a page you happen to
+   have open. The tint is deliberately faint: it has to survive being looked at
+   for twenty minutes. */
+.dpc-oncall .dpc-head { background: #f0f9ff; border-bottom-color: #bae6fd; }
+.dpc-oncall .dpc-foot { background: #f0f9ff; border-top-color: #bae6fd; }
+
+/* Enter and exit along the same path: the strip came down from the top of the
+   panel, so it leaves the same way rather than blinking out. The curve is the
+   entry curve inverted, so the return traces the arrival. */
+.dpc-live.dpc-exit { animation: dpc-live-out .2s cubic-bezier(.7, 0, .8, .2) forwards; }
+@keyframes dpc-live-out { to { opacity: 0; transform: translateY(-100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Not "no feedback" — a gentler equivalent. The travel is what causes
+     trouble, so the arrival cross-fades instead of sliding; something still
+     has to mark that the state changed. */
+  .dpc-go.is-dialling .dpc-go-dot,
+  .dpc-oncall .dpc-dot { animation: none; }
+  .dpc-live.dpc-enter, .dp-acts.dpc-enter, .callbar {
+    animation: dpc-fade-in .2s ease both;
+  }
+  .dpc-live.dpc-exit { animation: dpc-fade-out .15s ease forwards; }
+  .dp-btn:active { transition: none; }
+}
+@keyframes dpc-fade-in { from { opacity: 0; } }
+@keyframes dpc-fade-out { to { opacity: 0; } }
+
+/* ── App-wide call bar ────────────────────────────────────────────────────
+   Sticky at the top of <main> rather than fixed to the viewport: <main> is the
+   flex child between the sidebar and the detail panel, so sticking inside it
+   tracks both the sidebar collapsing and the panel being dragged wider without
+   either width having to be known here. The negative margins cancel main's
+   padding so the bar spans the column edge to edge. */
+.callbar {
+  /* `top` has to match the negative pull, not be 0: sticky offsets resolve
+     against the scroll container's padding box, so top:0 would pin the bar
+     2rem down — under main's padding — and the first heading would slide
+     beneath it. At -2rem the bar pins flush to the top of the column. */
+  position: sticky; top: -2rem; z-index: 30;
+  margin: -2rem -2rem 1.25rem;
+  display: flex; align-items: center; gap: .5rem;
+  padding: .5rem 1.25rem;
+  /* Floating chrome as a material, with the list gliding underneath, rather
+     than an opaque band cut out of the column. The opacity is as low as the
+     text will allow and no lower: white on this over white composites to about
+     6.4:1, and pushing the translucency further to make the effect obvious
+     would take 11px text below the 4.5:1 it has to clear. */
+  background: rgba(2, 89, 137, .93);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  color: #fff;
+  box-shadow: 0 2px 8px -2px rgba(15, 23, 42, .3);
+  animation: callbar-in .28s cubic-bezier(.2, .8, .3, 1);
+}
+/* Still being placed. Same amber as the button that was pressed, so the state
+   is recognisably the same one that started at the foot of the panel. */
+.callbar-dialling { background: rgba(146, 64, 14, .93); }
+.callbar-dialling .callbar-dot { background: #fed7aa; }
+/* Translucency and contrast are preferences, not givens. */
+@media (prefers-reduced-transparency: reduce) {
+  .callbar { background: #025989; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .callbar-dialling { background: #92400e; }
+}
+@media (prefers-contrast: more) {
+  .callbar { background: #0c4a6e; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .callbar-dialling { background: #7c2d12; }
+}
+@keyframes callbar-in { from { opacity: 0; transform: translateY(-100%); } }
+/* And out the way it came, on the entry curve inverted. The bar appears when a
+   call starts and vanishes when it ends — a state change worth seeing happen,
+   since it is the only thing on the page that was reporting the call. */
+.callbar-out { animation: callbar-out .2s cubic-bezier(.7, 0, .8, .2) forwards; }
+@keyframes callbar-out { to { opacity: 0; transform: translateY(-100%); } }
+.callbar-dot {
+  width: 7px; height: 7px; border-radius: 9999px; background: #4ade80;
+  flex: 0 0 auto; animation: dpc-pulse 2s ease-in-out infinite;
+}
+.callbar-t { font-size: .6875rem; font-weight: 600; opacity: .9; }
+.callbar-who { font-size: .75rem; font-weight: 700; }
+/* Tabular figures so the row does not twitch every second. */
+.callbar-time {
+  font-size: .84375rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  margin-left: .125rem;
+}
+/* The bar's only action, and it is navigation rather than commitment: End call
+   stays in the panel, where the outcome question follows it. */
+.callbar-go {
+  margin-left: auto; font-size: .6875rem; font-weight: 700; color: #fff;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.callbar-go:hover { color: #e0f2fe; }
+.callbar-go:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.callbar[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .callbar { animation: none; }
+  .callbar-dot { animation: none; }
+  .callbar-out { animation: dp-fade-out .12s ease forwards; }
+}
 
 .dpc-saved { font-size: .625rem; color: #16a34a; font-weight: 600; }
 .dpc-saved.dpc-saving { color: #94a3b8; }
@@ -1051,9 +1617,13 @@ body.dp-resizing { cursor: col-resize; user-select: none; }
   padding: .5rem .625rem; background: #f8fbfe; border: 0; border-radius: .4rem;
   cursor: pointer; text-align: left; font-family: inherit;
 }
-.dpc-card.open > .dpc-card-h { border-radius: .4rem .4rem 0 0; }
-.dpc-body .dpc-card.open > .dpc-card-h {
+.dpc-card.open .dpc-card-h { border-radius: .4rem .4rem 0 0; }
+/* The whole header row pins, not just the toggle inside it, so the protocol
+   name and its Edit link stay together while the questions scroll under them. */
+.dpc-body .dpc-card.open > .dpc-card-hrow {
   position: sticky; top: 0; z-index: 3;
+}
+.dpc-body .dpc-card.open .dpc-card-h {
   background: #f0f9ff; border-bottom: 1px solid #bae6fd;
 }
 .dpc-chev { color: #94a3b8; font-size: .6875rem; transition: transform .15s ease; }
@@ -1072,7 +1642,124 @@ body.dp-resizing { cursor: col-resize; user-select: none; }
 
 .dpc-desc { font-size: .6875rem; color: #64748b; line-height: 1.45; margin-bottom: .5rem; }
 .dpc-q { margin-bottom: .6875rem; }
-.dpc-qp { font-size: .75rem; color: #334155; line-height: 1.5; margin-bottom: .3125rem; }
+/* The question is a quieter numbered label and the answer always sits in a
+   field, so the two never read as one paragraph. */
+.dpc-qp {
+  display: flex; gap: 6px;
+  font-size: .6875rem; font-weight: 600; color: #475569;
+  line-height: 1.45; margin-bottom: .25rem;
+}
+.dpc-qp .dpc-qn { flex: 0 0 auto; color: #94a3b8; font-variant-numeric: tabular-nums; }
+/* A finished call shows the same fields as a live one, frozen, rather than
+   turning the answers back into paragraphs. */
+.dpc-ta[readonly] {
+  background: #f8fafc; border-color: #e2e8f0; color: #334155;
+  cursor: default; resize: none;
+}
+.dpc-ta[readonly]:focus { outline: 2px solid #e2e8f0; border-color: #e2e8f0; }
+.dpc-ta[readonly].dpc-ta-empty { color: #94a3b8; font-style: italic; }
+/* An answer changed but not yet written, visible from the field itself. */
+.dpc-ta.dpc-ta-dirty { border-color: #fcd34d; background: #fffdf5; }
+/* A call that has ended with nothing recorded. Amber rather than the blue of a
+   call in progress: this is something waiting on you, not something happening.
+   It sits in the foot, in the slot the call controls were using a moment ago,
+   so it arrives where the hand already is. */
+.dpc-outcome-ask {
+  margin: -10px -16px 0; padding: 10px 16px;
+  background: #fffbeb; border-bottom: 1px solid #fcd34d;
+}
+.dpc-outcome-ask .dpc-ask {
+  display: flex; align-items: center; gap: 7px;
+  color: #92400e; font-size: .75rem; text-transform: none; letter-spacing: 0;
+}
+.dpc-outcome-ask .dp-btn { background: #fff; border-color: #e7d3a8; }
+.dpc-outcome-ask .dp-btn:hover { background: #fffdf5; }
+
+/* ── Recording how a call went ───────────────────────────────────────────
+   Three equal buttons, told apart by a colour dot rather than by weight: a
+   filled Complete beside two outlines reads as the answer you are supposed to
+   give, and an outcome that is easier to press is an outcome that gets
+   over-recorded. */
+.dpc-out { justify-content: center; gap: 7px; }
+.dpc-out-dot { width: 7px; height: 7px; border-radius: 9999px; flex: 0 0 auto; }
+.dpc-out-done .dpc-out-dot { background: #16a34a; }
+.dpc-out-miss .dpc-out-dot { background: #94a3b8; }
+.dpc-out-part .dpc-out-dot { background: #b45309; }
+.dpc-out-done:hover { border-color: #86efac; background: #f0fdf4; }
+.dpc-out-miss:hover { border-color: #cbd5e1; background: #f8fafc; }
+.dpc-out-part:hover { border-color: #fcd34d; background: #fffbeb; }
+/* What was recorded, once it has been. The panel used to close instead, which
+   is why pressing one felt like nothing had happened. */
+.dpc-outcome-done {
+  display: flex; align-items: center; gap: 7px;
+  font-size: .6875rem; color: #334155;
+  background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: .375rem;
+  padding: .4375rem .625rem;
+}
+.dpc-outcome-done b { font-weight: 600; }
+.dpc-outcome-done a { margin-left: auto; color: #0369a1; font-weight: 600; text-decoration: none; }
+.dpc-outcome-done a:hover { text-decoration: underline; }
+
+.dpc-cardfoot {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: .125rem; padding-top: .5rem; border-top: 1px solid #f1f5f9;
+}
+
+/* ── How a protocol is being answered ────────────────────────────────────
+   One line rather than two buttons that are dead most of the time: before
+   anything is sent there is nothing to reload, and once it has been sent,
+   offering to send again is a second text to a real person. */
+.dpc-mode {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: .5rem .625rem; background: #fbfdff; border-bottom: 1px solid #f1f5f9;
+}
+.dpc-mode form { margin: 0; }
+.dpc-mode-t { font-size: .6875rem; color: #475569; margin-right: auto; }
+.dpc-mode-t b { color: #0f172a; font-weight: 600; }
+.dpc-mode-live { background: #f0f9ff; border-bottom-color: #bae6fd; }
+.dpc-mode-dot {
+  width: 7px; height: 7px; border-radius: 9999px; background: #16a34a; flex: 0 0 auto;
+}
+/* Amber while it is out and unanswered — green means something came back. */
+.dpc-mode-wait { background: #b45309; }
+.dpc-mode-ico {
+  font-family: "Material Icons Outlined"; font-size: 13px; line-height: 1;
+  margin-right: 4px; flex: 0 0 auto;
+}
+/* An answer the caregiver texted back, so whose words these are is visible
+   without reading them. Cleared as soon as a navigator edits it. */
+.dpc-ta-bytext { background: #f0f9ff; border-color: #bae6fd; }
+/* Answered on an earlier call. Quieter than a live field, because it is a
+   record of what they said rather than something to fill in — the protocols are
+   a programme worked through once, not a form repeated every call. */
+.dpc-ta-carried {
+  background: #f8fafc; border-color: #e2e8f0; border-style: dashed;
+  color: #475569; resize: none;
+}
+.dpc-carried {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: .25rem; font-size: .625rem; color: #94a3b8;
+}
+.dpc-carried[hidden] { display: none; }
+.dpc-carried-edit {
+  font: inherit; font-size: .625rem; font-weight: 600; border: 0; background: none;
+  color: #0369a1; cursor: pointer; padding: 0;
+}
+.dpc-carried-edit:hover { text-decoration: underline; }
+/* The accordion toggle and the editor link share the header row, so the link
+   is not inside the button. */
+.dpc-card-hrow { display: flex; align-items: stretch; }
+.dpc-card-hrow > .dpc-card-h { flex: 1; min-width: 0; border-radius: .4rem 0 0 .4rem; }
+.dpc-card.open > .dpc-card-hrow > .dpc-card-h { border-radius: .4rem 0 0 0; }
+.dpc-card-edit {
+  display: flex; align-items: center; flex: 0 0 auto;
+  padding: 0 .625rem; background: #f8fbfe; border-radius: 0 .4rem .4rem 0;
+  font-size: .625rem; font-weight: 600; color: #64748b; text-decoration: none;
+}
+.dpc-card-edit:hover { color: #0369a1; background: #f0f9ff; }
+.dpc-card.open .dpc-card-edit { background: #f0f9ff; border-bottom: 1px solid #bae6fd; border-radius: 0 .4rem 0 0; }
+.dpc-cardfoot .dpc-saved { margin-right: auto; }
+.dpc-saved.dpc-dirty { color: #b45309; }
 .dpc-qp p { margin: 0; }
 .dpc-qp strong { color: #0f172a; }
 .dpc-ta {
@@ -1109,14 +1796,14 @@ body.dp-resizing { cursor: col-resize; user-select: none; }
    not the thing you came to do — that lives at the foot. */
 .dp-headgo { margin-left: auto; flex: 0 0 auto; display: flex; gap: 4px; align-items: center; }
 .dp-go {
-  font-size: 11px; font-weight: 600; color: #0369a1;
+  font-size: 0.6875rem; font-weight: 600; color: #0369a1;
   background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px;
   padding: 4px 9px; text-decoration: none; white-space: nowrap;
   display: inline-flex; align-items: center; gap: 4px;
 }
 .dp-go:hover { background: #e0f2fe; color: #075985; }
 .dp-go:focus-visible { outline: 2px solid #0369a1; outline-offset: 1px; }
-.dp-go .material-icons-outlined { font-size: 13px; }
+.dp-go .material-icons-outlined { font-size: 0.8125rem; }
 /* Below the narrowest useful panel the label goes and the icon carries it. */
 @media (max-width: 400px) { .dp-go-t { display: none; } }
 
@@ -1134,7 +1821,7 @@ body.dp-resizing { cursor: col-resize; user-select: none; }
    its own border to recolour, and a dashboard row, which does not. */
 
 /* Timeline card whose panel is currently open. */
-.tl-card-open { border-color: #0ea5e9 !important; background: #f0f9ff; }
+.tl-card-open { border-color: var(--brand-primary) !important; background: #f0f9ff; }
 
 /* Dashboard row, same intent. The stroke is an inset shadow rather than a
    border because a border adds height to one row and pushes every row below
@@ -1188,6 +1875,28 @@ body.dp-takeover .dp-grip { display: none; }
   width: min(340px, calc(100vw - 32px));
   pointer-events: none;
 }
+
+/* The panel occupies the same corner, and toasts sit above it — so every
+   confirmation in the app landed on top of the panel's own foot, which is
+   where its actions are. A failed call reported its reason directly over the
+   Start call button the navigator needed next.
+
+   `--dp-w` is written to the root element by the resize handler in base.html,
+   so this tracks the panel being dragged wider. The grip's 9px is included
+   because it sits between the two. */
+body:has(.dp:not([hidden])) .toaster {
+  right: calc(var(--dp-w) + 9px + 16px);
+}
+
+/* Except when the panel is the whole screen. Then there is nothing to sit
+   beside, and the corner is the right place again — the panel's own foot is
+   the full width of the viewport, so no inset avoids it. Both takeover routes
+   are covered: the width media query and the class base.html sets when an
+   expanded nav rail starves the list on a wider screen. */
+@media (max-width: 720px) {
+  body:has(.dp:not([hidden])) .toaster { right: 16px; }
+}
+body.dp-takeover:has(.dp) .toaster { right: 16px; }
 .toast {
   pointer-events: auto; position: relative; overflow: hidden;
   display: flex; gap: 10px; align-items: flex-start;
@@ -1195,6 +1904,14 @@ body.dp-takeover .dp-grip { display: none; }
   border-radius: .5rem; padding: 10px 11px 11px;
   box-shadow: 0 6px 20px -6px rgba(15, 23, 42, .22), 0 2px 5px -2px rgba(15, 23, 42, .1);
   animation: toast-in .26s cubic-bezier(.2, .8, .3, 1);
+  /* The space a dismissed toast occupied closes with it, rather than the ones
+     below jumping up into the gap the moment it is removed. The height is set
+     from JS before the collapse, because `auto` has nothing to animate from;
+     the negative margin at the end absorbs the flex gap, which does not
+     collapse on its own when an item reaches zero height. */
+  transition: height .2s cubic-bezier(.2, .8, .3, 1),
+              margin .2s cubic-bezier(.2, .8, .3, 1),
+              padding .2s cubic-bezier(.2, .8, .3, 1);
 }
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(10px) scale(.98); }
@@ -1204,6 +1921,23 @@ body.dp-takeover .dp-grip { display: none; }
 @keyframes toast-out { to { opacity: 0; transform: translateY(4px) scale(.98); } }
 @media (prefers-reduced-motion: reduce) {
   .toast, .toast.toast-out { animation: none !important; }
+  .toast { transition: none; }
+}
+
+/* ── Native dialogs ──────────────────────────────────────────────────────
+   The confirmations use <dialog> so the browser owns focus, Escape and the
+   backdrop — but showModal() puts them on screen in one frame, which reads as
+   the page having been replaced rather than covered. One rule covers all of
+   them: the dashboard's "stop showing this call" confirm and the panel's own.
+
+   Enter only. A confirmation is dismissed to get back to what you were doing,
+   and holding it on screen to play an exit would be making you wait to leave. */
+dialog[open] { animation: dlg-in .2s cubic-bezier(.2, .8, .3, 1) both; }
+@keyframes dlg-in { from { opacity: 0; transform: scale(.96); } }
+dialog[open]::backdrop { animation: dlg-scrim .2s ease both; }
+@keyframes dlg-scrim { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  dialog[open] { animation: dlg-scrim .14s ease both; }
 }
 
 .toast-ic { flex: 0 0 auto; width: 16px; height: 16px; margin-top: 1px; }
@@ -1278,28 +2012,34 @@ body.dp-takeover .dp-grip { display: none; }
    tab on a client's own page. The two differ in what a row leads with,
    not in how the list works — see templates/communications/_list.html. */
   .cm-hd { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 2px; }
-  .cm-hd h1 { font-size: 29px; font-weight: 600; color: #1f2937; letter-spacing: -.01em; margin: 0; }
-  .cm-sub { font-size: 13.5px; color: #475569; margin: 2px 0 0; }
+  .cm-hd h1 {
+    font-size: 1.8125rem; font-weight: 600; color: #1f2937; margin: 0;
+    /* Tracking and leading are size-specific, not one value for the app:
+       letters read too far apart as they grow, and lines too far down. Same
+       pair on .pd-hd-name and .dash-hello — one page title, three pages. */
+    letter-spacing: -.02em; line-height: 1.15;
+  }
+  .cm-sub { font-size: 0.84375rem; color: #475569; margin: 2px 0 0; }
   .cm-new {
     margin-left: auto; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px;
-    font-size: 12.5px; font-weight: 700; color: #fff; background: #0369a1;
+    font-size: 0.78125rem; font-weight: 700; color: #fff; background: #0369a1;
     border: 0; border-radius: 8px; padding: 9px 14px; cursor: pointer;
   }
   .cm-new:hover { background: #075985; }
-  .cm-new .material-icons-outlined { font-size: 17px; }
+  .cm-new .material-icons-outlined { font-size: 1.0625rem; }
 
   .cm-box { background: #fff; border: 1px solid #e8f1fb; border-radius: 12px; overflow: hidden; margin-top: 16px; }
 
   .cm-tabs { display: flex; gap: 2px; border-bottom: 1px solid #e2e8f0; padding: 0 16px; }
   .cm-tab {
-    font-size: 13.5px; font-weight: 600; color: #64748b; text-decoration: none;
+    font-size: 0.84375rem; font-weight: 600; color: #64748b; text-decoration: none;
     border-bottom: 2px solid transparent; padding: 11px 14px; margin-bottom: -1px;
     display: inline-flex; align-items: center; gap: 7px;
   }
   .cm-tab:hover { color: #1e293b; }
   .cm-tab.on { color: #0369a1; border-bottom-color: #0369a1; font-weight: 700; }
   .cm-tab .c {
-    font-size: 11px; font-weight: 700; background: #f1f5f9; color: #64748b;
+    font-size: 0.6875rem; font-weight: 700; background: #f1f5f9; color: #64748b;
     border-radius: 9999px; padding: 1px 8px; font-variant-numeric: tabular-nums;
   }
   .cm-tab.on .c { background: #e0f2fe; color: #0369a1; }
@@ -1310,22 +2050,22 @@ body.dp-takeover .dp-grip { display: none; }
     padding: 10px 16px; background: #f8fbfe; border-bottom: 1px solid #f1f5f9;
   }
   .cm-find {
-    flex: 1; min-width: 130px; font-size: 12.5px; color: #475569; background: #fff;
+    flex: 1; min-width: 130px; font-size: 0.78125rem; color: #475569; background: #fff;
     border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px;
   }
   .cm-find:focus { outline: 2px solid #0369a1; outline-offset: -1px; }
   .cm-chip {
-    font-size: 11.5px; font-weight: 600; color: #475569; background: #fff;
+    font-size: 0.71875rem; font-weight: 600; color: #475569; background: #fff;
     border: 1px solid #e2e8f0; border-radius: 9999px; padding: 5px 12px;
     text-decoration: none; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
   }
   .cm-chip:hover { border-color: #7dd3fc; }
   .cm-chip.on { background: #f0f9ff; border-color: #7dd3fc; color: #0c4a6e; }
-  .cm-chip .n { font-size: 10.5px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+  .cm-chip .n { font-size: 0.65625rem; color: #94a3b8; font-variant-numeric: tabular-nums; }
   .cm-chip.on .n { color: #0369a1; }
 
   .cm-tools-when { background: #fff; border-bottom: 1px solid #f1f5f9; }
-  .cm-when-lab { font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
+  .cm-when-lab { font-size: 0.65625rem; font-weight: 700; letter-spacing: .07em;
                  text-transform: uppercase; color: #94a3b8; }
 
   /* The day header is the control for its own day: the whole strip is the
@@ -1333,18 +2073,18 @@ body.dp-takeover .dp-grip { display: none; }
   .cm-day {
     position: sticky; top: 0; z-index: 2; background: #fff; width: 100%;
     display: flex; align-items: center; gap: 8px; padding: 10px 18px 8px;
-    font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    font-size: 0.65625rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
     color: #94a3b8; border: 0; border-bottom: 1px solid #f1f5f9;
     text-align: left; cursor: pointer; font-family: inherit;
   }
   .cm-day:hover { background: #f8fbfe; color: #475569; }
   .cm-day:focus-visible { outline: 2px solid #0369a1; outline-offset: -2px; }
-  .cm-chev { font-size: 16px !important; color: #cbd5e1; transition: transform .15s ease; }
+  .cm-chev { font-size: 1rem !important; color: #cbd5e1; transition: transform .15s ease; }
   .cm-day:hover .cm-chev { color: #64748b; }
   .cm-day[aria-expanded="false"] .cm-chev { transform: rotate(-90deg); }
   .cm-dayrows[hidden] { display: none; }
   @media (prefers-reduced-motion: reduce) { .cm-chev { transition: none; } }
-  .cm-day .rel { color: #0369a1; font-size: 11px; letter-spacing: 0; text-transform: none; }
+  .cm-day .rel { color: #0369a1; font-size: 0.6875rem; letter-spacing: 0; text-transform: none; }
   .cm-day .n { margin-left: auto; color: #cbd5e1; letter-spacing: 0; text-transform: none;
                font-variant-numeric: tabular-nums; }
 
@@ -1370,7 +2110,7 @@ body.dp-takeover .dp-grip { display: none; }
     flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px;
     display: inline-flex; align-items: center; justify-content: center;
   }
-  .cm-ic .material-icons-outlined { font-size: 16px; }
+  .cm-ic .material-icons-outlined { font-size: 1rem; }
   .cm-ic-call { background: #eff6ff; color: #1d4ed8; }
   .cm-ic-visit { background: #fff7ed; color: #c2410c; }
   .cm-ic-chat { background: #f0fdf4; color: #15803d; }
@@ -1379,12 +2119,12 @@ body.dp-takeover .dp-grip { display: none; }
 
   .cm-main { flex: 1; min-width: 0; }
   .cm-l1 { display: flex; align-items: center; gap: 8px; }
-  .cm-who { min-width: 0; font-weight: 600; font-size: 14px; color: #1e293b;
+  .cm-who { min-width: 0; font-weight: 600; font-size: 0.875rem; color: #1e293b;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .cm-l2 { display: block; font-size: 12px; color: #64748b; margin-top: 1px;
+  .cm-l2 { display: block; font-size: 0.75rem; color: #64748b; margin-top: 1px;
            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cm-l2 b { color: #475569; font-weight: 600; }
-  .cm-tag { flex: 0 0 auto; font-size: 10px; font-weight: 700; padding: 2px 8px;
+  .cm-tag { flex: 0 0 auto; font-size: 0.625rem; font-weight: 700; padding: 2px 8px;
             border-radius: 9999px; white-space: nowrap; }
   .cm-tag-late { background: #fef2f2; color: #b91c1c; }
   .cm-tag-todo { background: #f0f9ff; color: #0369a1; }
@@ -1393,25 +2133,25 @@ body.dp-takeover .dp-grip { display: none; }
   .cm-tag-low  { background: #f0f9ff; color: #0369a1; }
 
   .cm-right { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-  .cm-when { font-size: 12.5px; font-weight: 600; color: #475569; white-space: nowrap;
+  .cm-when { font-size: 0.78125rem; font-weight: 600; color: #475569; white-space: nowrap;
              font-variant-numeric: tabular-nums; }
   .cm-when-late { color: #b91c1c; }
-  .cm-sub2 { font-size: 10.5px; color: #94a3b8; white-space: nowrap;
+  .cm-sub2 { font-size: 0.65625rem; color: #94a3b8; white-space: nowrap;
              display: flex; align-items: center; gap: 5px; }
   .cm-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
   .cm-dot-done { background: #16a34a; }
   .cm-dot-int  { background: #f59e0b; }
   .cm-dot-no   { background: #94a3b8; }
 
-  .cm-empty { padding: 40px 18px; text-align: center; color: #94a3b8; font-size: 13px; }
+  .cm-empty { padding: 40px 18px; text-align: center; color: #94a3b8; font-size: 0.8125rem; }
 
   .cm-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
              padding: 11px 18px; border-top: 1px solid #f1f5f9; }
-  .cm-count { font-size: 12px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+  .cm-count { font-size: 0.75rem; color: #94a3b8; font-variant-numeric: tabular-nums; }
   .cm-pg { margin-left: auto; display: flex; align-items: center; gap: 3px; }
   .cm-pg-n, .cm-pg-a {
     min-width: 28px; height: 28px; display: inline-flex; align-items: center;
-    justify-content: center; font-size: 12px; font-weight: 600; color: #475569;
+    justify-content: center; font-size: 0.75rem; font-weight: 600; color: #475569;
     border-radius: 7px; text-decoration: none; font-variant-numeric: tabular-nums;
   }
   .cm-pg-n:hover, .cm-pg-a:hover { background: #f0f9ff; color: #0f172a; }
@@ -1419,7 +2159,7 @@ body.dp-takeover .dp-grip { display: none; }
   .cm-pg-a.is-off { color: #cbd5e1; pointer-events: none; }
   /* Given a number's width so the arrows never shift as you click through. */
   .cm-pg-dots { min-width: 28px; height: 28px; display: inline-flex; align-items: center;
-                justify-content: center; color: #cbd5e1; font-size: 12px; }
+                justify-content: center; color: #cbd5e1; font-size: 0.75rem; }
 
   /* Scheduling, in place. A new call is a small form and never needed a page
      of its own; leaving the list behind to fill in four fields lost your place
@@ -1429,32 +2169,64 @@ body.dp-takeover .dp-grip { display: none; }
     position: fixed; inset: 0; z-index: 90; display: flex;
     align-items: center; justify-content: center; padding: 20px;
     background: rgba(15, 23, 42, .45);
+    /* The scrim dimming is what says "this task, and nothing else" — so it has
+       to be seen arriving. Cut in at full strength it reads as the page having
+       been replaced rather than covered. */
+    animation: cm-scrim-in .18s ease both;
   }
   .cm-dialog {
     background: #fff; border-radius: 14px; width: min(460px, 100%);
     max-height: calc(100vh - 40px); overflow-y: auto;
     box-shadow: 0 24px 60px -12px rgba(15, 23, 42, .4);
+    /* Grows out of the control that opened it. The script writes the origin
+       from that button's position; the centre is only the fallback for a
+       dialog that arrives without one — a deep link, or a re-render after a
+       validation error. */
+    transform-origin: var(--cm-ox, 50%) var(--cm-oy, 50%);
+    animation: cm-dialog-in .24s cubic-bezier(.2, .8, .3, 1) both;
+  }
+  @keyframes cm-scrim-in { from { opacity: 0; } }
+  @keyframes cm-dialog-in { from { transform: scale(.94); } }
+
+  /* Out along the path it came in on, with the entry curve inverted — the same
+     pairing the call strip uses. `.cm-out` is added on close and the element is
+     hidden once it has played. */
+  .cm-modal.cm-out {
+    pointer-events: none;
+    animation: cm-scrim-out .16s cubic-bezier(.7, 0, .8, .2) forwards;
+  }
+  .cm-modal.cm-out .cm-dialog {
+    animation: cm-dialog-out .16s cubic-bezier(.7, 0, .8, .2) forwards;
+  }
+  @keyframes cm-scrim-out { to { opacity: 0; } }
+  @keyframes cm-dialog-out { to { transform: scale(.94); } }
+
+  /* Cross-fade rather than travel. The dim still arrives — it is the thing that
+     says the rest of the page is not available — it simply does not grow. */
+  @media (prefers-reduced-motion: reduce) {
+    .cm-dialog, .cm-modal.cm-out .cm-dialog { animation: none; transform: none; }
+    .cm-modal { animation-duration: .12s; }
   }
   .cm-dialog-h { display: flex; align-items: flex-start; gap: 10px;
                  padding: 18px 20px 0; }
-  .cm-dialog-h h2 { font-size: 17px; font-weight: 700; color: #1e293b; margin: 0; }
-  .cm-dialog-h p { font-size: 12.5px; color: #64748b; margin: 2px 0 0; }
+  .cm-dialog-h h2 { font-size: 1.0625rem; font-weight: 700; color: #1e293b; margin: 0; }
+  .cm-dialog-h p { font-size: 0.78125rem; color: #64748b; margin: 2px 0 0; }
   .cm-dialog-x { margin-left: auto; background: none; border: 0; cursor: pointer;
-                 color: #94a3b8; font-size: 16px; line-height: 1; padding: 2px 4px;
+                 color: #94a3b8; font-size: 1rem; line-height: 1; padding: 2px 4px;
                  border-radius: 6px; }
   .cm-dialog-x:hover { background: #f1f5f9; color: #0f172a; }
   .cm-form { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 13px; }
-  .cm-field label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  .cm-field label { display: block; font-size: 0.6875rem; font-weight: 700; letter-spacing: .06em;
                     text-transform: uppercase; color: #64748b; margin-bottom: 5px; }
   .cm-field input, .cm-field select {
-    width: 100%; font-size: 13.5px; color: #1e293b; background: #fff;
+    width: 100%; font-size: 0.84375rem; color: #1e293b; background: #fff;
     border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; font-family: inherit;
   }
   .cm-field input:focus, .cm-field select:focus { outline: 2px solid #0369a1; outline-offset: -1px; }
-  .cm-field .err { font-size: 11.5px; color: #b91c1c; margin-top: 4px; }
-  .cm-field .hint { font-size: 11.5px; color: #94a3b8; margin-top: 4px; }
+  .cm-field .err { font-size: 0.71875rem; color: #b91c1c; margin-top: 4px; }
+  .cm-field .hint { font-size: 0.71875rem; color: #94a3b8; margin-top: 4px; }
   .cm-dialog-f { display: flex; gap: 8px; justify-content: flex-end; padding-top: 3px; }
-  .cm-btn { font-size: 13px; font-weight: 600; border-radius: 8px; padding: 9px 16px;
+  .cm-btn { font-size: 0.8125rem; font-weight: 600; border-radius: 8px; padding: 9px 16px;
             cursor: pointer; border: 1px solid #cbd5e1; background: #fff; color: #475569;
             font-family: inherit; }
   .cm-btn:hover { background: #f0f9ff; color: #0f172a; }
@@ -1480,8 +2252,8 @@ body.dp-takeover .dp-grip { display: none; }
 .pd-hd { display: flex; align-items: flex-start; gap: .8125rem; margin-bottom: 1.25rem; }
 .pd-hd-main { flex: 1; min-width: 0; }
 .pd-hd-name {
-  font-size: 1.8125rem; font-weight: 600; color: #1f2937;
-  letter-spacing: -.01em; margin: 0; line-height: 1.2;
+  font-size: 1.8125rem; font-weight: 600; color: #1f2937; margin: 0;
+  letter-spacing: -.02em; line-height: 1.15;   /* see .cm-hd h1 */
 }
 .pd-hd-meta {
   display: flex; gap: .4375rem .9375rem; flex-wrap: wrap; margin-top: .4375rem;
@@ -1687,7 +2459,7 @@ body.dp-takeover .dp-grip { display: none; }
 .dp-rev { margin-top: 14px; padding-top: 13px; border-top: 1px solid #e6edf5; }
 .dp-rev-h {
   display: flex; align-items: center; gap: 8px;
-  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  font-size: 0.6875rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
   color: #64748b; margin-bottom: 9px;
 }
 .dp-rev-h2 { margin-top: 14px; }
@@ -1698,21 +2470,21 @@ body.dp-takeover .dp-grip { display: none; }
 }
 /* Drawn in CSS so the panel carries no icon font it would otherwise need. */
 .dp-star::before {
-  content: "★"; font-size: 18px; line-height: 1; color: currentColor;
+  content: "★"; font-size: 1.125rem; line-height: 1; color: currentColor;
 }
 .dp-star:hover { color: #fbbf24; }
 .dp-star.on { color: #f59e0b; }
-.dp-stars-n { margin-left: 7px; font-size: 11px; color: #94a3b8; }
+.dp-stars-n { margin-left: 7px; font-size: 0.6875rem; color: #94a3b8; }
 .dp-rev-t { width: 100%; }
 .dp-flags { display: flex; flex-direction: column; gap: 5px; }
 .dp-flag {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  font-size: 12px; color: #334155; background: #fff;
+  font-size: 0.75rem; color: #334155; background: #fff;
   border: 1px solid #e6edf5; border-radius: 8px; padding: 7px 10px; cursor: pointer;
 }
 .dp-flag:hover { background: #fafcff; }
 .dp-flag input { width: 15px; height: 15px; flex: 0 0 auto; accent-color: #0369a1; margin: 0; }
-.dp-hint { font-size: 10.5px; line-height: 1.5; color: #94a3b8; margin-top: 8px; }
+.dp-hint { font-size: 0.65625rem; line-height: 1.5; color: #94a3b8; margin-top: 8px; }
 .dp-rated { display: none; }
 
 /* ── Panel: actions that need something from you first ────────────────────── */
@@ -1725,16 +2497,16 @@ body.dp-takeover .dp-grip { display: none; }
 }
 .dp-dialog::backdrop { background: rgba(15, 23, 42, .42); }
 .dp-dialog form { padding: 16px 18px 13px; }
-.dp-dialog h3 { margin: 0; font-size: 15px; font-weight: 700; }
-.dp-dialog-sub { margin: 4px 0 14px; font-size: 12px; line-height: 1.5; color: #64748b; }
+.dp-dialog h3 { margin: 0; font-size: 0.9375rem; font-weight: 700; }
+.dp-dialog-sub { margin: 4px 0 14px; font-size: 0.75rem; line-height: 1.5; color: #64748b; }
 .dp-fld { display: block; margin-bottom: 12px; }
 .dp-fld > span {
   display: block; margin-bottom: 5px;
-  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  font-size: 0.6875rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
   color: #334155;
 }
 .dp-fld input, .dp-fld select, .dp-fld textarea {
-  font: inherit; font-size: 12.5px; color: #0f172a; width: 100%; box-sizing: border-box;
+  font: inherit; font-size: 0.78125rem; color: #0f172a; width: 100%; box-sizing: border-box;
   border: 1px solid #e6edf5; border-radius: 7px; padding: 8px 10px; background: #fff;
 }
 .dp-fld textarea { resize: vertical; min-height: 66px; }
@@ -1754,14 +2526,14 @@ body.dp-takeover .dp-grip { display: none; }
 /* Sending the care plan sits under the file it sends, not in a toolbar. */
 .pd-cp-send { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .pd-cp-send .pd-btn { display: inline-flex; align-items: center; gap: 6px; }
-.pd-cp-send .material-icons-outlined { font-size: 15px; }
-.pd-cp-note { font-size: 11.5px; color: #94a3b8; }
+.pd-cp-send .material-icons-outlined { font-size: 0.9375rem; }
+.pd-cp-note { font-size: 0.71875rem; color: #94a3b8; }
 
 /* Status beside the title, in the exact values the dashboard and Communications
    rows use — an alert must not change colour on its way into the panel. */
 .dp-tag {
   display: inline-flex; align-items: center;
-  font-size: 10px; font-weight: 700;
+  font-size: 0.625rem; font-weight: 700;
   padding: 2px 8px; border-radius: 9999px;
   white-space: nowrap; margin-left: 6px; vertical-align: 1px;
 }
@@ -1820,4 +2592,59 @@ body.dp-takeover .dp-grip { display: none; }
   background: #f1f5f9 !important;
   color: #94a3b8 !important;
   border-color: #e2e8f0 !important;
+}
+
+/* ── Press feedback ───────────────────────────────────────────────────────
+   Every control in here already had a :hover rule and, with three exceptions,
+   nothing for :active — so the whole app lit up when the mouse was near a
+   button and went dead the moment you actually pressed it. Feedback belongs on
+   the press, not on the release: the release is when the work starts, which on
+   a slow action is much later than the moment the user needs an answer.
+
+   Two treatments, because one does not fit both shapes. Things sized to their
+   own content take a scale, the way a physical key gives under a finger. Things
+   that span their container — list rows, nav items — darken instead: a
+   full-width row that shrinks reads as the layout breaking, not as a press.
+
+   Kept as one block rather than spread through the file so it reads, and
+   reverts, as the single decision it is. */
+
+.cm-btn:active, .cm-btn-pri:active, .cm-chip:active, .cm-tab:active,
+.cm-new:active, .cm-pg-n:active, .cm-pg-a:active, .cm-dialog-x:active,
+.pd-btn:active, .pd-btn-pri:active, .pd-chip:active, .pd-tab-btn:active,
+.dp-close:active, .dp-tab:active, .dp-go:active, .dp-flag:active,
+.toast-x:active, .button-primary:active, .button-secondary:active,
+.save-button:active, .send-button:active, .automation-button:active {
+  transform: scale(.97);
+  transition: transform 100ms ease-out;
+}
+
+/* Not .cm-day with a transform: it is position: sticky, and a scaling pinned
+   header is exactly the kind of thing that looks like a rendering fault. */
+.cm-row:active, .cm-day:active, .sidebar-item:active,
+.pd-pr:active, .nl-opt:active {
+  filter: brightness(.96);
+  transition: filter 100ms ease-out;
+}
+
+/* A press is not travel — there is nothing vestibular about it — but the
+   easing still goes, so the change lands in one step rather than over time. */
+@media (prefers-reduced-motion: reduce) {
+  .cm-btn:active, .cm-btn-pri:active, .cm-chip:active, .cm-tab:active,
+  .cm-new:active, .cm-pg-n:active, .cm-pg-a:active, .cm-dialog-x:active,
+  .pd-btn:active, .pd-btn-pri:active, .pd-chip:active, .pd-tab-btn:active,
+  .dp-close:active, .dp-tab:active, .dp-go:active, .dp-flag:active,
+  .toast-x:active, .button-primary:active, .button-secondary:active,
+  .save-button:active, .send-button:active, .automation-button:active,
+  .cm-row:active, .cm-day:active, .sidebar-item:active,
+  .pd-pr:active, .nl-opt:active {
+    transition: none;
+  }
+}
+
+/* A disabled control is not pressable, and must not pretend otherwise. */
+.cm-btn:disabled:active, .pd-btn:disabled:active, .dp-btn:disabled:active,
+.button-primary:disabled:active, .save-button:disabled:active,
+.send-button:disabled:active {
+  transform: none;
 }

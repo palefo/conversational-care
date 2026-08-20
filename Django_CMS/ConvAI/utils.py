@@ -7,6 +7,7 @@ import logging
 import os
 from .site_config import get_setting, get_bool, brand_name
 import uuid
+import wave
 import hmac
 import time
 import base64
@@ -54,14 +55,23 @@ def make_phone_conference(phone_numbers, record_ctn=True, record_dyad=True):
     auth_token = get_setting("TWILIO_AUTH_TOKEN")
     client = Client(account_sid, auth_token)
     conference_name = str(uuid.uuid4()) #to avoid collisions
+    # Two channels rather than one mixed track. Whisper cannot tell voices
+    # apart, but a dual-channel leg already has them apart: what the platform
+    # sent is on one channel and what the person on the other end said is on the
+    # other. That is what lets the transcript name a speaker at all. Mono
+    # recordings still transcribe, just without anyone attributed — see
+    # transcribe_audio. Applies to calls placed from here on; recordings already
+    # on disk are mono and cannot be separated after the fact.
     call1 = client.calls.create(
       record=record_ctn,
+      recording_channels="dual",
       to=phone_numbers["CTN"],
       from_=phone_numbers["Platform"],
       twiml=f'<Response><Dial><Conference endConferenceOnExit="true">{conference_name}</Conference></Dial></Response>'
     )
     call2 = client.calls.create(
       record=record_dyad,
+      recording_channels="dual",
       to=phone_numbers["Dyad"],
       from_=phone_numbers["Platform"],
       twiml=f'<Response><Dial><Conference endConferenceOnExit="true">{conference_name}</Conference></Dial></Response>'
@@ -755,14 +765,116 @@ def synthesize_speech_elevenlabs(text: str, filename: str, voice_id: Optional[st
     save(response, output_path)
     return output_path
 
-def transcribe_audio(file_path):
+def _openai_client():
     # Resolve the OpenAI key the same way the chat models do (DB override → env),
     # so transcription works even when the key is only set in SiteConfiguration.
     api_key = get_setting("OPENAI_API_KEY")
-    openai_client = OpenAI(api_key=api_key) if api_key else OpenAI()
+    return OpenAI(api_key=api_key) if api_key else OpenAI()
+
+
+def _whisper(file_path, client=None):
+    """Whisper, asked for its segments instead of only the flat text.
+
+    ``verbose_json`` costs nothing extra and returns every segment with a start
+    and an end. Asking for plain text and throwing the timings away is what left
+    the panel unable to run a timestamp down the side of the transcript or jump
+    the player to a line.
+    """
+    client = client or _openai_client()
     with open(file_path, "rb") as audio_file:
-        transcript = openai_client.audio.transcriptions.create(model="whisper-1", file=audio_file)
-    return transcript.text
+        result = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file,
+            response_format="verbose_json",
+            timestamp_granularities=["segment"],
+        )
+    text = (getattr(result, "text", "") or "").strip()
+    segments = []
+    for seg in (getattr(result, "segments", None) or []):
+        # The SDK hands back objects on some versions and dicts on others.
+        get = seg.get if isinstance(seg, dict) else lambda k, d=None: getattr(seg, k, d)
+        body = (get("text", "") or "").strip()
+        if not body:
+            continue
+        segments.append({
+            "start": round(float(get("start", 0.0) or 0.0), 2),
+            "end": round(float(get("end", 0.0) or 0.0), 2),
+            "text": body,
+            "speaker": None,
+        })
+    return text, segments
+
+
+def _split_stereo(file_path):
+    """Split a two-channel recording into two mono files, or return None.
+
+    A conference leg recorded with ``recording_channels="dual"`` puts each party
+    on its own channel: what the platform sent on one, what the person on the
+    other end said on the other. That is speaker separation for free — Whisper
+    itself cannot tell voices apart. A mono recording has nothing to split, and
+    is transcribed as one track with no speaker attributed.
+    """
+    import audioop
+    import tempfile
+
+    try:
+        with wave.open(file_path, "rb") as src:
+            if src.getnchannels() != 2:
+                return None
+            params = src.getparams()
+            frames = src.readframes(params.nframes)
+    except (wave.Error, EOFError, FileNotFoundError):
+        return None
+
+    width = params.sampwidth
+    out = []
+    for channel in (0, 1):
+        mono = audioop.tomono(frames, width, 1 if channel == 0 else 0,
+                              0 if channel == 0 else 1)
+        fd, path = tempfile.mkstemp(suffix=f".ch{channel}.wav")
+        os.close(fd)
+        with wave.open(path, "wb") as dst:
+            dst.setnchannels(1)
+            dst.setsampwidth(width)
+            dst.setframerate(params.framerate)
+            dst.writeframes(mono)
+        out.append(path)
+    return out
+
+
+def transcribe_audio(file_path, with_segments=False):
+    """Transcribe a recording.
+
+    Returns the plain text by default, so every existing caller keeps working.
+    Pass ``with_segments=True`` for ``(text, segments)``.
+    """
+    client = _openai_client()
+    channels = _split_stereo(file_path)
+
+    if not channels:
+        text, segments = _whisper(file_path, client)
+    else:
+        # Two channels, so each side is transcribed on its own and the two are
+        # merged back in time order. Speaker 1 is the party the platform dialled
+        # out to; speaker 2 is the other side of the conference.
+        merged = []
+        try:
+            for number, path in enumerate(channels, start=1):
+                _, segs = _whisper(path, client)
+                for seg in segs:
+                    seg["speaker"] = number
+                merged.extend(segs)
+        finally:
+            for path in channels:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+        merged.sort(key=lambda s: s["start"])
+        segments = merged
+        text = "\n".join(s["text"] for s in merged)
+
+    return (text, segments) if with_segments else text
 
 ## Self registration logic ##
 

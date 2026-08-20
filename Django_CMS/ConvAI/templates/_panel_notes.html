@@ -1,0 +1,42 @@
+{% load i18n tz %}
+{% comment %}
+  The notes already written about this thing, under the box for writing a new
+  one. Shared by every kind of panel, so a note reads and behaves the same
+  whether it hangs off a call, a meeting, an alert or a conversation.
+
+  Deleting happens on the click and offers the way back for a few seconds
+  rather than stopping to ask first: a note is small and the undo is cheaper
+  than a dialog on every removal.
+
+  Expects panel_item.notes_list, .note_parent and .note_parent_id.
+{% endcomment %}
+{% if panel_item.notes_list %}<div class="dpc-sect">{% trans "Earlier notes" %}</div>{% endif %}
+<div class="dp-notelist" id="dpNotes"
+     data-add-url="{% url 'add_note' panel_item.note_parent panel_item.note_parent_id %}">
+
+  {% for n in panel_item.notes_list %}
+    <article class="dp-note" data-note="{{ n.id }}"
+             data-edit-url="{% url 'edit_note' n.id %}"
+             data-delete-url="{% url 'delete_note' n.id %}">
+      <p data-note-body>{{ n.body }}</p>
+      <div class="dp-note-edit" hidden>
+        <textarea class="dpc-ta" rows="3">{{ n.body }}</textarea>
+        <div class="dp-note-editrow">
+          <button type="button" class="dp-btn" data-note-cancel>{% trans "Cancel" %}</button>
+          <button type="button" class="dp-btn dp-btn-pri" data-note-save>{% trans "Save" %}</button>
+        </div>
+      </div>
+      <footer>
+        <b>{{ n.author }}</b>
+        <time data-note-when>{% if n.edited %}{% trans "edited" %} {% endif %}{{ n.when|localtime|date:"d M · H:i" }}</time>
+        <button type="button" class="dp-note-act" data-note-edit>{% trans "Edit" %}</button>
+        <button type="button" class="dp-note-act dp-note-del" data-note-delete>{% trans "Delete" %}</button>
+      </footer>
+    </article>
+  {% endfor %}
+
+  <div class="dp-undo" id="dpNoteUndo" hidden>
+    <span>{% trans "Note deleted" %}</span>
+    <button type="button" class="dp-btn" id="dpNoteUndoBtn">{% trans "Undo" %}</button>
+  </div>
+</div>

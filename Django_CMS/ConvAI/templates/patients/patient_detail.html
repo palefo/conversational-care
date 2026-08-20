@@ -87,9 +87,17 @@
         </dd>
       </div>
 
-      {% if patient.caregiver.phone_number %}
-        <div><dt>{% trans "Caregiver phone" %}</dt><dd>{{ patient.caregiver.phone_number }}</dd></div>
-      {% endif %}
+      {% comment %}
+        The client's own number was the one fact about them the profile did not
+        show, while the caregiver's sat right below it. Both are editable on the
+        edit form; neither was much use there if you could not see the current
+        value without opening it.
+      {% endcomment %}
+      <div><dt>{% trans "Phone" %}</dt>
+        <dd>{% if patient.phone_number %}{{ patient.phone_number }}{% else %}<i>{% trans "Not recorded" %}</i>{% endif %}</dd></div>
+
+      <div><dt>{% trans "Caregiver phone" %}</dt>
+        <dd>{% if patient.caregiver.phone_number %}{{ patient.caregiver.phone_number }}{% elif patient.caregiver %}<i>{% trans "Not recorded" %}</i>{% else %}&mdash;{% endif %}</dd></div>
       {% comment %}
         Patient.navigator is null=True / SET_NULL, so it really can be absent.
         The fallback has to be a conditional: a chained lookup used as a filter
@@ -377,7 +385,18 @@
       });
       ['details', 'comms'].forEach(function (t) {
         var panel = document.getElementById('pd-panel-' + t);
-        if (panel) panel.hidden = (t !== name);
+        if (!panel) return;
+        var on = (t === name);
+        panel.hidden = !on;
+        if (!on) return;
+        // The tab strip does not move, so neither does the box — what changed
+        // is what is in it. Removed and re-added so switching back and forth
+        // plays each time rather than only the first; the reflow read between
+        // them is what restarts the animation.
+        panel.classList.remove('ui-arrive');
+        void panel.offsetWidth;
+        panel.classList.add('ui-arrive');
+        setTimeout(function () { panel.classList.remove('ui-arrive'); }, 260);
       });
     }
 
@@ -388,9 +407,13 @@
       });
     });
 
-    // Arriving with a panel open means you came from the timeline (or a deep
-    // link into it), so show that tab rather than dropping you on Details.
-    if (location.hash === '#comms' || /[?&]item=/.test(location.search)) show('comms');
+    // Arriving with anything the Communications tab owns means you were in it
+    // and the page reloaded — switching to Happened, running a search, picking
+    // a chip, turning a page. Every one of those is a GET that drops the
+    // fragment, and landing back on Details after clicking a tab inside
+    // Communications reads as the app losing your place.
+    var COMMS_PARAMS = /[?&](item|tab|q|kind|when|page)=/;
+    if (location.hash === '#comms' || COMMS_PARAMS.test(location.search)) show('comms');
   })();
 </script>
 <style>@keyframes spin { to { transform: rotate(360deg); } }</style>

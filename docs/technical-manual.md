@@ -111,6 +111,15 @@ the item exists.
 A chat item is a *patient plus a day*, not a single row — hence the
 `chat-<patient_pk>-<iso_date>` form.
 
+The panel can also be fetched on its own: `GET /panel/?item=<token>` renders
+just the fragment (`views/_panel.py::panel_fragment`), which is what `base.html`
+swaps in when a row is opened, so the list beside it is never rebuilt to change
+which row is highlighted. The item is permission-checked there exactly as on a
+full page load, and a token that resolves to nothing answers **204** — a stale
+link is a panel with nothing in it, not an error — at which point the front end
+closes the panel. Every row keeps a real `href`, so a modified click, a failed
+fetch or no scripting at all falls through to ordinary navigation.
+
 Every kind shares one frame: a pinned header, a pinned tab strip, a scrolling
 body, and a pinned footer holding the actions. Actions either settle the item
 in place or open a `<dialog>`; nothing navigates away.
@@ -156,7 +165,10 @@ All are `navigator_required` and ownership-checked.
 | Route | Name | Purpose |
 | --- | --- | --- |
 | `POST /meetings/<id>/cancel/` | `cancel_meeting` | cancel a scheduled call, or reinstate with `reinstate=1` |
-| `POST /meetings/<id>/notes/` | `save_meeting_notes` | autosaved free-text notes, answers JSON |
+| `GET /panel/` | `panel_fragment` | the detail panel on its own, for `?item=` swaps; 204 when nothing resolves |
+| `POST /notes/<kind>/<pk>/add/` | `add_note` | write a note on a meeting, recording, alert or conversation |
+| `POST /notes/<pk>/edit/` | `edit_note` | change a note's body |
+| `POST /notes/<pk>/delete/` | `delete_note` | remove a note; the panel offers Undo before it fires |
 | `POST /patients/<pk>/chatbot/` | `toggle_patient_chatbot` | agent on/off per client, with reason + audit fields |
 | `POST /patients/<pk>/raise-alert/` | `raise_alert` | human-raised alert (`data.raised_by_human=True`) |
 | `POST /patients/<pk>/note/` | `save_client_note` | client-page notes |
@@ -169,7 +181,7 @@ All are `navigator_required` and ownership-checked.
 
 | Model | Added |
 | --- | --- |
-| `Meeting` | `notes`, `notes_updated_at`; `modality` (PHONE/IN_PERSON) + `location`; `CANCELLED` status with `cancel_reason`, `cancelled_at` |
+| `Meeting` | `notes`, `notes_updated_at` (both **removed again in 0072** — see below); `modality` (PHONE/IN_PERSON) + `location`; `CANCELLED` status with `cancel_reason`, `cancelled_at` |
 | `Caregiver` | `relationship`, `involvement` |
 | `ContactTerm` | new model, 5 standard terms seeded; stored on `Patient.contact_terms` as a slug list |
 | `SeenMark` | new model — per-user read marks, keyed by panel token (no FK: a chat item is a patient+day) |
@@ -180,6 +192,26 @@ The agent off-switch is **per client**, not per alert, and it genuinely gates
 replies: `process_message_for_patient` in `utils.py` returns early. Both inbound
 paths funnel through it. The caregiver's message is still recorded; what stops
 is the answer.
+
+### Model changes (migrations 0066–0072)
+
+| Model | Change |
+| --- | --- |
+| `Note` | **new model** — one written note, with an author and created/updated times. The parent is an explicit nullable FK per kind (meeting / recording / alert / conversation) rather than a generic relation: more columns, but the queries stay simple and permission follows the parent's client. Replaces `Meeting.notes` and `alert.data['internal_note']`, which were single strings with no author, overwritten on every save |
+| `CallRecording` | `transcript_segments`, `transcript_moments` — Whisper is called with `verbose_json` so the timings survive, and each key moment names a *segment index* rather than writing its own timestamp, so a moment the model invents has nothing to attach to and is dropped instead of pointing at silence |
+| `Meeting` | `ended_at`, with a `happened_at` property falling back to `cancelled_at` then `scheduled_time`. Before this, completed calls sorted by their *scheduled* time, so "Happened" could contain future dates. `notes` / `notes_updated_at` **dropped** |
+| `Answer` | `by_text` — the answer came back from the caregiver via the protocol automation rather than being typed by a navigator. Cleared when a human edits the answer |
+| `SiteConfiguration` | `transcript_moments_prompt` — editable in Settings → Prompts, blank falls back to `default_prompts.DEFAULT_TRANSCRIPT_MOMENTS_PROMPT` |
+
+Four of these move data and are **not cleanly reversible** — run them against a
+copy of production first:
+
+| Migration | What it moves |
+| --- | --- |
+| `0067_meeting_notes_to_note_rows` | the old `Meeting.notes` blob into `Note` rows |
+| `0068_alert_internal_note_to_note_rows` | `alert.data['internal_note']` into `Note` rows |
+| `0071_backfill_ended_at` | stamps `ended_at` on past-tense meetings still dated in the future |
+| `0072_retire_legacy_note_fields` | carries `alert.data['note_log']` (a rolling list nothing ever displayed, and the one place holding notes `0068` did not cover) into `Note` rows, then drops the four dead alert keys and the two `Meeting` note columns |
 
 ### Environment sensitivities
 
@@ -276,6 +308,7 @@ precedence over `.env`.
 | `DB_ENGINE` `DB_NAME` `DB_USER` `DB_PASSWORD` `DB_HOST` `DB_PORT` | Standard connection settings; `DB_HOST=db` targets the bundled container. |
 | `DB_SSLMODE` | `disable` locally, `require` for managed Postgres. |
 | `POSTGRES_PUBLISH_PORT` | Host port publishing the bundled DB (compose only). |
+| `WEB_PUBLISH_PORT` | Host port publishing the app (compose only, default `8000`). Set it when the host already has something on 8000 — e.g. a second copy of this project. |
 
 ### Twilio / messaging
 
@@ -501,6 +534,11 @@ Before going to production:
       consider `ASYNC_WHATSAPP_REPLY=1`.
 - [ ] Decide whether the REST API should be exposed (`ENABLE_API`).
 - [ ] Set up database backups ([database.md](../database.md)).
+- [ ] Confirm `collectstatic` picked up `ConvAI/static/app/fonts/`. The DM Sans
+      and Material Icons faces are served from the app, not from Google — if
+      those three `.woff2` files are missing, **every icon renders as its
+      ligature text** (literally the words `home`, `settings`, `save`), which
+      looks like a CSS failure but is a static-files one.
 
 ## 15. Development workflow
 

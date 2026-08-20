@@ -76,19 +76,50 @@
     var modal = document.getElementById('cmModal');
     if (!modal) return;
     var opener = document.getElementById('cmNew');
+    var dialog = modal.querySelector('.cm-dialog');
     var lastFocus = null;
+    var closingTimer = null;
+
+    // Where the dialog grows from. Measured rather than declared, because the
+    // Schedule button sits at the end of a header row and moves with the
+    // heading beside it.
+    function anchorTo(el) {
+      if (!el || !dialog) return;
+      var d = dialog.getBoundingClientRect();
+      if (!d.width) return;                       // not laid out: keep the centre
+      var r = el.getBoundingClientRect();
+      dialog.style.setProperty('--cm-ox', (r.left + r.width / 2 - d.left) + 'px');
+      dialog.style.setProperty('--cm-oy', (r.top + r.height / 2 - d.top) + 'px');
+    }
 
     function open() {
+      clearTimeout(closingTimer);
       lastFocus = document.activeElement;
+      modal.classList.remove('cm-out');
       modal.hidden = false;
+      // After `hidden` comes off, so the dialog has a box to measure against —
+      // and before the browser can paint, so the first frame already has it.
+      anchorTo(opener);
       var first = modal.querySelector('select, input, textarea');
       if (first) first.focus();
     }
+
     function close() {
-      modal.hidden = true;
+      if (modal.hidden || modal.classList.contains('cm-out')) return;
+      // Focus goes back now rather than when the exit finishes: a keyboard user
+      // should not be made to wait out an animation they are not watching.
       if (lastFocus) lastFocus.focus();
+      modal.classList.add('cm-out');
+      closingTimer = setTimeout(function () {
+        modal.hidden = true;
+        modal.classList.remove('cm-out');
+      }, 170);
     }
     opener.addEventListener('click', open);
+
+    // Re-rendered open because the form came back with errors. It was not
+    // opened by a press this time, but it still belongs to the same button.
+    if (!modal.hidden) anchorTo(opener);
 
     // Opened from somewhere else — the follow-up action in a call panel links
     // here with ?schedule=<client pk>, because the dialog and its form live on
@@ -135,7 +166,16 @@
     function apply(head, isFolded) {
       head.setAttribute('aria-expanded', String(!isFolded));
       var rows = document.querySelector('[data-rows="' + head.dataset.day + '"]');
-      if (rows) rows.hidden = isFolded;
+      if (!rows) return;
+      rows.hidden = isFolded;
+      if (isFolded) return;
+      // Unfolding: the day's rows arrive rather than appearing. The sticky day
+      // header is a sibling of this element, not inside it, so nothing here can
+      // disturb it.
+      rows.classList.remove('ui-arrive');
+      void rows.offsetWidth;
+      rows.classList.add('ui-arrive');
+      setTimeout(function () { rows.classList.remove('ui-arrive'); }, 260);
     }
 
     var saved = folded();

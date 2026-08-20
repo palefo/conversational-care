@@ -12,20 +12,64 @@
       border-radius: 12px;
       overflow: hidden;
     }
-    .dash-acc-head {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      text-align: left;
-      padding: 15px 18px;
-      border-bottom: 1px solid #f1f5f9;
+    /* The date under the greeting. */
+    .dash-today { font-size: .8125rem; color: #64748b; margin: 2px 0 16px; }
+
+    /* The little dashboard: three numbers at a glance, above the lists that
+       hold the actual work. A box is a summary and a way in, not a container —
+       nothing lives inside one. */
+    .dash-stats {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px; margin-bottom: 16px;
     }
+    @media (max-width: 760px) { .dash-stats { grid-template-columns: 1fr; } }
+    .dash-stat {
+      display: block; background: #fff; border-radius: .75rem;
+      padding: 1.125rem 1.25rem; text-decoration: none;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
+    }
+    /* Everything clickable on this page answers the pointer the same way: the
+       surface lifts and warms slightly. A shadow alone was too quiet to read as
+       a control, and the section headers below had no hover at all — so two
+       things that both take you somewhere behaved differently. */
+    .dash-stat, .dash-acc-head {
+      transition: background-color .12s ease, box-shadow .12s ease;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .dash-stat, .dash-acc-head { transition: none; }
+    }
+    .dash-stat:hover {
+      background: #f8fbff;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, .10);
+    }
+    .dash-stat:hover .dash-stat-k { color: #0369a1; }
+    .dash-stat:focus-visible {
+      outline: 2px solid #0369a1; outline-offset: 2px;
+    }
+    .dash-stat-k {
+      display: block; font-size: .6875rem; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; color: #64748b;
+    }
+    .dash-stat-v {
+      display: block; margin-top: .25rem; font-size: 2.25rem; font-weight: 700;
+      color: #0f172a; line-height: 1.15; font-variant-numeric: tabular-nums;
+    }
+    /* Nothing there yet is not the same news as ten things waiting. */
+    .dash-stat-v.is-none { color: #cbd5e1; }
+
+    .dash-acc-head {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; padding: .875rem 1.125rem; text-align: left;
+      background: transparent; border: 0; border-bottom: 1px solid #f1f5f9;
+      cursor: pointer;
+    }
+    .dash-acc-head:hover { background: #f8fbff; }
+    .dash-acc-head:focus-visible { outline: 2px solid #0369a1; outline-offset: -2px; }
     .dash-acc.collapsed .dash-acc-head { border-bottom: 0; }
     .dash-acc.collapsed .dash-acc-body { display: none; }
     .dash-acc.collapsed .dash-acc-chevron { transform: rotate(-90deg); }
-    .dash-acc-chevron { transition: transform 0.15s ease; color: #94a3b8; }
+    .dash-acc-chevron { transition: transform .2s cubic-bezier(.2, .8, .3, 1); color: #94a3b8; }
+    @media (prefers-reduced-motion: reduce) { .dash-acc-chevron { transition: none; } }
     .dash-acc-badge {
       display: inline-flex;
       align-items: center;
@@ -34,7 +78,7 @@
       height: 1.375rem;
       padding: 0 0.45rem;
       border-radius: 9999px;
-      background: #0ea5e9;
+      background: var(--brand-primary);
       color: #fff;
       font-size: 0.75rem;
       font-weight: 600;
@@ -45,51 +89,66 @@
        telling that it is about your day. */
     .dash-hd { margin-bottom: 6px; }
     .dash-hello {
-      font-size: 29px; font-weight: 600; color: #1f2937; letter-spacing: -0.01em; margin: 0;
+      font-size: 1.8125rem; font-weight: 600; color: #1f2937; margin: 0;
+      /* Matches .cm-hd h1 and .pd-hd-name — see app_new_design.css. */
+      letter-spacing: -0.02em; line-height: 1.15;
     }
-    .dash-day { font-size: 13.5px; color: #475569; line-height: 1.55; margin: 0 0 14px; }
+    .dash-day { font-size: 0.84375rem; color: #475569; line-height: 1.55; margin: 0 0 14px; }
     .dash-sum-em { color: #b91c1c; font-weight: 600; }
 
     /* The next call. White on a sky border so it sits forward of the page
        without shouting, and the middle column may shrink — without that the
        name has nowhere to go and the button lands on top of it. */
+    /* The one thing you are about to do, made the largest thing on the page.
+       It used to be a tinted card the same weight as everything under it. */
     .dash-next {
-      position: relative;
-      display: flex; align-items: center; gap: 14px;
-      background: #fff; border: 1px solid #bae6fd; border-radius: 12px;
-      padding: 13px 16px 13px 16px; padding-right: 38px; margin-bottom: 1.25rem;
+      display: flex; align-items: center; gap: 16px; position: relative;
+      background: #0c4a6e; color: #fff;
+      border-radius: .875rem; padding: 1.125rem 1.25rem; margin-bottom: 16px;
     }
-    .dash-next:hover { border-color: #7dd3fc; }
+    /* The card is not itself a link — the two things inside it are — so it
+       lifts rather than lighting up, and Open call keeps its own hover. */
+    .dash-next:hover { box-shadow: 0 6px 20px -6px rgba(12, 74, 110, .45); }
+    .dash-next-body:focus-visible, .dash-next-go:focus-visible {
+      outline: 2px solid #7dd3fc; outline-offset: 3px; border-radius: 6px;
+    }
     .dash-next.is-late { border-color: #fecaca; }
     .dash-next-body { flex: 1; min-width: 0; text-decoration: none; display: block; }
     .dash-next-lab {
-      display: block; font-size: 11px; font-weight: 700; letter-spacing: .07em;
-      text-transform: uppercase; color: #0369a1; margin-bottom: 1px;
+      display: block; font-size: 0.6875rem; font-weight: 700; letter-spacing: .09em;
+      text-transform: uppercase; color: #7dd3fc; margin-bottom: 2px;
     }
-    .dash-next.is-late .dash-next-lab { color: #b91c1c; }
+    /* Late reads as amber on this ground; red on dark blue is a warning about
+       the system rather than about the call. */
+    .dash-next.is-late { background: #7c2d12; }
+    .dash-next.is-late .dash-next-lab { color: #fdba74; }
     .dash-next-time {
-      display: block; font-size: 14.5px; font-weight: 700; color: #1e293b;
-      font-variant-numeric: tabular-nums;
+      display: block; font-size: 1.25rem; font-weight: 700; color: #fff;
+      letter-spacing: -.01em; font-variant-numeric: tabular-nums;
     }
-    .dash-next.is-late .dash-next-time { color: #b91c1c; }
+    .dash-next.is-late .dash-next-time { color: #fff; }
     .dash-next-det {
-      display: block; font-size: 12px; color: #64748b; margin-top: 1px;
+      display: block; font-size: 0.8125rem; color: #bae6fd; margin-top: 2px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .dash-next-det b { color: #1e293b; font-weight: 600; }
+    .dash-next-det b { color: #fff; font-weight: 600; }
+    .dash-next.is-late .dash-next-det { color: #fed7aa; }
     .dash-next-go {
-      flex: 0 0 auto; font-size: 12.5px; font-weight: 700; color: #fff;
-      background: #0369a1; border-radius: 8px; padding: 8px 14px;
-      white-space: nowrap; text-decoration: none;
+      flex: 0 0 auto; font-size: 0.8125rem; font-weight: 700; color: #fff;
+      background: #0ea5e9; border-radius: 9999px; padding: 9px 18px;
+      white-space: nowrap; text-decoration: none; margin-right: 18px;
     }
-    .dash-next-go:hover { background: #075985; color: #fff; }
+    .dash-next-go:hover { background: #38bdf8; color: #fff; }
+    .dash-next.is-late .dash-next-go { background: #ea580c; }
+    .dash-next.is-late .dash-next-go:hover { background: #f97316; }
     .dash-next-x {
       position: absolute; top: 8px; right: 8px;
       width: 22px; height: 22px; border: 0; border-radius: 6px; background: none;
-      color: #94a3b8; font-size: 13px; line-height: 1; cursor: pointer;
+      color: #94a3b8; font-size: 0.8125rem; line-height: 1; cursor: pointer;
       display: inline-flex; align-items: center; justify-content: center;
     }
-    .dash-next-x:hover { background: #f0f9ff; color: #0f172a; }
+    .dash-next-x { color: #7dd3fc; }
+    .dash-next-x:hover { background: rgba(255,255,255,.12); color: #fff; }
 
     /* The kind of thing a row is, said the same way as on Communications:
        one tinted square, one icon, one colour per kind. */
@@ -97,7 +156,7 @@
       flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px;
       display: inline-flex; align-items: center; justify-content: center;
     }
-    .dash-ic .material-icons-outlined { font-size: 16px; }
+    .dash-ic .material-icons-outlined { font-size: 1rem; }
     .dash-ic-call  { background: #eff6ff; color: #1d4ed8; }
     .dash-ic-visit { background: #fff7ed; color: #c2410c; }
     .dash-ic-chat  { background: #f0fdf4; color: #15803d; }
@@ -118,9 +177,9 @@
     .dash-row-bar-red { background: #ef4444; }
     .dash-row-main { flex: 1; min-width: 0; }
     .dash-row-l1 { display: flex; align-items: center; gap: 8px; }
-    .dash-row-name { font-weight: 600; color: #1e293b; font-size: 14px; }
+    .dash-row-name { font-weight: 600; color: #1e293b; font-size: 0.875rem; }
     .dash-row-l2 {
-      font-size: 12px;
+      font-size: 0.75rem;
       color: #64748b;
       margin-top: 2px;
       white-space: nowrap;
@@ -128,7 +187,7 @@
       text-overflow: ellipsis;
     }
     .dash-utag {
-      font-size: 10.5px;
+      font-size: 0.65625rem;
       font-weight: 700;
       padding: 2px 8px;
       border-radius: 9999px;
@@ -146,19 +205,23 @@
     .dash-row-overdue:hover { background: #fee2e2; }
 
     /* Today's work reads differently from the reading lists around it. */
-    .dash-card-today { border-color: #bae6fd; border-left: 3px solid #0ea5e9; border-radius: 0 12px 12px 0; }
+    .dash-card-today { border-color: #bae6fd; border-left: 3px solid var(--brand-primary); border-radius: 0 12px 12px 0; }
     .dash-card-today .dash-acc-head { background: #f0f9ff; }
-    .dash-today-dot { width: 7px; height: 7px; border-radius: 9999px; background: #0ea5e9; display: inline-block; }
+    /* This card's head already carries a tint, and that rule is later in the
+       file at equal specificity — so it needs its own hover or it would be the
+       one section on the page that stays inert under the pointer. */
+    .dash-card-today .dash-acc-head:hover { background: #e0f2fe; }
+    .dash-today-dot { width: 7px; height: 7px; border-radius: 9999px; background: var(--brand-primary); display: inline-block; }
 
     /* Filters live inside the box they filter. */
     .dash-row-right { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
-    .dash-time { font-size: 13px; color: #475569; font-weight: 600; white-space: nowrap; }
+    .dash-time { font-size: 0.8125rem; color: #475569; font-weight: 600; white-space: nowrap; }
     .dash-time-late { color: #b91c1c; }
-    .dash-stag { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 9999px; }
+    .dash-stag { font-size: 0.65625rem; font-weight: 600; padding: 2px 8px; border-radius: 9999px; }
     .dash-stag-done { background: #dcfce7; color: #166534; }
     .dash-stag-interrupted { background: #fee2e2; color: #b91c1c; }
     .dash-stag-noans { background: #f3f4f6; color: #4b5563; }
-    .dash-empty { padding: 14px 18px; color: #94a3b8; font-size: 13px; }
+    .dash-empty { padding: 14px 18px; color: #94a3b8; font-size: 0.8125rem; }
     /* Rows are hidden by the live search. `.block` sets display:block, which
        would otherwise win over the [hidden] attribute and show them anyway. */
     .dash-acc-body > a[hidden] { display: none !important; }
@@ -169,7 +232,7 @@
       padding: 8px 18px; background: #f8fbfe; border-bottom: 1px solid #f1f5f9;
     }
     .dash-find, .dash-sort {
-      font-size: 12px; border: 1px solid #e2e8f0; border-radius: 7px;
+      font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 7px;
       padding: 4px 8px; color: #475569; background: #fff; font-family: inherit;
     }
     /* Draw the chevron ourselves: the native one varies by browser and is easy
@@ -189,19 +252,19 @@
        list — a column you can scan rather than labels you have to read. */
     .dash-prio {
       display: inline-flex; align-items: center; gap: 5px;
-      font-size: 11px; color: #64748b; white-space: nowrap; width: 70px;
+      font-size: 0.6875rem; color: #64748b; white-space: nowrap; width: 70px;
     }
     .dash-dot { width: 7px; height: 7px; border-radius: 9999px; flex: 0 0 auto; display: inline-block; }
     .dash-dot-high { background: #ef4444; }
     .dash-dot-med  { background: #f59e0b; }
     .dash-dot-low  { background: #38bdf8; }
     .dash-age {
-      font-size: 12.5px; color: #64748b; font-weight: 600; white-space: nowrap;
+      font-size: 0.78125rem; color: #64748b; font-weight: 600; white-space: nowrap;
       font-variant-numeric: tabular-nums; text-align: right; min-width: 76px;
     }
     .dash-kick { color: #94a3b8; }
     .dash-wip {
-      font-size: 10px; font-weight: 700; letter-spacing: .05em;
+      font-size: 0.625rem; font-weight: 700; letter-spacing: .05em;
       text-transform: uppercase; color: #0369a1; white-space: nowrap;
     }
     .dash-row-right { flex-direction: row; align-items: center; gap: 12px; }
@@ -209,14 +272,14 @@
     /* Two sizes across every row: 14px for what you scan — the client's name
        and the hour — and 12px for everything supporting them. The uppercase
        micro-labels are gone; colour and weight already did that work. */
-    .dash-row-l2, .dash-prio, .dash-age, .dash-late, .dash-wip { font-size: 12px; }
+    .dash-row-l2, .dash-prio, .dash-age, .dash-late, .dash-wip { font-size: 0.75rem; }
     .dash-wip { text-transform: none; letter-spacing: 0; font-weight: 600; }
     .dash-prio { width: 78px; }
 
     /* Leading day and hour. A call is a time before it is anything else. */
     .dash-when { flex: 0 0 auto; width: 78px; line-height: 1.3; }
-    .dash-when-d { display: block; font-size: 12px; color: #64748b; }
-    .dash-when-h { display: block; font-size: 14px; font-weight: 700; color: #1e293b;
+    .dash-when-d { display: block; font-size: 0.75rem; color: #64748b; }
+    .dash-when-h { display: block; font-size: 0.875rem; font-weight: 700; color: #1e293b;
                    font-variant-numeric: tabular-nums; }
     .dash-when-late .dash-when-d, .dash-when-late .dash-when-h { color: #b91c1c; }
     /* Right-aligned as a block: the two lines are different lengths, so
@@ -225,19 +288,19 @@
     .dash-late-red { color: #b91c1c; font-weight: 600; }
     /* The date states the fact; this says what has not happened, without
        naming anyone as the reason for it. */
-    .dash-notyet { display: block; text-align: right; font-size: 10.5px; color: #94a3b8; font-weight: 400; }
+    .dash-notyet { display: block; text-align: right; font-size: 0.65625rem; color: #94a3b8; font-weight: 400; }
 
     /* Quiet on purpose. It sits at the foot of the page and is the one thing
        there that is not asking for anything. */
     .dash-digest { margin: 4px 0 8px; padding: 15px 18px; background: #fff;
       border: 1px solid #e8f1fb; border-radius: 12px; }
-    .dash-digest h2 { font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
+    .dash-digest h2 { font-size: 0.65625rem; font-weight: 700; letter-spacing: .08em;
       text-transform: uppercase; color: #94a3b8; margin: 0 0 10px; }
     .dash-digest-l { display: flex; gap: 9px; align-items: flex-start;
-      font-size: 12.5px; color: #334155; line-height: 1.5; }
+      font-size: 0.78125rem; color: #334155; line-height: 1.5; }
     .dash-digest-l + .dash-digest-l { margin-top: 8px; }
     .dash-digest-l b { color: #1e293b; font-weight: 600; }
-    .dash-digest-l .material-icons-outlined { font-size: 15px; color: #be123c; flex: 0 0 auto;
+    .dash-digest-l .material-icons-outlined { font-size: 0.9375rem; color: #be123c; flex: 0 0 auto;
       margin-top: 2px; }
 
     .dash-dot-done { background: #16a34a; }
@@ -245,23 +308,23 @@
     .dash-dot-no   { background: #94a3b8; }
 
     /* Section icons, matching the set the timeline and Communications use. */
-    .dash-sect-i { font-size: 19px !important; color: #0369a1; }
+    .dash-sect-i { font-size: 1.1875rem !important; color: #0369a1; }
 
     /* Pager: numbers with an arrow either side, both greyed at the ends
        rather than removed, so the rows above never shift. */
     .dash-pg { display: flex; align-items: center; gap: 4px; padding: 9px 18px; border-top: 1px solid #f4f7fb; }
-    .dash-pg-count { font-size: 12px; color: #94a3b8; margin-right: auto; font-variant-numeric: tabular-nums; }
+    .dash-pg-count { font-size: 0.75rem; color: #94a3b8; margin-right: auto; font-variant-numeric: tabular-nums; }
     .dash-pg-num {
       min-width: 28px; height: 28px; padding: 0 6px; border-radius: 7px;
       display: inline-flex; align-items: center; justify-content: center;
-      color: #475569; font-size: 12px; text-decoration: none; font-variant-numeric: tabular-nums;
+      color: #475569; font-size: 0.75rem; text-decoration: none; font-variant-numeric: tabular-nums;
     }
     .dash-pg-num:hover { background: #f0f9ff; color: #0369a1; }
     .dash-pg-num.is-on { background: #0369a1; color: #fff; font-weight: 700; }
     .dash-pg-arrow {
       width: 28px; height: 28px; border-radius: 7px; border: 1px solid #e2e8f0;
       display: inline-flex; align-items: center; justify-content: center;
-      color: #475569; font-size: 15px; line-height: 1; text-decoration: none;
+      color: #475569; font-size: 0.9375rem; line-height: 1; text-decoration: none;
     }
     .dash-pg-arrow:hover { background: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
     .dash-pg-arrow.is-off { color: #cbd5e1; border-color: #f1f5f9; pointer-events: none; }
@@ -271,7 +334,7 @@
     .dash-pg-dots {
       min-width: 28px; height: 28px;
       display: inline-flex; align-items: center; justify-content: center;
-      color: #cbd5e1; font-size: 12px;
+      color: #cbd5e1; font-size: 0.75rem;
     }
   </style>
 
@@ -284,30 +347,22 @@
   {% endcomment %}
   <header class="dash-hd">
     <h1 class="dash-hello">{{ greeting }}, {{ first_name }}</h1>
+    {% comment %}
+      The date and nothing else. The counts that used to run along this line are
+      the three tiles below, where each one sits on the box it describes and can
+      be pressed; saying them twice made the line a summary competing with the
+      thing it summarised.
+    {% endcomment %}
+    <p class="dash-today">{{ today_label }}</p>
   </header>
 
   {% comment %}
-    A sentence, not a generated summary, and deliberately not styled as AI.
-    Every number is read from the same queryset as the box it describes, so
-    the two can never disagree.
+    The standing summary above the boxes is out for now, at Marco's request —
+    every number in it also appears on the box it describes, a few lines below.
+    The markup and the context it read from (todo_count, carried_over_count,
+    alert_counts, high_topics) are untouched in views/dashboard.py, so putting
+    it back is uncommenting this block; see git history for the sentence.
   {% endcomment %}
-  <p class="dash-day">
-      {% if todo_count %}
-        {% blocktrans count n=todo_count %}{{ n }} meeting pending{% plural %}{{ n }} meetings pending{% endblocktrans %}{% if carried_over_count %} —
-          {% blocktrans count t=pending_count %}{{ t }} today{% plural %}{{ t }} today{% endblocktrans %},
-          <span class="dash-sum-em">{% blocktrans count co=carried_over_count %}{{ co }} still to make{% plural %}{{ co }} still to make{% endblocktrans %}</span>{% endif %}.
-      {% else %}
-        {% trans "No meetings pending." %}
-      {% endif %}
-
-      {% if alert_counts.all %}
-        {% blocktrans count n=alert_counts.all %}{{ n }} chat flagged for review{% plural %}{{ n }} chats flagged for review{% endblocktrans %}{% if alert_counts.high %},
-          {% blocktrans count h=alert_counts.high %}{{ h }} high priority{% plural %}{{ h }} high priority{% endblocktrans %} —
-          {% if high_topics|length == 1 %}
-            <span class="dash-sum-em">{% blocktrans with topic=high_topics.0.title %}all “{{ topic }}”{% endblocktrans %}</span>{% else %}<span class="dash-sum-em">{% for t in high_topics %}{{ t.count }} × “{{ t.title }}”{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}{% endif %}.
-      {% endif %}
-
-  </p>
 
   {% if next_meeting %}
     {% comment %}
@@ -318,7 +373,7 @@
     {% endcomment %}
     <div class="dash-next{% if next_meeting.is_late %} is-late{% endif %}"
          id="dashNext" data-call="{{ next_meeting.panel_token }}">
-      <a class="dash-next-body" href="?item={{ next_meeting.panel_token }}">
+      <a class="dash-next-body" href="?item={{ next_meeting.panel_token }}" data-dp-open>
         <span class="dash-next-lab">
           {% trans "Next call" %}{% if next_meeting.is_late %} · {% trans "not yet made" %}{% endif %}
         </span>
@@ -327,66 +382,99 @@
           <b>{{ next_meeting.name }}</b> · {{ next_meeting.protocol }} · {{ next_meeting.with_ }}
         </span>
       </a>
-      <a class="dash-next-go" href="?item={{ next_meeting.panel_token }}">{% trans "Open call" %}</a>
-      <button type="button" class="dash-next-x" id="dashNextX"
-              aria-label="{% trans 'Put this away' %}" title="{% trans 'Put this away' %}">✕</button>
-    </div>
-
-    {% comment %}
-      The ✕ asks rather than assumes. "Not this one" and "not this card at all"
-      are different intentions and used to be split across two places — the ✕
-      here and a switch in Profile — so pressing ✕ could not express the second
-      and there was nothing to tell you the second existed.
-    {% endcomment %}
-    <dialog class="dp-dialog" id="dashNextDlg">
-      <form method="post" action="{% url 'hide_next_call' %}">
+      <a class="dash-next-go" href="?item={{ next_meeting.panel_token }}" data-dp-open>{% trans "Open call" %}</a>
+      {% comment %}
+        The ✕ dismisses this call and nothing more: the card returns with the
+        next one. Turning the card off for good is a standing preference and
+        lives in Settings, which is where a standing preference belongs — it
+        does not need a dialog on a card to reach it.
+      {% endcomment %}
+      <form method="post" action="{% url 'hide_next_call' %}" class="dash-next-xf">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ request.get_full_path }}">
         <input type="hidden" name="token" value="{{ next_meeting.panel_token }}">
-        <h3>{% trans "Put this away" %}</h3>
-        <p class="dp-dialog-sub">
-          {% blocktrans with n=next_meeting.name %}The call with {{ n }} is still scheduled either way — this only decides what sits at the top of Home.{% endblocktrans %}
-        </p>
-        <label class="dp-fld">
-          <span>{% trans "For how long" %}</span>
-          <select name="off">
-            <option value="">{% trans "Just this call — the card comes back with the next one" %}</option>
-            <option value="1">{% trans "Turn the card off — until I switch it back on in Profile" %}</option>
-          </select>
-        </label>
-        <div class="dp-dialog-f">
-          <button type="button" class="dp-btn" data-dpclose>{% trans "Keep it" %}</button>
-          <button type="submit" class="dp-btn dp-btn-pri">{% trans "Put it away" %}</button>
-        </div>
+        <button type="submit" class="dash-next-x" id="dashNextX"
+                aria-label="{% trans 'Put this away' %}"
+                title="{% trans 'Put this away — it comes back with the next call' %}">✕</button>
       </form>
-    </dialog>
+    </div>
+
+    {% comment %}
+      Dismiss is keyed to this particular call rather than to the card, so
+      putting it away clears today's clutter without hiding tomorrow's: make,
+      move or finish this one and the next call brings the card back on its own.
+
+      Recorded on the user rather than in localStorage — putting it away on a
+      laptop should keep it away on a phone. The server knows before it renders,
+      so a dismissed card never reaches the page.
+
+      Sent without leaving the page. Putting a card away is the smallest thing
+      on Home and it was costing a full navigation, which meant everything the
+      page was holding had to be restored afterwards. Nothing reloads now, so
+      there is no state to lose. The form still posts on its own if the script
+      never runs.
+    {% endcomment %}
     <script>
-      // Dismiss is keyed to this particular call rather than to the card, so
-      // putting it away clears today's clutter without hiding tomorrow's:
-      // make, move or finish this one and the next call brings the card back
-      // on its own.
-      //
-      // Recorded on the user rather than in localStorage — putting it away on
-      // a laptop should keep it away on a phone. The server already knows
-      // before it renders, so a dismissed card never reaches the page and
-      // there is nothing to hide on load.
       (function () {
-        var x = document.getElementById('dashNextX');
-        var dlg = document.getElementById('dashNextDlg');
-        if (!x || !dlg) return;
-        x.addEventListener('click', function () { if (dlg.showModal) dlg.showModal(); });
-        var cancel = dlg.querySelector('[data-dpclose]');
-        if (cancel) cancel.addEventListener('click', function () { dlg.close(); });
+        var form = document.querySelector('.dash-next-xf');
+        var card = document.getElementById('dashNext');
+        if (!form || !card) return;
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          var token = form.querySelector('[name=csrfmiddlewaretoken]');
+          fetch(form.action, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+              'X-CSRFToken': token ? token.value : '',
+              'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: new FormData(form)
+          }).then(function (r) {
+            if (!r.ok) throw new Error('dismiss failed');
+            card.style.transition = 'opacity .18s ease';
+            card.style.opacity = '0';
+            setTimeout(function () { card.remove(); }, 180);
+          }).catch(function () {
+            // Not recorded, so the card stays rather than vanishing on a
+            // promise the server never made.
+            form.submit();
+          });
+        });
       })();
     </script>
   {% endif %}
 
-  <!-- Chats to review — alerts raised from client conversations -->
-  <section class="dash-acc dash-card mb-4" data-acc="alerts">
+
+  {% comment %}
+    A glance at the three numbers, above the lists rather than instead of them.
+    Each box is a summary and nothing more: the work itself is in the sections
+    below, which open and close as they always have. Clicking a box takes you
+    to the list it counts.
+  {% endcomment %}
+  <div class="dash-stats">
+    <a class="dash-stat" href="#dash-alerts">
+      <span class="dash-stat-k">{% trans "Alerts to review" %}</span>
+      <span class="dash-stat-v{% if not alert_counts.all %} is-none{% endif %}">{{ alert_counts.all }}</span>
+    </a>
+    <a class="dash-stat" href="#dash-meetings">
+      <span class="dash-stat-k">{% trans "Pending meetings" %}</span>
+      <span class="dash-stat-v{% if not meetings_total %} is-none{% endif %}">{{ meetings_total }}</span>
+    </a>
+    <a class="dash-stat" href="#dash-completed">
+      <span class="dash-stat-k">{% trans "Calls completed today" %}</span>
+      <span class="dash-stat-v{% if not completed_count %} is-none{% endif %}">{{ completed_count }}</span>
+    </a>
+  </div>
+
+  <!-- Alerts to review — called what they are: these are Alert rows, raised from a
+       conversation or by hand, and calling them chats hid that from the person
+       deciding what to do with one. -->
+  <section class="dash-acc dash-card mb-4" id="dash-alerts" data-acc="alerts">
     <button type="button" class="dash-acc-head" aria-expanded="true">
       <span class="text-base font-semibold text-gray-800 flex items-center gap-3">
         <span class="material-icons-outlined dash-sect-i">notification_important</span>
-        {% trans "Chats to review" %}
+        {% trans "Alerts to review" %}
         <span class="dash-acc-badge">{{ alert_counts.all }}</span>
       </span>
       <span class="material-icons-outlined dash-acc-chevron">expand_more</span>
@@ -413,7 +501,12 @@
 
       {% if alerts %}
         {% for it in alerts %}
-          <a href="{{ it.url }}" class="block">
+          {% comment %}
+            `it.url` is built in views/dashboard.py as the current querystring
+            plus `item`, so it satisfies the same contract as the literal ones
+            below — it is just assembled in Python rather than here.
+          {% endcomment %}
+          <a href="{{ it.url }}" data-dp-open class="block">
             <div class="dash-row{% if panel_item.token == it.panel_token %} dash-row-open{% endif %}{% if it.unread %} dash-row-new{% endif %}"
                  {% if panel_item.token == it.panel_token %}aria-current="true"{% endif %}
                  {% if it.unread %}title="{% trans 'Not opened yet' %}"{% endif %}>
@@ -459,7 +552,7 @@
   </section>
 
   <!-- Pending meetings — every call still to be made, seven to a page -->
-  <section class="dash-acc dash-card mb-4" data-acc="meetings">
+  <section class="dash-acc dash-card mb-4" id="dash-meetings" data-acc="meetings">
     <button type="button" class="dash-acc-head" aria-expanded="true">
       <span class="text-base font-semibold text-gray-800 flex items-center gap-3">
         <span class="material-icons-outlined dash-sect-i">schedule</span>
@@ -482,7 +575,7 @@
       </form>
 
       {% for it in call_meetings %}
-        <a href="?{% if query %}q={{ query|urlencode }}&amp;{% endif %}item={{ it.panel_token }}" class="block">
+        <a href="?{% if query %}q={{ query|urlencode }}&amp;{% endif %}item={{ it.panel_token }}" data-dp-open class="block">
           <div class="dash-row{% if panel_item.token == it.panel_token %} dash-row-open{% endif %}"
                {% if panel_item.token == it.panel_token %}aria-current="true"{% endif %}>
             {% comment %}
@@ -524,7 +617,7 @@
   </section>
 
   <!-- Calls completed today -->
-  <section class="dash-acc dash-card mb-4" data-acc="completed">
+  <section class="dash-acc dash-card mb-4" id="dash-completed" data-acc="completed">
     <button type="button" class="dash-acc-head" aria-expanded="true">
       <span class="text-base font-semibold text-gray-800 flex items-center gap-3">
         <span class="material-icons-outlined dash-sect-i">check_circle</span>
@@ -536,7 +629,7 @@
 
     <div class="dash-acc-body">
       {% for it in completed_meetings_today %}
-        <a href="?{% if query %}q={{ query|urlencode }}&amp;{% endif %}item={{ it.panel_token }}" class="block">
+        <a href="?{% if query %}q={{ query|urlencode }}&amp;{% endif %}item={{ it.panel_token }}" data-dp-open class="block">
           <div class="dash-row{% if panel_item.token == it.panel_token %} dash-row-open{% endif %}"
                {% if panel_item.token == it.panel_token %}aria-current="true"{% endif %}>
             <span class="dash-when">
@@ -565,6 +658,7 @@
       {% endfor %}
     </div>
   </section>
+
 
   {% comment %}
     The last thing on the page, and the only part of it that is not a demand.
@@ -755,6 +849,20 @@
 
         var collapsed = section.classList.toggle('collapsed');
         head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+
+        // The section's height still changes in one step — the scroll
+        // correction below measures the difference the instant it happens, and
+        // an animated height would give it the wrong number to work with. What
+        // arrives is the content, so the chevron is no longer promising a
+        // movement the body does not make. Opacity only: it cannot affect the
+        // measurement, which is the whole point.
+        var body = section.querySelector('.dash-acc-body');
+        if (body && !collapsed) {
+          body.classList.remove('ui-arrive');
+          void body.offsetWidth;
+          body.classList.add('ui-arrive');
+          setTimeout(function () { body.classList.remove('ui-arrive'); }, 260);
+        }
 
         var delta = head.getBoundingClientRect().top - before;
         if (delta) main.scrollTop += delta;

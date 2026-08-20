@@ -9,15 +9,23 @@
   every row and say nothing, and the headline becomes what the entry actually
   is: the protocol, the alert, the topic. `scoped` picks between the two.
 {% endcomment %}
-<div class="cm-box">
+<div class="cm-box"{% if client_pk %} data-dp-client="{{ client_pk }}"{% endif %}>
+  {% comment %}
+    Happened first: what came in is what you check, and it is the half that can
+    hold something you have not read. Coming up is your own diary — you put it
+    there, so it is never news.
+
+    The badge counts what is unread rather than what exists, and disappears at
+    zero. A number that is always present is furniture; one that appears only
+    when there is something to read is a signal. The red dot said the same
+    thing as the number beside it, twice.
+  {% endcomment %}
   <nav class="cm-tabs">
-    <a class="cm-tab {% if tab == 'up' %}on{% endif %}" href="?{{ qs_tab_up }}">
-      {% trans "Coming up" %}
-      {% if overdue_count %}<span class="cm-warn" title="{{ overdue_count }}"></span>{% endif %}
-      <span class="c">{{ up_count }}</span>
+    <a class="cm-tab {% if tab == 'past' %}on{% endif %}" href="?{{ qs_tab_past }}{% if scoped %}#comms{% endif %}">
+      {% trans "Happened" %}{% if past_unread %}<span class="c">{{ past_unread }}</span>{% endif %}
     </a>
-    <a class="cm-tab {% if tab == 'past' %}on{% endif %}" href="?{{ qs_tab_past }}">
-      {% trans "Happened" %}<span class="c">{{ past_count }}</span>
+    <a class="cm-tab {% if tab == 'up' %}on{% endif %}" href="?{{ qs_tab_up }}{% if scoped %}#comms{% endif %}">
+      {% trans "Coming up" %}{% if up_unread %}<span class="c">{{ up_unread }}</span>{% endif %}
     </a>
   </nav>
 
@@ -29,7 +37,7 @@
            placeholder="{% if scoped %}{% trans 'Find a protocol, alert or place' %}{% else %}{% trans 'Find a client, protocol or place' %}{% endif %}">
     {% for value, label, count in chips %}
       <a class="cm-chip {% if kind == value %}on{% endif %}"
-         href="?{{ qs_base }}{% if value != 'all' %}&amp;kind={{ value }}{% endif %}">
+         href="?{{ qs_base }}{% if value != 'all' %}&amp;kind={{ value }}{% endif %}{% if scoped %}#comms{% endif %}">
         {{ label }}<span class="n">{{ count }}</span>
       </a>
     {% endfor %}
@@ -46,7 +54,7 @@
       <span class="cm-when-lab">{% trans "When" %}</span>
       {% for value, label, count in when_chips %}
         <a class="cm-chip {% if when == value %}on{% endif %}"
-           href="?{{ qs_when }}{% if value != 'all' %}&amp;when={{ value }}{% endif %}">
+           href="?{{ qs_when }}{% if value != 'all' %}&amp;when={{ value }}{% endif %}{% if scoped %}#comms{% endif %}">
           {{ label }}<span class="n">{{ count }}</span>
         </a>
       {% endfor %}
@@ -73,6 +81,7 @@
       {% endcomment %}
       <a class="cm-row {% if panel_item.token == r.token %}cm-row-open{% endif %}{% if r.unread %} cm-row-new{% endif %}{% if r.cancelled %} cm-row-off{% endif %}"
          href="?{{ qs_base }}{% if kind != 'all' %}&amp;kind={{ kind }}{% endif %}&amp;item={{ r.token }}{% if scoped %}#comms{% endif %}"
+         data-dp-open
          {% if panel_item.token == r.token %}aria-current="true"{% endif %}
          {% if r.unread %}title="{% trans 'Not opened yet' %}"{% elif r.cancelled %}title="{% trans 'Cancelled' %}"{% endif %}>
         <span class="cm-ic cm-ic-{{ r.kind }}">
@@ -119,20 +128,20 @@
       {% if pages > 1 %}
         <nav class="cm-pg" aria-label="{% trans 'Pages' %}">
           {% if page > 1 %}
-            <a class="cm-pg-a" href="?{{ qs_page }}&amp;page={{ page|add:'-1' }}"
+            <a class="cm-pg-a" href="?{{ qs_page }}&amp;page={{ page|add:'-1' }}{% if scoped %}#comms{% endif %}"
                aria-label="{% trans 'Previous' %}">‹</a>
           {% else %}<span class="cm-pg-a is-off">‹</span>{% endif %}
           {% for c in page_cells %}
             {% if c %}
               <a class="cm-pg-n {% if c == page %}on{% endif %}"
-                 href="?{{ qs_page }}&amp;page={{ c }}"
+                 href="?{{ qs_page }}&amp;page={{ c }}{% if scoped %}#comms{% endif %}"
                  {% if c == page %}aria-current="page"{% endif %}>{{ c }}</a>
             {% else %}
               <span class="cm-pg-dots">…</span>
             {% endif %}
           {% endfor %}
           {% if page < pages %}
-            <a class="cm-pg-a" href="?{{ qs_page }}&amp;page={{ page|add:'1' }}"
+            <a class="cm-pg-a" href="?{{ qs_page }}&amp;page={{ page|add:'1' }}{% if scoped %}#comms{% endif %}"
                aria-label="{% trans 'Next' %}">›</a>
           {% else %}<span class="cm-pg-a is-off">›</span>{% endif %}
         </nav>

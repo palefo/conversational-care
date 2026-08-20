@@ -17,7 +17,7 @@ dropped — same component, one less row.
 """
 from ._base import *  # noqa: F401,F403
 
-__all__ = ['resolve_panel_item', 'panel_context']
+__all__ = ['resolve_panel_item', 'panel_context', 'panel_fragment']
 
 
 def _can_see(user, patient):
@@ -92,8 +92,9 @@ def _alert_panel(request, pk):
     if data.get('archive_bucket'):
         points.append({'text': _("Archived as: %s") % (
             _("False alarm") if data['archive_bucket'] == 'false_alarms' else _("Resolved"))})
-    if data.get('internal_note'):
-        points.append({'text': _("Note: %s") % data['internal_note']})
+    # The internal note used to be echoed here. It is a Note row now, shown in
+    # the Notes tab with an author and a time, so repeating it in the summary
+    # would be the same sentence twice.
 
     # The agent switch belongs to the client, so a general alert \u2014 which has no
     # client \u2014 simply does not carry it.
@@ -115,16 +116,71 @@ def _alert_panel(request, pk):
     state = ('' if alert.status == Alert.AlertStatus.CREATED
              else alert.get_status_display())
 
+    # The conversation behind the alert, resolved the way the original alert
+    # page resolved it, in the same order of preference:
+    #
+    #   1. data['conversation_id'] or data['thread_id'] — the real link. The
+    #      alerts API still accepts these, so an agent raising an alert through
+    #      it can say exactly which exchange caused it.
+    #   2. data['source'] — the panel token, written when a person presses
+    #      Raise an alert from a conversation they are reading.
+    #   3. Failing both, the client's messages from the day the alert appeared.
+    #      This is the original's fallback too, and it is the one that can be
+    #      wrong, so the panel labels it differently rather than passing it off
+    #      as the linked exchange.
+    #
+    # An alert with none of the three shows no conversation, which is correct:
+    # plenty of alerts have nothing to do with a chat.
+    linked = Message.objects.none()
+    link_is_exact = False
+
+    conversation_id = str(data.get('conversation_id') or data.get('thread_id') or '').strip()
+    if conversation_id:
+        linked = Message.objects.filter(conversation_id=conversation_id).order_by('timestamp')
+        link_is_exact = linked.exists()
+
+    source = (data.get('source') or '')
+    if not link_is_exact and source.startswith('chat-'):
+        pk_str, _sep, day_str = source[len('chat-'):].partition('-')
+        try:
+            src_patient = Patient.objects.get(pk=int(pk_str))
+            day = dt.datetime.strptime(day_str, "%Y-%m-%d").date()
+        except (ValueError, Patient.DoesNotExist):
+            src_patient, day = None, None
+        if src_patient and day:
+            nums = [n for n in (str(src_patient.phone_number or ''),
+                                str(getattr(src_patient.caregiver, 'phone_number', '') or '')) if n]
+            if nums:
+                linked = (Message.objects
+                          .filter(user__in=nums, timestamp__date=day)
+                          .order_by('timestamp'))
+                link_is_exact = linked.exists()
+
+    if not link_is_exact and alert.patient:
+        nums = [n for n in (str(alert.patient.phone_number or ''),
+                            str(getattr(alert.patient.caregiver, 'phone_number', '') or '')) if n]
+        if nums:
+            linked = (Message.objects
+                      .filter(user__in=nums,
+                              timestamp__date=timezone.localtime(alert.created_at).date())
+                      .order_by('timestamp'))
+
     return {
         **bot,
         'kind': 'alert',
+        'messages': list(linked[:20]),
+        'message_count': linked.count(),
+        'link_is_exact': link_is_exact,
+        'notes_list': _notes_for(alert=alert),
+        'note_parent': 'alert',
+        'note_parent_id': alert.pk,
         'tag_class': tag[0],
         'tag_label': tag[1],
         # Ordered pairs rather than the raw dict: a template cannot sort one and
         # the key order would otherwise change between rows.
         'alert_data': sorted(
             (k, v) for k, v in data.items()
-            if k not in ('internal_note', 'archive_bucket') and not isinstance(v, (dict, list))
+            if k != 'archive_bucket' and not isinstance(v, (dict, list))
         ),
         # Not "Alert \u00b7 high": the tag beside the title says high, in colour.
         'kicker': _("Alert"),
@@ -143,6 +199,27 @@ def _alert_panel(request, pk):
     }
 
 
+def _automation_state(meeting, protocols):
+    """Which protocol, if any, is out with the caregiver right now.
+
+    The Patient carries the running automation — which meeting and which
+    protocol — so the card can say it was asked rather than offering to ask
+    again, and a second navigator opening the panel does not text them twice.
+    """
+    patient = meeting.patient
+    if not (patient and patient.automation_active):
+        return None
+    if patient.automation_meeting_id != meeting.pk:
+        return None
+    return {
+        'protocol': patient.automation_protocol,
+        # start_automation sets the deadline three hours out and slides it on
+        # every reply, so this is "last heard from", which is the more useful
+        # of the two anyway.
+        'until': patient.automation_expires_at,
+    }
+
+
 def _meeting_protocols(meeting):
     """Every protocol that has questions, with this meeting's answers folded in.
 
@@ -157,11 +234,30 @@ def _meeting_protocols(meeting):
                  .distinct()
                  .order_by('number'))
 
-    answers = {
-        a.question_id: a.response
-        for a in Answer.objects.filter(meeting=meeting,
-                                       question__protocol__in=protocols)
-    }
+    # Answers follow the client, not the single call.
+    #
+    # The protocols are a programme a client works through once — Welcome and
+    # orientation, then daily living, then medication — not a checklist repeated
+    # every call. Reading only this meeting's answers meant a protocol finished
+    # last week showed up blank and unstarted in every call after it, and the
+    # same questions got asked again.
+    #
+    # The most recent answer wins, so an updated answer replaces the one it
+    # corrects. Which call it came from travels with it: an answer given on this
+    # call is editable here, one carried from an earlier call is shown as a
+    # record of what they said, with the date.
+    answers = {}
+    for a in (Answer.objects
+              .filter(meeting__patient=meeting.patient,
+                      question__protocol__in=protocols)
+              .select_related('meeting')
+              .order_by('meeting__scheduled_time', 'pk')):
+        answers[a.question_id] = {
+            'text': a.response,
+            'by_text': a.by_text,
+            'mine': a.meeting_id == meeting.pk,
+            'when': a.meeting.happened_at,
+        }
 
     out = []
     for p in protocols:
@@ -173,10 +269,21 @@ def _meeting_protocols(meeting):
                 # whole protocol back to protocol_view, so these must match.
                 'field': f'q_{q.id}',
                 'prompt_md': q.prompt_md,
-                'answer': answers.get(q.id, ''),
+                'answer': answers.get(q.id, {}).get('text', ''),
+                'by_text': answers.get(q.id, {}).get('by_text', False),
+                # False when the answer was given on an earlier call: shown as a
+                # record rather than a field, so saving this call cannot quietly
+                # copy someone else's call into it.
+                'mine': answers.get(q.id, {}).get('mine', True),
+                'when': answers.get(q.id, {}).get('when'),
             })
+        # Answered at all, by anyone, on any of this client's calls — which is
+        # what makes a protocol read as done everywhere once it is done once.
         answered = sum(1 for q in questions if q['answer'])
+        carried = sum(1 for q in questions if q['answer'] and not q['mine'])
         out.append({
+            'by_text_count': sum(1 for q in questions if q['by_text'] and q['answer']),
+            'carried_count': carried,
             'number': p.number,
             'title': p.title,
             'description': p.description,
@@ -270,6 +377,21 @@ def _meeting_panel(request, pk):
         'can_remind': bool(caregiver and caregiver.phone_number),
         'last_call': last_call,
         'protocols': protocols,
+        'automation': _automation_state(meeting, protocols),
+        # The three ways a call ends, in the model's own words, so the buttons
+        # and the line confirming what was recorded can never drift apart. The
+        # dot class travels with each one; cancelling is deliberately not here,
+        # since calling an appointment off is not an outcome of it happening.
+        # Placed but never closed. retries is bumped by make_phone_call, so a
+        # meeting still Pending with one on it is a call that went out and was
+        # never recorded — the case no prompt at the moment of ending can catch,
+        # because the person was interrupted and never came back to the panel.
+        'outcome_missing': meeting.retries > 0 and meeting.status == Meeting.Status.PENDING,
+        'outcomes': [
+            (Meeting.Status.COMPLETED, Meeting.Status.COMPLETED.label, 'done'),
+            (Meeting.Status.NOT_ANSWERED, Meeting.Status.NOT_ANSWERED.label, 'miss'),
+            (Meeting.Status.INTERRUPTED, Meeting.Status.INTERRUPTED.label, 'part'),
+        ],
         # Meeting.Protocol labels are placeholders ("2. Protocol 2"); the real
         # name lives on the Protocol record. Prefer it where one exists, so the
         # header and the card below it do not disagree.
@@ -278,7 +400,20 @@ def _meeting_panel(request, pk):
             meeting.get_scheduled_protocol_display()
         ),
         'answered_total': sum(p['answered'] for p in protocols),
+        # Answers given on this call, as opposed to ones carried in from earlier
+        # calls. Summarising reads this meeting's own answers, so offering it on
+        # the strength of answers that belong to another call would write a
+        # summary of the wrong conversation.
+        'answered_here_total': sum(
+            1 for p in protocols for q in p['questions'] if q['answer'] and q['mine']
+        ),
         'question_total': sum(p['total'] for p in protocols),
+        # The Protocols tab counts protocols, not questions, because protocols
+        # are what the tab holds: a "12/12" over two cards, one of them
+        # unfinished, was reporting on the wrong thing. The question totals stay
+        # for the per-card pills, which do describe questions.
+        'protocol_done_total': sum(1 for p in protocols if p['total'] and p['answered'] == p['total']),
+        'protocol_total': len(protocols),
         # executed_protocol draws from Meeting.Protocol, a longer list than the
         # Protocol records above — the two vocabularies are not interchangeable.
         'protocol_choices': Meeting.Protocol.choices,
@@ -296,8 +431,46 @@ def _meeting_panel(request, pk):
         # used to copy.
         'can_edit_answers': True,
         'automations_enabled': get_bool("ENABLE_AUTOMATIONS"),
-        'notes': meeting.notes,
+        # The written-up notes themselves, now that a note is a row with an
+        # author and a time rather than one overwritten blob.
+        'notes_list': _notes_for(meeting=meeting),
+        'note_parent': 'meeting',
+        'note_parent_id': meeting.pk,
+        # Key moments and the segmented transcript belong to the recording
+        # attached to this meeting, if there is one.
+        'moments': _stamped(recording.transcript_moments) if recording else [],
+        'segments': _stamped(recording.transcript_segments) if recording else [],
     }
+
+
+def _stamp(seconds):
+    """Seconds to m:ss. Formatted here rather than in the template so the
+    transcript and the key moments cannot drift into two different clocks."""
+    total = int(seconds or 0)
+    return "%d:%02d" % divmod(total, 60)
+
+
+def _stamped(rows, key="start"):
+    return [dict(r, stamp=_stamp(r.get(key))) for r in rows or []]
+
+
+def _notes_for(**parent):
+    """The notes on one parent, newest first, ready for the panel.
+
+    Author is rendered here rather than in the template so a note written before
+    there was an author field still reads sensibly instead of showing a blank.
+    """
+    rows = (Note.objects
+            .filter(**parent)
+            .select_related('author')
+            .order_by('-created_at'))
+    return [{
+        'id': n.pk,
+        'body': n.body,
+        'author': (n.author.get_full_name() or n.author.username) if n.author else _("Unknown"),
+        'when': n.created_at,
+        'edited': n.updated_at and n.created_at and (n.updated_at - n.created_at).total_seconds() > 1,
+    } for n in rows]
 
 
 def _recording_panel(request, pk):
@@ -321,9 +494,21 @@ def _recording_panel(request, pk):
         'patient': patient,
         'overview_heading': _("Transcript summary") if rec.transcript_summary else '',
         'overview': rec.transcript_summary,
+        # The moments pulled out of the transcript, each anchored to a segment
+        # so its timestamp points at audio that exists. Falls back to the bare
+        # fact of the call when nothing has been extracted yet.
         'points': [
+            {'text': m.get('text', ''),
+             'stamp': "%d:%02d" % divmod(int(m.get('start') or 0), 60),
+             'at': m.get('start') or 0}
+            for m in (rec.transcript_moments or [])
+        ] or [
             {'text': _("Called %s") % rec.to_number, 'stamp': f"{mins}:{secs:02d}"},
         ],
+        'segments': _stamped(rec.transcript_segments),
+        'notes_list': _notes_for(recording=rec),
+        'note_parent': 'recording',
+        'note_parent_id': rec.recording_sid,
         'duration_label': f"{mins}:{secs:02d}",
         'recording': rec,
         'audio_url': reverse('serve_protected_file', args=[rec.recording_sid]),
@@ -360,6 +545,9 @@ def _chat_panel(request, ident):
 
     return {
         'kind': 'chat',
+        'notes_list': _notes_for(conversation=conv) if conv else [],
+        'note_parent': 'conversation',
+        'note_parent_id': str(conv.id) if conv else '',
         'kicker': _("Chatbot"),
         'accent': 'calm',
         'title': conv.topic if conv and conv.topic else _("Conversation"),
@@ -459,3 +647,35 @@ def panel_context(request, in_client_page_for=None):
     if patient and (in_client_page_for is None or in_client_page_for.pk != patient.pk):
         ctx['panel_context'] = _context_strip(patient)
     return ctx
+
+
+@login_required
+def panel_fragment(request):
+    """The panel on its own, so opening one costs a fetch and not a page.
+
+    Every page that hosts a panel already builds it through ``panel_context``;
+    this renders the same thing without the shell around it, for base.html to
+    swap in. The querystring it is called with is the one the row's own link
+    carries, so ``item`` — and any filter or sort alongside it — is read here
+    exactly as a full navigation would have read it.
+
+    ``in_client`` is the client whose page the panel is being opened on. It
+    does what ``in_client_page_for`` does for the Communications view: drops the
+    context strip, because a page that is already about one person does not need
+    a row explaining who they are. Checked against the same permission as the
+    item itself, so it cannot be used to probe for clients.
+
+    204 rather than 404 when nothing resolves: a stale or unreadable token is
+    not an error, it is a panel with nothing to show. The caller closes.
+    """
+    for_patient = None
+    want = (request.GET.get('in_client') or '').strip()
+    if want.isdigit():
+        candidate = Patient.objects.filter(pk=int(want)).first()
+        if _can_see(request.user, candidate):
+            for_patient = candidate
+
+    ctx = panel_context(request, in_client_page_for=for_patient)
+    if not ctx:
+        return HttpResponse(status=204)
+    return render(request, '_detail_panel.html', ctx)

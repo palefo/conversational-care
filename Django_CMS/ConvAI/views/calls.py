@@ -5,7 +5,7 @@ from ._panel import panel_context
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['scoped_meeting_form', 'save_scheduled_meeting', 'calendar_view', 'calendar_create_meeting', 'complete_meeting', 'cancel_meeting', 'edit_meeting', 'pending_call', 'make_phone_call', 'save_meeting_notes', 'schedule_call', 'send_whatsapp_reminder_view']
+__all__ = ['scoped_meeting_form', 'save_scheduled_meeting', 'calendar_view', 'calendar_create_meeting', 'complete_meeting', 'cancel_meeting', 'edit_meeting', 'pending_call', 'make_phone_call', 'schedule_call', 'send_whatsapp_reminder_view']
 
 
 @login_required
@@ -91,6 +91,20 @@ def schedule_call(request):
     return redirect('communications')
 
 
+def _call_error(message, status, fix_href=None, fix_label=None):
+    """A refusal the panel can actually render.
+
+    These used to be bare HttpResponseForbidden/BadRequest bodies, and the
+    panel discarded every one of them in favour of "Could not start the call."
+    Three of the four reasons below are things the navigator can fix in under a
+    minute — but only if they are told which one it is, and where to go.
+    """
+    payload = {'error': message}
+    if fix_href:
+        payload['fix'] = {'href': fix_href, 'label': fix_label}
+    return JsonResponse(payload, status=status)
+
+
 @login_required
 def make_phone_call(request, meeting_id):
     """
@@ -102,17 +116,21 @@ def make_phone_call(request, meeting_id):
     )
 
     if not (is_admin(request.user) or meeting.patient.navigator_id == request.user.id):
-        return HttpResponseForbidden(_("You do not have permission to start this call."))
+        return _call_error(_("You do not have permission to start this call."), 403)
 
     caregiver = meeting.patient.caregiver
     if not caregiver or not caregiver.phone_number:
-        return HttpResponseBadRequest(_("This client has no caregiver with a valid phone number."))
+        return _call_error(
+            _("This client has no caregiver with a phone number to call."), 400,
+            reverse('patient_detail', args=[meeting.patient_id]), _("Open the client"),
+        )
 
     # The conference bridges the navigator's own phone too, so a missing number
     # here used to reach Twilio as the string "None" and fail obscurely.
     if not request.user.phone_number:
-        return HttpResponseBadRequest(
-            _("Your own phone number is not set, so the call cannot be placed.")
+        return _call_error(
+            _("Your own phone number is not set, so the call cannot be placed."), 400,
+            reverse('profile'), _("Add your number"),
         )
 
     # Convertir a string para Twilio
@@ -127,10 +145,15 @@ def make_phone_call(request, meeting_id):
             'Dyad': dyad_phone,
             'Platform': platform_phone
         })
-    except Exception as e:
-        # Loggear e informar error al cliente
-        # logger.exception("Error al iniciar conferencia")
-        return HttpResponseServerError(f"Error iniciando la llamada: {e}")
+    except Exception:
+        # The exception text used to be handed to the browser verbatim. Twilio
+        # errors carry account SIDs and endpoint detail, none of which belongs
+        # on a navigator's screen and none of which they could act on — so it
+        # goes to the log, and the panel gets a sentence instead.
+        logger.exception("Failed to start conference for meeting %s", meeting.pk)
+        return _call_error(
+            _("The phone system did not accept the call. Please try again."), 502,
+        )
 
     # Incrementar retries en 1
     Meeting.objects.filter(pk=meeting.pk).update(retries=F('retries') + 1)
@@ -164,6 +187,12 @@ def complete_meeting(request, meeting_id):
         return _back_to(request, 'pending_call', call_id=meeting_id)
 
     meeting.status = new_status
+
+    # When it actually happened, as opposed to when it was booked. Stamped on
+    # the first outcome only: pressing Change to correct a mis-click is fixing
+    # the record of a call, not moving when the call took place.
+    if new_status != Meeting.Status.PENDING and meeting.ended_at is None:
+        meeting.ended_at = timezone.now()
 
     # Si se marcó Completed, debemos capturar el protocolo ejecutado
     if new_status == Meeting.Status.COMPLETED:
@@ -245,6 +274,15 @@ def calendar_view(request):
         'view_options': [('month', _('Month')), ('week', _('Week')), ('day', _('Day'))],
     }
 
+    # Every view, not only the ones with clickable slots. The Schedule button in
+    # the header opens the same modal from the month as from the week, and a
+    # month rendering it without a form gave a New meeting dialog with nothing
+    # in it but Cancel and Schedule.
+    meeting_form = MeetingForm()
+    if not is_admin(request.user):
+        meeting_form.fields['patient'].queryset = Patient.objects.filter(navigator=request.user)
+    context['meeting_form'] = meeting_form
+
     if view == 'month':
         first_of_month = today_local.replace(day=1) + relativedelta(months=offset)
         year, month = first_of_month.year, first_of_month.month
@@ -300,10 +338,6 @@ def calendar_view(request):
                 })
             grid_rows.append({'label': slot['label'], 'cells': cells})
 
-        meeting_form = MeetingForm()
-        if not is_admin(request.user):
-            meeting_form.fields['patient'].queryset = Patient.objects.filter(navigator=request.user)
-
         if view == 'week':
             last = start_date + timedelta(days=6)
             label = f'{formats.date_format(start_date, "d M")} – {formats.date_format(last, "d M Y")}'
@@ -314,13 +348,13 @@ def calendar_view(request):
             'day_headers': day_headers,
             'grid_rows': grid_rows,
             'span': span,
-            'meeting_form': meeting_form,
         })
 
     # The panel is meant to survive moving around the platform, and the
     # calendar is exactly where you go mid-triage to find a slot — closing it
     # on arrival loses the thing you were scheduling around.
-    context.update(panel_context(request))
+    panel = panel_context(request)
+    context.update(panel)
 
     # Everything except `item`, so clicking an event opens it in place without
     # throwing you back to this month in the default view. Ends in `&` (or is
@@ -329,6 +363,15 @@ def calendar_view(request):
     rest.pop('item', None)
     encoded = rest.urlencode()
     context['cal_qs'] = f"{encoded}&" if encoded else ""
+
+    # The opposite, for the view switcher, Today and the arrows. Those are
+    # third-layer moves — they change what the calendar is showing, not what you
+    # are looking at — so the open panel goes with them. They build their
+    # querystring from scratch rather than from `keep()`, so `item` has to be
+    # handed to them explicitly or it is simply dropped, which is what used to
+    # close the panel on every change of week.
+    open_token = (panel.get('panel_item') or {}).get('token')
+    context['cal_item_qs'] = f"&item={quote_plus(open_token)}" if open_token else ""
 
     return render(request, 'calls/calendar.html', context)
 
@@ -446,30 +489,6 @@ def send_whatsapp_reminder_view(request, meeting_id):
 
     messages.success(request, _("Reminder sent via WhatsApp."))
     return _back_to(request, 'pending_call', call_id=meeting_id)
-
-
-@login_required
-@require_POST
-def save_meeting_notes(request, meeting_id):
-    """Store the navigator's free-text notes for a call.
-
-    Autosaved from the detail panel, so it answers with JSON rather than a
-    redirect. Same ownership rule as the protocol answers it sits beside.
-    """
-    meeting = get_object_or_404(
-        Meeting.objects.select_related('patient__navigator'), pk=meeting_id
-    )
-    if not (is_admin(request.user) or meeting.patient.navigator_id == request.user.id):
-        return HttpResponseForbidden(_("You do not have permission to do this."))
-
-    meeting.notes = (request.POST.get("notes") or "").strip()
-    meeting.notes_updated_at = timezone.now()
-    meeting.save(update_fields=["notes", "notes_updated_at"])
-
-    return JsonResponse({
-        "status": "ok",
-        "saved_at": timezone.localtime(meeting.notes_updated_at).strftime("%H:%M"),
-    })
 
 
 @require_POST

@@ -42,3 +42,18 @@ agitation, distress) if mentioned.
 Base the summary only on the transcript. If the transcript is empty or \
 unintelligible, say that clearly instead of guessing.
 """
+
+# Picks the moments worth jumping back to out of an already-segmented
+# transcript. Each moment names a segment number rather than writing its own
+# timestamp, so ``summarization.extract_moments`` can drop an invented one
+# instead of pointing the player at audio that is not there.
+DEFAULT_TRANSCRIPT_MOMENTS_PROMPT = (
+    "You are given a call transcript as numbered segments. Pick the moments a "
+    "care worker would want to jump back to — a symptom reported, a request, a "
+    "decision, anything that needs following up. Return between two and six of "
+    "them.\n\n"
+    "Answer with one line per moment, in this exact form:\n"
+    "<segment number>|<one short sentence in the third person>\n\n"
+    "Use only segment numbers that appear below. Do not invent moments that are "
+    "not in the transcript. If nothing stands out, answer with nothing at all."
+)

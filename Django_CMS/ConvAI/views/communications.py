@@ -10,6 +10,8 @@ A recording is not an event here. It belongs to the meeting it came from and is
 played inside that meeting's panel; see build_patient_events, which folds the
 two together for the same reason.
 """
+import unicodedata
+
 from ._base import *  # noqa: F401,F403
 from ._panel import panel_context
 from .patients import build_patient_events
@@ -126,7 +128,15 @@ def _row(event, now):
             row['detail'] = _("with %s") % caregiver
 
         if event['status_code'] == Meeting.Status.PENDING:
-            if event['ts'] < now:
+            if event.get('outcome_missing'):
+                # The call went out and was never closed. Said on the row, so it
+                # can be found again without opening every pending call to see
+                # which ones were actually made.
+                row['badge'] = _("Outcome missing")
+                row['badge_class'] = 'late'
+                row['sub'] = _("Called, not recorded")
+                row['dot'] = 'no'
+            elif event['ts'] < now:
                 # The due date rather than "4 days late": same information, same
                 # sort, no verdict. See _lateness in views/dashboard.py.
                 row['is_late'] = True
@@ -136,7 +146,8 @@ def _row(event, now):
             else:
                 row['badge'] = _("To do")
                 row['badge_class'] = 'todo'
-            row['sub'] = _("In-person meeting") if kind == 'visit' else _("Scheduled call")
+            if not event.get('outcome_missing'):
+                row['sub'] = _("In-person meeting") if kind == 'visit' else _("Scheduled call")
         else:
             row['sub'] = event['status']
             row['dot'] = {
@@ -188,6 +199,14 @@ def _group_by_day(pairs, today):
     for g in groups:
         g['count'] = len(g['rows'])
     return groups
+
+
+def _fold(text):
+    """Lower-case and strip accents, so a search box matches what people type."""
+    return ''.join(
+        ch for ch in unicodedata.normalize('NFKD', (text or '').lower())
+        if not unicodedata.combining(ch)
+    )
 
 
 @login_required
@@ -279,14 +298,23 @@ def comms_list_context(request, events, for_patient=None):
     overdue = [e for e in upcoming if e['ts'] < now]
 
     if q:
-        needle = q.lower()
+        # Every word has to appear somewhere, rather than the whole query having
+        # to appear inside one field. Matching the raw string against each field
+        # separately meant "Elena" found her and "Marchetti" found her, but
+        # "Elena Marchetti" — which is what anyone actually types — found
+        # nothing, because no single field holds both words.
+        # Accents are folded on both sides. Half the client base is called
+        # María or Ramírez, and nobody types the accent into a search box.
+        words = [_fold(w) for w in q.split()]
 
         def hit(e):
             p = e['patient']
-            bits = [p.name or '', p.lastname or '', str(p.caregiver or ''),
-                    e.get('title') or '', e.get('protocol') or '',
-                    e.get('location') or '']
-            return any(needle in b.lower() for b in bits)
+            hay = _fold(' '.join([
+                p.name or '', p.lastname or '', str(p.caregiver or ''),
+                e.get('title') or '', e.get('protocol') or '',
+                e.get('location') or '',
+            ]))
+            return all(w in hay for w in words)
 
         pool = [e for e in pool if hit(e)]
 
@@ -367,9 +395,28 @@ def comms_list_context(request, events, for_patient=None):
                 rest[k] = v
         return rest.urlencode()
 
+    # Unread counts for the tab badges, over each whole tab rather than the page
+    # on screen. Only alerts and chats can be unread — a call you scheduled
+    # yourself was never news — so the badge answers "is there anything here I
+    # have not read", not "how many rows are there", which the list already
+    # shows by being long.
+    def unread_count(events):
+        tokens = [e['panel_token'] for e in events
+                  if _kind_of(e) in ('alert', 'chat') and e.get('panel_token')]
+        if not tokens:
+            return 0
+        seen = SeenMark.seen_tokens(request.user, tokens)
+        return sum(1 for t in tokens if t not in seen)
+
     return {
         **panel,
         'scoped': scoped,
+        'up_unread': unread_count(upcoming),
+        'past_unread': unread_count(happened),
+        # Rendered onto the list so base.html can tell the panel endpoint which
+        # client's page a row is being opened from — the fragment drops the
+        # context strip for their own items, exactly as this view does.
+        'client_pk': for_patient.pk if scoped else None,
         'tab': tab,
         'kind': kind,
         'q': q,

@@ -7,7 +7,7 @@
   th.mtg-sortable { cursor: pointer; user-select: none; white-space: nowrap; }
   th.mtg-sortable:hover, th.mtg-sorted { background: #e5e7eb; }
   .mtg-sort-arrow { margin-left: 0.25rem; color: #9ca3af; font-size: 0.7rem; }
-  th.mtg-sorted .mtg-sort-arrow { color: #0284c7; }
+  th.mtg-sorted .mtg-sort-arrow { color: var(--brand-secondary); }
 
   .user-tabs { display: inline-flex; gap: .25rem; background: #f1f5f9; padding: .25rem; border-radius: .6rem; }
   .user-tab { padding: .4rem .9rem; border-radius: .45rem; font-size: .85rem; font-weight: 500; color: #475569;
@@ -21,10 +21,10 @@
   .call-footer-right { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 1rem; flex-wrap: wrap; }
   .call-per-page, .call-pagination { display: flex; align-items: center; gap: 0.4rem; }
   .call-per-page select { border: 1px solid #d1d5db; border-radius: 0.375rem; background: #fff; color: #374151; font-size: 0.875rem; padding: 0.35rem 0.5rem; outline: none; }
-  .call-per-page select:focus { border-color: #0ea5e9; box-shadow: 0 0 0 2px rgba(14,165,233,.15); }
+  .call-per-page select:focus { border-color: var(--brand-primary); box-shadow: 0 0 0 2px rgba(3,105,161,.15); }
   .call-page-btn { min-width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; padding: 0 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; background: #fff; color: #4b5563; font-size: 0.875rem; cursor: pointer; text-decoration: none; }
   .call-page-btn:hover { background: #f9fafb; }
-  .call-page-btn.active { background: #0284c7; color: #fff; border-color: #0284c7; }
+  .call-page-btn.active { background: var(--brand-secondary); color: #fff; border-color: var(--brand-secondary); }
   .call-page-btn.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
   .call-page-dots { padding: 0 0.2rem; color: #9ca3af; }
 
@@ -34,7 +34,7 @@
     padding: .5rem .75rem; font-size: .875rem; background: #fff; color: #111827;
   }
   .user-modal input:focus, .user-modal select:focus, .user-modal textarea:focus {
-    outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.15);
+    outline: none; border-color: var(--brand-primary); box-shadow: 0 0 0 3px rgba(3,105,161,.15);
   }
 </style>
 

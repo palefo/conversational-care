@@ -34,6 +34,7 @@ _STR_KEYS = {
     # Summarization prompts.
     "MEETING_SUMMARY_PROMPT": "meeting_summary_prompt",
     "TRANSCRIPT_SUMMARY_PROMPT": "transcript_summary_prompt",
+    "TRANSCRIPT_MOMENTS_PROMPT": "transcript_moments_prompt",
     # Agent models / LLM providers.
     "DEFAULT_AGENT_MODEL": "default_agent_model",
     "ANTHROPIC_API_KEY": "anthropic_api_key",

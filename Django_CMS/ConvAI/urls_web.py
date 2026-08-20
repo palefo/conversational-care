@@ -11,6 +11,7 @@ from .views import (
     cancel_meeting,
     calendar_view, calendar_create_meeting, create_user, user_list, create_client,
     create_test_user, test_user_result, edit_user, edit_patient,
+    add_note, edit_note, delete_note,
     agent_list, agent_form, agent_delete, agent_test, agent_test_send, agent_test_audio,
     agent_realtime_session, external_realtime_session,
     edit_patient_details, edit_care_plan, view_care_plan,
@@ -18,7 +19,6 @@ from .views import (
     toggle_patient_chatbot, raise_alert,
     hide_next_call,
     download_care_plan, edit_meeting, send_whatsapp_reminder_view,
-    save_meeting_notes,
     send_chat_message, protocol_view, protocol_editor,
     protocol_editor_save, protocol_create, protocol_delete, message_feedback,
     create_chat_link, external_chat, send_external_message, serve_audio_file,
@@ -26,7 +26,7 @@ from .views import (
     issue_api_token, approve_self_registration, alert_detail, act_alert, send_alert_sms,
     alerts_since,
     twilio_audio_download, send_care_plan_whatsapp, twilio_careplan_download,
-    start_protocol_automation, communications,
+    start_protocol_automation, communications, panel_fragment,
     summarize_meeting_view, transcribe_recording_view,
     download_client_sdk,
 )
@@ -71,7 +71,6 @@ urlpatterns = [
     path('meetings/<int:meeting_id>/call/', navigator_required(make_phone_call), name='make_phone_call'),
     path('meetings/<int:meeting_id>/complete/', navigator_required(complete_meeting), name='complete_meeting'),
     path('meetings/<int:meeting_id>/cancel/', navigator_required(cancel_meeting), name='cancel_meeting'),
-    path('meetings/<int:meeting_id>/notes/', navigator_required(save_meeting_notes), name='save_meeting_notes'),
     path('calendar/', navigator_required(calendar_view), name='calendar'),
     path('calendar/create/', navigator_required(calendar_create_meeting), name='calendar_create_meeting'),
     path('patients/<int:pk>/edit_details/', navigator_required(edit_patient_details), name='edit_patient_details'),
@@ -79,6 +78,12 @@ urlpatterns = [
     path('patients/<int:pk>/terms/', navigator_required(update_client_terms), name='update_client_terms'),
     path('patients/<int:pk>/chatbot/', navigator_required(toggle_patient_chatbot), name='toggle_patient_chatbot'),
     path('patients/<int:pk>/raise-alert/', navigator_required(raise_alert), name='raise_alert'),
+
+    # Notes on a call, meeting, alert or conversation. One set of endpoints for
+    # all four; the kind in the path says which parent the note hangs off.
+    path('notes/<str:kind>/<str:pk>/add/', navigator_required(add_note), name='add_note'),
+    path('notes/<int:pk>/edit/', navigator_required(edit_note), name='edit_note'),
+    path('notes/<int:pk>/delete/', navigator_required(delete_note), name='delete_note'),
     path('patients/<int:pk>/care_plan/edit/', navigator_required(edit_care_plan), name="edit_care_plan"),
     path('patients/<int:pk>/care_plan/view/', navigator_required(view_care_plan), name="view_care_plan"),
     path('patients/<int:pk>/care_plan/download/', navigator_required(download_care_plan), name='download_care_plan'),
@@ -109,6 +114,11 @@ urlpatterns = [
     path('self-registrations/<int:pk>/approve/', approve_self_registration, name='approve_self_registration'),
     # Polled by the notification component in base.html.
     path("alerts/since/", alerts_since, name="alerts_since"),
+    # The detail panel on its own, fetched by base.html when a row is opened so
+    # the list beside it is not thrown away and rebuilt. Same guard as every
+    # page that hosts a panel; the item itself is permission-checked again in
+    # resolve_panel_item, as it is on a full page load.
+    path("panel/", navigator_required(panel_fragment), name="panel_fragment"),
     path("alerts/<int:pk>/", alert_detail, name="alert_detail"),
     path("alerts/<int:pk>/act/", act_alert, name="act_alert"),
     path("alerts/<int:alert_id>/send-infection-sms/", send_alert_sms, name="send_alert_sms"),

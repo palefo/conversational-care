@@ -20,17 +20,29 @@ themselves — see the autosave note in the script below.
 
   <div class="dpc-live" id="dpcLive" hidden>
     <span class="dpc-dot"></span>
+    {% comment %}
+      "Call placed" rather than "On call": the stopwatch starts when Twilio
+      accepted the request, and nothing on this page knows whether either phone
+      was ever picked up. A bare 03:21 claims a connection we cannot see. See
+      the call-state note in the script below.
+    {% endcomment %}
+    <span class="dpc-live-t">{% trans "Call placed" %}</span>
     <span class="dpc-timer" id="dpcTimer">00:00</span>
     <small id="dpcAttempt"></small>
   </div>
 
+  {% comment %}
+    The strip that carried the timer used to ask the question here as well as at
+    the foot. Two places asking one thing read as two things to do, so the ask
+    lives at the foot only — see the outcome block there, which now carries the
+    amber the strip had.
+  {% endcomment %}
+
   <div class="dpc-head">
     <div class="dp-head">
       <div>
-        <div class="dp-kick dp-kick-{{ panel_item.accent }}">
-          {{ panel_item.kicker }}{% if panel_item.when %} · {{ panel_item.when|localtime|date:"D d M · H:i" }}{% endif %}
-        </div>
-        <p class="dp-title">{{ panel_item.title }}{% if panel_item.tag_label %}<span class="dp-tag dp-tag-{{ panel_item.tag_class }}">{{ panel_item.tag_label }}</span>{% endif %}</p>
+        <div class="dp-kick dp-kick-{{ panel_item.accent }}">{{ panel_item.kicker }}</div>
+        <p class="dp-title">{{ panel_item.title }}{% if panel_item.tag_label %}<span class="dp-tag dp-tag-{{ panel_item.tag_class }}">{{ panel_item.tag_label }}</span>{% endif %}{% if panel_item.outcome_missing %}<span class="dp-tag dp-tag-due">{% trans "Outcome missing" %}</span>{% endif %}</p>
         <div class="dp-meta">
           {{ panel_item.patient.name }} {{ panel_item.patient.lastname }}
           {% comment %}
@@ -40,10 +52,21 @@ themselves — see the autosave note in the script below.
           {% if panel_context.last_contact %}
             · <span class="dp-last">{% blocktrans with t=panel_context.last_contact|localtime|timesince|first_unit %}Last contact {{ t }} ago{% endblocktrans %}</span>
           {% endif %}
-          {% if panel_item.question_total %}
-            · <span class="dpc-count"><span id="dpcCount">{{ panel_item.answered_total }} {% trans "of" %} {{ panel_item.question_total }}</span> {% trans "answered" %}</span>
-          {% endif %}
           <span class="dpc-saved" id="dpcSaved" hidden></span>
+        </div>
+        {% comment %}
+          The dated facts, in the same place and the same shape on every kind of
+          panel. The time the appointment is for was sharing a line with the
+          kicker, where it read as part of the category rather than as a fact
+          about this meeting.
+        {% endcomment %}
+        <div class="dp-facts">
+          {% if panel_item.when %}
+            <div><b>{% trans "Scheduled" %}</b> {{ panel_item.when|localtime|date:"D d M Y · H:i" }}</div>
+          {% endif %}
+          {% if panel_item.in_person and panel_item.location %}
+            <div><b>{% trans "Where" %}</b> {{ panel_item.location }}</div>
+          {% endif %}
         </div>
       </div>
       {% comment %}
@@ -63,18 +86,43 @@ themselves — see the autosave note in the script below.
     actions below never move. Pinned outside the scrolling body for the same
     reason.
   {% endcomment %}
+  {% if panel_item.recording %}
+    <div class="dpc-ctl">
+      <audio class="dp-player" controls preload="none" src="{{ panel_item.recording_url }}"></audio>
+      <p class="dpc-attach">
+        {% blocktrans with d=panel_item.recording_len %}Attached to this meeting · {{ d }}{% endblocktrans %}
+      </p>
+    </div>
+  {% endif %}
+
+  {% comment %}
+    Summary first and Notes last on every kind of panel, with whatever evidence
+    that kind has in between. A tab that could hold something stays in the strip
+    and explains itself when it is empty — a call about to be made still shows
+    Transcript, saying there is no recording yet, because the tab appearing
+    later would change the shape of the panel mid-call. A tab that can never
+    hold anything is absent instead: an in-person meeting has no transcript to
+    wait for.
+
+    Which tab opens is a different question from the order. While a call is
+    still to be made the panel is a working surface, so it opens on Protocols;
+    once it is done it opens on Summary, which is what you came to read.
+  {% endcomment %}
   <div class="dp-tabs">
-    <button type="button" class="dp-tab on" data-dptab="protocols">{% trans "Protocols" %}
-      {% if panel_item.question_total %}<span class="dp-tab-n">{{ panel_item.answered_total }}/{{ panel_item.question_total }}</span>{% endif %}
+    <button type="button" class="dp-tab{% if not panel_item.is_pending %} on{% endif %}" data-dptab="summary">{% trans "Summary" %}</button>
+    <button type="button" class="dp-tab{% if panel_item.is_pending %} on{% endif %}" data-dptab="protocols">{% trans "Protocols" %}
+      {% if panel_item.protocol_total %}<span class="dp-tab-n" data-protocount>{{ panel_item.protocol_done_total }}/{{ panel_item.protocol_total }}</span>{% endif %}
     </button>
-    <button type="button" class="dp-tab" data-dptab="notes">{% trans "Notes" %}</button>
-    {% if not panel_item.is_pending %}
-      <button type="button" class="dp-tab" data-dptab="record">{% trans "Recording" %}</button>
+    {% if not panel_item.in_person %}
+      <button type="button" class="dp-tab" data-dptab="transcript">{% trans "Transcript" %}</button>
     {% endif %}
+    <button type="button" class="dp-tab" data-dptab="notes">{% trans "Notes" %}
+      {% if panel_item.notes_list %}<span class="dp-tab-n">{{ panel_item.notes_list|length }}</span>{% endif %}
+    </button>
   </div>
 
   <div class="dpc-body">
-  <div data-dppane="protocols">
+  <div data-dppane="protocols"{% if not panel_item.is_pending %} hidden{% endif %}>
     {% if panel_item.in_person %}
       <div class="dp-meta dpc-toaddress">
         {% trans "Where" %}: <b>{{ panel_item.location|default:_("Location not set") }}</b>
@@ -85,20 +133,73 @@ themselves — see the autosave note in the script below.
     {% endif %}
 
     {% if panel_item.protocols %}
+      {% comment %}
+        Editing the protocol structure changes the questions for every client on
+        it, not just this meeting. It sits up here rather than in the card, where
+        it would be the same size and colour as Save answers and one slip away
+        from rewriting a protocol nobody meant to touch.
+      {% endcomment %}
       <div class="dpc-sect">{% trans "Protocols" %}</div>
       {% for p in panel_item.protocols %}
-        <div class="dpc-card" data-protocol="{{ p.number }}">
+        {% comment %}
+          The header row is about the protocol; the body below it is about this
+          meeting. Editing the structure changes the questions for every client
+          on it, so it sits up here as a quiet link rather than down beside Save
+          answers as a button the same size and colour.
+        {% endcomment %}
+        <div class="dpc-card" data-protocol="{{ p.number }}" data-total="{{ p.total }}">
+          <div class="dpc-card-hrow">
           <button type="button" class="dpc-card-h" aria-expanded="false">
             <span class="dpc-chev" aria-hidden="true">›</span>
             <span class="dpc-card-n">{{ p.number }}. {{ p.title }}</span>
             {% if p.complete %}
-              <span class="dpc-pill dpc-pill-done">{% trans "Complete" %}</span>
+              <span class="dpc-pill dpc-pill-done" data-pill>{% trans "Complete" %}</span>
             {% elif p.started %}
-              <span class="dpc-pill dpc-pill-part">{{ p.answered }} {% trans "of" %} {{ p.total }}</span>
+              <span class="dpc-pill dpc-pill-part" data-pill>{{ p.answered }} {% trans "of" %} {{ p.total }}</span>
             {% else %}
-              <span class="dpc-pill dpc-pill-todo">{% blocktrans count n=p.total %}{{ n }} question{% plural %}{{ n }} questions{% endblocktrans %}</span>
+              <span class="dpc-pill dpc-pill-todo" data-pill>{% blocktrans count n=p.total %}{{ n }} question{% plural %}{{ n }} questions{% endblocktrans %}</span>
             {% endif %}
           </button>
+          {% if panel_item.can_edit_answers %}
+            <a class="dpc-card-edit" href="{% url 'protocol_editor' p.number %}"
+               title="{% trans 'Changes the questions for every client on this protocol' %}">{% trans "Edit" %}</a>
+          {% endif %}
+          </div>
+
+          {% comment %}
+            How this protocol is being answered, as one line that changes with
+            the state. Send and Reload as two permanent buttons meant both were
+            dead most of the time: there is nothing to reload before anything
+            was sent, and asking twice is a second text to a real person.
+          {% endcomment %}
+          {% if panel_item.automations_enabled and panel_item.can_edit_answers %}
+            {% if panel_item.automation and panel_item.automation.protocol == p.number %}
+              <div class="dpc-mode dpc-mode-live">
+                <span class="dpc-mode-dot{% if not p.by_text_count %} dpc-mode-wait{% endif %}"></span>
+                <span class="dpc-mode-t">
+                  {% if p.by_text_count %}
+                    {% blocktrans count n=p.by_text_count %}<b>{{ n }} answer</b> came back by text{% plural %}<b>{{ n }} answers</b> came back by text{% endblocktrans %}
+                  {% else %}
+                    {% blocktrans with who=panel_item.patient.caregiver %}Asked {{ who }} by text &middot; no replies yet{% endblocktrans %}
+                  {% endif %}
+                </span>
+                <button type="button" class="dp-btn" onclick="window.location.reload()">
+                  <span class="dpc-mode-ico" aria-hidden="true">refresh</span>{% trans "Check for replies" %}
+                </button>
+              </div>
+            {% elif panel_item.is_pending %}
+              <div class="dpc-mode">
+                <span class="dpc-mode-t">{% trans "Type the answers, or ask the caregiver" %}</span>
+                <form method="post" action="{% url 'start_protocol_automation' panel_item.meeting.pk p.number %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  <button type="submit" class="dp-btn dp-btn-ghost">
+                    <span class="dpc-mode-ico" aria-hidden="true">send</span>{% trans "Send by text" %}
+                  </button>
+                </form>
+              </div>
+            {% endif %}
+          {% endif %}
 
           <div class="dpc-card-b">
             {% if p.description %}<div class="dpc-desc">{{ p.description|markdownify }}</div>{% endif %}
@@ -108,27 +209,63 @@ themselves — see the autosave note in the script below.
                   data-protocol="{{ p.number }}">
               {% csrf_token %}
               {% for q in p.questions %}
+                {% comment %}
+                  A finished call keeps the field rather than collapsing the
+                  answer into a paragraph: the same layout in both states, read
+                  -only in one of them. Question and answer were reading as one
+                  run of text, so the question is now a numbered label above a
+                  field that is visibly a field whether or not it was answered.
+                {% endcomment %}
                 <div class="dpc-q">
-                  <div class="dpc-qp markdown-content">{{ q.prompt_md|markdownify }}</div>
+                  <div class="dpc-qp markdown-content"><span class="dpc-qn">{{ forloop.counter }}.</span>{{ q.prompt_md|markdownify }}</div>
                   {% if panel_item.can_edit_answers %}
-                    <textarea class="dpc-ta" name="{{ q.field }}" rows="3"
-                              placeholder="{% trans 'Type what they said' %}">{{ q.answer }}</textarea>
+                    {% if q.answer and not q.mine %}
+                      {% comment %}
+                        Answered on an earlier call. Disabled rather than
+                        read-only on purpose: a disabled field is not submitted,
+                        so saving this call cannot copy another call's answers
+                        into it and end up with the same words recorded twice.
+                        Update hands the question to this call.
+                      {% endcomment %}
+                      <textarea class="dpc-ta dpc-ta-carried" rows="3" disabled
+                                data-carried="{{ q.field }}">{{ q.answer }}</textarea>
+                      <div class="dpc-carried">
+                        <span>{% blocktrans with d=q.when|localtime|date:"j M" %}Answered on {{ d }}{% endblocktrans %}</span>
+                        <button type="button" class="dpc-carried-edit" data-uncarry>{% trans "Update" %}</button>
+                      </div>
+                    {% else %}
+                      <textarea class="dpc-ta{% if q.by_text %} dpc-ta-bytext{% endif %}" name="{{ q.field }}" rows="3"
+                                {% if q.by_text %}title="{% trans 'Came back by text' %}"{% endif %}
+                                placeholder="{% trans 'Type what they said' %}">{{ q.answer }}</textarea>
+                    {% endif %}
                   {% else %}
-                    <div class="dpc-ans">{{ q.answer|default:"—" }}</div>
+                    <textarea class="dpc-ta{% if not q.answer %} dpc-ta-empty{% endif %}{% if q.answer and not q.mine %} dpc-ta-carried{% endif %}" rows="3" readonly
+                              placeholder="{% trans 'Not answered' %}">{{ q.answer }}</textarea>
+                    {% if q.answer and not q.mine %}
+                      <div class="dpc-carried"><span>{% blocktrans with d=q.when|localtime|date:"j M" %}Answered on {{ d }}{% endblocktrans %}</span></div>
+                    {% endif %}
                   {% endif %}
                 </div>
               {% endfor %}
             </form>
 
-            <div class="dpc-cardfoot">
-              {% if panel_item.automations_enabled and panel_item.is_pending %}
-                <form method="post" action="{% url 'start_protocol_automation' panel_item.meeting.pk p.number %}">
-                  {% csrf_token %}
-                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                  <button type="submit" class="dp-btn dp-btn-ghost">{% trans "Send by text" %}</button>
-                </form>
-              {% endif %}
-            </div>
+            {% comment %}
+              Saving is a button rather than a debounce. It was already being
+              written a beat after you stopped typing, but nothing on screen
+              moved — so there was no way to tell a saved answer from an unsaved
+              one, and the protocol never appeared to complete. The state is
+              named here instead: the field goes amber while it differs from
+              what is stored, the row says how many are unsaved, and saving
+              moves the pill and the tab count with it.
+            {% endcomment %}
+            {% if panel_item.can_edit_answers %}
+              <div class="dpc-cardfoot">
+                <span class="dpc-saved" data-cardsaved hidden></span>
+                <button type="button" class="dp-btn" data-savecard disabled>{% trans "Save answers" %}</button>
+              </div>
+            {% endif %}
+
+
           </div>
         </div>
       {% endfor %}
@@ -155,15 +292,21 @@ themselves — see the autosave note in the script below.
       {% trans "Notes" %}
       <span class="dpc-saved" id="dpcNoteSaved" hidden></span>
     </div>
+    {% comment %}
+      Writing a note now adds one rather than overwriting the last. The old
+      single blob per meeting had no author and no time, and a second person
+      writing after the first simply replaced them.
+    {% endcomment %}
     {% if panel_item.can_edit_answers %}
-      <form id="dpcNotesForm" method="post"
-            action="{% url 'save_meeting_notes' panel_item.meeting.pk %}">
-        {% csrf_token %}
-        <textarea class="dpc-ta dpc-notes" name="notes" rows="4"
-                  placeholder="{% if panel_item.in_person %}{% trans 'Anything else worth recording from this meeting' %}{% else %}{% trans 'Anything else worth recording from this call' %}{% endif %}">{{ panel_item.notes }}</textarea>
-      </form>
+      <textarea class="dpc-ta dpc-notes" id="dpNoteNew" rows="4"
+                placeholder="{% if panel_item.in_person %}{% trans 'Write a note about this meeting' %}{% else %}{% trans 'Write a note about this call' %}{% endif %}"></textarea>
+      <div class="dp-notebar">
+        <span class="dpc-saved" id="dpNoteState" hidden></span>
+        <button type="button" class="dp-btn dp-btn-pri" id="dpNoteSave">{% trans "Save note" %}</button>
+      </div>
     {% endif %}
 
+    {% include "_panel_notes.html" %}
   </div>
 
   {% comment %}
@@ -171,23 +314,103 @@ themselves — see the autosave note in the script below.
     the list no longer carries a separate row for it. Its own section, with the
     summary written from the same call beside it.
   {% endcomment %}
-  {% if not panel_item.is_pending %}
-    <div data-dppane="record" hidden>
-      <div class="dpc-sect">{% trans "Recording" %}</div>
-      {% if panel_item.recording %}
-        <audio class="dp-player" controls preload="none" src="{{ panel_item.recording_url }}"></audio>
-        <p class="dpc-attach">
-          {% blocktrans with d=panel_item.recording_len %}Attached to this meeting · {{ d }}{% endblocktrans %}
-        </p>
+  {% comment %}
+    The summary and the transcript were sharing one tab called "Recording",
+    which put the thing you read first behind the thing you check afterwards.
+    They are two tabs now; the player itself moved above the strip, so it stays
+    reachable from whichever one you are on.
+  {% endcomment %}
+  <div data-dppane="summary"{% if panel_item.is_pending %} hidden{% endif %}>
+    {% if panel_item.meeting.protocol_summary %}
+      <div class="dp-ov">
+        <div class="dp-ov-h">{% trans "Overview" %}</div>
+        <div class="dp-ov-t">{{ panel_item.meeting.protocol_summary }}</div>
+      </div>
+      {% comment %}
+        Moments worth going back to, each anchored to a transcript segment, so
+        the timestamp jumps the player to audio that exists rather than to a
+        time the model made up.
+      {% endcomment %}
+      {% if panel_item.moments %}
+        <div class="dpc-sect">{% trans "Key moments" %}</div>
+        {% for m in panel_item.moments %}
+          <div class="dp-pt">
+            <span class="dp-ptn">{{ forloop.counter }}</span>
+            <span class="dp-ptt">{{ m.text }}</span>
+            <button type="button" class="dp-stamp" data-dpseek="{{ m.start }}">{{ m.stamp }}</button>
+          </div>
+        {% endfor %}
+      {% endif %}
+      {% if panel_item.answered_here_total %}
+        <form method="post" action="{{ panel_item.summarize_url }}" class="dp-inline-form">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button type="submit" class="dpc-lnk">{% trans "Generate again" %}</button>
+        </form>
+      {% endif %}
+    {% elif panel_item.answered_here_total %}
+      {% comment %}
+        A line and the thing you can do, rather than a framed placeholder: the
+        frame drew a box around an absence and took most of a 380px tab to say
+        there was nothing in it. What is worth saying is the offer.
+      {% endcomment %}
+      <p class="dp-blank"><b>{% trans "No summary yet." %}</b></p>
+      <form method="post" action="{{ panel_item.summarize_url }}" class="dp-blank-act">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button type="submit" class="dp-btn">{% trans "Generate summary" %}</button>
+      </form>
+    {% else %}
+      <p class="dp-blank">
+        <b>{% trans "No summary yet." %}</b>
+        {% if panel_item.in_person %}{% trans "One can be written once the meeting is done." %}
+        {% else %}{% trans "One can be written once the call is done." %}{% endif %}
+      </p>
+    {% endif %}
+  </div>
 
+  {% if not panel_item.in_person %}
+    <div data-dppane="transcript" hidden>
+      {% if panel_item.recording %}
+        {% if panel_item.segments %}
+          {% comment %}
+            Segments, so a timestamp can run down the left and each line can be
+            played. Whisper cannot tell voices apart; a speaker is only named
+            when the recording had two channels to separate the parties, which
+            is why the label is conditional rather than always there.
+          {% endcomment %}
+          <div class="dp-tr-tools">
+            <input type="search" class="dp-find" id="dpFind" placeholder="{% trans 'Find in transcript' %}">
+            <button type="button" class="dp-btn" id="dpFindClear">{% trans "Clear" %}</button>
+          </div>
+          <div class="dp-tr" id="dpTranscript">
+            {% for seg in panel_item.segments %}
+              <div class="dp-tr-turn{% if seg.speaker == 2 %} dp-tr-them{% endif %}">
+                <button type="button" class="dp-tr-at" data-dpseek="{{ seg.start }}">{{ seg.stamp }}</button>
+                {% if seg.speaker %}
+                  <span class="dp-tr-who">{% if seg.speaker == 1 %}{% trans "Speaker 1" %}{% else %}{% trans "Speaker 2" %}{% endif %}</span>
+                {% endif %}
+                <p>{{ seg.text }}</p>
+              </div>
+            {% endfor %}
+          </div>
+        {% elif panel_item.recording.transcript %}
+          {% comment %}
+            Transcribed before segments were stored, so there is text but no
+            timings. Shown as it is rather than withheld.
+          {% endcomment %}
+          <div class="dp-transcript">{{ panel_item.recording.transcript }}</div>
+        {% else %}
+          <p class="dp-blank">
+            <b>{% trans "Not transcribed yet." %}</b>
+            {% trans "The recording is here and can be played." %}
+          </p>
+        {% endif %}
         {% comment %}
           Transcribing was only reachable from a page nothing links to. It
           belongs beside the recording it acts on, not in the footer with the
           actions that end the call.
         {% endcomment %}
-        {% if panel_item.recording.transcript %}
-          <div class="dp-transcript">{{ panel_item.recording.transcript }}</div>
-        {% endif %}
         <form method="post" action="{{ panel_item.transcribe_url }}" class="dp-inline-form">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -196,29 +419,16 @@ themselves — see the autosave note in the script below.
             {% else %}{% trans "Transcribe this recording" %}{% endif %}
           </button>
         </form>
+      {% elif panel_item.is_pending %}
+        <p class="dp-blank">
+          <b>{% trans "No recording yet." %}</b>
+          {% trans "The call has not been made. Once it has, the recording and its transcript appear here." %}
+        </p>
       {% else %}
-        <p class="dpc-attach">{% trans "Nothing was recorded." %}</p>
-      {% endif %}
-
-      {% comment %}
-        Same story for the protocol summary: an endpoint that worked, with no
-        door left to it.
-      {% endcomment %}
-      <div class="dpc-sect">{% trans "Summary" %}</div>
-      {% if panel_item.meeting.protocol_summary %}
-        <div class="dp-ov"><div class="dp-ov-t">{{ panel_item.meeting.protocol_summary }}</div></div>
-      {% else %}
-        <p class="dpc-attach">{% trans "The protocol answers have not been summarised." %}</p>
-      {% endif %}
-      {% if panel_item.answered_total %}
-        <form method="post" action="{{ panel_item.summarize_url }}" class="dp-inline-form">
-          {% csrf_token %}
-          <input type="hidden" name="next" value="{{ request.get_full_path }}">
-          <button type="submit" class="dpc-lnk">
-            {% if panel_item.meeting.protocol_summary %}{% trans "Summarise again" %}
-            {% else %}{% trans "Summarise the answers" %}{% endif %}
-          </button>
-        </form>
+        <p class="dp-blank">
+          <b>{% trans "Nothing was recorded." %}</b>
+          {% trans "This call has no recording attached to it." %}
+        </p>
       {% endif %}
     </div>
   {% endif %}
@@ -238,8 +448,25 @@ themselves — see the autosave note in the script below.
         {% if panel_item.in_person %}
           <button type="button" class="dp-btn dp-btn-pri" data-dpdialog="dpEdit">{% trans "Edit meeting" %}</button>
         {% elif panel_item.can_call %}
+          {% comment %}
+            The label sits in a span so dialling can replace the words without
+            discarding the button. The node that was pressed has to be the node
+            that answers: the eye is at the foot of the panel when the click
+            lands, and the live strip is a header's and a protocol list's worth
+            of scroll away from it.
+          {% endcomment %}
           <button type="button" class="dp-btn dpc-go" id="dpcStart"
-                  data-url="{% url 'make_phone_call' panel_item.meeting.pk %}">{% trans "Start call" %}</button>
+                  data-url="{% url 'make_phone_call' panel_item.meeting.pk %}"
+                  data-dialling="{% blocktrans with c=panel_item.patient.caregiver %}Calling {{ c }}…{% endblocktrans %}"
+                  data-who="{{ panel_item.patient.caregiver }}">
+            <span class="dpc-go-dot" aria-hidden="true"></span>
+            <span class="dpc-go-t">{% trans "Start call" %}</span>
+          </button>
+          {% comment %}
+            Failure belongs next to the control that failed. It used to be an
+            alert(), which is dismissed reflexively and takes the reason with it.
+          {% endcomment %}
+          <p class="dpc-dialerr" id="dpcErr" role="alert" hidden></p>
         {% else %}
           <button type="button" class="dp-btn" disabled
                   title="{% trans 'A phone number is missing for you or the caregiver.' %}">{% trans "Start call" %}</button>
@@ -375,25 +602,43 @@ themselves — see the autosave note in the script below.
         </form>
       </dialog>
 
-      <div id="dpcOutcome" hidden>
-        <p class="dpc-ask">{% trans "How did the call go?" %}</p>
+      <div id="dpcOutcome" class="dpc-outcome-ask" hidden>
+        <p class="dpc-ask">
+          <span class="dpc-out-dot dpc-mode-wait"></span>{% trans "Call ended. Record the outcome." %}
+        </p>
         {% comment %}
-          `next` drops the ?item=, so finishing a call closes the panel and
-          leaves you on the list with your search and sort intact. Sending a
-          reminder or a protocol above keeps it open — you are still working.
+          The panel stays open. `next` used to drop the ?item=, so pressing an
+          outcome closed the panel and returned you to the list — which reads
+          as the button having done nothing at all, when in fact it had already
+          saved. The outcome is recorded and the panel says so.
+
+          The three are equal weight on purpose. Completed was the only filled
+          button, which quietly says it is the expected answer; a call that was
+          not answered is just as ordinary, and weighting the record towards one
+          outcome is how a caseload ends up looking better than it was. They are
+          told apart by colour, not by size.
+
+          Cancelling is not here. It is a different verb — calling the
+          appointment off rather than recording what happened — and it keeps its
+          own red button below.
         {% endcomment %}
         <form method="post" action="{% url 'complete_meeting' panel_item.meeting.pk %}">
           {% csrf_token %}
-          <input type="hidden" name="next" value="{{ request.path }}{% if panel_close_query %}?{{ panel_close_query }}{% endif %}">
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
           <input type="hidden" name="executed_protocol" id="dpcExec"
                  value="{{ panel_item.meeting.scheduled_protocol }}">
           <div class="dp-acts">
-            <button type="submit" name="status" value="{{ panel_item.completed_status }}"
-                    class="dp-btn dp-btn-pri">{% trans "Complete" %}</button>
-            <div class="dp-acts-row">
-              <button type="submit" name="status" value="2" class="dp-btn">{% trans "Interrupted" %}</button>
-              <button type="submit" name="status" value="3" class="dp-btn">{% trans "No answer" %}</button>
-            </div>
+            {% for value, label, tone in panel_item.outcomes %}
+              {% if forloop.first %}
+                <button type="submit" name="status" value="{{ value }}"
+                        class="dp-btn dpc-out dpc-out-{{ tone }}"><span class="dpc-out-dot"></span>{{ label }}</button>
+                <div class="dp-acts-row">
+              {% else %}
+                <button type="submit" name="status" value="{{ value }}"
+                        class="dp-btn dpc-out dpc-out-{{ tone }}"><span class="dpc-out-dot"></span>{{ label }}</button>
+              {% endif %}
+            {% endfor %}
+                </div>
           </div>
         </form>
         <p class="dpc-covered">
@@ -423,7 +668,42 @@ themselves — see the autosave note in the script below.
         call that has already happened the button bounced. What you actually
         want after an interrupted call is another one.
       {% endcomment %}
-      <div class="dp-acts">
+      {% comment %}
+        What was recorded, said back. The panel used to close on choosing an
+        outcome, so the only confirmation was the row changing on a list you had
+        been returned to — which is why pressing one felt like nothing had
+        happened. Change reopens the three, because the wrong button gets
+        pressed and the record should not be the thing that is hard to correct.
+      {% endcomment %}
+      <div class="dpc-outcome-done">
+        <span class="dpc-out-dot"
+              style="background:{% if panel_item.meeting.status == 1 %}#16a34a{% elif panel_item.meeting.status == 3 %}#94a3b8{% elif panel_item.meeting.status == 2 %}#b45309{% else %}#dc2626{% endif %}"></span>
+        <span>{% blocktrans with s=panel_item.meeting.get_status_display %}Recorded as <b>{{ s }}</b>{% endblocktrans %}</span>
+        <a href="#" data-dpreopen>{% trans "Change" %}</a>
+      </div>
+
+      <form method="post" action="{% url 'complete_meeting' panel_item.meeting.pk %}"
+            id="dpcRedo" hidden>
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <input type="hidden" name="executed_protocol" value="{{ panel_item.meeting.executed_protocol|default_if_none:'' }}">
+        <p class="dpc-ask">{% trans "Outcome" %}</p>
+        <div class="dp-acts">
+          {% for value, label, tone in panel_item.outcomes %}
+            {% if forloop.first %}
+              <button type="submit" name="status" value="{{ value }}"
+                      class="dp-btn dpc-out dpc-out-{{ tone }}"><span class="dpc-out-dot"></span>{{ label }}</button>
+              <div class="dp-acts-row">
+            {% else %}
+              <button type="submit" name="status" value="{{ value }}"
+                      class="dp-btn dpc-out dpc-out-{{ tone }}"><span class="dpc-out-dot"></span>{{ label }}</button>
+            {% endif %}
+          {% endfor %}
+            </div>
+        </div>
+      </form>
+
+      <div class="dp-acts" id="dpcAfter">
         <a href="{% url 'communications' %}?schedule={{ panel_item.patient.pk }}"
            class="dp-btn dp-btn-pri">{% trans "Schedule a follow-up" %}</a>
       </div>
@@ -446,7 +726,21 @@ whatever you opened, and neither moves when the body scrolls.
         <div class="dp-kick dp-kick-{{ panel_item.accent }}">{{ panel_item.kicker }}</div>
         <p class="dp-title">{{ panel_item.title }}{% if panel_item.tag_label %}<span class="dp-tag dp-tag-{{ panel_item.tag_class }}">{{ panel_item.tag_label }}</span>{% endif %}</p>
         <div class="dp-meta">
-          {{ panel_item.when|localtime|date:"D d M Y · H:i" }}{% if panel_item.state %} · <b>{{ panel_item.state }}</b>{% endif %}{% if panel_item.source %} · {% blocktrans with s=panel_item.source %}from {{ s }}{% endblocktrans %}{% endif %}{% if panel_context.last_contact %} · <span class="dp-last">{% blocktrans with t=panel_context.last_contact|localtime|timesince|first_unit %}Last contact {{ t }} ago{% endblocktrans %}</span>{% endif %}
+          {% if panel_item.state %}<b>{{ panel_item.state }}</b>{% endif %}{% if panel_context.last_contact %}{% if panel_item.state %} · {% endif %}<span class="dp-last">{% blocktrans with t=panel_context.last_contact|localtime|timesince|first_unit %}Last contact {{ t }} ago{% endblocktrans %}</span>{% endif %}
+        </div>
+        {% comment %}
+          Same facts row as the call panel. The label changes with the kind
+          because "detected" and "recorded" are not the same fact, but the shape
+          does not.
+        {% endcomment %}
+        <div class="dp-facts">
+          {% if panel_item.when %}
+            <div>
+              <b>{% if panel_item.kind == 'alert' %}{% trans "Detected" %}{% elif panel_item.kind == 'recording' %}{% trans "Recorded" %}{% else %}{% trans "Started" %}{% endif %}</b>
+              {{ panel_item.when|localtime|date:"D d M Y · H:i" }}
+            </div>
+          {% endif %}
+          {% if panel_item.source %}<div><b>{% trans "Source" %}</b> {{ panel_item.source }}</div>{% endif %}
         </div>
       </div>
       <div class="dp-headgo">
@@ -463,10 +757,29 @@ whatever you opened, and neither moves when the body scrolls.
     way; a conversation has two because the transcript is long and the summary
     is what you read first.
   {% endcomment %}
+  {% comment %}
+    Same rule as the call panel: Summary first, Notes last, the evidence for
+    that kind in between. "Overview" was the odd one out — it is a summary like
+    every other summary, so it is called one.
+  {% endcomment %}
   {% if panel_item.kind == 'alert' %}
     <div class="dp-tabs">
-      <button type="button" class="dp-tab on" data-dptab="summary">{% trans "Overview" %}</button>
+      <button type="button" class="dp-tab on" data-dptab="summary">{% trans "Summary" %}</button>
+      {% comment %}
+        Only when there is one. An alert raised from a client's record rather
+        than from a chat can never have a conversation, so the tab is absent
+        rather than present-and-empty — the same rule the in-person meeting
+        follows for Transcript.
+      {% endcomment %}
+      {% if panel_item.messages %}
+        <button type="button" class="dp-tab" data-dptab="conversation">{% trans "Conversation" %}
+          {% if panel_item.message_count %}<span class="dp-tab-n">{{ panel_item.message_count }}</span>{% endif %}
+        </button>
+      {% endif %}
       <button type="button" class="dp-tab" data-dptab="technical">{% trans "Technical" %}</button>
+      <button type="button" class="dp-tab" data-dptab="notes">{% trans "Notes" %}
+        {% if panel_item.notes_list %}<span class="dp-tab-n">{{ panel_item.notes_list|length }}</span>{% endif %}
+      </button>
     </div>
   {% elif panel_item.kind == 'chat' %}
     <div class="dp-tabs">
@@ -474,11 +787,17 @@ whatever you opened, and neither moves when the body scrolls.
       <button type="button" class="dp-tab" data-dptab="conversation">{% trans "Conversation" %}
         {% if panel_item.message_count %}<span class="dp-tab-n">{{ panel_item.message_count }}</span>{% endif %}
       </button>
+      <button type="button" class="dp-tab" data-dptab="notes">{% trans "Notes" %}
+        {% if panel_item.notes_list %}<span class="dp-tab-n">{{ panel_item.notes_list|length }}</span>{% endif %}
+      </button>
     </div>
   {% elif panel_item.kind == 'recording' %}
     <div class="dp-tabs">
       <button type="button" class="dp-tab on" data-dptab="summary">{% trans "Summary" %}</button>
       <button type="button" class="dp-tab" data-dptab="transcript">{% trans "Transcript" %}</button>
+      <button type="button" class="dp-tab" data-dptab="notes">{% trans "Notes" %}
+        {% if panel_item.notes_list %}<span class="dp-tab-n">{{ panel_item.notes_list|length }}</span>{% endif %}
+      </button>
     </div>
   {% endif %}
 
@@ -514,17 +833,28 @@ whatever you opened, and neither moves when the body scrolls.
 
   </div>
 
-  {% if panel_item.kind == 'chat' %}
+  {% if panel_item.kind == 'chat' or panel_item.kind == 'alert' and panel_item.messages %}
   <div data-dppane="conversation" hidden>
+    {% if panel_item.kind == 'alert' and panel_item.messages %}
+      {% comment %}
+        Two different claims, and the panel should not make the stronger one on
+        the weaker evidence: either the alert names this exchange, or this is
+        simply what the client said that day and the connection is inferred.
+      {% endcomment %}
+      <p class="dp-hint">
+        {% if panel_item.link_is_exact %}{% trans "The conversation this alert was raised from." %}
+        {% else %}{% trans "What this client said on the day the alert appeared. The alert does not name a conversation, so this is context rather than the cause." %}{% endif %}
+      </p>
+    {% endif %}
     {% if panel_item.messages %}
       <div class="dp-msgs">
         {% for m in panel_item.messages %}
-          {% if m.user_message %}<div class="dp-msg dp-msg-in">{{ m.user_message|truncatechars:160 }}</div>{% endif %}
-          {% if m.response_message %}<div class="dp-msg dp-msg-out">{{ m.response_message|truncatechars:160 }}</div>{% endif %}
+          {% if m.user_message %}<div class="dp-msg dp-msg-in"><span class="dp-msg-b">{{ m.user_message|truncatechars:160 }}</span><time>{{ m.timestamp|localtime|date:"H:i" }}</time></div>{% endif %}
+          {% if m.response_message %}<div class="dp-msg dp-msg-out"><span class="dp-msg-b">{{ m.response_message|truncatechars:160 }}</span><time>{{ m.timestamp|localtime|date:"H:i" }}</time></div>{% endif %}
         {% endfor %}
       </div>
     {% else %}
-      <p class="dp-empty">{% trans "No messages recorded that day." %}</p>
+      <p class="dp-empty">{% if panel_item.kind == 'alert' %}{% trans "This alert was not raised from a conversation." %}{% else %}{% trans "No messages recorded that day." %}{% endif %}</p>
     {% endif %}
 
     {% comment %}
@@ -536,7 +866,7 @@ whatever you opened, and neither moves when the body scrolls.
       Saves itself against conversation_feedback — the same endpoint the old
       page used, unchanged.
     {% endcomment %}
-    {% if panel_item.conv %}
+    {% if panel_item.conv and panel_item.kind == 'chat' %}
       <div class="dp-rev" data-feedback-url="{{ panel_item.feedback_url }}">
         <div class="dp-rev-h">
           {% trans "Your review of this conversation" %}
@@ -594,6 +924,20 @@ whatever you opened, and neither moves when the body scrolls.
     of the thing you are deciding but not thrown away. This is what the old
     alert page called "Technical data".
   {% endcomment %}
+  {% comment %}
+    Notes, on every kind of panel. The alert and the chat had nowhere to write
+    one until notes became records; the recording had nowhere either.
+  {% endcomment %}
+  <div data-dppane="notes" hidden>
+    <textarea class="dpc-ta dpc-notes" id="dpNoteNew" rows="4"
+              placeholder="{% if panel_item.kind == 'alert' %}{% trans 'Write a note about this alert' %}{% elif panel_item.kind == 'chat' %}{% trans 'Write a note about this conversation' %}{% else %}{% trans 'Write a note about this call' %}{% endif %}"></textarea>
+    <div class="dp-notebar">
+      <span class="dpc-saved" id="dpNoteState" hidden></span>
+      <button type="button" class="dp-btn dp-btn-pri" id="dpNoteSave">{% trans "Save note" %}</button>
+    </div>
+    {% include "_panel_notes.html" %}
+  </div>
+
   {% if panel_item.kind == 'alert' %}
     <div data-dppane="technical" hidden>
       <dl class="dp-kv">
@@ -834,7 +1178,14 @@ whatever you opened, and neither moves when the body scrolls.
     var body = panel.querySelector('.dpc-body');
     var panes = panel.querySelectorAll('[data-dppane]');
 
-    function show(name) {
+    // Which tab you were on, remembered across the reload an action causes.
+    // Recording an outcome makes the call no longer pending, and the server
+    // then opens the panel on Summary — so pressing a button in Protocols
+    // moved you somewhere you had not asked to go. The server still decides
+    // where a panel opens the first time; this only holds your place.
+    var TABKEY = 'dpTab:' + (panel.dataset.meeting || location.search);
+
+    function show(name, remember) {
       tabs.forEach(function (x) {
         var on = x.dataset.dptab === name;
         x.classList.toggle('on', on);
@@ -842,7 +1193,28 @@ whatever you opened, and neither moves when the body scrolls.
       });
       panes.forEach(function (p) { p.hidden = (p.dataset.dppane !== name); });
       if (body) body.scrollTop = 0;
+      if (remember !== false) {
+        try { sessionStorage.setItem(TABKEY, name); } catch (e) {}
+      }
     }
+
+    // Restore, but only onto a tab this panel actually has: the strip changes
+    // shape with the item, and a remembered name that is no longer there would
+    // hide every pane.
+    try {
+      var wanted = sessionStorage.getItem(TABKEY);
+      if (wanted && panel.querySelector('.dp-tab[data-dptab="' + wanted + '"]')) {
+        show(wanted, false);
+      } else {
+        // Remember where the panel opened, not only where you clicked. A call
+        // still to be made opens on Protocols without anyone choosing it, so
+        // nothing was stored — and recording the outcome, which makes the call
+        // no longer pending, then dropped you on Summary. The tab you were
+        // handed counts as the tab you were on.
+        var open = panel.querySelector('.dp-tab.on');
+        if (open) { sessionStorage.setItem(TABKEY, open.dataset.dptab); }
+      }
+    } catch (e) {}
 
     tabs.forEach(function (t) {
       t.setAttribute('role', 'tab');
@@ -912,7 +1284,10 @@ whatever you opened, and neither moves when the body scrolls.
     panel.addEventListener('click', function (e) {
       var h = e.target.closest('.dpc-card-h');
       if (!h) return;
-      var card = h.parentElement;
+      // closest, not parentElement: the header shares a row with the editor
+      // link, so its parent is that row rather than the card.
+      var card = h.closest('.dpc-card');
+      if (!card) return;
 
       // Anchor on the card, not the header: an open header is sticky, so it
       // reports where it is pinned rather than where it belongs, and measuring
@@ -933,6 +1308,19 @@ whatever you opened, and neither moves when the body scrolls.
       }
       fitPad();
       writeOpen();
+
+      // The card's height changes in one step, because the anchoring above
+      // measures it the instant it happens. What arrives is the contents — so
+      // the chevron is no longer promising a movement the body does not make.
+      // Opacity only: the header inside is sticky, and a transform on this
+      // element would give it a new containing block and break it.
+      var cb = card.querySelector('.dpc-card-b');
+      if (cb && open) {
+        cb.classList.remove('ui-arrive');
+        void cb.offsetWidth;
+        cb.classList.add('ui-arrive');
+        setTimeout(function () { cb.classList.remove('ui-arrive'); }, 260);
+      }
     });
 
     // ── Autosave ──────────────────────────────────────────────────────────
@@ -949,34 +1337,67 @@ whatever you opened, and neither moves when the body scrolls.
       saved.classList.toggle('dpc-saving', !!busy);
     }
 
+    // The pill on each protocol and the count on the Protocols tab, moved to
+    // match what is now stored. This used to write into a counter in the panel
+    // header, which no longer exists — so answers were being saved and nothing
+    // on screen said so, and a protocol never appeared to complete.
     function recount() {
-      if (!count) return;
-      var filled = 0, total = 0;
-      panel.querySelectorAll('.dpc-form .dpc-ta').forEach(function (t) {
-        total++;
-        if (t.value.trim()) filled++;
+      if (count) {
+        var filled = 0, total = 0;
+        panel.querySelectorAll('.dpc-form .dpc-ta').forEach(function (t) {
+          total++;
+          if (t.value.trim()) filled++;
+        });
+        count.textContent = filled + ' {% trans "of" %} ' + total;
+      }
+
+      var done = 0, cards = panel.querySelectorAll('.dpc-card[data-protocol]');
+      cards.forEach(function (card) {
+        var pill = card.querySelector('[data-pill]');
+        var total = parseInt(card.dataset.total, 10) || 0;
+        var answered = 0;
+        card.querySelectorAll('.dpc-ta').forEach(function (t) {
+          if ((t.dataset.saved || '').trim()) answered++;
+        });
+        if (total && answered === total) done++;
+        if (!pill) return;
+        pill.className = 'dpc-pill ' + (
+          answered === 0 ? 'dpc-pill-todo' :
+          answered === total ? 'dpc-pill-done' : 'dpc-pill-part');
+        pill.textContent = answered === 0
+          ? total + ' {% trans "questions" %}'
+          : answered === total ? '{% trans "Complete" %}'
+          : answered + ' {% trans "of" %} ' + total;
       });
-      count.textContent = filled + ' {% trans "of" %} ' + total;
+
+      var badge = panel.querySelector('[data-protocount]');
+      if (badge) badge.textContent = done + '/' + cards.length;
     }
 
-    function save(form) {
-      flag('{% trans "saving…" %}', true);
-      fetch(form.action, {
-        method: 'POST',
-        credentials: 'same-origin',
-        redirect: 'follow',
-        headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
-        body: new FormData(form)
-      }).then(function (r) {
-        if (!r.ok) throw new Error('save failed');
-        var t = new Date();
-        flag('{% trans "saved" %} ' + String(t.getHours()).padStart(2, '0') + ':' +
-             String(t.getMinutes()).padStart(2, '0'), false);
-        recount();
-      }).catch(function () {
-        flag('{% trans "not saved — retrying" %}', false);
-        setTimeout(function () { save(form); }, 4000);
+    // What is on the server, so "changed" can be told from "typed the same
+    // thing again".
+    panel.querySelectorAll('.dpc-form .dpc-ta').forEach(function (t) {
+      t.dataset.saved = t.value.trim();
+    });
+
+    function syncCard(card) {
+      var button = card.querySelector('[data-savecard]');
+      if (!button) return;
+      var line = card.querySelector('[data-cardsaved]');
+      var dirty = 0;
+      card.querySelectorAll('.dpc-ta').forEach(function (t) {
+        var changed = t.value.trim() !== (t.dataset.saved || '');
+        t.classList.toggle('dpc-ta-dirty', changed);
+        if (changed) dirty++;
       });
+      button.disabled = dirty === 0;
+      if (dirty && line) {
+        line.hidden = false;
+        line.className = 'dpc-saved dpc-dirty';
+        line.textContent = dirty === 1
+          ? '1 {% trans "unsaved answer" %}'
+          : dirty + ' {% trans "unsaved answers" %}';
+      }
     }
 
     // Notes answer with JSON rather than a redirect, and carry their own
@@ -1019,20 +1440,68 @@ whatever you opened, and neither moves when the body scrolls.
       });
     }
 
-    var timers = new WeakMap();
-    panel.querySelectorAll('.dpc-form').forEach(function (form) {
-      form.addEventListener('input', function (e) {
+    // Typing marks the card unsaved; Save answers writes it. A debounce wrote
+    // the same thing a beat later with nothing on screen to say so, which is
+    // indistinguishable from nothing having happened.
+    panel.querySelectorAll('.dpc-card[data-protocol]').forEach(function (card) {
+      var form = card.querySelector('.dpc-form');
+      var button = card.querySelector('[data-savecard]');
+      if (!form || !button) return;
+      var line = card.querySelector('[data-cardsaved]');
+      var label = button.textContent;
+
+      card.addEventListener('input', function (e) {
         if (!e.target.classList.contains('dpc-ta')) return;
-        clearTimeout(timers.get(form));
-        timers.set(form, setTimeout(function () { save(form); }, 1200));
+        syncCard(card);
       });
-      // Leaving a field commits immediately rather than waiting out the debounce.
-      form.addEventListener('focusout', function (e) {
-        if (!e.target.classList.contains('dpc-ta')) return;
-        clearTimeout(timers.get(form));
-        save(form);
+
+      button.addEventListener('click', function () {
+        var pending = {};
+        card.querySelectorAll('.dpc-ta').forEach(function (t, i) { pending[i] = t.value.trim(); });
+        button.disabled = true;
+        button.textContent = '{% trans "Saving…" %}';
+        if (line) { line.hidden = false; line.className = 'dpc-saved dpc-saving'; line.textContent = '{% trans "saving…" %}'; }
+        // Echoed in the header as well, so a save is visible without scrolling
+        // back to the card that did it.
+        flag('{% trans "saving…" %}', true);
+
+        fetch(form.action, {
+          method: 'POST',
+          credentials: 'same-origin',
+          redirect: 'follow',
+          headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+          body: new FormData(form)
+        }).then(function (r) {
+          if (!r.ok) throw new Error('save failed');
+          card.querySelectorAll('.dpc-ta').forEach(function (t, i) {
+            t.dataset.saved = pending[i];
+            t.classList.remove('dpc-ta-dirty');
+          });
+          var now = new Date();
+          if (line) {
+            line.className = 'dpc-saved';
+            line.textContent = '{% trans "saved" %} ' +
+              String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+          }
+          recount();
+          flag('{% trans "saved" %} ' +
+               String(now.getHours()).padStart(2, '0') + ':' +
+               String(now.getMinutes()).padStart(2, '0'), false);
+          button.textContent = label;
+          syncCard(card);
+        }).catch(function () {
+          if (line) { line.className = 'dpc-saved dpc-dirty'; line.textContent = '{% trans "not saved — try again" %}'; }
+          flag('{% trans "not saved" %}', false);
+          button.textContent = label;
+          button.disabled = false;
+        });
       });
+
+      syncCard(card);
     });
+    recount();
+
+
 
     // ── Call state ────────────────────────────────────────────────────────
     // The platform has no idea whether a call is really connected: there is no
@@ -1050,6 +1519,18 @@ whatever you opened, and neither moves when the body scrolls.
     var retryBt = document.getElementById('dpcRetry');
     var tick    = null;
 
+    // Teardown. Everything else in this file is bound to elements inside the
+    // panel, so it dies with the markup when base.html swaps in another item —
+    // an interval does not. Left running it would keep ticking against a
+    // timer element that is no longer on the page, and every panel opened
+    // after it would leave another one behind. The swapper calls these before
+    // it replaces anything; on a full page load nothing calls them and the
+    // document teardown does the same job.
+    (window.dpCleanup = window.dpCleanup || []).push(function () {
+      clearInterval(tick);
+      tick = null;
+    });
+
     function state() {
       try { return JSON.parse(sessionStorage.getItem(KEY)) || null; } catch (e) { return null; }
     }
@@ -1064,10 +1545,19 @@ whatever you opened, and neither moves when the body scrolls.
     }
     function paint() {
       var s = state();
+      // A call still being dialled is not yet a call in progress as far as this
+      // panel is concerned: the foot shows the amber button, not the strip and
+      // End call. Only the bar renders the dialling state, because only the bar
+      // is somewhere the button is not.
+      if (s && !s.started) s = null;
       var done = false;
       try { done = !!sessionStorage.getItem(KEY + ':done'); } catch (e) {}
       if (live) live.hidden = !s;
       if (active) active.hidden = !s;
+      // The whole panel knows a call is out, not just the strip: one class, so
+      // the header and the foot can answer together instead of a green button
+      // vanishing on its own.
+      panel.classList.toggle('dpc-oncall', !!s);
       // Once a call has ended the question is how it went, not whether to
       // place another — so the green Start call row stands down.
       if (idle) idle.hidden = !!s || done;
@@ -1084,17 +1574,128 @@ whatever you opened, and neither moves when the body scrolls.
       }
     }
 
-    function dial(attemptNo) {
+    // ── Dialling ──────────────────────────────────────────────────────────
+    // Twilio takes a second or three to accept the request, and until now the
+    // button sat green and clickable throughout — so the natural answer to the
+    // silence was to press it again, which placed a second conference and
+    // counted a second attempt. `dialling` closes that door; the label and the
+    // pulse are what make the closed door legible rather than unresponsive.
+    var dialling = false;
+    var errEl    = document.getElementById('dpcErr');
+    var goLabel  = startBt ? startBt.querySelector('.dpc-go-t') : null;
+    var goIdle   = goLabel ? goLabel.textContent : '';
+
+    function setDialling(on) {
+      dialling = on;
       if (!startBt) return;
+      startBt.classList.toggle('is-dialling', on);
+      startBt.disabled = on;
+      startBt.setAttribute('aria-busy', String(on));
+      if (goLabel) goLabel.textContent = on ? (startBt.dataset.dialling || goIdle) : goIdle;
+    }
+
+    function dialFailed(msg, fix) {
+      setDialling(false);
+      // Nothing is in progress any more. The panel may also have been closed
+      // while the request was in flight — this closure outlives the markup —
+      // so the bar has to be told the dialling state is over.
+      setState(null);
+      if (window.callBarSync) window.callBarSync();
+
+      if (errEl) {
+        errEl.hidden = false;
+        errEl.textContent = msg;          // clears any previous link too
+        // Most of these are fixable in a minute, by someone who is told where
+        // to go. The link sits with the message rather than only in the toast,
+        // because the toast is dismissible and this is the durable copy.
+        if (fix && fix.href) {
+          var a = document.createElement('a');
+          a.className = 'dpc-dialerr-a';
+          a.href = fix.href;
+          a.textContent = fix.label;
+          errEl.appendChild(document.createTextNode(' '));
+          errEl.appendChild(a);
+        }
+      }
+
+      // Long, but not sticky. The toaster is pinned bottom-right and the panel
+      // occupies that corner, so a toast covers the panel's own foot — which is
+      // where Start call is. A sticky one would sit on top of the button the
+      // navigator needs next. The toast is the attention; the block above it is
+      // the record, and it is still there when the toast goes.
+      if (window.toast) {
+        window.toast('err', '{% trans "Call not placed" %}', msg, {
+          life: 12000,
+          href: fix ? fix.href : '',
+          action: fix ? fix.label : ''
+        });
+      }
+    }
+
+    function dial(attemptNo) {
+      if (!startBt || dialling) return;
+      if (errEl) errEl.hidden = true;
+      setDialling(true);
+      // Publish the dialling state before the request, not after it. A call
+      // being placed is already a call in progress, and closing the panel
+      // during the Twilio round trip used to leave no trace of it anywhere.
+      // `since` is what stops a dialling entry outliving the request that made
+      // it: navigating away aborts the fetch, so neither the success nor the
+      // failure path ever runs to clear it. The bar expires it instead.
+      setState({
+        dialling: true, since: Date.now(),
+        attempt: attemptNo, who: (startBt.dataset.who || '')
+      });
       fetch(startBt.dataset.url, {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'X-CSRFToken': CSRF, 'Accept': 'application/json' }
       }).then(function (r) {
-        if (!r.ok) throw new Error('{% trans "Could not start the call." %}');
-        setState({ started: Date.now(), attempt: attemptNo });
+        if (r.ok) return null;
+        // Carry the server's own reason through. "No caregiver phone number"
+        // and "your own number is missing" are things the navigator can act on;
+        // collapsing them into one generic sentence threw that away. A body
+        // that is not JSON — a proxy's error page in front of Django — still
+        // has to come out as a sentence, hence the fallback.
+        return r.json().then(function (d) { return d; }, function () { return {}; })
+          .then(function (d) {
+            return Promise.reject({ msg: d.error, fix: d.fix });
+          });
+      }).then(function () {
+        setDialling(false);
+        // `who` is for the app-wide bar, which has no panel to read it off: it
+        // finds the call by scanning sessionStorage from whatever page you have
+        // wandered to, and has to be able to name it. The way back it builds
+        // itself, from the meeting id in the key.
+        setState({
+          started: Date.now(), attempt: attemptNo,
+          who: (startBt.dataset.who || '')
+        });
+        // Only the transition animates. paint() also runs on every page load
+        // while a call is out, and a strip that slid in again each time you
+        // came back would read as a second call being placed.
+        if (live) {
+          live.classList.add('dpc-enter');
+          setTimeout(function () { live.classList.remove('dpc-enter'); }, 400);
+        }
+        if (active) {
+          active.classList.add('dpc-enter');
+          setTimeout(function () { active.classList.remove('dpc-enter'); }, 400);
+        }
         paint();
-      }).catch(function (err) { alert(err.message); });
+        // The panel may have been closed mid-request, in which case the bar is
+        // now the only thing showing this call and needs the placed state.
+        if (window.callBarSync) window.callBarSync();
+      },
+      // Rejection handler on this .then rather than a trailing .catch: a bug
+      // thrown while rendering the success state must not be reported to the
+      // navigator as "the call failed", when the call in fact went out.
+      function (e) {
+        // A network failure rejects with a TypeError, which has no `msg` — the
+        // request never reached Django, so there is no server reason to show.
+        dialFailed((e && e.msg) || '{% trans "Could not start the call." %}',
+                   e && e.fix);
+      });
     }
 
     if (startBt) startBt.addEventListener('click', function () { dial(1); });
@@ -1106,7 +1707,21 @@ whatever you opened, and neither moves when the body scrolls.
       // Local only — this never hung up the phone, and still does not.
       setState(null);
       try { sessionStorage.setItem(KEY + ':done', '1'); } catch (e) {}
-      paint();
+      // The strip leaves the way it arrived rather than vanishing. paint() is
+      // what actually hides it, so it waits for the exit to play.
+      // Guarded: this sits in the End call handler, and a missing matchMedia
+      // throwing here would leave the call unmarked as ended.
+      var moves = !(window.matchMedia &&
+                    window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      if (live && !live.hidden) {
+        live.classList.add('dpc-exit');
+        setTimeout(function () {
+          live.classList.remove('dpc-exit');
+          paint();
+        }, moves ? 200 : 150);
+      } else {
+        paint();
+      }
     });
 
     var change = document.getElementById('dpcChange');
@@ -1124,4 +1739,269 @@ whatever you opened, and neither moves when the body scrolls.
 
     paint();
   })();
+</script>
+
+{% comment %}
+  Transcript and notes. Kept out of the call-panel block above because the
+  notes list is shared by every kind of panel, and the transcript belongs to
+  whichever of them has a recording.
+{% endcomment %}
+<script>
+(function () {
+  var panel = document.querySelector('.dp');
+  if (!panel) return;
+
+  function csrf() {
+    var el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+  }
+  function post(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrf(),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify(body || {}),
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (payload) {
+        if (!r.ok || payload.ok === false) {
+          throw new Error(payload.error || '{% trans "That could not be saved." %}');
+        }
+        return payload;
+      });
+    });
+  }
+
+  // What changed, marked. Recording an outcome reloads the panel, and a page
+  // that comes back looking almost identical reads as nothing having happened —
+  // which is what made the outcome buttons feel dead in the first place. The
+  // confirmation fades in on arrival so the eye is taken to the one line that
+  // is new. Respects reduced motion through the shared ui-arrive rule.
+  var recorded = panel.querySelector('.dpc-outcome-done');
+  if (recorded) {
+    recorded.classList.add('ui-arrive');
+    setTimeout(function () { recorded.classList.remove('ui-arrive'); }, 400);
+  }
+
+  // Update on an answer carried from an earlier call: give the field its name
+  // back so it posts, and let it be typed in. Until then it is disabled and
+  // this call saves nothing for that question.
+  panel.querySelectorAll('[data-uncarry]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var row = button.closest('.dpc-q');
+      var field = row.querySelector('[data-carried]');
+      if (!field) return;
+      field.name = field.dataset.carried;
+      field.disabled = false;
+      field.classList.remove('dpc-ta-carried');
+      row.querySelector('.dpc-carried').hidden = true;
+      field.focus();
+      var card = row.closest('.dpc-card');
+      if (card) card.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
+
+  // Every `next` in the panel, corrected to the page you are actually on.
+  //
+  // The panel is usually fetched on its own from /panel/ and injected into the
+  // host page, so inside the template `request.get_full_path` is that fragment
+  // URL rather than the page — and a form posting `next` from it redirected to
+  // a bare, unstyled panel with the querystring doubled up. The browser is the
+  // only party that knows the real page, so it fills these in. Correct in both
+  // cases: when the panel is rendered inline, this is the same URL the server
+  // would have written.
+  panel.querySelectorAll('input[name="next"]').forEach(function (field) {
+    field.value = window.location.pathname + window.location.search;
+  });
+
+  // Change reopens the outcome buttons on a call already recorded.
+  var reopen = panel.querySelector('[data-dpreopen]');
+  if (reopen) {
+    reopen.addEventListener('click', function (e) {
+      e.preventDefault();
+      var redo = document.getElementById('dpcRedo');
+      var after = document.getElementById('dpcAfter');
+      var done = panel.querySelector('.dpc-outcome-done');
+      if (redo) redo.hidden = false;
+      if (done) done.hidden = true;
+      if (after) after.hidden = true;
+    });
+  }
+
+  // ── Seeking ───────────────────────────────────────────────────────────
+  // A timestamp anywhere in the panel moves the player and starts it. The
+  // player is pinned above the tabs, so it is reachable from the summary and
+  // the transcript alike.
+  var audio = panel.querySelector('audio.dp-player');
+  panel.addEventListener('click', function (e) {
+    var hit = e.target.closest('[data-dpseek]');
+    if (!hit || !audio) return;
+    var at = parseFloat(hit.dataset.dpseek || '0');
+    if (isNaN(at)) return;
+    audio.currentTime = at;
+    audio.play().catch(function () { /* a blocked autoplay is not an error */ });
+  });
+
+  // ── Find in transcript ────────────────────────────────────────────────
+  var find = document.getElementById('dpFind');
+  if (find) {
+    var turns = Array.prototype.slice.call(panel.querySelectorAll('.dp-tr-turn'));
+    var originals = turns.map(function (t) { return t.querySelector('p').textContent; });
+    var run = function () {
+      var q = find.value.trim().toLowerCase();
+      turns.forEach(function (turn, i) {
+        var p = turn.querySelector('p');
+        var text = originals[i];
+        if (!q) { p.textContent = text; turn.hidden = false; return; }
+        var at = text.toLowerCase().indexOf(q);
+        turn.hidden = at === -1;
+        if (at === -1) { p.textContent = text; return; }
+        p.textContent = '';
+        p.appendChild(document.createTextNode(text.slice(0, at)));
+        var mark = document.createElement('mark');
+        mark.textContent = text.substr(at, q.length);
+        p.appendChild(mark);
+        p.appendChild(document.createTextNode(text.slice(at + q.length)));
+      });
+    };
+    find.addEventListener('input', run);
+    var clear = document.getElementById('dpFindClear');
+    if (clear) clear.addEventListener('click', function () { find.value = ''; run(); });
+  }
+
+  // ── Notes ─────────────────────────────────────────────────────────────
+  var list = document.getElementById('dpNotes');
+  if (!list) return;
+
+  // The count in the tab is rendered server-side, but notes are added and
+  // deleted without a reload — so it has to be recounted, or it starts lying
+  // the moment you write one. A note pending deletion is hidden, not removed,
+  // so counting the visible ones covers Undo for free.
+  var notesTab = panel.querySelector('.dp-tab[data-dptab="notes"]');
+  function syncNoteCount() {
+    if (!notesTab) return;
+    var n = list.querySelectorAll('.dp-note:not([hidden])').length;
+    var pill = notesTab.querySelector('.dp-tab-n');
+    if (!n) { if (pill) pill.remove(); return; }
+    if (!pill) {
+      pill = document.createElement('span');
+      pill.className = 'dp-tab-n';
+      notesTab.appendChild(pill);
+    }
+    pill.textContent = n;
+  }
+
+  var undoBar = document.getElementById('dpNoteUndo');
+  var undoBtn = document.getElementById('dpNoteUndoBtn');
+  var pending = null;   // {article, timer} — the delete not yet sent
+
+  function commitDelete() {
+    if (!pending) return;
+    var article = pending.article;
+    pending = null;
+    if (undoBar) undoBar.hidden = true;
+    post(article.dataset.deleteUrl, {}).then(function () {
+      article.remove();
+    }).catch(function () {
+      article.hidden = false;   // put it back rather than lie about it
+    }).then(syncNoteCount);
+  }
+
+  function wire(article) {
+    var body = article.querySelector('[data-note-body]');
+    var editor = article.querySelector('.dp-note-edit');
+    var field = editor.querySelector('textarea');
+
+    article.querySelector('[data-note-edit]').addEventListener('click', function () {
+      field.value = body.textContent;
+      editor.hidden = false;
+      body.hidden = true;
+      field.focus();
+    });
+    article.querySelector('[data-note-cancel]').addEventListener('click', function () {
+      editor.hidden = true;
+      body.hidden = false;
+    });
+    article.querySelector('[data-note-save]').addEventListener('click', function () {
+      var text = field.value.trim();
+      if (!text) { field.focus(); return; }
+      post(article.dataset.editUrl, { body: text }).then(function (payload) {
+        body.textContent = payload.body;
+        article.querySelector('[data-note-when]').textContent = '{% trans "edited" %} ' + payload.when;
+        editor.hidden = true;
+        body.hidden = false;
+      });
+    });
+
+    // Deleting waits a few seconds before it is sent, so Undo never has to
+    // recreate anything — the row is simply still there.
+    article.querySelector('[data-note-delete]').addEventListener('click', function () {
+      commitDelete();
+      article.hidden = true;
+      pending = { article: article };
+      syncNoteCount();
+      if (undoBar) undoBar.hidden = false;
+      pending.timer = setTimeout(commitDelete, 6000);
+    });
+  }
+
+  Array.prototype.slice.call(list.querySelectorAll('.dp-note')).forEach(wire);
+
+  if (undoBtn) {
+    undoBtn.addEventListener('click', function () {
+      if (!pending) return;
+      clearTimeout(pending.timer);
+      pending.article.hidden = false;
+      pending = null;
+      undoBar.hidden = true;
+      syncNoteCount();
+    });
+  }
+
+  var newNote = document.getElementById('dpNoteNew');
+  var saveNote = document.getElementById('dpNoteSave');
+  var state = document.getElementById('dpNoteState');
+  if (newNote && saveNote) {
+    saveNote.addEventListener('click', function () {
+      var text = newNote.value.trim();
+      if (!text) { newNote.focus(); return; }
+      saveNote.disabled = true;
+      if (state) { state.hidden = false; state.textContent = '{% trans "saving…" %}'; }
+      post(list.dataset.addUrl, { body: text }).then(function (payload) {
+        var article = document.createElement('article');
+        article.className = 'dp-note';
+        article.dataset.note = payload.id;
+        article.dataset.editUrl = '/notes/' + payload.id + '/edit/';
+        article.dataset.deleteUrl = '/notes/' + payload.id + '/delete/';
+        article.innerHTML =
+          '<p data-note-body></p>' +
+          '<div class="dp-note-edit" hidden><textarea class="dpc-ta" rows="3"></textarea>' +
+          '<div class="dp-note-editrow">' +
+          '<button type="button" class="dp-btn" data-note-cancel>{% trans "Cancel" %}</button>' +
+          '<button type="button" class="dp-btn dp-btn-pri" data-note-save>{% trans "Save" %}</button>' +
+          '</div></div>' +
+          '<footer><b></b><time data-note-when></time>' +
+          '<button type="button" class="dp-note-act" data-note-edit>{% trans "Edit" %}</button>' +
+          '<button type="button" class="dp-note-act dp-note-del" data-note-delete>{% trans "Delete" %}</button>' +
+          '</footer>';
+        article.querySelector('[data-note-body]').textContent = payload.body;
+        article.querySelector('.dp-note-edit textarea').value = payload.body;
+        article.querySelector('footer b').textContent = payload.author;
+        article.querySelector('[data-note-when]').textContent = payload.when;
+        wire(article);
+        list.insertBefore(article, list.firstElementChild);
+        newNote.value = '';
+        syncNoteCount();
+        if (state) state.textContent = '{% trans "saved" %}';
+      }).catch(function (err) {
+        if (state) { state.hidden = false; state.textContent = err.message; }
+      }).then(function () {
+        saveNote.disabled = false;
+      });
+    });
+  }
+})();
 </script>

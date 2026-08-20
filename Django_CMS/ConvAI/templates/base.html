@@ -6,20 +6,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{% block title %}{% brand_name %}{% endblock %}</title>
 
-  <!-- Fonts & Icons. The preconnects open the TLS connection to the font host
-       while the stylesheet is still being fetched. Without them DM Sans lands
-       late, every line of text re-measures after first paint, and the page
-       visibly settles — the judder is the font swapping in, not the layout. -->
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link
-    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap"
-    rel="stylesheet"
-  />
-  <link
-    href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined"
-    rel="stylesheet"
-  />
+  <!-- Fonts & Icons, served from this app rather than fetched from Google.
+       They were two render-blocking stylesheets on a third-party host, so every
+       page waited on two round-trips before painting anything — the reason
+       navigation felt heavy, and the reason a page transition became a stall.
+       The faces now live in app_new_design.css and the files beside it.
+
+       Preloaded because a font referenced from a stylesheet is not discovered
+       until that stylesheet has parsed; this starts the fetch in the same
+       breath as the CSS. Only the latin file, which every page needs — the
+       extended range is left to be fetched on demand as before. -->
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+        href="{% static 'app/fonts/dm-sans-latin.woff2' %}"/>
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+        href="{% static 'app/fonts/material-icons-outlined.woff2' %}"/>
 
   <!-- TailwindCSS (built locally, see tailwind/ + Dockerfile) -->
   <link rel="stylesheet" href="{% static_versioned 'app/css/tailwind.css' %}"/>
@@ -42,7 +42,13 @@
           if (s) {
             s.classList.add('collapsed');
             var b = document.getElementById('sidebarToggle');
-            if (b) b.setAttribute('aria-expanded', 'false');
+            if (b) {
+              b.setAttribute('aria-expanded', 'false');
+              // Restored during parse alongside the class, so the button never
+              // says "Collapse" while already collapsed.
+              var lab = b.getAttribute('data-label-expand');
+              if (lab) { b.setAttribute('aria-label', lab); b.title = lab; }
+            }
           }
         }
         var w = parseInt(localStorage.getItem('dpWidth'), 10);
@@ -55,6 +61,7 @@
   </script>
 
   <main class="flex-1 p-8 overflow-y-auto">
+    {% include "_call_bar.html" %}
     {% block content %}{% endblock %}
   </main>
 
@@ -127,92 +134,6 @@
          title="{% trans 'Drag to resize · double-click to reset' %}"></div>
     {% include "_detail_panel.html" %}
 
-    <script>
-      // Closing the panel is a change of view, not of page. It used to follow
-      // its own href, and the reload cost you whatever you had on the left —
-      // scroll position, the tab you were on, the section you had open. Here
-      // the panel is simply removed and `item` dropped from the URL, so the
-      // left side never moves and the address stays shareable. The href stays
-      // on the link as the fallback when scripting is off.
-      (function () {
-        var close = document.querySelector('.dp-close');
-        if (!close) return;
-        var main = document.querySelector('main');
-
-        // Removing the panel gives its width back to the list, which rewraps
-        // and changes height — so even without a reload the content under the
-        // cursor would slide. Anchor on whatever is at the top of the list,
-        // and pad the foot first so a shorter page cannot clamp the scroll
-        // before the correction lands. The padding is trimmed on the next
-        // scroll, exactly like the accordion spacer.
-        // Whatever is sitting at the top of the list — skipping anything with
-        // no box of its own, since a <style> or an empty wrapper reports 0 and
-        // would make the correction a no-op.
-        function topAnchor() {
-          var r = main.getBoundingClientRect();
-          var el = document.elementFromPoint(
-            r.left + Math.min(48, r.width / 2), r.top + 6);
-          while (el && main.contains(el) && !el.getBoundingClientRect().height) {
-            el = el.parentElement;
-          }
-          if (el && main.contains(el) && el !== main) return el;
-          for (var i = 0; i < main.children.length; i++) {
-            var b = main.children[i].getBoundingClientRect();
-            if (b.height && b.bottom > r.top) return main.children[i];
-          }
-          return null;
-        }
-
-        function keepPlace(mutate) {
-          if (!main) return mutate();
-          var anchor = topAnchor();
-          var before = anchor ? anchor.getBoundingClientRect().top : 0;
-
-          main.style.paddingBottom = main.scrollHeight + 'px';
-          mutate();
-
-          if (anchor) {
-            var delta = anchor.getBoundingClientRect().top - before;
-            if (delta) main.scrollTop += delta;
-          }
-          trim();
-          main.addEventListener('scroll', trim, { passive: true });
-        }
-
-        function trim() {
-          var padded = parseFloat(main.style.paddingBottom) || 0;
-          var natural = main.scrollHeight - padded;
-          var need = Math.max(0, main.scrollTop + main.clientHeight - natural);
-          main.style.paddingBottom = need ? need + 'px' : '';
-          if (!need) main.removeEventListener('scroll', trim);
-        }
-
-        close.addEventListener('click', function (e) {
-          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
-          e.preventDefault();
-
-          keepPlace(function () {
-            var panel = document.querySelector('.dp');
-            var grip = document.getElementById('dpGrip');
-            if (panel) panel.remove();
-            if (grip) grip.remove();
-            document.body.classList.remove('dp-takeover');
-          });
-
-          // Whatever was marked as the open item is no longer open.
-          document.querySelectorAll('.dash-row-open, .tl-card-open').forEach(function (r) {
-            r.classList.remove('dash-row-open', 'tl-card-open');
-            r.removeAttribute('aria-current');
-          });
-
-          try {
-            var u = new URL(location.href);
-            u.searchParams.delete('item');
-            history.replaceState(null, '', u.pathname + u.search + u.hash);
-          } catch (err) {}
-        });
-      })();
-    </script>
   {% endif %}
 
   {% comment %}
@@ -316,8 +237,20 @@
           if (closing) return;
           closing = true;
           forget(entry.id);
+          // Collapse the space as it leaves. Removing it outright made every
+          // toast below jump up into the gap the moment one was dismissed —
+          // and with a stack of three, dismissing the top one moved the two you
+          // were still reading. The height has to be pinned first: `auto` has
+          // nothing to animate from. The negative margin absorbs the flex gap,
+          // which does not close on its own when an item reaches zero height.
+          el.style.height = el.offsetHeight + 'px';
+          void el.offsetHeight;
           el.classList.add('toast-out');
-          setTimeout(function () { el.remove(); }, 200);
+          el.style.height = '0';
+          el.style.marginBottom = '-8px';
+          el.style.paddingTop = '0';
+          el.style.paddingBottom = '0';
+          setTimeout(function () { el.remove(); }, 230);
         }
         el.querySelector('.toast-x').addEventListener('click', close);
 
@@ -446,15 +379,26 @@
         toggle.addEventListener('click', () => {
           const collapsed = sidebar.classList.toggle('collapsed');
           toggle.setAttribute('aria-expanded', String(!collapsed));
+          // The glyph is swapped by CSS off the same class; only the wording
+          // needs saying out loud, for the tooltip and for a screen reader.
+          const label = collapsed ? toggle.dataset.labelExpand
+                                  : toggle.dataset.labelCollapse;
+          if (label) { toggle.setAttribute('aria-label', label); toggle.title = label; }
           try { localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0'); } catch (e) {}
         });
       }
 
-      // ── Detail panel resize ───────────────────────────────────────────
+      // ── Detail panel width ────────────────────────────────────────────
       // The panel is the thing that gives ground: MAX is capped so the list
       // it sits beside always keeps at least MIN_LIST of readable width.
-      const grip = document.getElementById('dpGrip');
-      if (grip) {
+      //
+      // Page-level rather than bound to one handle. The grip only exists while
+      // a panel is open, and a panel can now be opened, swapped and closed
+      // without a page load — so the width logic has to outlive any particular
+      // handle. `dpInitGrip` wires whichever one currently exists; the resize
+      // and rail listeners below are registered once and no-op when there is no
+      // panel at all.
+      {
         const MIN = 280, MAX = 560, MIN_LIST = 360, DEFAULT = 340;
         const root = document.documentElement;
 
@@ -468,6 +412,7 @@
           if (saved) preferred = Math.max(MIN, Math.min(MAX, saved));
         } catch (e) {}
 
+        const gripEl = () => document.getElementById('dpGrip');
         const railWidth = () => sidebar ? sidebar.getBoundingClientRect().width : 0;
         const ceiling = () =>
           Math.max(MIN, Math.min(MAX, window.innerWidth - railWidth() - MIN_LIST));
@@ -482,8 +427,11 @@
         function setWidth(px, save) {
           const w = Math.round(Math.max(MIN, Math.min(ceiling(), px)));
           root.style.setProperty('--dp-w', w + 'px');
-          grip.setAttribute('aria-valuenow', String(w));
-          grip.setAttribute('aria-valuemax', String(ceiling()));
+          const g = gripEl();
+          if (g) {
+            g.setAttribute('aria-valuenow', String(w));
+            g.setAttribute('aria-valuemax', String(ceiling()));
+          }
           if (save) {
             preferred = w;
             try { localStorage.setItem('dpWidth', String(w)); } catch (e) {}
@@ -491,21 +439,52 @@
           return w;
         }
 
+        // Past the limits the panel keeps giving, just less and less. A handle
+        // that simply stops while the pointer is still travelling reads as the
+        // drag having broken; continuous resistance reads as "still with you,
+        // but there is nothing more here". Only the drag is allowed out of
+        // bounds — setWidth's clamp still owns every value that gets kept.
+        function band(px) {
+          const lo = MIN, hi = ceiling(), c = 0.55, d = window.innerWidth;
+          if (px < lo) { const o = lo - px; return lo - (o * d * c) / (d + c * o); }
+          if (px > hi) { const o = px - hi; return hi + (o * d * c) / (d + c * o); }
+          return px;
+        }
+
+        // Wires one handle. Called for the server-rendered grip below, and
+        // again by the swapper for any grip it creates. Idempotent: a grip that
+        // has already been wired is left alone.
+        window.dpInitGrip = function (grip) {
+          if (!grip || grip.dataset.dpWired) return;
+          grip.dataset.dpWired = '1';
+
         grip.addEventListener('pointerdown', (e) => {
           e.preventDefault();
           const x0 = e.clientX, w0 = current();
           grip.setPointerCapture(e.pointerId);
           grip.classList.add('dp-grip-live');
           document.body.classList.add('dp-resizing');
+          // No easing while the finger is down: the panel edge has to stay
+          // under the pointer, and a transition would drag it behind.
+          document.body.classList.remove('dp-settling');
 
           // Panel is on the right, so dragging left widens it.
-          const move = (ev) => setWidth(w0 - (ev.clientX - x0), false);
+          const move = (ev) => {
+            root.style.setProperty('--dp-w', Math.round(band(w0 - (ev.clientX - x0))) + 'px');
+          };
           const up = () => {
             grip.classList.remove('dp-grip-live');
             document.body.classList.remove('dp-resizing');
             grip.removeEventListener('pointermove', move);
             grip.removeEventListener('pointerup', up);
             grip.removeEventListener('pointercancel', up);
+            // Let go and the stretch comes back rather than snapping — the
+            // return traces the resistance instead of cancelling it.
+            const stretched = current() < MIN || current() > ceiling();
+            if (stretched) {
+              document.body.classList.add('dp-settling');
+              setTimeout(() => document.body.classList.remove('dp-settling'), 200);
+            }
             setWidth(current(), true);
           };
           grip.addEventListener('pointermove', move);
@@ -528,18 +507,51 @@
           setWidth(w, true);
         });
 
+          refit();
+        };
+
         // Re-fit from `preferred`, never from the width currently showing, so
         // space taken by a narrow window is handed back when it widens again.
+        // Safe with no panel open: takeover is a property of the split, and
+        // there is no split to take over when nothing is beside the list.
         const refit = () => {
-          document.body.classList.toggle('dp-takeover', takeover());
+          document.body.classList.toggle(
+            'dp-takeover', takeover() && !!document.querySelector('.dp'));
           setWidth(preferred, false);
         };
+        window.dpRefit = refit;
         window.addEventListener('resize', refit);
         if (toggle) {
+          // The panel's ceiling is measured off the rail, so it has to be
+          // recomputed while the rail is folding rather than once it has
+          // stopped. Waiting for transitionend left the panel at the old width
+          // for the whole 220ms and then jumped it — the rail and the panel are
+          // one movement, and they have to arrive together. One measurement per
+          // frame for the length of the fold, then it stops.
+          let railFrame = null, railStop = null;
+          const trackRail = () => {
+            refit();
+            railFrame = requestAnimationFrame(trackRail);
+          };
+          const stopTracking = () => {
+            cancelAnimationFrame(railFrame);
+            clearTimeout(railStop);
+            railFrame = null;
+            refit();
+          };
+          toggle.addEventListener('click', () => {
+            cancelAnimationFrame(railFrame);
+            clearTimeout(railStop);
+            trackRail();
+            // Backstop: transitionend does not fire if the rail was already at
+            // its target width, or if the transition is cut short.
+            railStop = setTimeout(stopTracking, 400);
+          });
           sidebar.addEventListener('transitionend', (e) => {
-            if (e.propertyName === 'width') refit();
+            if (e.propertyName === 'width' && railFrame !== null) stopTracking();
           });
         }
+        window.dpInitGrip(gripEl());   // the server-rendered one, if any
         refit();
       }
 
@@ -579,7 +591,448 @@
       window.addEventListener('blur', () => menu.classList.add('hidden'));
     });
   </script>
-  
+
+  {% trans 'Resize details panel' as t_dp_resize %}
+  {% trans 'Drag to resize · double-click to reset' as t_dp_hint %}
+  <script>
+    // ── Opening and closing the detail panel ──────────────────────────────
+    // Reading an item is a change of view, not of page. Closing one has always
+    // worked that way; opening one did not, and cost a full document for the
+    // sake of a 340px column — the list beside it was thrown away and rebuilt
+    // to change which row was highlighted, and nothing at all could acknowledge
+    // the press until the new page painted.
+    //
+    // So both directions go through here now. The panel is fetched on its own
+    // (see views/_panel.py: panel_fragment), swapped in, and `item` written to
+    // the URL — which stays exactly the URL a full navigation would have
+    // produced, so links, refreshes and new tabs are unaffected. Every row keeps
+    // its real href: a modified click, a failed fetch or no scripting at all
+    // falls through to the navigation this replaces.
+    (function () {
+      var PANEL_URL = '{% url "panel_fragment" %}';
+      var main = document.querySelector('main');
+      // Guarded: this runs at the top of the component, so an environment
+      // without matchMedia would take the whole panel down with it rather
+      // than just losing the preference. Not reduced by default — the CSS
+      // media query still applies either way.
+      var softMotion = window.matchMedia
+        ? window.matchMedia('(prefers-reduced-motion: reduce)')
+        : { matches: false };
+      if (!main || !window.fetch || !window.history || !history.pushState) return;
+
+      // ---- Keeping the reader's place -----------------------------------
+      // Adding or removing the panel changes the list's width, so it rewraps
+      // and changes height — the content under the cursor would slide even
+      // though nothing was navigated. Anchor on whatever is at the top of the
+      // list and correct for however far it moved.
+      function topAnchor() {
+        var r = main.getBoundingClientRect();
+        var el = document.elementFromPoint
+          ? document.elementFromPoint(r.left + Math.min(48, r.width / 2), r.top + 6)
+          : null;
+        while (el && main.contains(el) && !el.getBoundingClientRect().height) {
+          el = el.parentElement;
+        }
+        if (el && main.contains(el) && el !== main) return el;
+        for (var i = 0; i < main.children.length; i++) {
+          var b = main.children[i].getBoundingClientRect();
+          if (b.height && b.bottom > r.top) return main.children[i];
+        }
+        return null;
+      }
+
+      function trim() {
+        var padded = parseFloat(main.style.paddingBottom) || 0;
+        var natural = main.scrollHeight - padded;
+        var need = Math.max(0, main.scrollTop + main.clientHeight - natural);
+        main.style.paddingBottom = need ? need + 'px' : '';
+        if (!need) main.removeEventListener('scroll', trim);
+      }
+
+      // Pad the foot before mutating so a shorter page cannot clamp the scroll
+      // before the correction lands; the padding is trimmed on the next scroll.
+      // Keeping the reader's place is a courtesy, not a precondition — so the
+      // measuring is fenced off from the mutation. Anchoring reads layout, and
+      // layout reads are the kind of thing that throws on an element that has
+      // just been removed, or in an environment without elementFromPoint. If
+      // any of it fails the panel must still open; it just opens without the
+      // scroll correction.
+      function keepPlace(mutate) {
+        var anchor = null, before = 0;
+        try {
+          anchor = topAnchor();
+          before = anchor ? anchor.getBoundingClientRect().top : 0;
+          main.style.paddingBottom = main.scrollHeight + 'px';
+        } catch (e) { anchor = null; }
+
+        mutate();
+
+        try {
+          if (anchor) {
+            var delta = anchor.getBoundingClientRect().top - before;
+            if (delta) main.scrollTop += delta;
+          }
+          trim();
+          main.addEventListener('scroll', trim, { passive: true });
+        } catch (e) {}
+      }
+
+      // ---- Teardown -----------------------------------------------------
+      // The panel's own script is a set of IIFEs bound to elements inside it,
+      // so they go when the markup goes. Anything that does not — an interval,
+      // a listener on document — registers a cleanup in window.dpCleanup and is
+      // stopped here first. Without this the call timer of every panel you had
+      // opened would still be ticking.
+      function teardown() {
+        var fns = window.dpCleanup || [];
+        window.dpCleanup = [];
+        for (var i = 0; i < fns.length; i++) {
+          try { fns[i](); } catch (e) {}
+        }
+      }
+
+      // ---- Which row is open --------------------------------------------
+      var OPEN = ['cm-row-open', 'dash-row-open', 'tl-card-open'];
+
+      function clearMarks() {
+        document.querySelectorAll('.' + OPEN.join(',.')).forEach(function (r) {
+          r.classList.remove(OPEN[0], OPEN[1], OPEN[2]);
+          r.removeAttribute('aria-current');
+        });
+      }
+
+      // Communications puts the class on the <a> itself; the dashboard wraps a
+      // <div class="dash-row"> in a bare link. Find whichever is the row.
+      function rowOf(a) {
+        if (!a) return null;
+        if (a.classList.contains('cm-row')) return a;
+        return a.querySelector('.dash-row, .tl-card, .cm-row') || null;
+      }
+
+      function mark(a) {
+        var row = rowOf(a);
+        if (!row) return;
+        var cls = row.classList.contains('cm-row') ? 'cm-row-open'
+                : row.classList.contains('dash-row') ? 'dash-row-open'
+                : 'tl-card-open';
+        row.classList.add(cls);
+        row.setAttribute('aria-current', 'true');
+      }
+
+      // Opening an alert or a chat is what reading it means, and the server
+      // records that when the panel fragment is fetched. But the list around
+      // it was rendered before the click, so without this the row stays bold
+      // until the next full reload — the mark was being kept, just never shown.
+      // Same rule as the rest of this handler: the press is answered on the
+      // press. Only alerts and chats can be unread; a call you scheduled
+      // yourself was never news, and carries no `-new` class to remove.
+      function markRead(a) {
+        var row = rowOf(a);
+        if (!row) return;
+        var was = false;
+        ['cm-row-new', 'dash-row-new', 'tl-card-new'].forEach(function (cls) {
+          if (row.classList.contains(cls)) { row.classList.remove(cls); was = true; }
+        });
+        if (!was) return;
+        if (row.getAttribute('title') === '{% trans "Not opened yet" %}') {
+          row.removeAttribute('title');
+        }
+        // The tab badge counts unread across the whole tab, so it owes the
+        // same answer. It disappears at zero rather than showing a 0.
+        var badge = document.querySelector('.cm-tab.on .c');
+        if (!badge) return;
+        var n = parseInt(badge.textContent, 10);
+        if (isNaN(n)) return;
+        if (n <= 1) badge.remove(); else badge.textContent = n - 1;
+      }
+
+      // ---- The panel itself ----------------------------------------------
+      function panelEl() { return document.querySelector('.dp'); }
+      function gripEl() { return document.getElementById('dpGrip'); }
+
+      function makeGrip() {
+        var g = document.createElement('div');
+        g.id = 'dpGrip';
+        g.className = 'dp-grip';
+        g.setAttribute('role', 'separator');
+        g.setAttribute('aria-orientation', 'vertical');
+        g.setAttribute('tabindex', '0');
+        g.setAttribute('aria-label', '{{ t_dp_resize|escapejs }}');
+        g.setAttribute('aria-valuemin', '280');
+        g.setAttribute('aria-valuemax', '560');
+        g.setAttribute('aria-valuenow', '340');
+        g.setAttribute('title', '{{ t_dp_hint|escapejs }}');
+        return g;
+      }
+
+      function removePanel() {
+        teardown();
+        var p = panelEl(), g = gripEl();
+        if (p) p.remove();
+        if (g) g.remove();
+        document.body.classList.remove('dp-takeover');
+      }
+
+      // Scripts inserted as markup do not run. Re-create them so the panel's
+      // behaviour arrives with it — the old nodes are discarded either way, so
+      // nothing is bound twice.
+      function runScripts(scripts) {
+        scripts.forEach(function (old) {
+          var s = document.createElement('script');
+          if (old.src) { s.src = old.src; } else { s.textContent = old.textContent; }
+          document.body.appendChild(s);
+          s.remove();
+        });
+      }
+
+      var exitTimer = null;
+
+      // A panel mid-exit is still in the DOM. Opening something else during it
+      // has to call this off, or the pending timer removes the panel that just
+      // arrived a moment after it lands.
+      function cancelExit() {
+        if (exitTimer) { clearTimeout(exitTimer); exitTimer = null; }
+        var p = panelEl();
+        if (p) p.classList.remove('dp-exit');
+      }
+
+      function install(html) {
+        cancelExit();
+        var host = document.createElement('div');
+        host.innerHTML = html;
+        var fresh = host.querySelector('.dp');
+        if (!fresh) return false;
+
+        // Taken out before the panel moves: a script nested inside .dp would
+        // otherwise travel with it, and markup-inserted scripts never run.
+        var scripts = Array.prototype.slice.call(host.querySelectorAll('script'));
+        scripts.forEach(function (s) { s.remove(); });
+
+        // Which arrival this is: a column that was not there before, or new
+        // contents in one that was. See .dp-enter / .dp-swap.
+        var replacing = !!panelEl();
+
+        keepPlace(function () {
+          teardown();
+          var old = panelEl();
+          if (old) old.remove();
+          var grip = gripEl() || makeGrip();
+          main.insertAdjacentElement('afterend', grip);
+          grip.insertAdjacentElement('afterend', fresh);
+          fresh.classList.add(replacing ? 'dp-swap' : 'dp-enter');
+          if (window.dpInitGrip) window.dpInitGrip(grip);
+          if (window.dpRefit) window.dpRefit();
+        });
+
+        // Taken off once it has played, so nothing replays on a later swap and
+        // no animation-applied transform is left owning a containing block.
+        setTimeout(function () {
+          fresh.classList.remove('dp-swap', 'dp-enter');
+        }, 320);
+
+        // After the markup is in the document, so the scripts find their nodes.
+        runScripts(scripts);
+        // A call may have been in progress: the panel showing it has changed,
+        // and the bar stands down only while the matching panel is open.
+        if (window.callBarSync) window.callBarSync();
+        return true;
+      }
+
+      // ---- Fetching -------------------------------------------------------
+      var inflight = null;
+
+      function fragmentUrl(search) {
+        var f = new URL(PANEL_URL, location.href);
+        f.search = search;
+        var scope = document.querySelector('[data-dp-client]');
+        if (scope) f.searchParams.set('in_client', scope.dataset.dpClient);
+        return f;
+      }
+
+      function load(search, onFail) {
+        var token = {};
+        inflight = token;
+        return fetch(fragmentUrl(search), {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin'
+        }).then(function (r) {
+          // A login that expired mid-session, or a permission that changed:
+          // hand it to the browser so the real redirect happens.
+          if (r.status === 403 || r.status === 401 || r.redirected) throw new Error('auth');
+          if (r.status === 204) return null;          // nothing readable to show
+          if (!r.ok) throw new Error(r.status);
+          return r.text();
+        }).then(function (html) {
+          if (inflight !== token) return;             // a later click won
+          inflight = null;
+          if (html === null) {
+            // Nothing readable at that token — deleted, or no longer ours.
+            // This used to yank the panel out of the document mid-frame, the
+            // one close in the app that simply blinked out. It leaves the same
+            // way as every other close now; there is only one exit.
+            //
+            // `replaceState` rather than push, so Back does not lead straight
+            // back to the item that is not there.
+            try {
+              var gone = new URL(location.href);
+              gone.searchParams.delete('item');
+              history.replaceState({ dp: 1 }, '', gone.pathname + gone.search + gone.hash);
+            } catch (err) {}
+            closePanel(false);
+            return;
+          }
+          if (!install(html)) throw new Error('empty');
+        }).catch(function () {
+          if (inflight !== token) return;
+          inflight = null;
+          onFail();
+        });
+      }
+
+      // Where cross-document view transitions run, the browser already
+      // dissolves one page into the next and the panel goes out with the frame
+      // it belongs to. Holding the link back would only add latency, and fading
+      // the panel first would hand the transition a half-gone snapshot.
+      var viewTransitions = !!(window.CSS && CSS.supports &&
+                               CSS.supports('view-transition-name: none'));
+
+      // ---- Leaving for another section ------------------------------------
+      // Navigation has three layers: the main menu, the tabs inside a page (a
+      // client's Details / Communications), and the tabs inside those
+      // (Happened / Coming up). The panel belongs to a row, and that row
+      // belongs to the section you are in — so the lower two layers keep it
+      // (they carry `item` through in the querystring) and the top one leaves
+      // it behind.
+      //
+      // It should be seen to go. Until now it was simply absent when the next
+      // page painted, which reads as a glitch rather than as closing.
+      //
+      // This is the one place a deliberate delay earns its keep: the
+      // navigation waits out the 180ms exit. Starting the animation and
+      // navigating at once — the trick that works elsewhere — fails here,
+      // because the browser can replace the page before the animation has
+      // played and you are back to the panel just vanishing.
+      document.addEventListener('click', function (e) {
+        if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey ||
+            e.altKey || e.button) return;
+
+        var nav = e.target.closest('#sidebar a.sidebar-item, #sidebar a.sidebar-logo');
+        if (!nav || nav.target || nav.hasAttribute('download')) return;
+
+        var open = panelEl();
+        if (!open || open.classList.contains('dp-exit')) return;
+
+        var dest;
+        try { dest = new URL(nav.href, location.href); } catch (err) { return; }
+        if (dest.origin !== location.origin) return;
+        // A link that carries `item` forward is not leaving the panel behind,
+        // so there is nothing to close.
+        if (dest.searchParams.get('item')) return;
+
+        if (viewTransitions) return;
+
+        e.preventDefault();
+        cancelExit();
+        open.classList.add('dp-exit');
+        var go = function () { location.href = nav.href; };
+        if (softMotion.matches) { go(); return; }
+        setTimeout(go, 190);
+      });
+
+      // ---- Opening --------------------------------------------------------
+      document.addEventListener('click', function (e) {
+        // Anything the browser should handle itself.
+        if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey ||
+            e.altKey || e.button) return;
+
+        // `data-dp-open` is the template saying this link differs from the page
+        // it is on by `item` alone — it is built from the list's own state
+        // (qs_base, cal_qs, query), so following it would re-render an identical
+        // list. Comparing the two querystrings here instead does not work: the
+        // link carries the canonical parameters the bare URL leaves implicit, so
+        // /communications/ and ?tab=past&kind=all&item=… are the same view
+        // spelled two ways, and every open looked like a filter change.
+        //
+        // Anything without the marker — a different page, a filter, a sort — is
+        // a real navigation and is left alone.
+        var a = e.target.closest('a[data-dp-open]');
+        if (!a || a.target || a.hasAttribute('download')) return;
+
+        var u;
+        try { u = new URL(a.href, location.href); } catch (err) { return; }
+        if (u.origin !== location.origin) return;
+        if (u.pathname !== location.pathname) return;
+        if (!u.searchParams.get('item')) return;
+
+        e.preventDefault();
+
+        // The mark moves now, not when the panel lands. This is the whole
+        // point: the press is answered on the press.
+        clearMarks();
+        mark(a);
+        markRead(a);
+
+        var target = u.pathname + u.search + u.hash;
+        history.pushState({ dp: 1 }, '', target);
+        load(u.search, function () { location.href = target; });
+      });
+
+      // ---- Closing --------------------------------------------------------
+      // Delegated, because the close control belongs to a panel that is
+      // replaced on every open.
+      document.addEventListener('click', function (e) {
+        var close = e.target.closest('.dp-close');
+        if (!close || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+        e.preventDefault();
+        closePanel(true);
+      });
+
+      function closePanel(push) {
+        var p = panelEl();
+        if (!p || p.classList.contains('dp-exit')) return;
+
+        // Everything that answers the press happens on the press: the mark
+        // goes, the URL goes. Only the column itself is allowed to take the
+        // 180ms, and nothing waits on it.
+        clearMarks();
+        try {
+          var u = new URL(location.href);
+          u.searchParams.delete('item');
+          if (push) history.pushState({ dp: 1 }, '', u.pathname + u.search + u.hash);
+        } catch (err) {}
+
+        var finish = function () {
+          exitTimer = null;
+          keepPlace(removePanel);
+          if (window.dpRefit) window.dpRefit();
+          if (window.callBarSync) window.callBarSync();
+        };
+
+        if (softMotion.matches) { finish(); return; }
+        p.classList.add('dp-exit');
+        exitTimer = setTimeout(finish, 190);
+      }
+
+      // ---- Back and forward ------------------------------------------------
+      // The URL is the state, so both directions read from it rather than from
+      // anything kept on the side.
+      window.addEventListener('popstate', function () {
+        var want = new URLSearchParams(location.search).get('item');
+        var open = panelEl();
+        if (!want) {
+          if (open) closePanel(false);
+          else if (window.callBarSync) window.callBarSync();
+          return;
+        }
+        cancelExit();
+        clearMarks();
+        var a = document.querySelector('a[href*="item=' + want.replace(/"/g, '') + '"]');
+        if (a) { mark(a); markRead(a); }
+        load(location.search, function () { location.reload(); });
+      });
+    })();
+  </script>
+
   {% endblock %}
 
   {% if request.user.is_authenticated and request.user.agent %}

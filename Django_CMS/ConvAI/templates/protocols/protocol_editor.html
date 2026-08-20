@@ -5,7 +5,12 @@
 {% block title %}{% trans "Protocol editor" %} {{ protocol.number }}{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+{% comment %}
+  Pulled a whole Google icon font, render-blocking, for the single save icon
+  below — and being on a page that extends base.html, it put back exactly the
+  third-party wait the local fonts were meant to remove. The outlined set is
+  already served from this app and is what the rest of the platform uses.
+{% endcomment %}
 <style>
   .pe-card {
     background: var(--card-background);
@@ -48,7 +53,7 @@
   .pe-tool .material-icons-outlined { font-size:1.1rem; }
   .pe-tool-sep { width:1px; background:var(--border-color); margin:.2rem .15rem; }
   .beta-badge {
-    font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+    font-size: 0.625rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
     line-height:1; padding:.15rem .4rem; border-radius:9999px;
     background:#e0f2fe; color:#0369a1;
   }
@@ -133,7 +138,7 @@
 
   {# Floating save button #}
   <button id="pe-save" type="button" class="save-button" title="{% trans 'Save' %}">
-    <span class="material-icons">save</span>
+    <span class="material-icons-outlined">save</span>
   </button>
   {% endif %}
 </div>

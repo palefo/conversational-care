@@ -1,0 +1,152 @@
+{% load i18n %}
+{% comment %}
+  App-wide "a call is out" bar.
+
+  The detail panel's own strip only exists while that panel is on screen, and
+  the panel is deliberately easy to leave — the whole point of it is that you
+  can go and read the client's history mid-call. Leaving it used to take the
+  only evidence of the call with it.
+
+  This bar carries the same stopwatch on every page. It renders empty and is
+  filled in by script, because the call lives in sessionStorage rather than in
+  the request: nothing server-side knows a call is in progress (there is no
+  Twilio status callback — see the note in _detail_panel.html).
+{% endcomment %}
+<div class="callbar" id="callBar" hidden>
+  <span class="callbar-dot" aria-hidden="true"></span>
+  {% comment %}
+    Two states, because a call that is still being placed is also a call in
+    progress: leaving the panel during the Twilio round trip used to lose the
+    only trace of it. The bar carries the dialling state through, in the same
+    amber the button used, and swaps to the stopwatch once the call is out.
+  {% endcomment %}
+  <span class="callbar-t" id="callBarLabel">{% trans "Call placed" %}</span>
+  <span class="callbar-who" id="callBarWho"></span>
+  <span class="callbar-time" id="callBarTime">00:00</span>
+  {% comment %}
+    No End call here, deliberately. Ending is the moment the "how did it go?"
+    question appears, and that lives in the panel — ending from the bar would
+    leave the follow-up somewhere the navigator is not. It also keeps a button
+    that does not actually hang up the phone off every page in the app.
+  {% endcomment %}
+  <a class="callbar-go" id="callBarGo" href="#">{% trans "Back to call" %}</a>
+</div>
+
+<script>
+  (function () {
+    var bar = document.getElementById('callBar');
+    if (!bar) return;
+    var whoEl  = document.getElementById('callBarWho');
+    var timeEl = document.getElementById('callBarTime');
+    var goEl   = document.getElementById('callBarGo');
+    var labEl  = document.getElementById('callBarLabel');
+    var tick   = null;
+
+    function mmss(sec) {
+      return String(Math.floor(sec / 60)).padStart(2, '0') + ':' +
+             String(sec % 60).padStart(2, '0');
+    }
+
+    // sessionStorage is the only place a live call exists, and it is keyed per
+    // meeting — so finding one means a scan. There is normally at most one.
+    //
+    // The open panel is read on every pass rather than once: closing the panel
+    // is a DOM removal with no page load, so a value captured at startup would
+    // still name a panel that is gone.
+    function findCall() {
+      // The panel already shows this call in its own strip, and showing it
+      // twice on one screen is two stopwatches disagreeing by a frame. The bar
+      // is the away-from-the-panel indicator.
+      var openPanel = document.querySelector('.dp-call');
+      var openMid   = openPanel ? openPanel.dataset.meeting : null;
+      try {
+        for (var i = 0; i < sessionStorage.length; i++) {
+          var k = sessionStorage.key(i);
+          if (!k || k.indexOf('dpCall:') !== 0 || k.indexOf(':done') > -1) continue;
+          var mid = k.slice('dpCall:'.length);
+          if (mid === openMid) continue;
+          var s = JSON.parse(sessionStorage.getItem(k));
+          if (!s) continue;
+          // A dialling entry whose request never finished — the navigation that
+          // brought you here aborted it — would otherwise say "Calling…" for
+          // the rest of the session. Twilio answers in seconds; a minute is
+          // long past the point where this is still true.
+          if (s.dialling && !s.started) {
+            if (Date.now() - (s.since || 0) > 60000) {
+              sessionStorage.removeItem(k);
+              continue;
+            }
+            return { mid: mid, state: s };
+          }
+          if (s.started) return { mid: mid, state: s };
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    var exitT = null;
+    var softMotion = window.matchMedia
+      ? window.matchMedia('(prefers-reduced-motion: reduce)')
+      : { matches: false };
+
+    function hide() {
+      clearInterval(tick);
+      tick = null;
+      if (bar.hidden) return;
+      if (softMotion.matches) { bar.hidden = true; return; }
+      // It came down from the top of the column, so it leaves the same way
+      // rather than blinking out — this bar is the only thing on the page
+      // reporting the call, and it ending is worth seeing happen.
+      bar.classList.add('callbar-out');
+      clearTimeout(exitT);
+      exitT = setTimeout(function () {
+        bar.classList.remove('callbar-out');
+        bar.hidden = true;
+      }, 210);
+    }
+
+    function show() {
+      // A call placed while the previous one is still animating away: cancel
+      // the exit rather than let its timer hide the bar a moment later.
+      clearTimeout(exitT);
+      bar.classList.remove('callbar-out');
+
+      var found = findCall();
+      if (!found) return hide();
+      var s = found.state;
+      whoEl.textContent = s.who || '';
+      whoEl.hidden = !s.who;
+      // Open the panel on the page you are already on, rather than returning
+      // to the page you happened to dial from. `?item=<kind>-<id>` is resolved
+      // by every view (see views/_panel.py), so carrying the token forward is
+      // all it takes — the same trick the sidebar links use.
+      var url = new URL(location.href);
+      url.searchParams.set('item', 'meeting-' + found.mid);
+      goEl.href = url.pathname + url.search;
+
+      clearInterval(tick);
+      bar.classList.toggle('callbar-dialling', !!s.dialling);
+      if (s.dialling) {
+        // No stopwatch yet: there is nothing to count until the call is out,
+        // and a timer here would be counting the wrong thing.
+        labEl.textContent = '{% trans "Calling" %}';
+        timeEl.hidden = true;
+      } else {
+        labEl.textContent = '{% trans "Call placed" %}';
+        timeEl.hidden = false;
+        var draw = function () {
+          timeEl.textContent = mmss(
+            Math.max(0, Math.round((Date.now() - s.started) / 1000)));
+        };
+        draw();
+        tick = setInterval(draw, 1000);
+      }
+      bar.hidden = false;
+    }
+
+    // Closing the panel removes it from the DOM without a page load, so the
+    // bar has to be told to look again — see the close handler in base.html.
+    window.callBarSync = show;
+    show();
+  })();
+</script>

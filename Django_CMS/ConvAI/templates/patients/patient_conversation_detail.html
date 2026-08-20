@@ -42,11 +42,11 @@
   .pcv-row.user { align-self:flex-end; flex-direction:row-reverse; }
   .pcv-msg-avatar { width:2rem; height:2rem; border-radius:9999px; display:inline-flex; align-items:center;
     justify-content:center; font-size:.68rem; font-weight:700; flex-shrink:0; text-transform:uppercase; }
-  .pcv-row.user .pcv-msg-avatar { background:#0ea5e9; color:#fff; }
+  .pcv-row.user .pcv-msg-avatar { background:var(--brand-primary); color:#fff; }
   .pcv-row.bot .pcv-msg-avatar { background:#fff; color:#64748b; border:1px solid #e2e8f0; }
   .pcv-bubble { padding:.6rem .85rem; border-radius:.9rem; font-size:.9rem; line-height:1.5;
     word-wrap:break-word; min-width:0; }
-  .pcv-row.user .pcv-bubble { background:#0ea5e9; color:#fff; border-bottom-right-radius:.25rem; }
+  .pcv-row.user .pcv-bubble { background:var(--brand-primary); color:#fff; border-bottom-right-radius:.25rem; }
   .pcv-row.bot .pcv-bubble { background:#fff; color:#334155; border:1px solid #e8edf3;
     border-bottom-left-radius:.25rem; }
   .pcv-time { font-size:.68rem; color:#94a3b8; margin-top:.25rem; }
@@ -71,13 +71,13 @@
   .pcv-saved.show { opacity:1; }
   .pcv-notes { width:100%; border:1px solid #d1d5db; border-radius:.5rem; padding:.6rem .75rem;
     font-size:.875rem; color:#111827; resize:vertical; }
-  .pcv-notes:focus { outline:none; border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.15); }
+  .pcv-notes:focus { outline:none; border-color:var(--brand-primary); box-shadow:0 0 0 3px rgba(3,105,161,.15); }
   .pcv-flag { display:flex; align-items:center; justify-content:space-between; gap:.5rem;
     padding:.5rem .75rem; border:1px solid #e2e8f0; border-radius:.5rem; font-size:.85rem; color:#475569;
     cursor:pointer; transition:border-color .12s, background .12s; }
   .pcv-flag:hover { border-color:#bae6fd; }
   .pcv-flag.on { background:#f0f9ff; border-color:#7dd3fc; color:#075985; }
-  .pcv-flag input { accent-color:#0284c7; width:1.1rem; height:1.1rem; flex-shrink:0; }
+  .pcv-flag input { accent-color:var(--brand-secondary); width:1.1rem; height:1.1rem; flex-shrink:0; }
 
   .pcv-empty { padding:3.5rem 1.5rem; text-align:center; color:#94a3b8; }
   .pcv-empty .material-icons-outlined { font-size:2.75rem; color:#cbd5e1; }

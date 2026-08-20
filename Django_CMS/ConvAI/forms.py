@@ -203,8 +203,14 @@ class ProtocolAnswerForm(forms.Form):
 
             if value:
                 if ans:
+                    # A navigator editing an answer makes it theirs, so the
+                    # "came back by text" tint goes with the change. Only an
+                    # untouched reply should still read as the caregiver's.
+                    changed = ans.response != value
                     ans.response = value
-                    ans.save(update_fields=["response"])
+                    if changed:
+                        ans.by_text = False
+                    ans.save(update_fields=["response", "by_text"])
                 else:
                     Answer.objects.create(
                         meeting=self.meeting,
@@ -345,10 +351,12 @@ class PromptsConfigForm(forms.ModelForm):
     """
     class Meta:
         model = SiteConfiguration
-        fields = ["meeting_summary_prompt", "transcript_summary_prompt"]
+        fields = ["meeting_summary_prompt", "transcript_summary_prompt",
+                  "transcript_moments_prompt"]
         labels = {
             "meeting_summary_prompt": _("Meeting protocol summary prompt"),
             "transcript_summary_prompt": _("Call transcript summary prompt"),
+            "transcript_moments_prompt": _("Call transcript key moments prompt"),
         }
         help_texts = {
             "meeting_summary_prompt": _(
@@ -360,10 +368,17 @@ class PromptsConfigForm(forms.ModelForm):
                 "Base prompt for post-processing a Whisper call transcript into a summary. "
                 "Leave blank to use the built-in default. The transcript is appended automatically."
             ),
+            "transcript_moments_prompt": _(
+                "Base prompt for picking the key moments out of a call transcript. "
+                "Leave blank to use the built-in default. The transcript's numbered "
+                "segments are appended automatically, and the reply is read back as "
+                "one \u201csegment number|sentence\u201d line per moment."
+            ),
         }
         widgets = {
             "meeting_summary_prompt": forms.Textarea(attrs={**_INPUT, "rows": 8}),
             "transcript_summary_prompt": forms.Textarea(attrs={**_INPUT, "rows": 8}),
+            "transcript_moments_prompt": forms.Textarea(attrs={**_INPUT, "rows": 8}),
         }
 
 
