@@ -541,6 +541,20 @@ class Agent(models.Model):
                     "API (live speech in/out) instead of the text chat."),
     )
 
+    # For prompt-based agents: the RAG subtype. When on, the agent gains a
+    # `search_documents` tool backed by the documents uploaded against it
+    # (see RagDocument / RagChunk). Off = a plain prompt agent with no tools.
+    rag_enabled = models.BooleanField(
+        default=False,
+        help_text=_("Prompt-based agents only: give the agent a searchable "
+                    "knowledge base built from documents you upload."),
+    )
+    # How many chunks the retrieval tool returns per search.
+    rag_top_k = models.PositiveSmallIntegerField(
+        default=5, validators=[MinValueValidator(1)],
+        help_text=_("How many document extracts the search tool returns per query."),
+    )
+
     # Model behind in-process agents (native + prompt-based). Blank uses the
     # platform default (DEFAULT_AGENT_MODEL). May be provider-prefixed, e.g.
     # 'openai/gpt-4.1-mini', 'anthropic/claude-sonnet-4-6'. Under USE_AZURE it is
@@ -588,6 +602,143 @@ class Agent(models.Model):
 
     def __str__(self):
         return f"{self.name} @ {self.host}:{self.port}"
+
+
+# ---------------------------------------------------------------------------
+# RAG-based prompt agents (see agents.md → "RAG-based agents")
+#
+# The knowledge base is deliberately *lightweight*: no external vector store, no
+# extra service. A document's text is split into chunks, each chunk is embedded
+# once, and the vector is kept on the row as a packed float32 blob. Retrieval
+# loads the (few thousand) vectors for one agent and scores them with numpy.
+#
+# Because the vectors live with the document, switching a document **off** is
+# just a boolean — the embeddings are kept and never recomputed when it comes
+# back on. Only deleting the document throws them away.
+# ---------------------------------------------------------------------------
+def _rag_upload_to(instance, filename):
+    """Store uploads under ``media/rag_documents/<agent_id>/<uuid><ext>``.
+
+    The stored name is randomised: two people may upload ``notes.pdf`` for the
+    same agent, and the display name is kept separately in ``original_name``.
+    """
+    ext = os.path.splitext(filename)[1].lower()[:10]
+    return os.path.join("rag_documents", str(instance.agent_id or "unassigned"),
+                        f"{uuid.uuid4().hex}{ext}")
+
+
+class RagDocument(models.Model):
+    """One uploaded source document in a RAG agent's knowledge base.
+
+    Ingestion (extract → chunk → embed) runs on the background pool and the
+    progress fields below are the *only* record of it, so a browser that
+    reloads — or a user who closes the tab — picks the job back up simply by
+    reading these rows.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", _("Queued")
+        EXTRACTING = "extracting", _("Reading text")
+        CHUNKING = "chunking", _("Splitting into chunks")
+        EMBEDDING = "embedding", _("Computing vectors")
+        READY = "ready", _("Ready")
+        FAILED = "failed", _("Failed")
+
+    # Statuses that mean "a worker should be on this right now". Used to spot
+    # jobs orphaned by a restart (see `is_stalled`).
+    ACTIVE_STATUSES = ("pending", "extracting", "chunking", "embedding")
+
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="rag_documents")
+    file = models.FileField(
+        upload_to=_rag_upload_to,
+        validators=[FileExtensionValidator(allowed_extensions=["txt", "md", "pdf", "docx"])],
+    )
+    original_name = models.CharField(max_length=255)
+    size_bytes = models.PositiveIntegerField(default=0)
+
+    # Off = excluded from retrieval, vectors kept. On/off costs nothing.
+    enabled = models.BooleanField(default=True, db_index=True)
+
+    status = models.CharField(max_length=16, choices=Status.choices,
+                              default=Status.PENDING, db_index=True)
+    error = models.TextField(blank=True, default="")
+
+    chunk_total = models.PositiveIntegerField(default=0)
+    chunk_done = models.PositiveIntegerField(default=0)
+    # Characters of extracted text — shown in the UI, and 0 means "nothing
+    # readable in this file" (e.g. a scanned PDF with no text layer).
+    char_count = models.PositiveIntegerField(default=0)
+
+    # Which embedding model produced the stored vectors. Kept per document so a
+    # later change of model is visible rather than silently mixing vector
+    # spaces; mismatched documents are skipped at retrieval time.
+    embedding_model = models.CharField(max_length=120, blank=True, default="")
+    embedding_dim = models.PositiveIntegerField(default=0)
+
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                    on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(default=timezone.now)
+    # Touched on every progress tick, so it doubles as the worker's heartbeat.
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at"]
+        # Named explicitly: retrieval and the knowledge-base page both filter on
+        # exactly this triple, and an explicit name keeps the migration and the
+        # model in step (an auto-generated one is a hash of the column list).
+        indexes = [models.Index(fields=["agent", "enabled", "status"],
+                                name="rag_doc_agent_enabled_idx")]
+
+    def __str__(self):
+        return f"{self.original_name} ({self.agent_id})"
+
+    @property
+    def progress(self) -> int:
+        """Percent complete, 0-100, for the progress bar."""
+        if self.status == self.Status.READY:
+            return 100
+        if self.status == self.Status.FAILED:
+            return 0
+        if self.status == self.Status.PENDING:
+            return 0
+        if self.status == self.Status.EXTRACTING:
+            return 5
+        if self.status == self.Status.CHUNKING:
+            return 15
+        if not self.chunk_total:
+            return 20
+        # Embedding spans 20→100%.
+        return min(99, 20 + int(80 * self.chunk_done / self.chunk_total))
+
+    def is_stalled(self, seconds: int = 300) -> bool:
+        """True if this job claims to be running but its worker went away.
+
+        A process restart (deploy, crash) leaves rows mid-ingest with nobody
+        working them. The heartbeat in ``updated_at`` is how we tell.
+        """
+        if self.status not in self.ACTIVE_STATUSES:
+            return False
+        return (timezone.now() - self.updated_at).total_seconds() > seconds
+
+
+class RagChunk(models.Model):
+    """One embedded slice of a ``RagDocument``.
+
+    ``embedding`` is the raw little-endian float32 vector, L2-normalised at
+    write time so similarity is a plain dot product.
+    """
+    document = models.ForeignKey(RagDocument, on_delete=models.CASCADE, related_name="chunks")
+    ordinal = models.PositiveIntegerField(default=0)
+    text = models.TextField()
+    embedding = models.BinaryField()
+
+    class Meta:
+        ordering = ["document_id", "ordinal"]
+        indexes = [models.Index(fields=["document", "ordinal"],
+                                name="rag_chunk_doc_ordinal_idx")]
+
+    def __str__(self):
+        return f"{self.document_id}#{self.ordinal}"
 
 
 class Conversation(models.Model):
@@ -798,6 +949,13 @@ class SiteConfiguration(models.Model):
     # Only needed when the resource exposes just the preview Realtime API: the
     # Azure region hosting the preview WebRTC gateway (e.g. 'swedencentral').
     azure_realtime_webrtc_region = models.CharField(max_length=40, blank=True, default="")
+
+    # Embeddings behind RAG-based prompt agents. Blank uses
+    # 'text-embedding-3-small' — multilingual, and the cheapest of the OpenAI
+    # embedding models. Under USE_AZURE the deployment name is taken from
+    # azure_embedding_deployment (falling back to the model name).
+    rag_embedding_model = models.CharField(max_length=120, blank=True, default="")
+    azure_embedding_deployment = models.CharField(max_length=100, blank=True, default="")
 
     # --- Editable content (live) ---
     # Markdown source for the Help page. Blank falls back to the shipped default

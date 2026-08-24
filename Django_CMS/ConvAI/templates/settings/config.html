@@ -236,6 +236,15 @@
           </div>
         </div>
 
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Embeddings (RAG agents)" %}</div>
+          <p class="text-xs text-gray-500 mb-3">{% trans "Used to index and search the documents uploaded to prompt-based agents with a knowledge base. The default is multilingual: a question in one language finds answers in documents written in another." %}</p>
+          <div class="stg-grid2">
+            {% include "settings/_field.html" with field=agents_form.rag_embedding_model %}
+            {% include "settings/_field.html" with field=agents_form.azure_embedding_deployment %}
+          </div>
+        </div>
+
         <div class="mt-5">
           <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
         </div>

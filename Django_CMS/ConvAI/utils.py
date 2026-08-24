@@ -232,9 +232,10 @@ def generate_response_with_agent(agent,
         if kind == "native":
             from .native_agents import run_native
             return run_native(agent.native_key, thread_id, user_message, configurable, model_name)
-        # prompt-based
+        # prompt-based (plain, or the RAG subtype — run_prompt_agent decides
+        # from the agent's rag_enabled flag)
         from .native_agents import run_prompt_agent
-        return run_prompt_agent(agent.system_prompt, thread_id, user_message, configurable, model_name)
+        return run_prompt_agent(agent, thread_id, user_message, configurable, model_name)
 
     # AS-06/F8 fix: deny SSRF to non-allow-listed agent hosts.
     if not agent_host_allowed(getattr(agent, "host", "")):

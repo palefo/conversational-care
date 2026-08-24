@@ -4,6 +4,11 @@
    class="button-secondary py-1.5 px-3 rounded-lg text-xs inline-flex items-center gap-1">
   <span class="material-icons-outlined text-sm">chat</span>{% trans "Test" %}
 </a>
+{% if a.kind == 'prompt' and a.rag_enabled %}
+  <a href="{% url 'agent_knowledge' a.pk %}" class="button-secondary py-1.5 px-3 rounded-lg text-xs inline-flex items-center gap-1">
+    <span class="material-icons-outlined text-sm">library_books</span>{% trans "Documents" %}
+  </a>
+{% endif %}
 {% if can_edit %}
   <a href="{% url 'agent_edit' a.pk %}" class="button-secondary py-1.5 px-3 rounded-lg text-xs inline-flex items-center gap-1">
     <span class="material-icons-outlined text-sm">edit</span>{% trans "Edit" %}

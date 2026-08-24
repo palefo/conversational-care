@@ -14,7 +14,8 @@ The returned models are LangChain chat models and support both ``.invoke`` and
 """
 from __future__ import annotations
 
-from langchain_openai import ChatOpenAI, AzureChatOpenAI
+from langchain_openai import (ChatOpenAI, AzureChatOpenAI,
+                              OpenAIEmbeddings, AzureOpenAIEmbeddings)
 
 from .site_config import get_setting, get_bool
 
@@ -165,3 +166,61 @@ def make_llm(model_name: str | None = None, temperature: float = 0.0):
             temperature=temperature,
         )
     return ChatOpenAI(model=clean_model, temperature=temperature, api_key=_s("OPENAI_API_KEY"))
+
+
+# ---------------------------------------------------------------------------
+# Embeddings (RAG-based prompt agents)
+#
+# Only OpenAI/Azure OpenAI here. The embedding model is what fixes the vector
+# space a knowledge base lives in, so it is a *platform* setting rather than a
+# per-agent one — changing it per agent would silently make two agents' vectors
+# incomparable for no benefit.
+#
+# `text-embedding-3-small` is the default because it is multilingual (the same
+# vector space across languages, so a Spanish question finds the answer in an
+# English document) and the cheapest of the three.
+# ---------------------------------------------------------------------------
+DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
+
+
+def embedding_model_name() -> str:
+    """The embedding model used to build and query every knowledge base."""
+    return _s("RAG_EMBEDDING_MODEL") or DEFAULT_EMBEDDING_MODEL
+
+
+def make_embeddings(model_name: str | None = None):
+    """Build the LangChain embeddings client (OpenAI, or Azure under USE_AZURE).
+
+    Returns an object with ``embed_documents(list[str])`` and
+    ``embed_query(str)``. Raises ``RuntimeError`` when the credentials for the
+    selected route are missing, so callers can surface one clear message
+    instead of an opaque auth error mid-ingest.
+    """
+    model_name = (model_name or "").strip() or embedding_model_name()
+    model_name = _strip_provider_prefix(model_name)
+
+    if _use_azure():
+        # Under Azure the model string is a *deployment* name; the deployment
+        # setting wins, and the model name is a reasonable fallback because
+        # deployments are conventionally named after their model.
+        endpoint = _s("AZURE_OPENAI_ENDPOINT")
+        api_key = _s("AZURE_OPENAI_API_KEY")
+        if not endpoint or not api_key:
+            raise RuntimeError(
+                "Azure OpenAI is not configured. Set the endpoint and key under "
+                "Settings → Agents → Azure before uploading documents."
+            )
+        return AzureOpenAIEmbeddings(
+            azure_endpoint=endpoint,
+            azure_deployment=_s("AZURE_EMBEDDING_DEPLOYMENT") or model_name,
+            api_key=api_key,
+            api_version=_s("AZURE_OPENAI_API_VERSION") or "2024-12-01-preview",
+        )
+
+    api_key = _s("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY is not set. Add it under Settings → Integrations "
+            "before uploading documents."
+        )
+    return OpenAIEmbeddings(model=model_name, api_key=api_key)

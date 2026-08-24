@@ -1,4 +1,7 @@
-# Asynchronous WhatsApp / SMS replies
+# Background work: asynchronous WhatsApp / SMS replies
+
+> The same in-process machinery also runs **RAG document ingestion**, on its own
+> separate pool. See [Other background work](#other-background-work) at the end.
 
 Twilio expects the inbound webhook that delivers a WhatsApp or SMS message to
 return a response within a few seconds. Generating a reply, however, can take
@@ -72,3 +75,19 @@ under load.
   stale connections.
 - **Failures are isolated.** An exception in one job is logged and never crashes
   the pool or the web process.
+
+## Other background work
+
+[`ConvAI/async_reply.py`](Django_CMS/ConvAI/async_reply.py) exposes a second
+pool, used by RAG-based agents to read, chunk and embed uploaded documents
+(`submit_ingest`, sized by `RAG_WORKERS`). The pools are deliberately separate:
+ingesting a long PDF holds a thread for minutes, and on a shared pool a couple
+of uploads would sit in front of every waiting WhatsApp reply.
+
+Ingestion also does *not* accept the "queued work is lost on restart" trade-off
+above, because an upload someone is watching a progress bar for must survive a
+deploy. It takes a different approach on the same pool: every bit of state lives
+on the `RagDocument` row, whose `updated_at` doubles as the worker's heartbeat,
+so a job orphaned by a restart is recognisable and gets claimed again by a
+conditional `UPDATE` — safe even with several web processes racing. See
+[agents.md](agents.md#rag-based-agents-rag_enabled--true).

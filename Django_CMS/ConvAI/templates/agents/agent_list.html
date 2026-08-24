@@ -54,25 +54,33 @@
 
 {% comment %} ---------- Prompt-based ---------- {% endcomment %}
 <section class="agent-panel" data-agent-panel="prompt">
-  <p class="text-sm text-gray-500 max-w-xl mb-4">{% trans "Custom in-process agents driven by a system prompt you write. No tools." %}</p>
-  {% if prompt_agents %}
-    <div class="agent-grid">
-      {% for a in prompt_agents %}{% include "agents/_agent_card.html" with a=a %}{% endfor %}
-      <a href="{% url 'agent_create' 'prompt' %}" class="agent-card agent-add">
-        <span class="material-icons-outlined text-3xl">add</span>
-        <span class="font-medium text-sm">{% trans "New prompt agent" %}</span>
-      </a>
-    </div>
-  {% else %}
-    <div class="agent-empty">
-      <span class="material-icons-outlined text-4xl text-indigo-300">chat</span>
-      <p class="mt-2 font-medium text-gray-700">{% trans "No prompt-based agents yet." %}</p>
-      <p class="text-sm text-gray-500 mb-4">{% trans "Create one and drive it with your own system prompt." %}</p>
-      <a href="{% url 'agent_create' 'prompt' %}" class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
-        <span class="material-icons-outlined text-base">add</span>{% trans "New prompt agent" %}
-      </a>
-    </div>
-  {% endif %}
+  <p class="text-sm text-gray-500 max-w-xl mb-4">{% trans "Custom in-process agents driven by a system prompt you write. Two subtypes: plain, and RAG-based — the same prompt plus a search tool over documents you upload." %}</p>
+
+  {% comment %} ── plain ── {% endcomment %}
+  <h2 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+    <span class="material-icons-outlined text-base text-indigo-500">chat</span>{% trans "Plain" %}
+  </h2>
+  <p class="text-xs text-gray-500 mb-3">{% trans "Prompt only, no tools." %}</p>
+  <div class="agent-grid mb-8">
+    {% for a in plain_prompt_agents %}{% include "agents/_agent_card.html" with a=a %}{% endfor %}
+    <a href="{% url 'agent_create' 'prompt' %}" class="agent-card agent-add">
+      <span class="material-icons-outlined text-3xl">add</span>
+      <span class="font-medium text-sm">{% trans "New prompt agent" %}</span>
+    </a>
+  </div>
+
+  {% comment %} ── RAG ── {% endcomment %}
+  <h2 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+    <span class="material-icons-outlined text-base text-violet-500">library_books</span>{% trans "RAG-based" %}
+  </h2>
+  <p class="text-xs text-gray-500 mb-3">{% trans "Answers from documents you upload — PDF, Word or text — and says which one it used. Multilingual: a question in one language finds answers written in another." %}</p>
+  <div class="agent-grid">
+    {% for a in rag_agents %}{% include "agents/_agent_card.html" with a=a %}{% endfor %}
+    <a href="{% url 'agent_create' 'prompt' %}?rag=1" class="agent-card agent-add">
+      <span class="material-icons-outlined text-3xl">add</span>
+      <span class="font-medium text-sm">{% trans "New RAG agent" %}</span>
+    </a>
+  </div>
 </section>
 
 {% comment %} ---------- Remote ---------- {% endcomment %}

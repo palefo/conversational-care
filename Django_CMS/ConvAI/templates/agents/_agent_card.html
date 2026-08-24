@@ -2,7 +2,9 @@
 {% comment %} One agent as a card. Expects `a` (Agent). Kind drives icon/colour/meta. {% endcomment %}
 <div class="agent-card">
   <div class="flex items-start gap-3">
-    {% if a.kind == 'prompt' %}
+    {% if a.kind == 'prompt' and a.rag_enabled %}
+      <span class="agent-avatar bg-violet-50 text-violet-600"><span class="material-icons-outlined">library_books</span></span>
+    {% elif a.kind == 'prompt' %}
       <span class="agent-avatar bg-indigo-50 text-indigo-600"><span class="material-icons-outlined">chat</span></span>
     {% elif a.kind == 'remote' %}
       <span class="agent-avatar bg-sky-50 text-sky-600"><span class="material-icons-outlined">cloud</span></span>
@@ -12,7 +14,9 @@
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
         <h3 class="font-semibold text-gray-900 truncate">{{ a.name }}</h3>
-        {% if a.kind == 'prompt' %}
+        {% if a.kind == 'prompt' and a.rag_enabled %}
+          <span class="agent-badge bg-violet-100 text-violet-700">{% trans "RAG" %}</span>
+        {% elif a.kind == 'prompt' %}
           <span class="agent-badge bg-indigo-100 text-indigo-700">{% trans "Prompt" %}</span>
         {% elif a.kind == 'remote' %}
           <span class="agent-badge bg-sky-100 text-sky-700">{% trans "Remote" %}</span>
@@ -43,6 +47,12 @@
       <span class="agent-chip" title="{% trans 'Model' %}">
         <span class="material-icons-outlined text-[13px]">memory</span>
         <code>{{ a.model|default:_("default") }}</code>
+      </span>
+    {% endif %}
+    {% if a.kind == 'prompt' and a.rag_enabled %}
+      <span class="agent-chip" title="{% trans 'Documents searched by this agent' %}">
+        <span class="material-icons-outlined text-[13px]">library_books</span>
+        {% blocktrans count n=a.active_document_count %}{{ n }} document{% plural %}{{ n }} documents{% endblocktrans %}
       </span>
     {% endif %}
     {% if a.kind == 'prompt' and a.realtime_enabled %}

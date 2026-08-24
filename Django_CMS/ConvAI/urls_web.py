@@ -14,6 +14,8 @@ from .views import (
     add_note, edit_note, delete_note,
     agent_list, agent_form, agent_delete, agent_test, agent_test_send, agent_test_audio,
     agent_realtime_session, external_realtime_session,
+    agent_knowledge, agent_knowledge_upload, agent_knowledge_status,
+    agent_knowledge_toggle, agent_knowledge_delete, agent_knowledge_retry,
     edit_patient_details, edit_care_plan, view_care_plan,
     save_client_note, update_client_terms,
     toggle_patient_chatbot, raise_alert,
@@ -51,6 +53,15 @@ urlpatterns = [
     path('agents/<int:pk>/test/send/', agent_test_send, name='agent_test_send'),
     path('agents/<int:pk>/test/audio/', agent_test_audio, name='agent_test_audio'),
     path('agents/<int:pk>/test/realtime-session/', agent_realtime_session, name='agent_realtime_session'),
+    # Knowledge base for RAG-based prompt agents. Upload is one file per
+    # request so each gets its own progress bar; everything else is polled
+    # from the DB, so a reload picks up jobs already running.
+    path('agents/<int:pk>/knowledge/', agent_knowledge, name='agent_knowledge'),
+    path('agents/<int:pk>/knowledge/upload/', agent_knowledge_upload, name='agent_knowledge_upload'),
+    path('agents/<int:pk>/knowledge/status/', agent_knowledge_status, name='agent_knowledge_status'),
+    path('agents/<int:pk>/knowledge/<int:doc_id>/toggle/', agent_knowledge_toggle, name='agent_knowledge_toggle'),
+    path('agents/<int:pk>/knowledge/<int:doc_id>/delete/', agent_knowledge_delete, name='agent_knowledge_delete'),
+    path('agents/<int:pk>/knowledge/<int:doc_id>/retry/', agent_knowledge_retry, name='agent_knowledge_retry'),
     path('login/', RoleBasedLoginView.as_view(), name='login'),
     path('calls/<str:call_id>', navigator_required(pending_call), name='pending_call'),
     path('help/', navigator_required(help_page), name='help'),

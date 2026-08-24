@@ -55,6 +55,9 @@ _STR_KEYS = {
     "AZURE_REALTIME_DEPLOYMENT": "azure_realtime_deployment",
     "AZURE_REALTIME_VOICE": "azure_realtime_voice",
     "AZURE_REALTIME_WEBRTC_REGION": "azure_realtime_webrtc_region",
+    # Embeddings for RAG-based prompt agents.
+    "RAG_EMBEDDING_MODEL": "rag_embedding_model",
+    "AZURE_EMBEDDING_DEPLOYMENT": "azure_embedding_deployment",
 }
 
 _BOOL_KEYS = {

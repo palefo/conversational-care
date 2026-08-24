@@ -43,9 +43,17 @@ outside this repo.
 
 A **custom, configurable** kind: admins create instances in the app, each storing
 its own **system prompt** in the DB (`Agent.system_prompt`). It runs in-process
-like a native agent (async graph + Postgres checkpointer) but is a single
-model-call node with the stored prompt as the system message and **no tools**.
-It's a trimmed version of the "Reco A" sample (`ConvAI/native_agents/prompt_agent.py`).
+like a native agent (async graph + Postgres checkpointer).
+
+Prompt-based agents come in two **subtypes**, selected by `Agent.rag_enabled`:
+
+| Subtype | What it is |
+|---|---|
+| **Plain** (`rag_enabled = False`) | A single model-call node with the stored prompt as the system message and **no tools**. A trimmed version of the "Reco A" sample (`ConvAI/native_agents/prompt_agent.py`). |
+| **RAG-based** (`rag_enabled = True`) | The same prompt, plus one tool — `search_documents` — over files uploaded against that agent. See [RAG-based agents](#rag-based-agents-rag_enabled--true) below. |
+
+Both share the model, the prompt, and the classification settings; the Agents
+page lists them as two groups under the same **Prompt-based** tab.
 
 The model is chosen per agent via **`Agent.model`** and built by the shared
 factory (see *Choosing the model* below). It needs the provider credentials **in
@@ -73,6 +81,139 @@ don't expose the GA v1 realtime surface (it 404s) are handled automatically via
 the *preview* API fallback, which additionally needs
 `AZURE_REALTIME_WEBRTC_REGION` (the resource's region, e.g. `swedencentral`)
 because the preview WebRTC gateway is regional.
+
+#### RAG-based agents (`rag_enabled = True`)
+
+A RAG agent answers from **documents you upload to it** rather than from the
+model's own knowledge. Same stored prompt, same model — plus one tool.
+
+Turning the toggle **off** does not touch the documents or their vectors. The
+agent simply stops being handed the tool, and turning it back on costs nothing.
+
+##### It is a tool, not a preprocessor
+
+Retrieval is exposed as a LangGraph tool (`search_documents`) on a
+`create_react_agent`, so the **model decides when to search**. That matters in
+practice: a greeting shouldn't cost an embedding call, and a follow-up question
+often needs a second search with different words. Nothing is silently stuffed
+into the prompt behind the model's back, so what it saw is always visible in
+the trace.
+
+The tool is deliberately **synchronous**. LangGraph runs sync tools in a worker
+thread during `ainvoke()`, so Django ORM access inside them is safe; an async
+tool would execute inside the event loop, where the ORM raises
+`SynchronousOnlyOperation`. (Same reasoning as `link_worker`'s tools.)
+
+`Agent.rag_top_k` (default 5) sets how many extracts one search returns.
+
+##### Multilingual by construction
+
+The default embedding model, `text-embedding-3-small`, puts all languages in
+**one** vector space, so a question asked in Spanish retrieves the passage that
+answers it even when the document is in English. The prompt suffix
+(`prompt_agent.RAG_PROMPT_SUFFIX`) then tells the agent to reply in the
+language the user wrote in, translating what it found — without that
+instruction models drift into the language of the extracts.
+
+Text extraction is language-aware too: `.txt`/`.md` files are decoded as UTF-8
+and, failing that, sniffed with `chardet` before falling back to latin-1, so a
+cp1252 export does not arrive with its accents mangled. Chunking is by
+characters rather than tokens, so a Chinese or Korean document is split the
+same way an English one is.
+
+##### The lightweight architecture
+
+**There is no vector database and no extra service.** A chunk's vector is
+stored on its own row as a packed little-endian float32 blob — 4 bytes a
+dimension, ~6 KB for a 1536-dim vector against ~24 KB as JSON — L2-normalised
+on the way in, so cosine similarity at query time is a plain dot product.
+Retrieval stacks one agent's vectors into a numpy matrix and scores them in a
+single multiply.
+
+That is the right shape for this workload. A knowledge base here is a handful
+of documents — hundreds to a few thousand chunks — and scoring 5,000 × 1536
+floats takes a couple of milliseconds, which rounds to nothing beside the
+embedding call that had to happen first. The matrix is cached per process and
+keyed by a cheap fingerprint of the agent's ready-and-enabled documents, so it
+is rebuilt only when the set actually changes.
+
+It also keeps **one** source of truth. Switching a document off is a `WHERE`
+clause, not an index rebuild — which is exactly why the off toggle can be free.
+
+If a deployment ever outgrows this, the change is local: keep the schema and
+put an ANN index in front of `retrieve._matrix_for`.
+
+| Model | What it holds |
+|---|---|
+| `RagDocument` | One uploaded file: its name, size, on/off flag, ingestion status and progress, and the embedding model its vectors were built with. |
+| `RagChunk` | One embedded slice of a document: ordinal, text, and the packed vector. Cascades with the document. |
+
+##### Ingestion, and why a reload is harmless
+
+Uploading is one HTTP request **per file** — that is what gives each file its
+own progress bar, and stops one rejected file from failing the whole drop. The
+request saves the bytes, creates the row and returns; the work happens on the
+ingestion pool (`async_reply.submit_ingest`, sized by `RAG_WORKERS`, separate
+from the WhatsApp reply pool so a long PDF cannot delay a reply).
+
+Every bit of job state lives on the `RagDocument` row — stage, chunks done,
+error. The page is only ever a *view* onto those rows, never the owner of the
+job, so closing the tab, reloading, or coming back on another machine all show
+the same progress.
+
+The harder case is a process restart mid-ingest. `updated_at` is written on
+every progress tick, so it doubles as the worker's heartbeat: a row claiming to
+be in-flight that has not been touched for five minutes has lost its worker.
+`resume_orphans` re-queues those whenever anyone looks at the knowledge base,
+and claiming is a single conditional `UPDATE`, so two web processes racing to
+resume the same document cannot both win. Ingestion always rebuilds a
+document's chunks from scratch, so a re-run is never additive.
+
+Stages, as shown in the UI: `pending` → `extracting` → `chunking` →
+`embedding` → `ready`, or `failed` with the reason and a **Retry** button.
+Failures are usually transient or fixable elsewhere (a missing API key, a rate
+limit part-way through embedding), and the file is already stored, so a retry
+does not need a re-upload.
+
+##### Files, formats and limits
+
+| Format | Read with | Notes |
+|---|---|---|
+| `.txt`, `.md` | direct | UTF-8, then `chardet`, then latin-1. |
+| `.pdf` | `pypdf` | Per-page; one unreadable page costs that page, not the upload. A scanned PDF with no text layer fails with a clear "needs OCR" message rather than indexing nothing. |
+| `.docx` | `python-docx` | Tables are walked separately — `document.paragraphs` omits them, and in care documents tables carry a lot of the content. The older `.doc` format is not supported. |
+
+Uploads are capped at 25 MB (`rag.extract.MAX_UPLOAD_BYTES`) and chunked at
+1000 characters with a 150-character overlap (`rag.ingest`).
+
+Stored files live under `media/rag_documents/<agent_id>/` with randomised
+names. **Nothing serves them** — there is no download view; the file is written
+once by the upload, read once by the worker, and kept only so a failed
+ingestion can be retried. Deleting a document (or its agent) deletes the file.
+See [file_storage.md](file_storage.md).
+
+##### Configuration
+
+The embedding model is a **platform** setting, not a per-agent one: it fixes
+the vector space a knowledge base lives in, and letting agents differ would
+silently make their vectors incomparable for no benefit.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `RAG_EMBEDDING_MODEL` | `text-embedding-3-small` | Model used to index and search. Also editable in **Settings → Agents → Embeddings**. |
+| `AZURE_EMBEDDING_DEPLOYMENT` | — | Under `USE_AZURE`, the deployment serving that model. Blank reuses the model name; endpoint/key come from `AZURE_OPENAI_*`. |
+| `RAG_WORKERS` | `2` | Background threads that read, chunk and embed. |
+
+> **Changing the embedding model invalidates existing documents.** Each
+> document records the model its vectors were built with; a query embedded with
+> a different model has a different width and cannot be compared. Rather than
+> return nonsense, the search tool says the knowledge base was built with a
+> different model and points at re-uploading or restoring the old setting.
+
+A RAG agent cannot also be a **real-time voice** agent: realtime agents
+converse straight with the voice API and never call the tool, so the form
+rejects the combination rather than shipping a knowledge base that can never
+be consulted.
 
 ### Native agents (`kind = "native"`)
 
@@ -119,9 +260,9 @@ their server owns the model.
   `GOOGLE_API_KEY`, `MISTRAL_API_KEY`, `DEEPSEEK_API_KEY`. Only the providers you
   use are required. If a provider's SDK isn't installed, selecting it yields a
   clear "add `langchain-…`" message instead of a crash.
-- **Editable in the app.** The default model, the provider keys, and all the
-  Azure settings can also be set at runtime in **Settings → Agents** (stored on
-  `SiteConfiguration`). These DB values take precedence over `.env`, so you can
+- **Editable in the app.** The default model, the provider keys, the embedding
+  model, and all the Azure settings can also be set at runtime in
+  **Settings → Agents** (stored on `SiteConfiguration`). These DB values take precedence over `.env`, so you can
   switch models/providers without redeploying. Keys are write-only (a blank field
   keeps the stored secret). Resolution order is DB → `.env` → Django settings.
 - **Azure.** Set `USE_AZURE=true` to route models to Azure instead of the public
@@ -155,6 +296,7 @@ the project's LangGraph version.
 
 ## Roadmap
 
-Per-agent model selection and multi-provider (incl. Azure) routing are in place.
-Natural extensions: per-agent temperature, and optional tools for prompt-based
-agents.
+Per-agent model selection, multi-provider (incl. Azure) routing, and the
+RAG subtype's document tool are in place. Natural extensions: per-agent
+temperature, more tools for prompt-based agents, and OCR so scanned PDFs can be
+ingested instead of rejected.

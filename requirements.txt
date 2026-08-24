@@ -184,3 +184,10 @@ python-dateutil
 django-markdownify
 django-widget-tweaks
 psycopg[binary]
+
+# RAG-based prompt agents: document text extraction. PDF text comes from pypdf
+# (already pinned above) and .txt/.md are read directly; only .docx needs a
+# dedicated reader. Chunking reuses langchain-text-splitters, and the vectors
+# live in Postgres as float32 blobs (numpy for the similarity search) — no
+# extra vector-store service is required.
+python-docx==1.1.2

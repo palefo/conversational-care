@@ -448,17 +448,22 @@ _MODEL_INPUT = {**_INPUT, "list": "model-suggestions", "placeholder": "openai/gp
 class PromptAgentForm(forms.ModelForm):
     """App-level create/edit form for **prompt-based** agents.
 
-    These run in-process using the stored ``system_prompt`` as the system message
-    (no tools, no LangGraph server).
+    These run in-process using the stored ``system_prompt`` as the system
+    message. Two subtypes, selected by ``rag_enabled``: plain (no tools) and
+    RAG-based, which adds a search tool over documents uploaded against the
+    agent on its own Knowledge base page.
     """
     class Meta:
         model = Agent
         fields = [
-            "name", "system_prompt", "model", "realtime_enabled",
+            "name", "system_prompt", "model", "rag_enabled", "rag_top_k",
+            "realtime_enabled",
             "classification_role", "abstract_instruction", "detectors", "tts_voice_id",
         ]
         labels = {
             "realtime_enabled": _("Real-time voice agent"),
+            "rag_enabled": _("Knowledge base (RAG)"),
+            "rag_top_k": _("Extracts per search"),
         }
         help_texts = {
             "realtime_enabled": _(
@@ -466,12 +471,23 @@ class PromptAgentForm(forms.ModelForm):
                 "text chat. The model above is ignored; the Realtime deployment "
                 "from Settings → Agents is used."
             ),
+            "rag_enabled": _(
+                "Give the agent a search tool over documents you upload. Save "
+                "first, then add documents from the agent's Knowledge base page. "
+                "Switching this off keeps the documents and their vectors — the "
+                "agent just stops being able to search them."
+            ),
+            "rag_top_k": _("How many document extracts each search returns. "
+                           "5 suits most knowledge bases; raise it for long "
+                           "documents, lower it for short ones."),
         }
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
             "system_prompt": forms.Textarea(attrs={**_INPUT, "rows": 10,
                 "placeholder": "You are a helpful assistant…"}),
             "model": forms.TextInput(attrs=_MODEL_INPUT),
+            "rag_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "rag_top_k": forms.NumberInput(attrs={**_INPUT, "min": 1, "max": 20}),
             "realtime_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "classification_role": forms.Textarea(attrs={**_INPUT, "rows": 4}),
             "abstract_instruction": forms.TextInput(attrs=_INPUT),
@@ -482,6 +498,23 @@ class PromptAgentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["system_prompt"].required = True
+
+    def clean(self):
+        cleaned = super().clean()
+        # Real-time voice runs speech-to-speech against the Realtime API, which
+        # this agent does not drive tool calls through. Allowing both would put
+        # a knowledge base on an agent that can never consult it.
+        if cleaned.get("rag_enabled") and cleaned.get("realtime_enabled"):
+            raise forms.ValidationError(
+                _("A knowledge base cannot be combined with real-time voice: "
+                  "real-time agents converse directly with the voice API and "
+                  "cannot call the search tool. Pick one.")
+            )
+        top_k = cleaned.get("rag_top_k")
+        if top_k is not None and top_k > 20:
+            self.add_error("rag_top_k", _("Use 20 or fewer — more extracts "
+                                          "crowd out the conversation."))
+        return cleaned
 
 
 class NativeAgentForm(forms.ModelForm):
@@ -682,6 +715,7 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "azure_realtime_endpoint", "azure_realtime_api_key",
             "azure_realtime_deployment", "azure_realtime_voice",
             "azure_realtime_webrtc_region",
+            "rag_embedding_model", "azure_embedding_deployment",
         ]
         labels = {
             "default_agent_model": _("Default agent model"),
@@ -705,6 +739,8 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "azure_realtime_deployment": _("Realtime deployment"),
             "azure_realtime_voice": _("Realtime voice"),
             "azure_realtime_webrtc_region": _("Realtime WebRTC region"),
+            "rag_embedding_model": _("Embedding model"),
+            "azure_embedding_deployment": _("Azure embedding deployment"),
         }
         help_texts = {
             "default_agent_model": _("Used when an agent has no explicit model, e.g. "
@@ -719,6 +755,14 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "azure_realtime_webrtc_region": _("Only for resources on the preview "
                                               "Realtime API: the resource's region, "
                                               "e.g. 'swedencentral' or 'eastus2'."),
+            "rag_embedding_model": _("Used to index and search RAG agents' "
+                                     "documents. Blank uses "
+                                     "'text-embedding-3-small'. Changing it "
+                                     "makes existing documents unsearchable "
+                                     "until they are re-uploaded."),
+            "azure_embedding_deployment": _("Under Azure, the deployment serving "
+                                            "the embedding model above. Blank "
+                                            "reuses the model name."),
         }
         widgets = {
             "default_agent_model": forms.TextInput(attrs={**_INPUT, "list": "model-suggestions",
@@ -734,4 +778,6 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "azure_realtime_deployment": forms.TextInput(attrs={**_INPUT, "placeholder": "gpt-realtime"}),
             "azure_realtime_voice": forms.TextInput(attrs={**_INPUT, "placeholder": "marin"}),
             "azure_realtime_webrtc_region": forms.TextInput(attrs={**_INPUT, "placeholder": "swedencentral"}),
+            "rag_embedding_model": forms.TextInput(attrs={**_INPUT, "placeholder": "text-embedding-3-small"}),
+            "azure_embedding_deployment": forms.TextInput(attrs={**_INPUT, "placeholder": "text-embedding-3-small"}),
         }

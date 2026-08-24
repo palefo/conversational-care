@@ -167,3 +167,9 @@ ASYNC_WHATSAPP_REPLY = (
 # Higher values allow more concurrent replies at the cost of more memory/CPU per
 # web process. Ignored when ASYNC_WHATSAPP_REPLY is off.
 WHATSAPP_WORKERS = max(1, int(os.getenv("WHATSAPP_WORKERS", "2") or "2"))
+
+# Number of background worker threads used to ingest RAG documents (read →
+# chunk → embed). Separate from WHATSAPP_WORKERS so a long upload cannot sit in
+# front of a waiting WhatsApp reply. Two is plenty: the work is dominated by
+# waiting on the embeddings API, and each thread holds a DB connection.
+RAG_WORKERS = max(1, int(os.getenv("RAG_WORKERS", "2") or "2"))

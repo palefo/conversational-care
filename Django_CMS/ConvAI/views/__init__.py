@@ -13,6 +13,7 @@ from .media import *
 from .notes import *
 from .patients import *
 from .protocols import *
+from .rag import *
 from .settings_views import *
 from .summaries import *
 from .users import *

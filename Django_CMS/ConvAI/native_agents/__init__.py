@@ -138,14 +138,24 @@ def run_native(native_key: str, thread_id: str, user_message: str,
     )
 
 
-def run_prompt_agent(system_prompt: str, thread_id: str, user_message: str,
+def run_prompt_agent(agent, thread_id: str, user_message: str,
                      configurable: dict | None = None, model_name: str | None = None) -> str:
-    """Run a user-created prompt-based agent using its stored system prompt."""
+    """Run a user-created prompt-based agent using its stored system prompt.
+
+    Takes the ``Agent`` row rather than just the prompt string, because the RAG
+    subtype also needs the agent's id (to scope the knowledge base) and its
+    ``rag_top_k``.
+    """
     from .prompt_agent import build_prompt_graph
+    rag_enabled = bool(getattr(agent, "rag_enabled", False))
     return _run_sync(
         lambda: _arun_graph(
-            lambda cp: build_prompt_graph(system_prompt, cp, model_name),
+            lambda cp: build_prompt_graph(
+                agent.system_prompt, cp, model_name,
+                agent_id=agent.pk, rag_enabled=rag_enabled,
+                top_k=getattr(agent, "rag_top_k", 5) or 5,
+            ),
             thread_id, user_message, configurable,
         ),
-        "Prompt agent",
+        "RAG agent" if rag_enabled else "Prompt agent",
     )

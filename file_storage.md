@@ -12,6 +12,7 @@ controlled** (so a leaked link does not expose private data).
 | **TTS audio** | ElevenLabs text-to-speech | Spoken agent replies (sent to users, incl. via Twilio) |
 | **User voice notes** | Inbound WhatsApp / web audio | Audio messages recorded by caregivers/clients |
 | **Call recordings** | Downloaded from Twilio | Recordings of phone calls |
+| **RAG documents** | Admin uploads on an agent's Knowledge base page | Source documents a RAG-based agent searches |
 | Brand logo | Admin uploads in Settings | The logo shown on the login page (**public**) |
 
 Everything except the brand logo is **private**.
@@ -26,14 +27,15 @@ media/                    ← MEDIA_ROOT, a persistent Docker volume (media_data
 ├── branding/             public   — brand logo (login page)
 ├── care_plans/           private  — uploaded care-plan PDFs
 ├── voice/                private  — ElevenLabs TTS + inbound user voice notes
-└── call_recordings/      private  — call recordings downloaded from Twilio
+├── call_recordings/      private  — call recordings downloaded from Twilio
+└── rag_documents/<agent>/ private — documents uploaded to a RAG agent
 ```
 
 Key points for running in containers:
 
 - **One persistent volume.** `docker-compose.yml` mounts `media_data:/media`,
-  and in the container `MEDIA_ROOT` resolves to `/media`. All four categories
-  live under it, so nothing is lost on rebuild/restart.
+  and in the container `MEDIA_ROOT` resolves to `/media`. Every category lives
+  under it, so nothing is lost on rebuild/restart.
 - **Nothing is written into the code tree.** Previously voice files went to
   `./recordings` (inside the `.:/app` bind-mount). They now default to
   `media/voice` on the persistent volume.
@@ -68,6 +70,12 @@ file — a link alone is never enough.
 | Care plan (view/download) | `view_care_plan`, `download_care_plan` | Admins and the client's assigned navigator |
 | Call recording | `serve_protected_file` | Admins, and the navigator of the client whose number matches the recording |
 | Message audio | `serve_audio_file` | Admins, and the test user linked to that client |
+
+RAG documents have **no download view at all**. Nothing serves the stored file:
+it is written once by the upload, read once by the ingestion worker, and kept
+only so a failed ingestion can be retried without re-uploading. What people
+read is the extracted text, through the agent. Files are removed with the
+document (or with the agent) rather than being left behind.
 
 If the check fails the view returns `403 Forbidden` — even for a valid,
 existing file.

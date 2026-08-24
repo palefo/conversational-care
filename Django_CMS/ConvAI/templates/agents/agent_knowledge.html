@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Knowledge base" %} · {{ agent.name }}{% endblock %}
+
+{% block content %}
+<style>
+  /* Drop zone. The dashed border is the whole affordance, so the dragover
+     state has to be unmistakable — people drop from a folder window that is
+     covering half the screen and only see a sliver of the page. */
+  .kb-drop { border: 2px dashed #cbd5e1; border-radius: .9rem; background: #fafbfc;
+    padding: 2.25rem 1.25rem; text-align: center; transition: border-color .15s, background .15s;
+    cursor: pointer; }
+  .kb-drop:hover { border-color: #94a3b8; background: #f8fafc; }
+  .kb-drop.dragover { border-color: #0ea5e9; background: #f0f9ff; }
+  .kb-drop input[type=file] { display: none; }
+
+  .kb-row { background: #fff; border: 1px solid #eef2f7; border-radius: .75rem;
+    padding: .9rem 1.1rem; display: flex; align-items: flex-start; gap: .9rem;
+    box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+  .kb-row.is-off { background: #fafbfc; }
+  .kb-row.is-off .kb-name { color: #94a3b8; }
+  .kb-icon { width: 2.25rem; height: 2.25rem; border-radius: .5rem; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center; }
+  .kb-name { font-weight: 600; color: #0f172a; font-size: .9rem; word-break: break-all; }
+  .kb-meta { font-size: .75rem; color: #64748b; margin-top: .15rem; }
+
+  /* One bar serves both phases: the upload (bytes to the server) and then the
+     ingestion (chunking + embedding). They are different colours so it is
+     clear which one is running. */
+  .kb-bar { height: 6px; border-radius: 9999px; background: #e2e8f0; overflow: hidden; margin-top: .5rem; }
+  .kb-bar > span { display: block; height: 100%; width: 0; border-radius: 9999px;
+    background: #0ea5e9; transition: width .25s ease; }
+  .kb-bar.is-upload > span { background: #94a3b8; }
+  .kb-bar.is-ready > span { background: #10b981; }
+  .kb-bar.is-failed > span { background: #ef4444; }
+
+  .kb-badge { font-size: .62rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .04em; padding: .12rem .45rem; border-radius: 9999px; flex-shrink: 0; }
+  .kb-err { font-size: .75rem; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca;
+    border-radius: .4rem; padding: .4rem .6rem; margin-top: .5rem; }
+
+  /* Toggle switch — the on/off control that keeps the vectors. */
+  .kb-switch { position: relative; width: 2.4rem; height: 1.35rem; border-radius: 9999px;
+    background: #cbd5e1; border: 0; cursor: pointer; transition: background .15s; flex-shrink: 0; }
+  .kb-switch[aria-checked="true"] { background: #0ea5e9; }
+  .kb-switch::after { content: ""; position: absolute; top: .175rem; left: .175rem;
+    width: 1rem; height: 1rem; border-radius: 9999px; background: #fff; transition: transform .15s; }
+  .kb-switch[aria-checked="true"]::after { transform: translateX(1.05rem); }
+  .kb-switch:disabled { opacity: .45; cursor: not-allowed; }
+
+  .kb-iconbtn { color: #64748b; border-radius: .4rem; padding: .25rem; line-height: 0; }
+  .kb-iconbtn:hover { color: #0f172a; background: #f1f5f9; }
+  .kb-iconbtn.danger:hover { color: #b91c1c; background: #fef2f2; }
+</style>
+
+<div class="max-w-3xl">
+  <a href="{% url 'agent_edit' agent.pk %}" class="text-sm text-sky-600 hover:text-sky-800 inline-flex items-center gap-1 mb-4">
+    <span class="material-icons-outlined text-sm">arrow_back</span>{% trans "Back to agent" %}
+  </a>
+
+  <div class="flex items-start gap-3 mb-6">
+    <span class="agent-avatar bg-indigo-50 text-indigo-600 w-11 h-11 rounded-lg inline-flex items-center justify-center flex-shrink-0">
+      <span class="material-icons-outlined">library_books</span>
+    </span>
+    <div>
+      <h1 class="text-2xl font-semibold text-gray-800">{% trans "Knowledge base" %}</h1>
+      <p class="text-sm text-gray-500">
+        {% blocktrans with name=agent.name %}Documents <strong>{{ name }}</strong> can search while answering.{% endblocktrans %}
+      </p>
+    </div>
+  </div>
+
+  {% if not agent.rag_enabled %}
+    <div class="mb-5 px-4 py-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-sm flex items-start gap-2">
+      <span class="material-icons-outlined text-base mt-px">info</span>
+      <div>
+        {% trans "The knowledge base is switched off for this agent, so it will not search these documents." %}
+        <a href="{% url 'agent_edit' agent.pk %}" class="underline font-medium">{% trans "Turn it on" %}</a>
+        {% trans "— nothing here is lost in the meantime." %}
+      </div>
+    </div>
+  {% endif %}
+
+  {# ── drop zone ── #}
+  <div class="kb-drop mb-5" id="kb-drop" role="button" tabindex="0"
+       aria-label="{% trans 'Add documents' %}">
+    <input type="file" id="kb-input" multiple accept="{{ accept }}">
+    <span class="material-icons-outlined text-4xl text-sky-300">cloud_upload</span>
+    <p class="mt-2 font-medium text-gray-700">{% trans "Drop documents here, or click to choose" %}</p>
+    <p class="text-xs text-gray-500 mt-1">
+      {% blocktrans with mb=max_upload_mb %}PDF, Word (.docx), or plain text (.txt, .md) — up to {{ mb }} MB each.{% endblocktrans %}
+    </p>
+  </div>
+
+  <p class="text-xs text-gray-500 mb-4 flex items-start gap-1.5">
+    <span class="material-icons-outlined text-sm">bolt</span>
+    <span>{% blocktrans with model=embedding_model %}Reading and indexing continue in the background — you can leave this page or close the tab, and come back to find the progress where it got to. Indexed with <code>{{ model }}</code>.{% endblocktrans %}</span>
+  </p>
+
+  {# ── document list. Rendered server-side so the page is complete without
+       JavaScript, then kept up to date in place by the poller. ── #}
+  <div id="kb-list" class="space-y-2">
+    {% for d in documents %}
+      {% include "agents/_kb_document.html" with d=d %}
+    {% endfor %}
+  </div>
+
+  <div id="kb-empty" class="agent-empty {% if documents %}hidden{% endif %}"
+       style="border:1.5px dashed #e2e8f0;border-radius:.75rem;padding:2.5rem 1rem;text-align:center;background:#fafbfc;">
+    <span class="material-icons-outlined text-4xl text-indigo-200">description</span>
+    <p class="mt-2 font-medium text-gray-700">{% trans "No documents yet." %}</p>
+    <p class="text-sm text-gray-500">{% trans "Add the material this agent should be able to quote from." %}</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+(function () {
+  var CSRF = "{{ csrf_token }}";
+  var URLS = {
+    upload: "{% url 'agent_knowledge_upload' agent.pk %}",
+    status: "{% url 'agent_knowledge_status' agent.pk %}",
+    // The document id is substituted at call time.
+    toggle: "{% url 'agent_knowledge_toggle' agent.pk 0 %}",
+    remove: "{% url 'agent_knowledge_delete' agent.pk 0 %}",
+    retry:  "{% url 'agent_knowledge_retry' agent.pk 0 %}"
+  };
+  var ACCEPT = "{{ accept }}".split(",");
+  var MAX_BYTES = {{ max_upload_mb }} * 1024 * 1024;
+  var T = {
+    queued: "{% trans 'Queued' %}",
+    reading: "{% trans 'Reading text' %}",
+    splitting: "{% trans 'Splitting into chunks' %}",
+    embedding: "{% trans 'Computing vectors' %}",
+    ready: "{% trans 'Ready' %}",
+    failed: "{% trans 'Failed' %}",
+    uploading: "{% trans 'Uploading' %}",
+    chunks: "{% trans 'chunks' %}",
+    off: "{% trans 'Not searched' %}",
+    confirmDelete: "{% trans 'Delete this document? Its text and vectors are removed and would need to be uploaded again.' %}",
+    badType: "{% trans 'Unsupported file type.' %}",
+    tooBig: "{% trans 'This file is too large.' %}",
+    uploadFailed: "{% trans 'Upload failed.' %}"
+  };
+
+  var list = document.getElementById('kb-list');
+  var empty = document.getElementById('kb-empty');
+  var drop = document.getElementById('kb-drop');
+  var input = document.getElementById('kb-input');
+  // Placeholder rows for files still being sent. Keyed by a temporary id so a
+  // row can be swapped for the real one once the server has the bytes.
+  var pending = {};
+  var pollTimer = null;
+
+  // The {% templatetag openblock %} url {% templatetag closeblock %} tags above are reversed with a 0 placeholder for the
+  // document id, which is the only '/0/' segment in the path.
+  function urlFor(template, id) { return template.replace('/0/', '/' + id + '/'); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function humanSize(bytes) {
+    if (!bytes) return '—';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  }
+  function iconFor(name) {
+    var n = (name || '').toLowerCase();
+    if (n.endsWith('.pdf')) return ['picture_as_pdf', 'bg-red-50 text-red-500'];
+    if (n.endsWith('.docx')) return ['description', 'bg-blue-50 text-blue-500'];
+    return ['article', 'bg-slate-100 text-slate-500'];
+  }
+
+  // ---- rendering -----------------------------------------------------
+  function metaLine(d) {
+    var bits = [humanSize(d.size)];
+    if (d.status === 'ready') {
+      bits.push(d.chunk_total + ' ' + T.chunks);
+      if (!d.enabled) bits.push(T.off);
+    } else if (d.status === 'embedding' && d.chunk_total) {
+      bits.push(T.embedding + ' ' + d.chunk_done + '/' + d.chunk_total);
+    } else if (d.status === 'failed') {
+      bits.push(T.failed);
+    } else {
+      bits.push(d.status_label || T.queued);
+    }
+    return bits.join(' · ');
+  }
+
+  function rowHtml(d) {
+    var icon = iconFor(d.name);
+    var failed = d.status === 'failed';
+    var barClass = failed ? 'is-failed' : '';
+    // A failed bar is filled red rather than left empty: an empty track reads
+    // as "nothing happened yet", which is the opposite of what went on.
+    var width = failed ? 100 : d.progress;
+    var showBar = d.status !== 'ready';
+    return '' +
+      '<div class="kb-row ' + (d.enabled ? '' : 'is-off') + '" data-doc="' + d.id + '">' +
+        '<span class="kb-icon ' + icon[1] + '"><span class="material-icons-outlined text-lg">' + icon[0] + '</span></span>' +
+        '<div class="flex-1 min-w-0">' +
+          '<div class="kb-name">' + esc(d.name) + '</div>' +
+          '<div class="kb-meta">' + esc(metaLine(d)) + '</div>' +
+          (showBar
+            ? '<div class="kb-bar ' + barClass + '"><span style="width:' + width + '%"></span></div>'
+            : '') +
+          (d.error ? '<div class="kb-err">' + esc(d.error) + '</div>' : '') +
+        '</div>' +
+        '<div class="flex items-center gap-1.5 flex-shrink-0">' +
+          (d.status === 'failed'
+            ? '<button type="button" class="kb-iconbtn" data-act="retry" title="{% trans "Try again" %}">' +
+                '<span class="material-icons-outlined text-lg">refresh</span></button>'
+            : '<button type="button" class="kb-switch" role="switch" data-act="toggle" ' +
+                'aria-checked="' + (d.enabled ? 'true' : 'false') + '" ' +
+                (d.status === 'ready' ? '' : 'disabled ') +
+                'title="{% trans "Include in searches" %}"></button>') +
+          '<button type="button" class="kb-iconbtn danger" data-act="delete" title="{% trans "Delete" %}">' +
+            '<span class="material-icons-outlined text-lg">delete</span></button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function render(documents) {
+    // Rows still uploading are client-side only; keep them pinned at the top
+    // so a file does not appear to vanish between "sent" and "queued".
+    var uploading = Object.keys(pending).map(function (k) { return pending[k]; });
+    list.innerHTML = uploading.join('') + documents.map(rowHtml).join('');
+    empty.classList.toggle('hidden', documents.length > 0 || uploading.length > 0);
+  }
+
+  function uploadRowHtml(tempId, name, size) {
+    var icon = iconFor(name);
+    return '' +
+      '<div class="kb-row" data-temp="' + tempId + '">' +
+        '<span class="kb-icon ' + icon[1] + '"><span class="material-icons-outlined text-lg">' + icon[0] + '</span></span>' +
+        '<div class="flex-1 min-w-0">' +
+          '<div class="kb-name">' + esc(name) + '</div>' +
+          '<div class="kb-meta">' + humanSize(size) + ' · ' + T.uploading + ' <span data-pct>0%</span></div>' +
+          '<div class="kb-bar is-upload"><span style="width:0%"></span></div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  // ---- polling -------------------------------------------------------
+  // Only runs while something is actually in flight; a settled knowledge base
+  // costs no requests at all.
+  function poll() {
+    fetch(URLS.status, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        render(data.documents);
+        if (data.busy || Object.keys(pending).length) {
+          pollTimer = setTimeout(poll, 1200);
+        } else {
+          pollTimer = null;
+        }
+      })
+      .catch(function () { pollTimer = setTimeout(poll, 4000); });
+  }
+  function ensurePolling() {
+    if (pollTimer === null) { pollTimer = setTimeout(poll, 400); }
+  }
+
+  // ---- uploading -----------------------------------------------------
+  // One request per file: that is what makes a per-file progress bar possible,
+  // and stops one rejected file from failing the whole drop.
+  function upload(file) {
+    var ext = ('.' + file.name.split('.').pop()).toLowerCase();
+    if (ACCEPT.indexOf(ext) === -1) { alert(file.name + ': ' + T.badType); return; }
+    if (file.size > MAX_BYTES) { alert(file.name + ': ' + T.tooBig); return; }
+
+    var tempId = 'u' + Date.now() + Math.random().toString(36).slice(2, 7);
+    pending[tempId] = uploadRowHtml(tempId, file.name, file.size);
+    empty.classList.add('hidden');
+    list.insertAdjacentHTML('afterbegin', pending[tempId]);
+
+    var body = new FormData();
+    body.append('file', file);
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', URLS.upload, true);
+    xhr.setRequestHeader('X-CSRFToken', CSRF);
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+    xhr.upload.addEventListener('progress', function (e) {
+      if (!e.lengthComputable) return;
+      var pct = Math.round(100 * e.loaded / e.total);
+      var row = list.querySelector('[data-temp="' + tempId + '"]');
+      if (!row) return;
+      row.querySelector('.kb-bar > span').style.width = pct + '%';
+      row.querySelector('[data-pct]').textContent = pct + '%';
+    });
+
+    xhr.addEventListener('load', function () {
+      delete pending[tempId];
+      var row = list.querySelector('[data-temp="' + tempId + '"]');
+      if (xhr.status >= 200 && xhr.status < 300) {
+        // The server now owns this file; the poller takes the row over.
+        if (row) row.remove();
+        ensurePolling();
+      } else {
+        var message = T.uploadFailed;
+        try { message = JSON.parse(xhr.responseText).error || message; } catch (e) {}
+        if (row) {
+          row.querySelector('.kb-bar').className = 'kb-bar is-failed';
+          row.querySelector('.kb-bar > span').style.width = '100%';
+          row.querySelector('.kb-meta').textContent = message;
+        }
+      }
+    });
+    xhr.addEventListener('error', function () {
+      delete pending[tempId];
+      var row = list.querySelector('[data-temp="' + tempId + '"]');
+      if (row) row.querySelector('.kb-meta').textContent = T.uploadFailed;
+    });
+
+    xhr.send(body);
+  }
+
+  function uploadAll(files) {
+    Array.prototype.forEach.call(files, upload);
+  }
+
+  // ---- wiring --------------------------------------------------------
+  drop.addEventListener('click', function () { input.click(); });
+  drop.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+  });
+  input.addEventListener('change', function () { uploadAll(input.files); input.value = ''; });
+
+  ['dragenter', 'dragover'].forEach(function (name) {
+    drop.addEventListener(name, function (e) {
+      e.preventDefault(); e.stopPropagation(); drop.classList.add('dragover');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (name) {
+    drop.addEventListener(name, function (e) {
+      e.preventDefault(); e.stopPropagation(); drop.classList.remove('dragover');
+    });
+  });
+  drop.addEventListener('drop', function (e) {
+    if (e.dataTransfer && e.dataTransfer.files) uploadAll(e.dataTransfer.files);
+  });
+  // A file dropped just outside the zone would otherwise navigate the browser
+  // away from the page and lose the drop entirely.
+  ['dragover', 'drop'].forEach(function (name) {
+    window.addEventListener(name, function (e) {
+      if (!drop.contains(e.target)) e.preventDefault();
+    });
+  });
+
+  function post(url) {
+    return fetch(url, {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest'}
+    });
+  }
+
+  list.addEventListener('click', function (e) {
+    var button = e.target.closest('[data-act]');
+    if (!button) return;
+    var row = button.closest('[data-doc]');
+    if (!row) return;
+    var id = row.dataset.doc;
+    var action = button.dataset.act;
+
+    if (action === 'toggle') {
+      // Optimistic: the switch flips at once, and the poll that follows is
+      // the correction if the server disagreed.
+      var on = button.getAttribute('aria-checked') === 'true';
+      button.setAttribute('aria-checked', on ? 'false' : 'true');
+      row.classList.toggle('is-off', on);
+      post(urlFor(URLS.toggle, id)).then(function () { ensurePolling(); });
+    } else if (action === 'delete') {
+      if (!confirm(T.confirmDelete)) return;
+      row.style.opacity = '.4';
+      post(urlFor(URLS.remove, id)).then(function () { ensurePolling(); });
+    } else if (action === 'retry') {
+      post(urlFor(URLS.retry, id)).then(function () { ensurePolling(); });
+    }
+  });
+
+  // Something may already have been running when this page was opened — a job
+  // queued before a reload, or one started from another tab.
+  if (list.querySelector('.kb-bar:not(.is-ready):not(.is-failed)')) ensurePolling();
+})();
+</script>
+{% endblock %}

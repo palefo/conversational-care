@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import ConvAIUser, Message, CallRecording, Caregiver, Patient, Meeting, Protocol, Question, Answer, Agent, Conversation, SelfRegistration, Alert
+from .models import ConvAIUser, Message, CallRecording, Caregiver, Patient, Meeting, Protocol, Question, Answer, Agent, Conversation, SelfRegistration, Alert, RagDocument
 from django.db.models import Q
 from django.utils.html import format_html, escape
 from django.utils.safestring import mark_safe
@@ -404,7 +404,7 @@ class AgentAdmin(admin.ModelAdmin):
         (None, {"fields": ("name", "kind", "native_key", "tts_voice_id")}),
         ("Prompt-based", {
             "description": "Only used when kind = Prompt-based.",
-            "fields": ("system_prompt",),
+            "fields": ("system_prompt", "rag_enabled", "rag_top_k"),
         }),
         ("Remote connection", {
             "description": "Only used when kind = Remote.",
@@ -418,6 +418,28 @@ class AgentAdmin(admin.ModelAdmin):
             )
         }),
     )
+
+@admin.register(RagDocument)
+class RagDocumentAdmin(admin.ModelAdmin):
+    """Read-only view of RAG agents' documents.
+
+    Uploading and deleting belong on the agent's Knowledge base page, which
+    runs the ingestion; creating a row here would leave a document with no
+    chunks and no job behind it. Everything is editable through that page —
+    this is for looking at what a knowledge base actually contains.
+    """
+    list_display = ("original_name", "agent", "status", "enabled",
+                    "chunk_total", "embedding_model", "updated_at")
+    list_filter = ("status", "enabled", "agent")
+    search_fields = ("original_name",)
+    readonly_fields = ("agent", "file", "original_name", "size_bytes", "status",
+                       "error", "chunk_total", "chunk_done", "char_count",
+                       "embedding_model", "embedding_dim", "uploaded_by",
+                       "created_at", "updated_at")
+
+    def has_add_permission(self, request):
+        return False
+
 
 @admin.register(Conversation)
 class ConversationAdmin(admin.ModelAdmin):

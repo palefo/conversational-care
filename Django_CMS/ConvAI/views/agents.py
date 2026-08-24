@@ -30,12 +30,25 @@ _CREATABLE_KINDS = {Agent.Kind.REMOTE, Agent.Kind.PROMPT}
 @login_required
 @admin_required
 def agent_list(request):
-    """Admin-only listing of agents, grouped by kind."""
-    agents = Agent.objects.order_by('name')
+    """Admin-only listing of agents, grouped by kind (and prompt subtype)."""
+    from ..models import RagDocument
+    # The document count is annotated rather than read per card, which would be
+    # a query per RAG agent. Only ready *and* enabled documents count: that is
+    # what the agent can actually search.
+    agents = Agent.objects.annotate(
+        active_document_count=Count(
+            'rag_documents',
+            filter=Q(rag_documents__enabled=True,
+                     rag_documents__status=RagDocument.Status.READY),
+        ),
+    ).order_by('name')
+    prompt_agents = [a for a in agents if a.kind == Agent.Kind.PROMPT]
     return render(request, 'agents/agent_list.html', {
         'active_page': 'agents',
         'native_agents': [a for a in agents if a.kind == Agent.Kind.NATIVE],
-        'prompt_agents': [a for a in agents if a.kind == Agent.Kind.PROMPT],
+        'prompt_agents': prompt_agents,
+        'plain_prompt_agents': [a for a in prompt_agents if not a.rag_enabled],
+        'rag_agents': [a for a in prompt_agents if a.rag_enabled],
         'remote_agents': [a for a in agents if a.kind == Agent.Kind.REMOTE],
     })
 
@@ -69,7 +82,12 @@ def agent_form(request, pk=None, kind=None):
             messages.success(request, _("Agent saved.") if agent else _("Agent created."))
             return redirect('agents')
     else:
-        form = FormClass(instance=agent)
+        # "New RAG agent" links here with ?rag=1, so the subtype the admin
+        # picked on the previous page arrives pre-selected.
+        initial = {}
+        if agent is None and kind == Agent.Kind.PROMPT and request.GET.get('rag') == '1':
+            initial['rag_enabled'] = True
+        form = FormClass(instance=agent, initial=initial)
     # Classification fields are advanced/optional; the form template tucks them
     # into a collapsible section when the form has them.
     classification_fields = ['classification_role', 'abstract_instruction', 'detectors']
@@ -82,6 +100,9 @@ def agent_form(request, pk=None, kind=None):
         'kind_label': _KIND_LABELS[kind],
         'classification_fields': classification_fields,
         'show_classification': show_classification,
+        # Documents hang off a saved agent, so the link only makes sense once
+        # there is one to hang them off.
+        'show_knowledge_link': bool(agent and agent.kind == Agent.Kind.PROMPT),
     })
 
 
@@ -94,7 +115,18 @@ def agent_delete(request, pk):
     if agent.kind == Agent.Kind.NATIVE:
         messages.error(request, _("Native agents cannot be deleted."))
         return redirect('agents')
+    # Deleting the agent cascades to its knowledge-base rows, but the uploaded
+    # files sit on the media volume and the cascade never reaches them. Collect
+    # them before the delete, while the rows still point at them.
+    stored_files = [d.file for d in agent.rag_documents.all()]
     agent.delete()
+    for stored_file in stored_files:
+        try:
+            stored_file.delete(save=False)
+        except Exception:  # pragma: no cover - a leftover file is not fatal
+            logger.warning("Could not delete a knowledge-base file for agent %s", pk)
+    from ..rag.retrieve import invalidate
+    invalidate(pk)
     messages.success(request, _("Agent deleted."))
     return redirect('agents')
 
