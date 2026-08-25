@@ -1,6 +1,8 @@
 from ._base import *  # noqa: F401,F403
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 
-__all__ = ['_build_config_context', 'approve_self_registration', 'config', 'config_save', 'download_client_sdk', 'run_conversation_classification', 'update_twilio_phonecalls']
+__all__ = ['_build_config_context', 'approve_self_registration', 'config', 'config_save', 'download_client_sdk', 'run_conversation_classification', 'send_test_email_view', 'update_twilio_phonecalls']
 
 
 def download_client_sdk(request):
@@ -105,6 +107,25 @@ def _selfreg_qr_context(request):
     return ctx
 
 
+def _email_status_context(request):
+    """Whether email is ready to send, for the banner on the Email tab.
+
+    Reported from the same check the backend runs before every send, so the
+    page cannot claim email works while sends are failing for a missing value.
+    """
+    from ..mailer import provider, reminder_channel, status
+
+    ok, reason = status()
+    return {
+        "ok": ok,
+        "reason": reason,
+        "provider": provider(),
+        "reminder_channel": reminder_channel(),
+        # Pre-filled into the test-email box: the address the admin can check.
+        "test_to": request.user.email or "",
+    }
+
+
 def _build_config_context(request, forms_override=None, active_tab="general"):
     """Assemble the settings-page context, letting one bound (invalid) form be
     injected so validation errors render inline."""
@@ -134,6 +155,7 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
             ("general", _("General"), "tune"),
             ("integrations", _("Integrations"), "key"),
             ("messaging", _("Messaging"), "forum"),
+            ("email", _("Email"), "mail"),
             ("branding", _("Branding"), "palette"),
             ("agents", _("Agents"), "smart_toy"),
             ("prompts", _("Prompts"), "auto_awesome"),
@@ -155,7 +177,10 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
         "general_form": _form("general"),
         "integrations_form": _form("integrations"),
         "messaging_form": _form("messaging"),
+        "email_form": _form("email"),
         "branding_form": _form("branding"),
+        # Whether mail could go out right now, and if not, what is missing.
+        "email_status": _email_status_context(request),
         "agents_form": _form("agents"),
         "prompts_form": _form("prompts"),
         # Boot-only values shown read-only (require .env change + restart).
@@ -197,6 +222,39 @@ def config_save(request):
     messages.error(request, _("Please correct the errors below."))
     ctx = _build_config_context(request, forms_override={section: form}, active_tab=section)
     return render(request, "settings/config.html", ctx)
+
+
+@login_required
+@admin_required
+@require_POST
+def send_test_email_view(request):
+    """Send one throwaway message to prove the email configuration works.
+
+    Configuration you cannot try is configuration you find out about when a
+    password reset silently fails, so the provider's own error is put in front
+    of the admin rather than logged.
+    """
+    from ..mailer import send_test_email
+
+    to = (request.POST.get("to") or "").strip() or (request.user.email or "").strip()
+    back = f"{reverse('config')}?tab=email#email"
+
+    if not to:
+        messages.error(request, _("Enter an address to send the test to."))
+        return redirect(back)
+
+    try:
+        validate_email(to)
+    except ValidationError:
+        messages.error(request, _("“%(address)s” is not a valid email address.") % {"address": to})
+        return redirect(back)
+
+    ok, detail = send_test_email(to)
+    if ok:
+        messages.success(request, _("Test email sent to %(address)s.") % {"address": to})
+    else:
+        messages.error(request, _("The test email could not be sent: %(detail)s") % {"detail": detail})
+    return redirect(back)
 
 
 @login_required

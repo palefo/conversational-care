@@ -1,0 +1,14 @@
+{% load i18n %}{% if in_person %}{% trans "Reminder: your upcoming meeting" %}{% else %}{% trans "Reminder: your upcoming call" %}{% endif %}
+
+{% if recipient_name %}{% blocktrans %}Hello {{ recipient_name }},{% endblocktrans %}{% else %}{% trans "Hello," %}{% endif %}
+
+{% blocktrans %}This is a reminder about the appointment arranged for {{ patient }}.{% endblocktrans %}
+
+{% trans "Date" %}: {{ date }}
+{% trans "Time" %}: {{ time }}{% if in_person and location %}
+{% trans "Where" %}: {{ location }}{% endif %}
+
+{% if in_person %}{% trans "Please arrive a few minutes early." %}{% else %}{% trans "Please be available to take the call at that time." %}{% endif %}
+
+--
+{% blocktrans %}This message was sent automatically by {{ brand_name }}. Please do not reply to it.{% endblocktrans %}

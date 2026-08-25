@@ -1,11 +1,17 @@
 from ._base import *  # noqa: F401,F403
+from django.contrib.auth import views as auth_views
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.http import HttpResponseRedirect
+from django.urls import reverse_lazy
 from ..forms import HelpContentForm
 from ..default_help import DEFAULT_HELP_MARKDOWN
+from ..site_config import brand_name
 
 __all__ = ['RoleBasedLoginView', '_issue_user_token', 'issue_api_token', 'profile',
-           'help_page', 'help_edit', 'update_language', 'update_profile']
+           'help_page', 'help_edit', 'update_language', 'update_profile',
+           'PasswordResetRequestView', 'PasswordResetSentView',
+           'PasswordResetConfirmView', 'PasswordResetCompleteView']
 
 
 def _profile_role_label(user):
@@ -178,3 +184,52 @@ class RoleBasedLoginView(LoginView):
         return super().get_success_url()
 
 
+
+
+# ── Password recovery ───────────────────────────────────────────────────────
+# Django's own views do the work; these subclasses only fix the two things a
+# stock install gets wrong here — the templates, and the host the link points
+# at. The mail itself goes out through ConvAI.mailer.PlatformEmailBackend, so it
+# travels over whichever provider Settings → Email selects.
+
+class PasswordResetRequestView(auth_views.PasswordResetView):
+    """Ask for the address, send the link."""
+    template_name = "registration/password_reset_form.html"
+    email_template_name = "registration/password_reset_email.txt"
+    html_email_template_name = "registration/password_reset_email.html"
+    subject_template_name = "registration/password_reset_subject.txt"
+    success_url = reverse_lazy("password_reset_done")
+
+    def form_valid(self, form):
+        # django.contrib.sites is installed and SITE_ID is 1, so the stock view
+        # builds the link against whatever that row says — "example.com" on an
+        # install nobody edited it on, which produces a mail whose only link is
+        # dead. The host the request actually arrived on is the one the person
+        # reading the mail can click, and ALLOWED_HOSTS has already vetted it.
+        form.save(
+            domain_override=self.request.get_host(),
+            use_https=self.request.is_secure(),
+            token_generator=self.token_generator,
+            from_email=self.from_email,
+            email_template_name=self.email_template_name,
+            html_email_template_name=self.html_email_template_name,
+            subject_template_name=self.subject_template_name,
+            extra_email_context={"brand_name": brand_name()},
+            request=self.request,
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class PasswordResetSentView(auth_views.PasswordResetDoneView):
+    """"We sent it" — worded so it does not reveal whether the address exists."""
+    template_name = "registration/password_reset_done.html"
+
+
+class PasswordResetConfirmView(auth_views.PasswordResetConfirmView):
+    """The link's destination: choose the new password."""
+    template_name = "registration/password_reset_confirm.html"
+    success_url = reverse_lazy("password_reset_complete")
+
+
+class PasswordResetCompleteView(auth_views.PasswordResetCompleteView):
+    template_name = "registration/password_reset_complete.html"

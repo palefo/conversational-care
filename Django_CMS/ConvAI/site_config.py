@@ -58,6 +58,25 @@ _STR_KEYS = {
     # Embeddings for RAG-based prompt agents.
     "RAG_EMBEDDING_MODEL": "rag_embedding_model",
     "AZURE_EMBEDDING_DEPLOYMENT": "azure_embedding_deployment",
+    # Outbound email (see email.md). SMTP_* rather than Django's EMAIL_HOST /
+    # EMAIL_PORT / EMAIL_HOST_USER / EMAIL_HOST_PASSWORD on purpose: those names
+    # are real Django settings with non-empty defaults ('localhost', 25), so
+    # falling through to settings would report SMTP as configured when nobody
+    # configured it. The Django names are still read from .env as aliases below.
+    "EMAIL_PROVIDER": "email_provider",
+    "EMAIL_FROM": "email_from",
+    "EMAIL_FROM_NAME": "email_from_name",
+    "EMAIL_REPLY_TO": "email_reply_to",
+    "AZURE_EMAIL_CONNECTION_STRING": "azure_email_connection_string",
+    "AZURE_EMAIL_ENDPOINT": "azure_email_endpoint",
+    "AZURE_EMAIL_ACCESS_KEY": "azure_email_access_key",
+    "SMTP_HOST": "smtp_host",
+    "SMTP_PORT": "smtp_port",
+    "SMTP_USER": "smtp_user",
+    "SMTP_PASSWORD": "smtp_password",
+    "SMTP_SECURITY": "smtp_security",
+    # Which channel meeting reminders go out on: 'whatsapp' or 'email'.
+    "REMINDER_CHANNEL": "reminder_channel",
 }
 
 _BOOL_KEYS = {
@@ -81,7 +100,15 @@ def _override(field_name):
 
 
 # Renamed env vars -> their deprecated legacy names (still read as a fallback).
-_LEGACY_ENV = {}
+# Only consulted through os.getenv, never through settings — which is what makes
+# the SMTP aliases safe despite Django defining EMAIL_HOST and friends itself.
+_LEGACY_ENV = {
+    "SMTP_HOST": "EMAIL_HOST",
+    "SMTP_PORT": "EMAIL_PORT",
+    "SMTP_USER": "EMAIL_HOST_USER",
+    "SMTP_PASSWORD": "EMAIL_HOST_PASSWORD",
+    "EMAIL_FROM": "DEFAULT_FROM_EMAIL",
+}
 
 
 def _env(key, default=None):

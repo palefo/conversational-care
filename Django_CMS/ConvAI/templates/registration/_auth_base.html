@@ -1,0 +1,31 @@
+{% comment %}
+  Shell for the signed-out pages that are not the login form itself — the four
+  password-reset steps. It deliberately mirrors registration/login.html rather
+  than extending base.html: base.html assumes a signed-in user with a sidebar,
+  and none of these pages has one.
+{% endcomment %}
+{% load static custom_filters i18n %}
+<!doctype html>
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}{% brand_name %}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'app/css/vars.css' %}">
+    <link rel="stylesheet" href="{% static 'app/css/login.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div class="login">
+      <div class="login-card">
+        <div class="login-title">
+          <img class="brand-logo" src="{% brand_logo_url %}" alt="{% brand_name %}" />
+          <p class="login-subtitle">{% block subtitle %}{% endblock %}</p>
+        </div>
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+  </body>
+</html>

@@ -191,3 +191,14 @@ langchain
 langchain-anthropic
 langchain-google-genai
 langchain-mistralai
+
+# RAG-based prompt agents: document text extraction. PDF text comes from pypdf
+# (already pinned above) and .txt/.md are read directly; only .docx needs a
+# dedicated reader. Chunking reuses langchain-text-splitters, and the vectors
+# live in Postgres as float32 blobs (numpy for the similarity search) — no
+# extra vector-store service is required.
+python-docx==1.1.2
+
+# Outbound email via Azure Communication Services (see email.md). Only needed
+# when EMAIL_PROVIDER=azure; the SMTP provider uses Django and needs nothing extra.
+azure-communication-email==1.0.0

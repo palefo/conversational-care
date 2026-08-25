@@ -474,7 +474,7 @@ themselves — see the autosave note in the script below.
         {% if panel_item.can_remind or not panel_item.in_person %}
           <div class="dp-acts-row">
             {% if panel_item.can_remind %}
-              <form method="post" action="{% url 'send_whatsapp_reminder' panel_item.meeting.pk %}" class="dp-form">
+              <form method="post" action="{% url 'send_meeting_reminder' panel_item.meeting.pk %}" class="dp-form">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
                 <button type="submit" class="dp-btn">{% trans "Send reminder" %}</button>

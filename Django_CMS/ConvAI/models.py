@@ -126,6 +126,10 @@ class Caregiver(models.Model):
     name = models.TextField()
     lastname = models.TextField()
     phone_number = PhoneNumberField(blank=True, null=True)
+    # Where an email reminder goes when REMINDER_CHANNEL is 'email'. The
+    # caregiver is tried first and the client second, because the caregiver is
+    # who the call is actually arranged with.
+    email = models.EmailField(blank=True, default="")
     relationship = models.CharField(
         max_length=60, blank=True,
         help_text="How they are related to the client — daughter, neighbour, paid carer",
@@ -170,6 +174,8 @@ class Patient(models.Model):
     name = models.TextField()
     lastname = models.TextField()
     phone_number = PhoneNumberField(blank=True, null=True)
+    # Fallback recipient for email reminders when the caregiver has no address.
+    email = models.EmailField(blank=True, default="")
     caregiver = models.ForeignKey(
         Caregiver,
         on_delete=models.SET_NULL,
@@ -891,6 +897,27 @@ class SiteConfiguration(models.Model):
         ("0", _("Off")),
     ]
 
+    # Every choice list below keeps a blank first entry with the same meaning as
+    # TRISTATE's: "no override, use whatever .env says".
+    EMAIL_PROVIDERS = [
+        ("", _("Use .env default")),
+        ("azure", _("Azure Communication Services")),
+        ("smtp", _("SMTP")),
+    ]
+
+    SMTP_SECURITY = [
+        ("", _("Use .env default")),
+        ("tls", _("STARTTLS (port 587)")),
+        ("ssl", _("SSL/TLS (port 465)")),
+        ("none", _("None")),
+    ]
+
+    REMINDER_CHANNELS = [
+        ("", _("Use .env default")),
+        ("whatsapp", _("WhatsApp")),
+        ("email", _("Email")),
+    ]
+
     # --- Behaviour / feature flags (live) ---
     hide_meeting_steps = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
     enable_automations = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
@@ -912,6 +939,32 @@ class SiteConfiguration(models.Model):
     sms_template_start_infection_sid = models.CharField(max_length=34, blank=True, default="", validators=[_HX_SID])
     sms_template_start_infection_text = models.TextField(blank=True, default="")
     whatsapp_template_care_plan_sid = models.CharField(max_length=34, blank=True, default="", validators=[_HX_SID])
+
+    # --- Email (live) ---
+    # Which provider carries outbound mail. Everything the platform sends —
+    # password-reset links, meeting reminders, the test message — goes through
+    # ConvAI.mailer.PlatformEmailBackend, which reads these on every send, so
+    # changing provider or credentials here needs no restart.
+    email_provider = models.CharField(max_length=10, choices=EMAIL_PROVIDERS, blank=True, default="")
+    email_from = models.CharField(max_length=254, blank=True, default="")
+    email_from_name = models.CharField(max_length=120, blank=True, default="")
+    email_reply_to = models.CharField(max_length=254, blank=True, default="")
+    # Azure Communication Services Email. Either paste the whole connection
+    # string, or give the endpoint and access key and let the platform assemble
+    # one from them.
+    azure_email_connection_string = models.CharField(max_length=500, blank=True, default="")
+    azure_email_endpoint = models.CharField(max_length=255, blank=True, default="")
+    azure_email_access_key = models.CharField(max_length=500, blank=True, default="")
+    # SMTP. Port is a CharField so blank keeps the tri-state meaning the rest of
+    # this table uses: empty falls back to .env, not to zero.
+    smtp_host = models.CharField(max_length=255, blank=True, default="")
+    smtp_port = models.CharField(max_length=6, blank=True, default="")
+    smtp_user = models.CharField(max_length=255, blank=True, default="")
+    smtp_password = models.CharField(max_length=255, blank=True, default="")
+    smtp_security = models.CharField(max_length=5, choices=SMTP_SECURITY, blank=True, default="")
+
+    # Which channel a meeting reminder goes out on.
+    reminder_channel = models.CharField(max_length=10, choices=REMINDER_CHANNELS, blank=True, default="")
 
     # --- Branding (live) ---
     brand_name = models.CharField(max_length=255, blank=True, default="")

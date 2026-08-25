@@ -1,0 +1,10 @@
+{% load i18n %}{% trans "Email is working" %}
+
+{% blocktrans %}If you are reading this, {{ brand_name }} can send email. Nothing else about this message matters - it exists only to prove the connection.{% endblocktrans %}
+
+{% trans "Provider" %}: {{ provider }}
+{% trans "Sent from" %}: {{ sender }}
+{% trans "Sent at" %}: {{ sent_at }}
+
+--
+{% blocktrans %}This message was sent automatically by {{ brand_name }}.{% endblocktrans %}

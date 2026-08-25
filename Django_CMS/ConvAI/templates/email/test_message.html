@@ -1,0 +1,13 @@
+{% extends "email/_base.html" %}{% load i18n %}
+{% block body %}
+  <h1 style="margin:0 0 12px 0;font-size:20px;line-height:28px;font-weight:600;color:#2f3131;">{% trans "Email is working" %}</h1>
+  <p style="margin:0 0 16px 0;">
+    {% blocktrans %}If you are reading this, {{ brand_name }} can send email. Nothing else about this message matters — it exists only to prove the connection.{% endblocktrans %}
+  </p>
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%"
+         style="background:#f7fafb;border-radius:12px;font-size:13px;line-height:20px;color:#464747;">
+    <tr><td style="padding:14px 16px 4px 16px;"><strong>{% trans "Provider" %}:</strong> {{ provider }}</td></tr>
+    <tr><td style="padding:0 16px 4px 16px;"><strong>{% trans "Sent from" %}:</strong> {{ sender }}</td></tr>
+    <tr><td style="padding:0 16px 14px 16px;"><strong>{% trans "Sent at" %}:</strong> {{ sent_at }}</td></tr>
+  </table>
+{% endblock %}

@@ -5,7 +5,7 @@ from ._panel import panel_context
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['scoped_meeting_form', 'save_scheduled_meeting', 'calendar_view', 'calendar_create_meeting', 'complete_meeting', 'cancel_meeting', 'edit_meeting', 'pending_call', 'make_phone_call', 'schedule_call', 'send_whatsapp_reminder_view']
+__all__ = ['scoped_meeting_form', 'save_scheduled_meeting', 'calendar_view', 'calendar_create_meeting', 'complete_meeting', 'cancel_meeting', 'edit_meeting', 'pending_call', 'make_phone_call', 'schedule_call', 'send_whatsapp_reminder_view', 'send_meeting_reminder_view']
 
 
 @login_required
@@ -461,10 +461,12 @@ def edit_meeting(request, meeting_id):
 
 
 @login_required
-def send_whatsapp_reminder_view(request, meeting_id):
-    """
-    View que dispara el envío de un WhatsApp recordatorio al cuidador.
-    Solo el CTN asignado o staff pueden usarla.
+def send_meeting_reminder_view(request, meeting_id):
+    """Remind the caregiver about a meeting, over whichever channel is configured.
+
+    Only the client's navigator or an admin may. The channel — WhatsApp or
+    email — is chosen in Settings → Messaging; this view does not care which,
+    it only reports which one carried it.
     """
     meeting = get_object_or_404(
         Meeting.objects.select_related('patient__caregiver'),
@@ -476,19 +478,32 @@ def send_whatsapp_reminder_view(request, meeting_id):
         return HttpResponseForbidden(_("You do not have permission to send reminders."))
 
     try:
-        send_whatsapp_reminder(meeting)
+        channel = send_meeting_reminder(meeting)
     except ValueError as e:
-        logger.warning("Could not send WhatsApp reminder for meeting %s: %s", meeting_id, e)
-        messages.error(request, _("The reminder could not be sent."))
+        # Nothing to send to — a missing phone number or email address. Worth
+        # saying so, because it is fixed on the client's record, not by retrying.
+        logger.warning("Could not send reminder for meeting %s: %s", meeting_id, e)
+        messages.error(request, _(
+            "The reminder could not be sent: there is no contact address for the "
+            "configured reminder channel."
+        ))
         return _back_to(request, 'pending_call', call_id=meeting_id)
     except Exception as e:
-        # Cualquier otro error de Twilio
-        logger.warning("Twilio error sending WhatsApp reminder for meeting %s: %s", meeting_id, e)
+        # Anything the provider raised — Twilio, Azure or the SMTP server.
+        logger.warning("Provider error sending reminder for meeting %s: %s", meeting_id, e)
         messages.error(request, _("The reminder could not be sent."))
         return _back_to(request, 'pending_call', call_id=meeting_id)
 
-    messages.success(request, _("Reminder sent via WhatsApp."))
+    if channel == "email":
+        messages.success(request, _("Reminder sent by email."))
+    else:
+        messages.success(request, _("Reminder sent via WhatsApp."))
     return _back_to(request, 'pending_call', call_id=meeting_id)
+
+
+# The button and the route were called send_whatsapp_reminder back when WhatsApp
+# was the only channel. Kept as an alias so old links and bookmarks still work.
+send_whatsapp_reminder_view = send_meeting_reminder_view
 
 
 @require_POST

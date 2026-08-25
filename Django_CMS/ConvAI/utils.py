@@ -679,6 +679,46 @@ def send_whatsapp_reminder(meeting):
     
     return msg.sid  # devuelve el SID del mensaje si es exitoso
 
+
+def reminder_recipient_missing(meeting):
+    """Why this meeting cannot be reminded on the configured channel, or "".
+
+    One place decides it so the button, the view and the send itself never
+    disagree about whether a reminder is possible.
+    """
+    from .mailer import meeting_reminder_recipient, reminder_channel
+
+    if reminder_channel() == "email":
+        if not meeting_reminder_recipient(meeting)[0]:
+            return "no-email"
+        return ""
+    caregiver = getattr(meeting.patient, "caregiver", None)
+    if not (caregiver and caregiver.phone_number):
+        return "no-phone"
+    return ""
+
+
+def can_send_reminder(meeting):
+    """True when a reminder has somewhere to go on the configured channel."""
+    return not reminder_recipient_missing(meeting)
+
+
+def send_meeting_reminder(meeting):
+    """Remind the caregiver about a meeting over whichever channel is configured.
+
+    Returns the channel used, so the caller can say which one carried it.
+    Raises ValueError when there is nobody to send to — the same failure the
+    WhatsApp path has always raised — and lets provider errors through.
+    """
+    from .mailer import reminder_channel, send_meeting_reminder_email
+
+    if reminder_channel() == "email":
+        send_meeting_reminder_email(meeting)
+        return "email"
+    send_whatsapp_reminder(meeting)
+    return "whatsapp"
+
+
 # Role decorators live in ConvAI/roles.py; re-exported here for existing importers.
 from .roles import navigator_required, tester_required as patient_tester_required  # noqa: E402,F401
 

@@ -173,3 +173,19 @@ WHATSAPP_WORKERS = max(1, int(os.getenv("WHATSAPP_WORKERS", "2") or "2"))
 # front of a waiting WhatsApp reply. Two is plenty: the work is dominated by
 # waiting on the embeddings API, and each thread holds a DB connection.
 RAG_WORKERS = max(1, int(os.getenv("RAG_WORKERS", "2") or "2"))
+
+
+# --- Outbound email (see email.md) ---
+# One backend for everything: it picks Azure Communication Services or SMTP at
+# send time from the live configuration, so Django's own password-reset mail and
+# the platform's reminders travel the same way, and switching provider in
+# Settings → Email needs no restart.
+EMAIL_BACKEND = "ConvAI.mailer.PlatformEmailBackend"
+# Read once at boot and only used as a placeholder — PlatformEmailBackend
+# replaces it with the configured sender on every message.
+DEFAULT_FROM_EMAIL = os.getenv("EMAIL_FROM", "") or "no-reply@localhost"
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+# How long a password-reset link stays valid. Three hours: long enough to
+# survive a message sitting unread over lunch, short enough that a forwarded or
+# archived mail is not a standing key to the account.
+PASSWORD_RESET_TIMEOUT = int(os.getenv("PASSWORD_RESET_TIMEOUT", "10800") or "10800")

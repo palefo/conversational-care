@@ -187,6 +187,7 @@ def create_client(request):
             patient.caregiver = Caregiver.objects.create(
                 name=cname, lastname=clast,
                 phone_number=(cd.get("caregiver_phone") or None),
+                email=(cd.get("caregiver_email") or "").strip(),
             )
         patient.save()
         messages.success(request, _("Client created."))
@@ -219,11 +220,13 @@ def edit_patient(request, pk):
             cname = (cd.get("caregiver_name") or "").strip()
             clast = (cd.get("caregiver_lastname") or "").strip()
             cphone = (cd.get("caregiver_phone") or "").strip() or None
-            if cname or clast or cphone:
+            cemail = (cd.get("caregiver_email") or "").strip()
+            if cname or clast or cphone or cemail:
                 caregiver = obj.caregiver or Caregiver()
                 caregiver.name = cname
                 caregiver.lastname = clast
                 caregiver.phone_number = cphone
+                caregiver.email = cemail
                 caregiver.save()
                 obj.caregiver = caregiver
 

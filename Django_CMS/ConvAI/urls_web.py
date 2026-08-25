@@ -20,12 +20,15 @@ from .views import (
     save_client_note, update_client_terms,
     toggle_patient_chatbot, raise_alert,
     hide_next_call,
-    download_care_plan, edit_meeting, send_whatsapp_reminder_view,
+    download_care_plan, edit_meeting, send_meeting_reminder_view,
     send_chat_message, protocol_view, protocol_editor,
     protocol_editor_save, protocol_create, protocol_delete, message_feedback,
     create_chat_link, external_chat, send_external_message, serve_audio_file,
     external_audio, process_audio, conversation_feedback, run_conversation_classification,
     issue_api_token, approve_self_registration, alert_detail, act_alert, send_alert_sms,
+    send_test_email_view,
+    PasswordResetRequestView, PasswordResetSentView,
+    PasswordResetConfirmView, PasswordResetCompleteView,
     alerts_since,
     twilio_audio_download, send_care_plan_whatsapp, twilio_careplan_download,
     start_protocol_automation, communications, panel_fragment,
@@ -70,6 +73,13 @@ urlpatterns = [
     path('profile/update/', navigator_required(update_profile), name='update_profile'),
     path('profile/language/', navigator_required(update_language), name='update_language'),
     path('logout/', LogoutView.as_view(next_page='/'), name='logout'),
+    # Password recovery. Django's flow, our templates and provider — see
+    # ConvAI/views/account.py. The `reset/` paths keep Django's own shape so the
+    # links in older emails, if any are still in flight, resolve.
+    path('password-reset/', PasswordResetRequestView.as_view(), name='password_reset'),
+    path('password-reset/sent/', PasswordResetSentView.as_view(), name='password_reset_done'),
+    path('reset/<uidb64>/<token>/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    path('reset/done/', PasswordResetCompleteView.as_view(), name='password_reset_complete'),
     # Inbound Twilio webhook: path is configurable via TWILIO_WEBHOOK_PATH.
     path(getattr(settings, 'TWILIO_WEBHOOK_PATH', 'webhooks/whatsapp'), whatsapp_webhook, name='whatsapp_webhook'),
     path('app/update_twilio', update_twilio_phonecalls, name='update_twilio'),
@@ -99,7 +109,9 @@ urlpatterns = [
     path('patients/<int:pk>/care_plan/view/', navigator_required(view_care_plan), name="view_care_plan"),
     path('patients/<int:pk>/care_plan/download/', navigator_required(download_care_plan), name='download_care_plan'),
     path('meetings/<int:meeting_id>/edit/', navigator_required(edit_meeting), name='edit_meeting'),
-    path('meetings/<int:meeting_id>/send_whatsapp/', navigator_required(send_whatsapp_reminder_view), name='send_whatsapp_reminder'),
+    path('meetings/<int:meeting_id>/send_reminder/', navigator_required(send_meeting_reminder_view), name='send_meeting_reminder'),
+    # Old name for the same endpoint, from when WhatsApp was the only channel.
+    path('meetings/<int:meeting_id>/send_whatsapp/', navigator_required(send_meeting_reminder_view), name='send_whatsapp_reminder'),
     path('meetings/<int:meeting_id>/summarize/', navigator_required(summarize_meeting_view), name='summarize_meeting'),
     path('recordings/<str:sid>/transcribe/', navigator_required(transcribe_recording_view), name='transcribe_recording'),
     path('client-sdk/download/', download_client_sdk, name='download_client_sdk'),
@@ -121,6 +133,7 @@ urlpatterns = [
     path("chat/external/audio/process/", process_audio, name="process_audio"),
     path("conversations/<str:conversation_id>/feedback/", navigator_required(conversation_feedback), name="conversation_feedback"),
     path("config/run-classification/", run_conversation_classification, name="run_conversation_classification"),
+    path("config/send-test-email/", send_test_email_view, name="send_test_email"),
     path("profile/token/issue/", issue_api_token, name="issue_api_token"),
     path('self-registrations/<int:pk>/approve/', approve_self_registration, name='approve_self_registration'),
     # Polled by the notification component in base.html.

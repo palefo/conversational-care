@@ -1,0 +1,29 @@
+{% extends "email/_base.html" %}{% load i18n %}
+{% block body %}
+  <h1 style="margin:0 0 12px 0;font-size:20px;line-height:28px;font-weight:600;color:#2f3131;">
+    {% if in_person %}{% trans "Reminder: your upcoming meeting" %}{% else %}{% trans "Reminder: your upcoming call" %}{% endif %}
+  </h1>
+  <p style="margin:0 0 16px 0;">
+    {% if recipient_name %}{% blocktrans %}Hello {{ recipient_name }},{% endblocktrans %}{% else %}{% trans "Hello," %}{% endif %}
+  </p>
+  <p style="margin:0 0 16px 0;">
+    {% blocktrans %}This is a reminder about the appointment arranged for {{ patient }}.{% endblocktrans %}
+  </p>
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%"
+         style="background:#f7fafb;border-radius:12px;font-size:15px;line-height:22px;color:#2f3131;">
+    <tr>
+      <td style="padding:16px 18px 6px 18px;"><span style="color:#767777;">{% trans "Date" %}</span><br><strong>{{ date }}</strong></td>
+    </tr>
+    <tr>
+      <td style="padding:6px 18px 16px 18px;"><span style="color:#767777;">{% trans "Time" %}</span><br><strong>{{ time }}</strong></td>
+    </tr>
+    {% if in_person and location %}
+    <tr>
+      <td style="padding:0 18px 16px 18px;"><span style="color:#767777;">{% trans "Where" %}</span><br><strong>{{ location }}</strong></td>
+    </tr>
+    {% endif %}
+  </table>
+  <p style="margin:16px 0 0 0;">
+    {% if in_person %}{% trans "Please arrive a few minutes early." %}{% else %}{% trans "Please be available to take the call at that time." %}{% endif %}
+  </p>
+{% endblock %}

@@ -374,7 +374,10 @@ def _meeting_panel(request, pk):
         # both numbers have to exist before the button means anything.
         'can_call': bool(not in_person and caregiver and caregiver.phone_number
                          and request.user.phone_number),
-        'can_remind': bool(caregiver and caregiver.phone_number),
+        # Whether a reminder has anywhere to go depends on the channel the
+        # platform is configured for, so the check lives with the sending code
+        # rather than being a phone-number test repeated here.
+        'can_remind': can_send_reminder(meeting),
         'last_call': last_call,
         'protocols': protocols,
         'automation': _automation_state(meeting, protocols),

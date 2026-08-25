@@ -1336,9 +1336,15 @@ pacRender();
           {{ client_form.lastname }}
         </div>
       </div>
-      <div class="mb-3">
-        <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.phone_number.label }}</label>
-        {{ client_form.phone_number }}
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.phone_number.label }}</label>
+          {{ client_form.phone_number }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.email.label }}</label>
+          {{ client_form.email }}
+        </div>
       </div>
       {% if client_admin %}
         <div class="mb-3">
@@ -1361,9 +1367,15 @@ pacRender();
           {{ client_form.caregiver_lastname }}
         </div>
       </div>
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.caregiver_phone.label }}</label>
-        {{ client_form.caregiver_phone }}
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.caregiver_phone.label }}</label>
+          {{ client_form.caregiver_phone }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.caregiver_email.label }}</label>
+          {{ client_form.caregiver_email }}
+        </div>
       </div>
       <div class="flex justify-end gap-2">
         <button type="button" onclick="clientClose()" class="button-secondary py-2 px-4 rounded-lg text-sm">{% trans "Cancel" %}</button>

@@ -153,6 +153,116 @@
     </div>
   </section>
 
+  {# ═════════ Email ═════════ #}
+  <section class="settings-panel hidden" data-tab="email">
+    <div class="card p-6 mb-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">mail</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Outbound email" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Password-reset links, meeting reminders and anything else the platform sends go out this way. Secrets are never shown again after saving — leave them blank to keep the current value." %}</p>
+        </div>
+      </div>
+
+      {# Whether mail would go out right now, from the same check the sender runs. #}
+      {% if email_status.ok %}
+        <div class="px-4 py-3 mb-5 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">check_circle</span>
+          <div>
+            {% if email_status.provider == 'azure' %}
+              {% blocktrans %}Email is configured and sending through <b>Azure Communication Services</b>.{% endblocktrans %}
+            {% else %}
+              {% blocktrans %}Email is configured and sending through <b>SMTP</b>.{% endblocktrans %}
+            {% endif %}
+          </div>
+        </div>
+      {% else %}
+        <div class="px-4 py-3 mb-5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">warning_amber</span>
+          <div>{{ email_status.reason }}</div>
+        </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="email">
+
+        <div class="stg-group-title" style="margin-top:0;">{% trans "Provider" %}</div>
+        {% include "settings/_field.html" with field=email_form.email_provider %}
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Sender" %}</div>
+          <div class="stg-grid2">
+            {% include "settings/_field.html" with field=email_form.email_from %}
+            {% include "settings/_field.html" with field=email_form.email_from_name %}
+          </div>
+          {% include "settings/_field.html" with field=email_form.email_reply_to %}
+        </div>
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Azure Communication Services" %}</div>
+          <p class="text-xs text-gray-500 mb-3">{% trans "Used when the provider above is Azure. Give either the whole connection string, or the endpoint and access key — the platform builds the connection string from the pair." %}</p>
+          {% include "settings/_field.html" with field=email_form.azure_email_connection_string %}
+          <div class="stg-grid2">
+            {% include "settings/_field.html" with field=email_form.azure_email_endpoint %}
+            {% include "settings/_field.html" with field=email_form.azure_email_access_key %}
+          </div>
+        </div>
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "SMTP" %}</div>
+          <p class="text-xs text-gray-500 mb-3">{% trans "Used when the provider above is SMTP." %}</p>
+          <div class="stg-grid2">
+            {% include "settings/_field.html" with field=email_form.smtp_host %}
+            {% include "settings/_field.html" with field=email_form.smtp_port %}
+            {% include "settings/_field.html" with field=email_form.smtp_user %}
+            {% include "settings/_field.html" with field=email_form.smtp_password %}
+            {% include "settings/_field.html" with field=email_form.smtp_security %}
+          </div>
+        </div>
+
+        <div class="mt-5">
+          <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+        </div>
+      </form>
+    </div>
+
+    {# Try it, rather than find out when a password reset silently fails. #}
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-4">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">outgoing_mail</span>
+        <div>
+          <h3 class="font-medium text-gray-800">{% trans "Send a test email" %}</h3>
+          <p class="text-sm text-gray-500">{% trans "Sends one message with the settings above. Save any changes first — the test uses what is stored, not what is typed." %}</p>
+        </div>
+      </div>
+      <form method="post" action="{% url 'send_test_email' %}" id="testEmailForm" class="flex flex-wrap items-end gap-3">
+        {% csrf_token %}
+        <div class="stg-field flex-1 min-w-[16rem] mb-0">
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="testEmailTo">{% trans "Send to" %}</label>
+          <input type="email" id="testEmailTo" name="to" value="{{ email_status.test_to }}"
+                 placeholder="you@example.com" required>
+        </div>
+        <button type="submit" id="testEmailBtn" class="button-primary py-2 px-4 rounded-lg flex items-center font-medium text-sm"
+                {% if not email_status.ok %}disabled title="{% trans 'Configure a provider above first.' %}"{% endif %}>
+          <span>{% trans "Send test email" %}</span>
+          <svg id="testEmailSpinner" class="ml-2 h-4 w-4 text-white animate-spin hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+          </svg>
+        </button>
+      </form>
+      <p class="text-xs text-gray-500 mt-3">
+        {% if email_status.reminder_channel == 'email' %}
+          {% blocktrans %}Meeting reminders are currently sent by <b>email</b>.{% endblocktrans %}
+        {% else %}
+          {% blocktrans %}Meeting reminders are currently sent over <b>WhatsApp</b>.{% endblocktrans %}
+        {% endif %}
+        <button type="button" class="underline font-medium" data-goto-tab="messaging">{% trans "Change this" %}</button>
+      </p>
+    </div>
+  </section>
+
   {# ═════════ Branding ═════════ #}
   <section class="settings-panel hidden" data-tab="branding">
     <div class="card p-6">
@@ -659,7 +769,7 @@ print(result)</code></pre>
 {{ block.super }}
 <script>
   (function () {
-    const validTabs = ['general','integrations','messaging','branding','agents','prompts','protocols','registrations','selfreg','api','maintenance'];
+    const validTabs = ['general','integrations','messaging','email','branding','agents','prompts','protocols','registrations','selfreg','api','maintenance'];
     const buttons = document.querySelectorAll('.stg-navitem');
     const panels  = document.querySelectorAll('.settings-panel');
 
@@ -742,6 +852,10 @@ print(result)</code></pre>
 
   document.getElementById('actionForm')?.addEventListener('submit', function(){
     const btn=document.getElementById('submitBtn'); const sp=document.getElementById('btnSpinner');
+    btn.disabled=true; sp.classList.remove('hidden');
+  });
+  document.getElementById('testEmailForm')?.addEventListener('submit', function(){
+    const btn=document.getElementById('testEmailBtn'); const sp=document.getElementById('testEmailSpinner');
     btn.disabled=true; sp.classList.remove('hidden');
   });
   document.getElementById('classifyForm')?.addEventListener('submit', function(){

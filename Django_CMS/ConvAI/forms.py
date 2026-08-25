@@ -327,21 +327,95 @@ class MessagingConfigForm(forms.ModelForm):
     class Meta:
         model = SiteConfiguration
         fields = [
+            "reminder_channel",
             "twilio_sms_from", "sms_template_start_infection_sid",
             "sms_template_start_infection_text", "whatsapp_template_care_plan_sid",
         ]
         labels = {
+            "reminder_channel": _("Meeting reminder channel"),
             "twilio_sms_from": _("SMS sender number"),
             "sms_template_start_infection_sid": _("Infection alert SMS template SID"),
             "sms_template_start_infection_text": _("Infection alert SMS text"),
             "whatsapp_template_care_plan_sid": _("Care plan WhatsApp template SID"),
         }
+        help_texts = {
+            "reminder_channel": _(
+                "How the Send reminder button contacts a caregiver. Email goes to "
+                "the caregiver's address, falling back to the client's, and needs "
+                "a working provider under the Email tab."
+            ),
+        }
         widgets = {
+            "reminder_channel": forms.Select(attrs=_SELECT),
             "twilio_sms_from": forms.TextInput(attrs={**_INPUT, "placeholder": "+51999999999"}),
             "sms_template_start_infection_sid": forms.TextInput(attrs={**_INPUT, "placeholder": "HX…"}),
             "sms_template_start_infection_text": forms.Textarea(attrs={**_INPUT, "rows": 3}),
             "whatsapp_template_care_plan_sid": forms.TextInput(attrs={**_INPUT, "placeholder": "HX…"}),
         }
+
+
+class EmailConfigForm(SecretPreserveMixin, forms.ModelForm):
+    """Outbound email: which provider carries it, and its credentials.
+
+    Both providers' fields are on one form rather than two, because an admin
+    switching from SMTP to Azure should not lose what they had typed for the
+    other. Only the selected provider's values are ever read (see
+    ConvAI.mailer), so the unused half sits harmlessly.
+    """
+    secret_fields = ("azure_email_connection_string", "azure_email_access_key", "smtp_password")
+
+    class Meta:
+        model = SiteConfiguration
+        fields = [
+            "email_provider", "email_from", "email_from_name", "email_reply_to",
+            "azure_email_connection_string", "azure_email_endpoint", "azure_email_access_key",
+            "smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_security",
+        ]
+        labels = {
+            "email_provider": _("Email provider"),
+            "email_from": _("Sender address"),
+            "email_from_name": _("Sender display name"),
+            "email_reply_to": _("Reply-to address"),
+            "azure_email_connection_string": _("Connection string"),
+            "azure_email_endpoint": _("Endpoint"),
+            "azure_email_access_key": _("Access key"),
+            "smtp_host": _("SMTP host"),
+            "smtp_port": _("Port"),
+            "smtp_user": _("Username"),
+            "smtp_password": _("Password"),
+            "smtp_security": _("Encryption"),
+        }
+        help_texts = {
+            "email_from": _("Must be a verified sender on the provider's domain, "
+                            "e.g. 'donotreply@mail.example.com'."),
+            "email_from_name": _("Shown as the sender's name. Blank uses the brand name. "
+                                 "Azure ignores this — its display name comes from the "
+                                 "sender username configured on the domain."),
+            "email_reply_to": _("Where replies go, if anywhere. Comma-separated for more than one."),
+            "azure_email_connection_string": _("The whole string from the Azure portal. "
+                                               "Leave blank to use the endpoint and access key below instead."),
+            "azure_email_endpoint": _("e.g. 'https://<resource>.uk.communication.azure.com/'. "
+                                      "Ignored when a connection string is set."),
+            "smtp_port": _("Blank uses 587 for STARTTLS and 465 for SSL/TLS."),
+        }
+        widgets = {
+            "email_provider": forms.Select(attrs=_SELECT),
+            "email_from": forms.EmailInput(attrs={**_INPUT, "placeholder": "donotreply@mail.example.com"}),
+            "email_from_name": forms.TextInput(attrs=_INPUT),
+            "email_reply_to": forms.TextInput(attrs={**_INPUT, "placeholder": "support@example.com"}),
+            "azure_email_endpoint": forms.TextInput(
+                attrs={**_INPUT, "placeholder": "https://<resource>.uk.communication.azure.com/"}),
+            "smtp_host": forms.TextInput(attrs={**_INPUT, "placeholder": "smtp.example.com"}),
+            "smtp_port": forms.TextInput(attrs={**_INPUT, "placeholder": "587", "inputmode": "numeric"}),
+            "smtp_user": forms.TextInput(attrs={**_INPUT, "autocomplete": "off"}),
+            "smtp_security": forms.Select(attrs=_SELECT),
+        }
+
+    def clean_smtp_port(self):
+        port = (self.cleaned_data.get("smtp_port") or "").strip()
+        if port and (not port.isdigit() or not 1 <= int(port) <= 65535):
+            raise forms.ValidationError(_("Enter a port number between 1 and 65535, or leave it blank."))
+        return port
 
 
 class PromptsConfigForm(forms.ModelForm):
@@ -388,18 +462,23 @@ class ClientForm(forms.ModelForm):
     caregiver_name = forms.CharField(required=False, label=_("Caregiver first name"), widget=forms.TextInput(attrs=_INPUT))
     caregiver_lastname = forms.CharField(required=False, label=_("Caregiver last name"), widget=forms.TextInput(attrs=_INPUT))
     caregiver_phone = forms.CharField(required=False, label=_("Caregiver phone"), widget=forms.TextInput(attrs={**_INPUT, "placeholder": "+51999999999"}))
+    caregiver_email = forms.EmailField(required=False, label=_("Caregiver e-mail"), widget=forms.EmailInput(attrs={**_INPUT, "placeholder": "carer@example.com"}))
 
     class Meta:
         model = Patient
-        fields = ["name", "lastname", "phone_number", "navigator", "agent"]
+        fields = ["name", "lastname", "phone_number", "email", "navigator", "agent"]
         labels = {
             "name": _("First name"), "lastname": _("Last name"), "phone_number": _("Phone"),
-            "navigator": _("Navigator"), "agent": _("Agent"),
+            "email": _("E-mail"), "navigator": _("Navigator"), "agent": _("Agent"),
+        }
+        help_texts = {
+            "email": _("Used for email reminders when the caregiver has no address."),
         }
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
             "lastname": forms.TextInput(attrs=_INPUT),
             "phone_number": forms.TextInput(attrs={**_INPUT, "placeholder": "+51999999999"}),
+            "email": forms.EmailInput(attrs={**_INPUT, "placeholder": "client@example.com"}),
             "navigator": forms.Select(attrs=_SELECT),
             "agent": forms.Select(attrs=_SELECT),
         }
@@ -534,8 +613,15 @@ class NativeAgentForm(forms.ModelForm):
 
 
 class NavigatorForm(forms.Form):
-    """Admin-only creation of a Navigator account (username + password)."""
+    """Admin-only creation of a Navigator account (username, e-mail, password)."""
     username = forms.CharField(max_length=150, label=_("Username"), widget=forms.TextInput(attrs=_INPUT))
+    # Optional, but an account without one can never recover its own password —
+    # the reset link has nowhere to go. See email.md.
+    email = forms.EmailField(
+        required=False, label=_("E-mail"),
+        help_text=_("Needed for password recovery. Can be added later."),
+        widget=forms.EmailInput(attrs={**_INPUT, "placeholder": "user@example.com"}),
+    )
     password = forms.CharField(label=_("Password"), widget=forms.PasswordInput(attrs={**_INPUT, "autocomplete": "new-password"}))
 
     def clean_username(self):
@@ -607,18 +693,23 @@ class PatientForm(forms.ModelForm):
     caregiver_name = forms.CharField(required=False, label=_("Caregiver first name"), widget=forms.TextInput(attrs=_INPUT))
     caregiver_lastname = forms.CharField(required=False, label=_("Caregiver last name"), widget=forms.TextInput(attrs=_INPUT))
     caregiver_phone = forms.CharField(required=False, label=_("Caregiver phone"), widget=forms.TextInput(attrs={**_INPUT, "placeholder": "+51999999999"}))
+    caregiver_email = forms.EmailField(required=False, label=_("Caregiver e-mail"), widget=forms.EmailInput(attrs={**_INPUT, "placeholder": "carer@example.com"}))
 
     class Meta:
         model = Patient
-        fields = ["name", "lastname", "phone_number", "navigator", "agent"]
+        fields = ["name", "lastname", "phone_number", "email", "navigator", "agent"]
         labels = {
             "name": _("First name"), "lastname": _("Last name"), "phone_number": _("Phone"),
-            "navigator": _("Navigator"), "agent": _("Agent"),
+            "email": _("E-mail"), "navigator": _("Navigator"), "agent": _("Agent"),
+        }
+        help_texts = {
+            "email": _("Used for email reminders when the caregiver has no address."),
         }
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
             "lastname": forms.TextInput(attrs=_INPUT),
             "phone_number": forms.TextInput(attrs={**_INPUT, "placeholder": "+51999999999"}),
+            "email": forms.EmailInput(attrs={**_INPUT, "placeholder": "client@example.com"}),
             "navigator": forms.Select(attrs=_SELECT),
             "agent": forms.Select(attrs=_SELECT),
         }
@@ -642,6 +733,7 @@ class PatientForm(forms.ModelForm):
         if caregiver:
             self.fields["caregiver_name"].initial = caregiver.name
             self.fields["caregiver_lastname"].initial = caregiver.lastname
+            self.fields["caregiver_email"].initial = caregiver.email
             self.fields["caregiver_phone"].initial = (
                 str(caregiver.phone_number) if caregiver.phone_number else ""
             )
