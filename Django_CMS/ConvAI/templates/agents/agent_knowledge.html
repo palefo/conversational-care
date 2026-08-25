@@ -97,8 +97,12 @@
     <span>{% blocktrans with model=embedding_model %}Reading and indexing continue in the background — you can leave this page or close the tab, and come back to find the progress where it got to. Indexed with <code>{{ model }}</code>.{% endblocktrans %}</span>
   </p>
 
-  {# ── document list. Rendered server-side so the page is complete without
-       JavaScript, then kept up to date in place by the poller. ── #}
+  {% comment %}
+    Document list. Rendered server-side so the page is complete without
+    JavaScript, then kept up to date in place by the poller.
+    ({% templatetag openbrace %}# … #{% templatetag closebrace %} is single-line
+    only — a multi-line one is not a comment and renders verbatim.)
+  {% endcomment %}
   <div id="kb-list" class="space-y-2">
     {% for d in documents %}
       {% include "agents/_kb_document.html" with d=d %}

@@ -204,6 +204,15 @@ silently make their vectors incomparable for no benefit.
 | `AZURE_EMBEDDING_DEPLOYMENT` | — | Under `USE_AZURE`, the deployment serving that model. Blank reuses the model name; endpoint/key come from `AZURE_OPENAI_*`. |
 | `RAG_WORKERS` | `2` | Background threads that read, chunk and embed. |
 
+> **Under `USE_AZURE`, embeddings need their own deployment.** An Azure OpenAI
+> resource does not serve `text-embedding-3-small` just because it serves a chat
+> model — embeddings are a *separate* deployment you create on the resource, and
+> its name is often not the model name. Without one, ingestion reaches the
+> embedding step and fails with `DeploymentNotFound` (extraction and chunking
+> having already succeeded). Create the deployment, put its exact name in
+> **Settings → Agents → Embeddings**, and press **Retry** — the file is already
+> stored, so nothing needs re-uploading.
+
 > **Changing the embedding model invalidates existing documents.** Each
 > document records the model its vectors were built with; a query embedded with
 > a different model has a different width and cannot be compared. Rather than

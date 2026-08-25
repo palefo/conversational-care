@@ -190,8 +190,7 @@ def _ingest(document: RagDocument) -> None:
         try:
             vectors = embeddings.embed_documents(batch)
         except Exception as exc:
-            _fail(document, f"Embedding failed after {done} of {len(chunks)} "
-                            f"chunks: {exc}")
+            _fail(document, _embedding_error(exc, done, len(chunks), model_name))
             return
 
         dimension = len(vectors[0]) if vectors else dimension
@@ -209,6 +208,40 @@ def _ingest(document: RagDocument) -> None:
            embedding_model=model_name, embedding_dim=dimension, error="")
     logger.info("Ingested %r for agent %s: %d chunks (%s)",
                 document.original_name, document.agent_id, len(chunks), model_name)
+
+
+def _embedding_error(exc: Exception, done: int, total: int, model_name: str) -> str:
+    """Turn an embeddings-API failure into something an admin can act on.
+
+    The raw provider error is accurate but unhelpful in the UI — a 404 body of
+    Azure JSON does not tell anyone which setting is wrong. The provider text is
+    still appended, because it is what you would search for.
+    """
+    from ..site_config import get_bool, get_setting
+
+    raw = str(exc)
+    where = f"Embedding failed after {done} of {total} chunks"
+
+    if "DeploymentNotFound" in raw or ("404" in raw and get_bool("USE_AZURE", False)):
+        configured = get_setting("AZURE_EMBEDDING_DEPLOYMENT") or ""
+        named = (f"the deployment named '{configured}'" if configured
+                 else f"a deployment named '{model_name}' (no "
+                      f"AZURE_EMBEDDING_DEPLOYMENT is set, so the model name is used)")
+        return (
+            f"{where}: Azure has no embeddings deployment to call. It looked for "
+            f"{named} on the Azure OpenAI resource. Create an embeddings "
+            f"deployment in Azure, then put its exact name in Settings → Agents "
+            f"→ Embeddings → 'Azure embedding deployment' and press Retry — the "
+            f"file does not need re-uploading. ({raw})"
+        )
+    if "401" in raw or "Unauthorized" in raw or "invalid_api_key" in raw:
+        return (f"{where}: the embeddings API rejected the credentials. Check the "
+                f"API key under Settings → Agents, then press Retry. ({raw})")
+    if "429" in raw or "rate limit" in raw.lower():
+        return (f"{where}: the embeddings API is rate-limiting this resource. "
+                f"Wait a moment and press Retry — already-embedded chunks are "
+                f"redone, so nothing is left half-indexed. ({raw})")
+    return f"{where}: {raw}"
 
 
 def split_text(text: str) -> list[str]:
