@@ -154,6 +154,18 @@ def _build_prompt(agent: Optional[Any], transcript: str):
         f"- abstract: {abstract_line}\n"
         f"- classification: pick ONE label (in conversation language) from {CATEGORIES}; if none fits, use Other.\n"
         "- important: true if a human must review following your previous instructions.\n"
+        # "The conversation language" is asked for in three places above and
+        # below, and left to inference it reads whatever looks most like a
+        # language — including the "Patient:"/"Agent:" labels the transcript
+        # builder puts on every line, which are ours and not anyone's speech.
+        # Pinning it to what the two of them actually wrote is what stops a
+        # formatting choice from deciding what language a navigator is answered
+        # in. See _format_transcript.
+        "\nLanguage: wherever an instruction above or below says \"the conversation "
+        "language\", that means the language the patient/caregiver and the agent "
+        "actually wrote in. Judge it only from the words they said. The speaker "
+        "labels and timestamps in the transcript are formatting added by this "
+        "system — ignore them entirely when deciding the language.\n"
     )
 
     if dets:
@@ -188,7 +200,15 @@ def _format_transcript(messages: Iterable[Dict[str, Any]]) -> str:
     """
     lines: List[str] = []
     for m in messages:
-        who = "Paciente" if m.get("from") == "user" else "Agente"
+        # English, and deliberately so. The prompt asks for the abstract and the
+        # triggers "in the conversation language", and these labels are on every
+        # single line of what it reads — so a Spanish "Paciente:"/"Agente:" was
+        # the loudest language signal in the input and got answered as one. An
+        # all-English exchange came back summarised in Spanish with the person's
+        # own words quoted inside it. These are scaffolding the code adds, not
+        # anything either party said, so they must not carry a language of their
+        # own; the transcript's language should be whatever was actually spoken.
+        who = "Patient" if m.get("from") == "user" else "Agent"
         ts = m.get("timestamp")
         ts_s = ts.strftime("%Y-%m-%d %H:%M") if ts else ""
         txt = (m.get("text") or "").strip().replace("\n", " ").strip()
