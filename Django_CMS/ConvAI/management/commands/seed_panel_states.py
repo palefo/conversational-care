@@ -330,10 +330,15 @@ class Command(BaseCommand):
         meeting.type = Meeting.MeetingType.REGULAR
         meeting.status = status
         meeting.modality = modality
-        meeting.scheduled_protocol = PROTOCOL_NUM
-        if status == Meeting.Status.COMPLETED:
-            meeting.executed_protocol = PROTOCOL_NUM
         meeting.save()
+        # What a call covers is a relation, so it is set after the row exists.
+        protocol = Protocol.objects.filter(number=PROTOCOL_NUM).first()
+        if protocol:
+            meeting.scheduled_protocols.add(protocol)
+            if status == Meeting.Status.COMPLETED:
+                meeting.executed_protocols.add(protocol)
+            # And the client has to be on it, or the panel will not show it.
+            patient.protocols.add(protocol)
         return meeting
 
     def _answers(self, meeting, protocol, responses):
@@ -361,6 +366,10 @@ class Command(BaseCommand):
             **{
                 "from_number": PLATFORM_PHONE,
                 "to_number": str(meeting.patient.phone_number),
+                # Attributed at creation, as a real call now is.
+                "meeting": meeting,
+                "patient": meeting.patient,
+                "leg": CallRecording.Leg.DYAD,
                 "start_time": meeting.scheduled_time,
                 "end_time": meeting.scheduled_time + timezone.timedelta(seconds=duration),
                 "duration": duration,

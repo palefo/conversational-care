@@ -41,7 +41,16 @@ themselves — see the autosave note in the script below.
   <div class="dpc-head">
     <div class="dp-head">
       <div>
-        <div class="dp-kick dp-kick-{{ panel_item.accent }}">{{ panel_item.kicker }}</div>
+        {% comment %}
+          The kind, in the colour the row that opened this panel used for it —
+          see .dp-t-* in app_new_design.css. It is the only thing here that is
+          coloured by kind; how urgent this one is stays on the tag beside the
+          title.
+        {% endcomment %}
+        <div class="dp-kickrow dp-t-{{ panel_item.type }}">
+          <span class="dp-tic" aria-hidden="true"><span class="material-icons-outlined">{{ panel_item.type_icon }}</span></span>
+          <div class="dp-kick">{{ panel_item.kicker }}</div>
+        </div>
         <p class="dp-title">{{ panel_item.title }}{% if panel_item.tag_label %}<span class="dp-tag dp-tag-{{ panel_item.tag_class }}">{{ panel_item.tag_label }}</span>{% endif %}{% if panel_item.outcome_missing %}<span class="dp-tag dp-tag-due">{% trans "Outcome missing" %}</span>{% endif %}</p>
         <div class="dp-meta">
           {{ panel_item.patient.name }} {{ panel_item.patient.lastname }}
@@ -68,6 +77,7 @@ themselves — see the autosave note in the script below.
             <div><b>{% trans "Where" %}</b> {{ panel_item.location }}</div>
           {% endif %}
         </div>
+        {% include "_panel_to.html" %}
       </div>
       {% comment %}
         Navigation top right, actions at the foot. Keeping "leave this client's
@@ -92,6 +102,27 @@ themselves — see the autosave note in the script below.
       <p class="dpc-attach">
         {% blocktrans with d=panel_item.recording_len %}Attached to this meeting · {{ d }}{% endblocktrans %}
       </p>
+      {% comment %}
+        The attempts that came before the one above. A call that rang out and
+        was redialled leaves a few seconds of ringing tone behind each time,
+        and those recordings belong to this call — they used to be listed
+        beside it as loose rows, which read as duplicates of the call itself.
+        They are here instead, below the recording someone actually came to
+        hear rather than competing with it.
+      {% endcomment %}
+      {% if panel_item.other_recordings %}
+        <details class="dpc-attempts">
+          <summary>
+            {% blocktrans count n=panel_item.other_recordings|length %}{{ n }} earlier attempt{% plural %}{{ n }} earlier attempts{% endblocktrans %}
+          </summary>
+          {% for r in panel_item.other_recordings %}
+            <div class="dpc-attempt">
+              <span class="dpc-attempt-when">{{ r.when|time:"H:i" }} · {{ r.len }}</span>
+              <audio class="dp-player" controls preload="none" src="{{ r.url }}"></audio>
+            </div>
+          {% endfor %}
+        </details>
+      {% endif %}
     </div>
   {% endif %}
 
@@ -128,149 +159,44 @@ themselves — see the autosave note in the script below.
         {% trans "Where" %}: <b>{{ panel_item.location|default:_("Location not set") }}</b>
       </div>
     {% endif %}
-    {% if panel_item.is_pending and panel_item.scheduled_title %}
-      <div class="dp-meta dpc-toaddress">{% trans "To address" %}: <b>{{ panel_item.scheduled_title }}</b></div>
+    {% comment %}
+      Two headings, not one list with a flag in it. What this call is for comes
+      first — it is the reason the panel is open — and the rest of the client's
+      programme follows underneath. A protocol appears under one heading or the
+      other, never both.
+
+      "To address: …" used to sit above a flat list, saying in a meta line what
+      the list itself could not show. The heading says it now.
+    {% endcomment %}
+    {% if panel_item.protocols_session %}
+      <div class="dpc-sect">
+        {% blocktrans count n=panel_item.protocols_session|length %}Protocol to address in this session{% plural %}Protocols to address in this session{% endblocktrans %}
+      </div>
+      {% for p in panel_item.protocols_session %}
+        {% include "_panel_protocol_card.html" %}
+      {% endfor %}
     {% endif %}
 
-    {% if panel_item.protocols %}
-      {% comment %}
-        Editing the protocol structure changes the questions for every client on
-        it, not just this meeting. It sits up here rather than in the card, where
-        it would be the same size and colour as Save answers and one slip away
-        from rewriting a protocol nobody meant to touch.
-      {% endcomment %}
-      <div class="dpc-sect">{% trans "Protocols" %}</div>
-      {% for p in panel_item.protocols %}
-        {% comment %}
-          The header row is about the protocol; the body below it is about this
-          meeting. Editing the structure changes the questions for every client
-          on it, so it sits up here as a quiet link rather than down beside Save
-          answers as a button the same size and colour.
-        {% endcomment %}
-        <div class="dpc-card" data-protocol="{{ p.number }}" data-total="{{ p.total }}">
-          <div class="dpc-card-hrow">
-          <button type="button" class="dpc-card-h" aria-expanded="false">
-            <span class="dpc-chev" aria-hidden="true">›</span>
-            <span class="dpc-card-n">{{ p.number }}. {{ p.title }}</span>
-            {% if p.complete %}
-              <span class="dpc-pill dpc-pill-done" data-pill>{% trans "Complete" %}</span>
-            {% elif p.started %}
-              <span class="dpc-pill dpc-pill-part" data-pill>{{ p.answered }} {% trans "of" %} {{ p.total }}</span>
-            {% else %}
-              <span class="dpc-pill dpc-pill-todo" data-pill>{% blocktrans count n=p.total %}{{ n }} question{% plural %}{{ n }} questions{% endblocktrans %}</span>
-            {% endif %}
-          </button>
-          {% if panel_item.can_edit_answers %}
-            <a class="dpc-card-edit" href="{% url 'protocol_editor' p.number %}"
-               title="{% trans 'Changes the questions for every client on this protocol' %}">{% trans "Edit" %}</a>
-          {% endif %}
-          </div>
-
-          {% comment %}
-            How this protocol is being answered, as one line that changes with
-            the state. Send and Reload as two permanent buttons meant both were
-            dead most of the time: there is nothing to reload before anything
-            was sent, and asking twice is a second text to a real person.
-          {% endcomment %}
-          {% if panel_item.automations_enabled and panel_item.can_edit_answers %}
-            {% if panel_item.automation and panel_item.automation.protocol == p.number %}
-              <div class="dpc-mode dpc-mode-live">
-                <span class="dpc-mode-dot{% if not p.by_text_count %} dpc-mode-wait{% endif %}"></span>
-                <span class="dpc-mode-t">
-                  {% if p.by_text_count %}
-                    {% blocktrans count n=p.by_text_count %}<b>{{ n }} answer</b> came back by text{% plural %}<b>{{ n }} answers</b> came back by text{% endblocktrans %}
-                  {% else %}
-                    {% blocktrans with who=panel_item.patient.caregiver %}Asked {{ who }} by text &middot; no replies yet{% endblocktrans %}
-                  {% endif %}
-                </span>
-                <button type="button" class="dp-btn" onclick="window.location.reload()">
-                  <span class="dpc-mode-ico" aria-hidden="true">refresh</span>{% trans "Check for replies" %}
-                </button>
-              </div>
-            {% elif panel_item.is_pending %}
-              <div class="dpc-mode">
-                <span class="dpc-mode-t">{% trans "Type the answers, or ask the caregiver" %}</span>
-                <form method="post" action="{% url 'start_protocol_automation' panel_item.meeting.pk p.number %}">
-                  {% csrf_token %}
-                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                  <button type="submit" class="dp-btn dp-btn-ghost">
-                    <span class="dpc-mode-ico" aria-hidden="true">send</span>{% trans "Send by text" %}
-                  </button>
-                </form>
-              </div>
-            {% endif %}
-          {% endif %}
-
-          <div class="dpc-card-b">
-            {% if p.description %}<div class="dpc-desc">{{ p.description|markdownify }}</div>{% endif %}
-
-            <form class="dpc-form" method="post"
-                  action="{% url 'protocol_view' panel_item.meeting.pk p.number %}"
-                  data-protocol="{{ p.number }}">
-              {% csrf_token %}
-              {% for q in p.questions %}
-                {% comment %}
-                  A finished call keeps the field rather than collapsing the
-                  answer into a paragraph: the same layout in both states, read
-                  -only in one of them. Question and answer were reading as one
-                  run of text, so the question is now a numbered label above a
-                  field that is visibly a field whether or not it was answered.
-                {% endcomment %}
-                <div class="dpc-q">
-                  <div class="dpc-qp markdown-content"><span class="dpc-qn">{{ forloop.counter }}.</span>{{ q.prompt_md|markdownify }}</div>
-                  {% if panel_item.can_edit_answers %}
-                    {% if q.answer and not q.mine %}
-                      {% comment %}
-                        Answered on an earlier call. Disabled rather than
-                        read-only on purpose: a disabled field is not submitted,
-                        so saving this call cannot copy another call's answers
-                        into it and end up with the same words recorded twice.
-                        Update hands the question to this call.
-                      {% endcomment %}
-                      <textarea class="dpc-ta dpc-ta-carried" rows="3" disabled
-                                data-carried="{{ q.field }}">{{ q.answer }}</textarea>
-                      <div class="dpc-carried">
-                        <span>{% blocktrans with d=q.when|localtime|date:"j M" %}Answered on {{ d }}{% endblocktrans %}</span>
-                        <button type="button" class="dpc-carried-edit" data-uncarry>{% trans "Update" %}</button>
-                      </div>
-                    {% else %}
-                      <textarea class="dpc-ta{% if q.by_text %} dpc-ta-bytext{% endif %}" name="{{ q.field }}" rows="3"
-                                {% if q.by_text %}title="{% trans 'Came back by text' %}"{% endif %}
-                                placeholder="{% trans 'Type what they said' %}">{{ q.answer }}</textarea>
-                    {% endif %}
-                  {% else %}
-                    <textarea class="dpc-ta{% if not q.answer %} dpc-ta-empty{% endif %}{% if q.answer and not q.mine %} dpc-ta-carried{% endif %}" rows="3" readonly
-                              placeholder="{% trans 'Not answered' %}">{{ q.answer }}</textarea>
-                    {% if q.answer and not q.mine %}
-                      <div class="dpc-carried"><span>{% blocktrans with d=q.when|localtime|date:"j M" %}Answered on {{ d }}{% endblocktrans %}</span></div>
-                    {% endif %}
-                  {% endif %}
-                </div>
-              {% endfor %}
-            </form>
-
-            {% comment %}
-              Saving is a button rather than a debounce. It was already being
-              written a beat after you stopped typing, but nothing on screen
-              moved — so there was no way to tell a saved answer from an unsaved
-              one, and the protocol never appeared to complete. The state is
-              named here instead: the field goes amber while it differs from
-              what is stored, the row says how many are unsaved, and saving
-              moves the pill and the tab count with it.
-            {% endcomment %}
-            {% if panel_item.can_edit_answers %}
-              <div class="dpc-cardfoot">
-                <span class="dpc-saved" data-cardsaved hidden></span>
-                <button type="button" class="dp-btn" data-savecard disabled>{% trans "Save answers" %}</button>
-              </div>
-            {% endif %}
-
-
-          </div>
-        </div>
+    {% comment %}
+      The second heading is always here, so the panel has the same shape on
+      every call. What sits under it changes: the rest of the programme, a line
+      saying the whole programme is in this session, or — on a client nobody has
+      set up yet — where to go and choose.
+    {% endcomment %}
+    <div class="dpc-sect">{% trans "All the protocols" %}</div>
+    {% if panel_item.protocols_other %}
+      {% for p in panel_item.protocols_other %}
+        {% include "_panel_protocol_card.html" %}
       {% endfor %}
+    {% elif panel_item.protocols_session %}
+      <p class="dp-empty">{% trans "Every protocol on this client's programme is being addressed in this session." %}</p>
     {% else %}
-      <p class="dp-empty">{% trans "No protocols have questions yet." %}</p>
+      <p class="dp-empty">
+        {% trans "No protocols on this client yet." %}
+        {% if panel_item.can_edit_answers %}
+          <a href="{% url 'edit_patient' panel_item.patient.pk %}">{% trans "Choose them on their profile." %}</a>
+        {% endif %}
+      </p>
     {% endif %}
 
     {% comment %}
@@ -322,10 +248,7 @@ themselves — see the autosave note in the script below.
   {% endcomment %}
   <div data-dppane="summary"{% if panel_item.is_pending %} hidden{% endif %}>
     {% if panel_item.meeting.protocol_summary %}
-      <div class="dp-ov">
-        <div class="dp-ov-h">{% trans "Overview" %}</div>
-        <div class="dp-ov-t">{{ panel_item.meeting.protocol_summary }}</div>
-      </div>
+      {% include "_panel_overview.html" %}
       {% comment %}
         Moments worth going back to, each anchored to a transcript segment, so
         the timestamp jumps the player to audio that exists rather than to a
@@ -555,14 +478,28 @@ themselves — see the autosave note in the script below.
             </select>
           </label>
 
-          <label class="dp-fld">
-            <span>{% trans "Protocol" %}</span>
-            <select name="scheduled_protocol">
-              {% for val, label in panel_item.protocol_choices %}
-                <option value="{{ val }}" {% if val == panel_item.meeting.scheduled_protocol %}selected{% endif %}>{{ label }}</option>
+          {% comment %}
+            A call can cover more than one protocol, so this is a list of
+            checkboxes rather than a dropdown that can only hold one. The
+            client's own protocols come first; the rest of the platform follows,
+            marked, and stays pickable for a one-off.
+          {% endcomment %}
+          <div class="dp-fld dp-fld-multi">
+            <span>{% trans "Protocols to address" %}</span>
+            <div class="dp-checks">
+              {% for o in panel_item.protocol_options %}
+                <label class="dp-check{% if not o.on_programme %} dp-check-off{% endif %}">
+                  <input type="checkbox" name="scheduled_protocols" value="{{ o.pk }}"
+                         {% if o.scheduled %}checked{% endif %}>
+                  <span class="dp-check-n">{{ o.number }}.</span>
+                  <span class="dp-check-t">{{ o.title }}{% if not o.on_programme %}
+                    <em>{% trans "— not on their programme" %}</em>{% endif %}</span>
+                </label>
+              {% empty %}
+                <p class="dp-empty">{% trans "No protocols exist yet." %}</p>
               {% endfor %}
-            </select>
-          </label>
+            </div>
+          </div>
 
           <div class="dp-dialog-f">
             <button type="button" class="dp-btn" data-dpclose>{% trans "Cancel" %}</button>
@@ -625,8 +562,19 @@ themselves — see the autosave note in the script below.
         <form method="post" action="{% url 'complete_meeting' panel_item.meeting.pk %}">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}">
-          <input type="hidden" name="executed_protocol" id="dpcExec"
-                 value="{{ panel_item.meeting.scheduled_protocol }}">
+          {% comment %}
+            What was covered, carried on the same form as the outcome so one
+            press records both. Hidden inputs mirror the picker below, which is
+            outside this form because it is a correction rather than part of the
+            three buttons.
+          {% endcomment %}
+          <span id="dpcExecFields">
+            {% for o in panel_item.protocol_options %}
+              {% if o.scheduled %}
+                <input type="hidden" name="executed_protocols" value="{{ o.pk }}">
+              {% endif %}
+            {% endfor %}
+          </span>
           <div class="dp-acts">
             {% for value, label, tone in panel_item.outcomes %}
               {% if forloop.first %}
@@ -642,15 +590,23 @@ themselves — see the autosave note in the script below.
           </div>
         </form>
         <p class="dpc-covered">
-          {% blocktrans with p=panel_item.scheduled_title %}Recording <b>{{ p }}</b> as covered.{% endblocktrans %}
+          {% if panel_item.scheduled_title %}
+            {% blocktrans with p=panel_item.scheduled_title %}Recording <b>{{ p }}</b> as covered.{% endblocktrans %}
+          {% else %}
+            {% trans "No protocol recorded as covered." %}
+          {% endif %}
           <button type="button" class="dpc-lnk" id="dpcChange">{% trans "Change" %}</button>
         </p>
         <div id="dpcChangePick" hidden>
-          <select class="dpc-sel" id="dpcExecPick">
-            {% for val, label in panel_item.protocol_choices %}
-              <option value="{{ val }}" {% if val == panel_item.meeting.scheduled_protocol %}selected{% endif %}>{{ label }}</option>
+          <div class="dp-checks" id="dpcExecPick">
+            {% for o in panel_item.protocol_options %}
+              <label class="dp-check{% if not o.on_programme %} dp-check-off{% endif %}">
+                <input type="checkbox" value="{{ o.pk }}" {% if o.scheduled %}checked{% endif %}>
+                <span class="dp-check-n">{{ o.number }}.</span>
+                <span class="dp-check-t">{{ o.title }}</span>
+              </label>
             {% endfor %}
-          </select>
+          </div>
         </div>
       </div>
     {% elif panel_item.is_cancelled %}
@@ -686,7 +642,11 @@ themselves — see the autosave note in the script below.
             id="dpcRedo" hidden>
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ request.get_full_path }}">
-        <input type="hidden" name="executed_protocol" value="{{ panel_item.meeting.executed_protocol|default_if_none:'' }}">
+        {% for o in panel_item.protocol_options %}
+          {% if o.executed %}
+            <input type="hidden" name="executed_protocols" value="{{ o.pk }}">
+          {% endif %}
+        {% endfor %}
         <p class="dpc-ask">{% trans "Outcome" %}</p>
         <div class="dp-acts">
           {% for value, label, tone in panel_item.outcomes %}
@@ -723,7 +683,11 @@ whatever you opened, and neither moves when the body scrolls.
   <div class="dpc-head">
     <div class="dp-head">
       <div>
-        <div class="dp-kick dp-kick-{{ panel_item.accent }}">{{ panel_item.kicker }}</div>
+        {% comment %} Same type mark as the call panel — see the note there. {% endcomment %}
+        <div class="dp-kickrow dp-t-{{ panel_item.type }}">
+          <span class="dp-tic" aria-hidden="true"><span class="material-icons-outlined">{{ panel_item.type_icon }}</span></span>
+          <div class="dp-kick">{{ panel_item.kicker }}</div>
+        </div>
         <p class="dp-title">{{ panel_item.title }}{% if panel_item.tag_label %}<span class="dp-tag dp-tag-{{ panel_item.tag_class }}">{{ panel_item.tag_label }}</span>{% endif %}</p>
         <div class="dp-meta">
           {% if panel_item.state %}<b>{{ panel_item.state }}</b>{% endif %}{% if panel_context.last_contact %}{% if panel_item.state %} · {% endif %}<span class="dp-last">{% blocktrans with t=panel_context.last_contact|localtime|timesince|first_unit %}Last contact {{ t }} ago{% endblocktrans %}</span>{% endif %}
@@ -742,6 +706,7 @@ whatever you opened, and neither moves when the body scrolls.
           {% endif %}
           {% if panel_item.source %}<div><b>{% trans "Source" %}</b> {{ panel_item.source }}</div>{% endif %}
         </div>
+        {% include "_panel_to.html" %}
       </div>
       <div class="dp-headgo">
         {% include "_panel_open.html" %}
@@ -762,6 +727,20 @@ whatever you opened, and neither moves when the body scrolls.
     that kind in between. "Overview" was the odd one out — it is a summary like
     every other summary, so it is called one.
   {% endcomment %}
+  {% comment %}
+    Pinned above the strip rather than sitting inside the scrolling body, which
+    is where the meeting panel already puts it: the player is reachable from
+    whichever tab you are on instead of scrolling away under the transcript.
+  {% endcomment %}
+  {% if panel_item.kind == 'recording' %}
+    <div class="dpc-ctl">
+      <audio class="dp-player" controls preload="none" src="{{ panel_item.audio_url }}"></audio>
+      {% if panel_item.duration_label %}
+        <p class="dpc-attach">{% blocktrans with d=panel_item.duration_label %}Recording · {{ d }}{% endblocktrans %}</p>
+      {% endif %}
+    </div>
+  {% endif %}
+
   {% if panel_item.kind == 'alert' %}
     <div class="dp-tabs">
       <button type="button" class="dp-tab on" data-dptab="summary">{% trans "Summary" %}</button>
@@ -802,16 +781,34 @@ whatever you opened, and neither moves when the body scrolls.
   {% endif %}
 
   <div class="dpc-body">
-  {% if panel_item.kind == 'recording' %}
-    <audio class="dp-player" controls preload="none" src="{{ panel_item.audio_url }}"></audio>
-  {% endif %}
 
   <div data-dppane="summary">
-    {% if panel_item.overview %}
-      <div class="dp-ov">
-        {% if panel_item.overview_heading %}<div class="dp-ov-h">{{ panel_item.overview_heading }}</div>{% endif %}
-        <div class="dp-ov-t">{{ panel_item.overview }}</div>
+    {% comment %}
+      Why somebody is being interrupted, above the summary of what happened.
+      A navigator clearing a queue reads the first line of each alert and
+      little else, so the first line has to be the reason rather than the
+      theme — and it names the moment, in the caregiver's own words where the
+      classifier could quote them.
+    {% endcomment %}
+    {% if panel_item.trigger %}
+      <div class="dp-trig">
+        <div class="dp-trig-h">
+          {% trans "What triggered this" %}
+          {% if panel_item.trigger_at %} · {{ panel_item.trigger_at|localtime|date:"H:i" }}{% endif %}
+        </div>
+        <div class="dp-trig-t">{{ panel_item.trigger }}</div>
       </div>
+    {% endif %}
+
+    {% comment %}
+      Rendered without a summary too, when the panel has said what the absence
+      means — see overview_empty in views/_panel.py. A conversation nobody has
+      summarised used to draw nothing at all, so the tab you opened to read the
+      summary looked broken rather than empty, and the Edit that would let you
+      write one by hand was inside the block that never appeared.
+    {% endcomment %}
+    {% if panel_item.overview or panel_item.overview_empty %}
+      {% include "_panel_overview.html" %}
     {% endif %}
 
     {% for p in panel_item.points %}
@@ -849,10 +846,13 @@ whatever you opened, and neither moves when the body scrolls.
     {% if panel_item.messages %}
       <div class="dp-msgs">
         {% for m in panel_item.messages %}
-          {% if m.user_message %}<div class="dp-msg dp-msg-in"><span class="dp-msg-b">{{ m.user_message|truncatechars:160 }}</span><time>{{ m.timestamp|localtime|date:"H:i" }}</time></div>{% endif %}
-          {% if m.response_message %}<div class="dp-msg dp-msg-out"><span class="dp-msg-b">{{ m.response_message|truncatechars:160 }}</span><time>{{ m.timestamp|localtime|date:"H:i" }}</time></div>{% endif %}
+          {% if m.user_message %}<div class="dp-msg dp-msg-in"><span class="dp-msg-b">{{ m.user_message|linebreaksbr }}</span><time>{{ m.timestamp|localtime|date:"H:i" }}</time></div>{% endif %}
+          {% if m.response_message %}<div class="dp-msg dp-msg-out"><span class="dp-msg-b">{{ m.response_message|linebreaksbr }}</span><time>{{ m.timestamp|localtime|date:"H:i" }}</time></div>{% endif %}
         {% endfor %}
       </div>
+      {% if panel_item.messages_clipped %}
+        <p class="dp-hint">{% blocktrans with shown=panel_item.messages|length total=panel_item.message_count %}Showing the first {{ shown }} of {{ total }} messages.{% endblocktrans %}</p>
+      {% endif %}
     {% else %}
       <p class="dp-empty">{% if panel_item.kind == 'alert' %}{% trans "This alert was not raised from a conversation." %}{% else %}{% trans "No messages recorded that day." %}{% endif %}</p>
     {% endif %}
@@ -929,12 +929,22 @@ whatever you opened, and neither moves when the body scrolls.
     one until notes became records; the recording had nowhere either.
   {% endcomment %}
   <div data-dppane="notes" hidden>
-    <textarea class="dpc-ta dpc-notes" id="dpNoteNew" rows="4"
-              placeholder="{% if panel_item.kind == 'alert' %}{% trans 'Write a note about this alert' %}{% elif panel_item.kind == 'chat' %}{% trans 'Write a note about this conversation' %}{% else %}{% trans 'Write a note about this call' %}{% endif %}"></textarea>
-    <div class="dp-notebar">
-      <span class="dpc-saved" id="dpNoteState" hidden></span>
-      <button type="button" class="dp-btn dp-btn-pri" id="dpNoteSave">{% trans "Save note" %}</button>
-    </div>
+    {% comment %}
+      No parent, no composer. A chat day whose messages belong to a thread this
+      client does not own has nothing to attach a note to, and offering a box
+      and a Save button that cannot save is worse than saying so. Existing
+      notes still read below.
+    {% endcomment %}
+    {% if panel_item.note_parent_id %}
+      <textarea class="dpc-ta dpc-notes" id="dpNoteNew" rows="4"
+                placeholder="{% if panel_item.kind == 'alert' %}{% trans 'Write a note about this alert' %}{% elif panel_item.kind == 'chat' %}{% trans 'Write a note about this conversation' %}{% else %}{% trans 'Write a note about this call' %}{% endif %}"></textarea>
+      <div class="dp-notebar">
+        <span class="dpc-saved" id="dpNoteState" hidden></span>
+        <button type="button" class="dp-btn dp-btn-pri" id="dpNoteSave">{% trans "Save note" %}</button>
+      </div>
+    {% else %}
+      <p class="dp-hint">{% trans "These messages are not linked to a conversation record, so a note cannot be attached to them." %}</p>
+    {% endif %}
     {% include "_panel_notes.html" %}
   </div>
 
@@ -1727,14 +1737,26 @@ whatever you opened, and neither moves when the body scrolls.
     var change = document.getElementById('dpcChange');
     var pick   = document.getElementById('dpcChangePick');
     var sel    = document.getElementById('dpcExecPick');
-    var exec   = document.getElementById('dpcExec');
+    var exec   = document.getElementById('dpcExecFields');
     if (change && pick && sel && exec) {
       change.addEventListener('click', function () {
         var open = !pick.hidden;
         pick.hidden = open;
         change.textContent = open ? '{% trans "Change" %}' : '{% trans "Keep as planned" %}';
       });
-      sel.addEventListener('change', function () { exec.value = sel.value; });
+      // The picker sits outside the outcome form, so what it holds is mirrored
+      // into hidden inputs inside it. A call can cover several protocols now,
+      // so this is a set of values rather than one.
+      sel.addEventListener('change', function () {
+        exec.innerHTML = '';
+        sel.querySelectorAll('input[type=checkbox]:checked').forEach(function (box) {
+          var f = document.createElement('input');
+          f.type = 'hidden';
+          f.name = 'executed_protocols';
+          f.value = box.value;
+          exec.appendChild(f);
+        });
+      });
     }
 
     paint();
@@ -1872,6 +1894,74 @@ whatever you opened, and neither moves when the body scrolls.
     if (clear) clear.addEventListener('click', function () { find.value = ''; run(); });
   }
 
+  // ── Overview ──────────────────────────────────────────────────────────
+  // Editing in place rather than in a dialog, the same way a note edits: the
+  // words stay where you read them, so you can see what you are changing.
+  // Sits above the Notes block on purpose — that one returns early when a
+  // panel has no notes list, and an overview can exist without one.
+  var ov = panel.querySelector('[data-ov]');
+  if (ov && ov.dataset.ovUrl) {
+    var ovView = ov.querySelector('[data-ov-view]');
+    var ovEditor = ov.querySelector('[data-ov-editor]');
+    var ovInput = ov.querySelector('[data-ov-input]');
+    var ovBody = ov.querySelector('[data-ov-body]');
+    var ovSrc = ov.querySelector('[data-ov-src]');
+    var ovStart = ov.querySelector('[data-ov-start]');
+    var ovCancel = ov.querySelector('[data-ov-cancel]');
+    var ovSave = ov.querySelector('[data-ov-save]');
+    var ovState = ov.querySelector('[data-ov-state]');
+
+    function ovShow(editing) {
+      if (ovView) ovView.hidden = editing;
+      if (ovEditor) ovEditor.hidden = !editing;
+      if (ovStart) ovStart.hidden = editing;
+      if (editing && ovInput) { ovInput.focus(); }
+    }
+
+    if (ovStart) ovStart.addEventListener('click', function () {
+      if (ovInput && ovBody) ovInput.value = ovBody.textContent.trim();
+      ovShow(true);
+    });
+    if (ovCancel) ovCancel.addEventListener('click', function () { ovShow(false); });
+
+    if (ovSave) ovSave.addEventListener('click', function () {
+      var text = ovInput ? ovInput.value.trim() : '';
+      if (!text) { if (ovInput) ovInput.focus(); return; }
+      ovSave.disabled = true;
+      if (ovState) { ovState.hidden = false; ovState.textContent = '{% trans "saving…" %}'; }
+      post(ov.dataset.ovUrl, { body: text }).then(function (payload) {
+        if (ovBody) ovBody.textContent = payload.body;
+        // "Not summarised yet" was true a moment ago and is not any more.
+        var ovNone = ov.querySelector('[data-ov-none]');
+        if (ovNone) ovNone.remove();
+        // The violet block means the model wrote it. It did not, now.
+        if (ovView) ovView.classList.add('dp-ov-mine');
+        if (ovSrc) {
+          ovSrc.textContent = '{% trans "Edited by" %} ' + payload.author + ' · ' + payload.when;
+        }
+        ovShow(false);
+        if (ovState) { ovState.textContent = '{% trans "saved" %}'; }
+      }).catch(function (err) {
+        if (ovState) { ovState.hidden = false; ovState.textContent = err.message; }
+      }).then(function () {
+        ovSave.disabled = false;
+        setTimeout(function () { if (ovState) ovState.hidden = true; }, 2000);
+      });
+    });
+
+    // Regenerating throws away what a person wrote, so it asks first — but
+    // only once there is something of theirs to throw away.
+    if (ov.querySelector('[data-ov-view]') &&
+        ov.querySelector('[data-ov-view]').classList.contains('dp-ov-mine')) {
+      var regen = panel.querySelector('form[action*="/summarize/"], form[action*="/transcribe/"]');
+      if (regen) regen.addEventListener('submit', function (e) {
+        if (!window.confirm('{% trans "This overview was written by hand. Generating again replaces it. Continue?" %}')) {
+          e.preventDefault();
+        }
+      });
+    }
+  }
+
   // ── Notes ─────────────────────────────────────────────────────────────
   var list = document.getElementById('dpNotes');
   if (!list) return;
@@ -1964,7 +2054,10 @@ whatever you opened, and neither moves when the body scrolls.
   var newNote = document.getElementById('dpNoteNew');
   var saveNote = document.getElementById('dpNoteSave');
   var state = document.getElementById('dpNoteState');
-  if (newNote && saveNote) {
+  // No addUrl means this item has nothing to hang a note off — the composer is
+  // not rendered in that case, but the guard stays so a missing URL can never
+  // become a POST to "undefined".
+  if (newNote && saveNote && list.dataset.addUrl) {
     saveNote.addEventListener('click', function () {
       var text = newNote.value.trim();
       if (!text) { newNote.focus(); return; }

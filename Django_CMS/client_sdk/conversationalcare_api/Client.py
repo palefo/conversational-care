@@ -21,7 +21,7 @@ Example
         patient_id=10,
         scheduled_time_iso="2026-08-01T15:30:00Z",
         type=1,                 # 0 Onboarding, 1 Regular, 2 Final, 3 Initial
-        scheduled_protocol=2,   # optional protocol number
+        scheduled_protocols=[2, 3],   # optional protocol numbers
     )
     if result.get("ok"):
         print("Scheduled meeting", result["meeting"]["id"])
@@ -97,9 +97,15 @@ class Client:
         patient_id: int,
         scheduled_time_iso: str,
         type: Optional[int] = None,
+        scheduled_protocols: Optional[List[int]] = None,
         scheduled_protocol: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Schedule a meeting for a client.
+
+        ``scheduled_protocols`` is a list of protocol *numbers* the call should
+        cover. ``scheduled_protocol`` is the single-value spelling this method
+        shipped with; it still works and means a list of one. A number with no
+        protocol behind it is rejected with a 400 rather than stored.
 
         Returns ``{"ok": True, "meeting": {...}}`` on success, or
         ``{"ok": False, "detail": "..."}`` if it was rejected (e.g. a
@@ -111,6 +117,8 @@ class Client:
         }
         if type is not None:
             payload["type"] = type
+        if scheduled_protocols:
+            payload["scheduled_protocols"] = list(scheduled_protocols)
         if scheduled_protocol is not None:
             payload["scheduled_protocol"] = scheduled_protocol
         resp = self.session.post(self._url("/api/v1/meetings/"), json=payload, timeout=self.timeout)

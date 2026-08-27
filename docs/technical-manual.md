@@ -417,6 +417,69 @@ immediately and hands the work to a **self-contained in-process thread pool**
 reply out through the Twilio REST API. Design, sizing guidance and operational
 notes: [async_replies.md](../async_replies.md).
 
+### Outbound calls and their recordings (migrations 0078–0079)
+
+A call from the panel is a **conference of two legs**: one out to the navigator
+(`CTN`, their own number from their profile) and one out to the client side
+(`Dyad`, the caregiver's number). Both are placed by `make_phone_conference`
+and both are recorded, dual-channel.
+
+Twilio names each leg with a Call SID the moment it is placed. That SID is
+written into a **`CallLeg`** row alongside the meeting, the client and which
+side it is, and `get_recordings_from_twilio` joins the audio back to it on
+`call_sid` when it arrives — minutes or hours later — filling `meeting`,
+`patient` and `leg` on the `CallRecording`.
+
+| Model | Change |
+| --- | --- |
+| `CallLeg` | **new model** — one outbound call placed for one meeting: `call_sid` (unique), `meeting`, `patient`, `leg`, `to_number`, `conference_name`, who placed it and when. A record of a call *placed*, not of a recording that exists: an unanswered leg simply never gets one |
+| `CallRecording` | `meeting`, `patient`, `leg`, `call_sid` — all nullable. Before this the model had no relation to anything and every surface re-derived ownership by matching `from_number`/`to_number` against `[patient.phone_number, caregiver.phone_number]`. A phone number is not an identity: one number can belong to two clients (a caregiver who looks after one and is themself another), which drew the same call on both timelines, and the navigator's own leg carries a *staff* number, which was filed against whichever client shared it |
+
+Reading it back, in `CallRecording.for_patient` and used by
+`build_patient_events`, `_context_strip` and the meeting panel: a recording that
+names its client is that client's and nobody else's; one that names nobody
+falls back to the old number matching; and the navigator's leg is left out of
+client-facing lists either way. The same two-step applies to the fold onto a
+meeting — an exact `meeting_id` first, then the ±90 minute
+`RECORDING_MATCH_WINDOW` walk for anything without one.
+
+That fold lives in **`views/_panel.fold_recordings`**, and both the timeline
+row and the panel it opens read it rather than each working it out. While they
+did work it out separately they disagreed: the row claimed the nearest free
+call, the panel took the earliest recording in the window and knew nothing
+about what another call had already claimed, so one recording could be a loose
+row and a call's recording at the same time. That is what made the timeline
+look like it listed every call twice.
+
+A call holds **every** recording it produced, not one. A number that rings out
+and is redialled leaves a few seconds of ringing tone behind on each attempt,
+and keeping one of those and orphaning the rest is what filled the list with
+loose `Call recording` rows that had a perfectly good call to sit under. The
+list is ordered longest-first — the conversation, not the attempts that failed
+to reach it — so the row names the longest and counts the rest, and the panel
+plays the longest with the others folded under it. A guess still prefers a call
+with nothing on it before joining one that is already spoken for, so two calls
+an hour apart do not both collapse onto whichever is marginally nearer.
+
+Recordings that match no call at all keep their own row. That row is the only
+route to `_recording_panel`, so dropping it would make the audio unreachable
+rather than tidy; it is labelled *Recording with no call* so it does not read
+as a duplicate of the call above it.
+
+`0081_backfill_recording_owners` gives the existing rows an owner where one can
+be established: a number matching exactly one client is written down, a number
+matching two is **left alone** for the fallback rather than guessed at, and a
+number belonging to a member of staff and to no client is marked as the
+navigator's leg. It attaches at most one recording per meeting. It is a no-op
+in reverse — there is no record of which rows it filled in, so clearing them
+would also clear anything a real call has written since.
+
+`get_recordings_from_twilio` also stopped short-circuiting on
+`date_updated <= max(end_time)`. That high-water mark only moved forward, so a
+recording Twilio finished assembling *late* was behind the mark on the first
+sync that saw it and was skipped permanently — which is why some recordings
+never appeared. It now asks which recording SIDs are already stored.
+
 ## 11. File storage & media security
 
 All user files (care plans, TTS audio, voice notes, call recordings, brand

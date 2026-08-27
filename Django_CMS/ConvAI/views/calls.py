@@ -1,6 +1,8 @@
 from ._base import *  # noqa: F401,F403
 import logging
 
+from django.db import transaction
+
 from ._panel import panel_context
 
 logger = logging.getLogger(__name__)
@@ -69,6 +71,9 @@ def save_scheduled_meeting(form):
         return None
 
     meeting.save()
+    # save(commit=False) defers the m2m, so without this the protocols picked in
+    # the dialog never reach the meeting.
+    form.save_m2m()
     return meeting
 
 
@@ -103,6 +108,55 @@ def _call_error(message, status, fix_href=None, fix_label=None):
     if fix_href:
         payload['fix'] = {'href': fix_href, 'label': fix_label}
     return JsonResponse(payload, status=status)
+
+
+def _record_call_legs(meeting, conference, user):
+    """Write down which Twilio call is which side of this meeting's conference.
+
+    This is the only moment the answer is free. Twilio names each leg here,
+    with the meeting and the client already in hand; the recording turns up
+    later carrying nothing but that name and two phone numbers, and a phone
+    number cannot say which client it is — or whether it is a client at all,
+    the navigator's own leg being a staff number. See CallLeg.
+
+    Deliberately after the conference has been placed, and deliberately
+    swallowed. By the time this runs both phones are already ringing, and
+    failing to write down what the call was must not turn a placed call into an
+    error on the navigator's screen. What is lost when it fails is the exact
+    link, and the recording falls back to being matched by number — which is
+    where every recording was before this.
+    """
+    legs = (conference or {}).get('legs') or []
+    rows = [
+        CallLeg(
+            call_sid=leg.get('call_sid'),
+            meeting=meeting,
+            patient=meeting.patient,
+            leg=leg.get('leg'),
+            to_number=str(leg.get('to_number') or ''),
+            conference_name=str((conference or {}).get('conference') or '')[:64],
+            placed_by=user if getattr(user, 'pk', None) else None,
+        )
+        for leg in legs if leg.get('call_sid')
+    ]
+    if not rows:
+        return
+    try:
+        # The savepoint is what makes swallowing this safe. Without it, a
+        # database error caught here would leave the surrounding transaction
+        # unusable — should ATOMIC_REQUESTS ever be switched on — and the retry
+        # counter below would fail next, turning a bookkeeping miss into the
+        # failed call this is written to avoid.
+        #
+        # ignore_conflicts because call_sid is unique: a SID already written
+        # down is the same leg, not a second one.
+        with transaction.atomic():
+            CallLeg.objects.bulk_create(rows, ignore_conflicts=True)
+    except Exception:
+        logger.exception(
+            "Call placed for meeting %s but its legs could not be recorded; "
+            "its recordings will fall back to number matching.", meeting.pk,
+        )
 
 
 @login_required
@@ -140,7 +194,7 @@ def make_phone_call(request, meeting_id):
 
     try:
         # Llamada al helper que inicia la conferencia
-        conference_result = make_phone_conference({
+        conference = make_phone_conference({
             'CTN': ctn_phone,
             'Dyad': dyad_phone,
             'Platform': platform_phone
@@ -155,13 +209,18 @@ def make_phone_call(request, meeting_id):
             _("The phone system did not accept the call. Please try again."), 502,
         )
 
+    _record_call_legs(meeting, conference, request.user)
+
     # Incrementar retries en 1
     Meeting.objects.filter(pk=meeting.pk).update(retries=F('retries') + 1)
 
-    # Puedes devolver detalles de la conferencia si quieres
+    # The conference name only. The Call SIDs the helper also returns stay on
+    # this side: they are Twilio's identifiers for the call, the browser has no
+    # use for them, and the panel already deliberately keeps Twilio detail off
+    # the navigator's screen — see _call_error.
     return JsonResponse({
         'status': 'ok',
-        'conference': conference_result
+        'conference': (conference or {}).get('conference')
     })
 
 
@@ -194,18 +253,26 @@ def complete_meeting(request, meeting_id):
     if new_status != Meeting.Status.PENDING and meeting.ended_at is None:
         meeting.ended_at = timezone.now()
 
-    # Si se marcó Completed, debemos capturar el protocolo ejecutado
-    if new_status == Meeting.Status.COMPLETED:
-        try:
-            ep = int(request.POST.get('executed_protocol', ''))
-            meeting.executed_protocol = ep
-        except (ValueError, TypeError):
-            messages.error(request, _("You must choose an executed protocol."))
-            return _back_to(request, 'pending_call', call_id=meeting_id)
-    else:
-        meeting.executed_protocol = None
-
     meeting.save()
+
+    # What the call actually covered. A call can work through more than one
+    # protocol, so this is a set rather than a single number, and it is only
+    # recorded on a call that happened — an unanswered call covered nothing.
+    #
+    # Nothing is rejected for being empty any more: a completed call with no
+    # protocol against it is an ordinary thing (a check-in, a conversation that
+    # went elsewhere), and refusing to record the outcome over it meant the
+    # outcome went unrecorded instead.
+    if new_status == Meeting.Status.COMPLETED:
+        ids = []
+        for raw in request.POST.getlist('executed_protocols'):
+            try:
+                ids.append(int(raw))
+            except (TypeError, ValueError):
+                continue
+        meeting.executed_protocols.set(Protocol.objects.filter(pk__in=ids))
+    else:
+        meeting.executed_protocols.clear()
     messages.success(request, _("Meeting status updated."))
     return _back_to(request, 'dashboard')
 
@@ -282,6 +349,10 @@ def calendar_view(request):
     if not is_admin(request.user):
         meeting_form.fields['patient'].queryset = Patient.objects.filter(navigator=request.user)
     context['meeting_form'] = meeting_form
+    # Which protocols each client is on, so the dialog can float the chosen
+    # client's own to the top the moment they are chosen. Scoped to the clients
+    # the form can pick, which is already scoped to who the user may see.
+    context['protocol_owners'] = meeting_form.protocol_owners()
 
     if view == 'month':
         first_of_month = today_local.replace(day=1) + relativedelta(months=offset)
@@ -404,6 +475,9 @@ def calendar_create_meeting(request):
             messages.error(request, _("You already have a meeting scheduled within this time range."))
         else:
             meeting.save()
+            # save(commit=False) defers the m2m write; without this the
+            # protocols picked in the dialog are silently dropped.
+            form.save_m2m()
             messages.success(request, _("Meeting scheduled."))
     else:
         messages.error(request, _("Please check the meeting details and try again."))
@@ -446,6 +520,7 @@ def edit_meeting(request, meeting_id):
             meeting = form.save(commit=False)
             meeting.navigator = request.user
             meeting.save()
+            form.save_m2m()
             messages.success(request, _("Meeting rescheduled successfully."))
         else:
             # The dialog is gone by the time this lands, so the errors have to

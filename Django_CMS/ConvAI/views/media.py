@@ -34,15 +34,13 @@ def twilio_audio_download(request, message_id: int, kind: str):
 
 @login_required
 def serve_protected_file(request, id):
-    # AS-08/F4 / WB-05 fix: enforce ownership — non-staff may only fetch a recording
-    # whose from/to number belongs to a patient (or their caregiver) they navigate.
+    # AS-08/F4 / WB-05 fix: enforce ownership — non-staff may only fetch a
+    # recording belonging to a client they navigate. Which client that is now
+    # comes from the recording itself where the call wrote it down, and falls
+    # back to the numbers where it did not; see CallRecording.owner_patients.
     rec = CallRecording.objects.filter(recording_sid=id).first()
     if not is_admin(request.user):
-        nums = {str(getattr(rec, "from_number", "") or ""), str(getattr(rec, "to_number", "") or "")} if rec else set()
-        owns = bool(rec) and Patient.objects.filter(
-            Q(navigator=request.user) &
-            (Q(phone_number__in=nums) | Q(caregiver__phone_number__in=nums))
-        ).exists()
+        owns = bool(rec) and rec.owner_patients().filter(navigator=request.user).exists()
         if not owns:
             return HttpResponseForbidden(_("You are not authorised to access this file."))
     audio_path = get_path_audio(id)

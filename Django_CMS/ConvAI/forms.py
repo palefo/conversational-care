@@ -1,7 +1,11 @@
+import json
+
 from django import forms
 from .models import Meeting, Patient, Question, Answer, Agent, SiteConfiguration
 from datetime import date
 from django.contrib.auth import get_user_model
+from django.utils.html import format_html, format_html_join
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 class MeetingForm(forms.ModelForm):
@@ -19,7 +23,7 @@ class MeetingForm(forms.ModelForm):
     class Meta:
         model = Meeting
         fields = ['patient', 'modality', 'location', 'type',
-                  'scheduled_protocol', 'scheduled_time']
+                  'scheduled_protocols', 'scheduled_time']
         widgets = {
             'patient': forms.Select(attrs={'class': 'form-select'}),
             'modality': forms.Select(attrs={'class': 'form-select'}),
@@ -28,14 +32,14 @@ class MeetingForm(forms.ModelForm):
                 'placeholder': _("Address or place"),
             }),
             'type': forms.Select(attrs={'class': 'form-select'}),
-            'scheduled_protocol': forms.Select(attrs={'class': 'form-select'}),
+            'scheduled_protocols': forms.CheckboxSelectMultiple(),
         }
         labels = {
             'patient': _('Client'),
             'modality': _('How'),
             'location': _('Where'),
             'type': _('Type'),
-            'scheduled_protocol': _('Scheduled protocol'),
+            'scheduled_protocols': _('Protocols to address'),
         }
         # The model's help_text is written for whoever reads the schema: it
         # spells out integer codes and is partly in Spanish. None of it belongs
@@ -44,22 +48,44 @@ class MeetingForm(forms.ModelForm):
             'location': '',
             'modality': '',
             'type': '',
-            'scheduled_protocol': '',
+            'scheduled_protocols': '',
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Meeting.Protocol's labels are placeholders ("3. Protocol 3"). Where a
-        # real Protocol record exists, offer the name a navigator recognises —
-        # the same substitution the panel and the lists already make.
+        # Every protocol in the platform, by its real name. This used to be a
+        # single choice over Meeting.Protocol — ten placeholder labels that were
+        # never anybody's protocol — with real titles patched over whichever
+        # numbers happened to exist. That is why it could offer protocols nobody
+        # had created and could never offer an eleventh that someone had.
+        #
+        # Not narrowed to the client's own programme: the client is chosen in
+        # this same form, so there is nothing to narrow by until they are, and a
+        # one-off against a protocol they are not on is a real thing to want.
+        # The dialog marks which are on the chosen client's programme — see
+        # protocol_owners below.
         from .models import Protocol as ProtocolRecord
-        titles = dict(ProtocolRecord.objects.values_list('number', 'title'))
-        field = self.fields.get('scheduled_protocol')
-        if field and titles:
-            field.choices = [
-                (value, f"{value}. {titles[value]}" if titles.get(value) else label)
-                for value, label in field.choices
-            ]
+        field = self.fields.get('scheduled_protocols')
+        if field is not None:
+            field.required = False
+            field.queryset = ProtocolRecord.objects.order_by('number')
+
+    def protocol_owners(self):
+        """{protocol id: [client id, …]} over the clients this form can pick.
+
+        Lets the dialog float the chosen client's own protocols to the top the
+        moment they are chosen, without a round trip. Scoped to the patient
+        queryset, which the view has already narrowed to who the user may see.
+        """
+        from .models import Patient
+        owners = {}
+        pairs = (Patient.objects
+                 .filter(pk__in=self.fields['patient'].queryset.values('pk'))
+                 .values_list('protocols__id', 'pk'))
+        for protocol_id, patient_id in pairs:
+            if protocol_id:
+                owners.setdefault(protocol_id, []).append(patient_id)
+        return owners
 
     def clean(self):
         """A meeting you turn up to needs somewhere to turn up."""
@@ -466,13 +492,20 @@ class ClientForm(forms.ModelForm):
 
     class Meta:
         model = Patient
-        fields = ["name", "lastname", "phone_number", "email", "navigator", "agent"]
+        fields = ["name", "lastname", "phone_number", "email", "navigator", "agent",
+                  "protocols"]
         labels = {
             "name": _("First name"), "lastname": _("Last name"), "phone_number": _("Phone"),
             "email": _("E-mail"), "navigator": _("Navigator"), "agent": _("Agent"),
+            "protocols": _("Protocols"),
         }
         help_texts = {
             "email": _("Used for email reminders when the caregiver has no address."),
+            "protocols": _(
+                "The protocols this client works through. Only these appear in "
+                "their call panel. Unticking one never deletes answers already "
+                "recorded against it."
+            ),
         }
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
@@ -481,6 +514,7 @@ class ClientForm(forms.ModelForm):
             "email": forms.EmailInput(attrs={**_INPUT, "placeholder": "client@example.com"}),
             "navigator": forms.Select(attrs=_SELECT),
             "agent": forms.Select(attrs=_SELECT),
+            "protocols": forms.CheckboxSelectMultiple(),
         }
 
     def __init__(self, *args, is_admin=False, **kwargs):
@@ -488,6 +522,13 @@ class ClientForm(forms.ModelForm):
         self.fields["name"].required = True
         self.fields["lastname"].required = True
         self.fields["agent"].required = False
+        # A new client starts on nothing. An empty panel asks which protocols
+        # this person is on; a full one answers it wrongly, for everybody, which
+        # is the state this replaces.
+        self.fields["protocols"].required = False
+        self.fields["protocols"].queryset = (
+            self.fields["protocols"].queryset.order_by("number")
+        )
         if is_admin:
             self.fields["navigator"].required = False
             self.fields["navigator"].queryset = get_user_model().objects.filter(
@@ -496,6 +537,199 @@ class ClientForm(forms.ModelForm):
         else:
             # Navigators can't choose — they are auto-assigned as the navigator.
             self.fields.pop("navigator")
+
+
+class DetectorTableWidget(forms.Widget):
+    """The editor for what an agent watches for, and what it does about it.
+
+    ``Agent.detectors`` was a JSON textarea, which was honest about the storage
+    and useless as a control: the field decided whether a caregiver's message
+    reached a human, and editing it meant hand-writing JSON with no indication
+    that "raises" was even a key you could write. It is a table now — label,
+    instruction, whether it raises an alert, at what priority.
+
+    Both stored shapes render. ``{label: "instruction"}`` predates alerts and
+    means detect-but-do-not-raise, which is exactly what those rows did, so
+    they come back with the box unticked rather than being quietly promoted.
+
+    The self-harm row is drawn first and cannot be unticked. It is compiled in
+    (see ``utils_conversation_classification.SAFETY_DETECTOR``) and applies
+    whether or not it appears here; showing it greyed is how an admin finds out
+    it exists, instead of wondering why an alert they never configured fired.
+    """
+
+    template_name = None
+
+    PRIORITIES = ((1, _("High")), (2, _("Medium")), (3, _("Low")))
+
+    def _rows(self, value):
+        """Normalized rows for rendering, safety floor first."""
+        from .utils_conversation_classification import (
+            SAFETY_LABEL, SAFETY_DETECTOR, normalize_detectors,
+        )
+        if isinstance(value, str):
+            try:
+                value = json.loads(value or "{}")
+            except ValueError:
+                value = {}
+        dets = normalize_detectors(value)
+        own = dets.pop(SAFETY_LABEL, None)
+        safety = (SAFETY_DETECTOR.instruction if own is None
+                  else (own.instruction or SAFETY_DETECTOR.instruction))
+        return safety, list(dets.values())
+
+    def render(self, name, value, attrs=None, renderer=None):
+        safety_instruction, rows = self._rows(value)
+
+        head = format_html(
+            '<thead><tr>'
+            '<th class="dt-c-label">{}</th><th>{}</th>'
+            '<th class="dt-c-raise">{}</th><th class="dt-c-prio">{}</th>'
+            '<th class="dt-c-x"></th></tr></thead>',
+            _("Label"), _("How to detect"), _("Raise alert"), _("Priority"),
+        )
+
+        locked = format_html(
+            '<tr class="dt-row dt-row-locked">'
+            '<td><span class="dt-lock-label">{}</span>'
+            '<span class="dt-lock-note">{}</span></td>'
+            '<td class="dt-lock-instr">{}</td>'
+            '<td class="dt-mid"><input type="checkbox" checked disabled></td>'
+            '<td><span class="dt-prio-high">{}</span></td>'
+            '<td></td></tr>',
+            _("Self-harm"), _("built in"), safety_instruction, _("High"),
+        )
+
+        body = [locked] + [self._row(name, i, d) for i, d in enumerate(rows)]
+
+        return format_html(
+            '<div class="dt-wrap" data-dt data-dt-name="{}" data-dt-next="{}">'
+            '<table class="dt-table">{}<tbody data-dt-body>{}</tbody></table>'
+            '<button type="button" class="dt-add" data-dt-add>+ {}</button>'
+            '<p class="dt-help">{}</p></div>{}',
+            name, len(rows), head, mark_safe("".join(body)),
+            _("Add detector"),
+            _("Unticked detectors still flag the conversation for review — they "
+              "just do not put it in anyone's queue."),
+            mark_safe(self._style() + self._script()),
+        )
+
+    def id_for_label(self, id_):
+        """No single control to point a label at, so don't claim one."""
+        return ""
+
+    def _row(self, name, i, d):
+        options = format_html_join(
+            "", '<option value="{}"{}>{}</option>',
+            ((v, mark_safe(' selected' if v == d.priority else ''), label)
+             for v, label in self.PRIORITIES),
+        )
+        return format_html(
+            '<tr class="dt-row">'
+            '<td><input type="text" class="form-control" name="{n}_label_{i}" value="{lb}"></td>'
+            '<td><input type="text" class="form-control" name="{n}_instr_{i}" value="{ins}"></td>'
+            '<td class="dt-mid"><input type="checkbox" name="{n}_raise_{i}"{ck}></td>'
+            '<td><select class="form-select" name="{n}_prio_{i}">{opt}</select></td>'
+            '<td class="dt-mid"><button type="button" class="dt-x" data-dt-x '
+            'aria-label="{rm}">&times;</button></td>'
+            '</tr>',
+            n=name, i=i, lb=d.label, ins=d.instruction,
+            ck=mark_safe(" checked" if d.raises else ""), opt=options, rm=_("Remove"),
+        )
+
+    def value_from_datadict(self, data, files, name):
+        """Rebuild the JSON object from the table's indexed inputs.
+
+        Indexed rather than parallel ``getlist`` arrays because an unticked
+        checkbox submits nothing at all: with parallel lists the ticks would
+        slide onto the wrong rows the moment one was cleared.
+        """
+        out = {}
+        prefix = f"{name}_label_"
+        for key in data:
+            if not key.startswith(prefix):
+                continue
+            idx = key[len(prefix):]
+            label = (data.get(key) or "").strip()
+            if not label:
+                continue
+            try:
+                priority = int(data.get(f"{name}_prio_{idx}") or 2)
+            except (TypeError, ValueError):
+                priority = 2
+            out[label] = {
+                "instruction": (data.get(f"{name}_instr_{idx}") or "").strip(),
+                "raises": bool(data.get(f"{name}_raise_{idx}")),
+                "priority": priority if priority in (1, 2, 3) else 2,
+            }
+        return out
+
+    def _style(self):
+        """Carried by the widget rather than the app stylesheet.
+
+        This renders on the Agents page and inside Django admin, and admin does
+        not load the app's CSS. One copy that travels with the markup beats two
+        that drift.
+        """
+        return """
+<style>
+.dt-table { width: 100%; border-collapse: collapse; font-size: .8125rem; }
+.dt-table th { text-align: left; font-weight: 500; color: #64748b;
+  padding: 0 .5rem .4rem 0; border-bottom: 1px solid #e2e8f0; }
+.dt-table td { padding: .45rem .5rem .45rem 0; vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9; }
+.dt-c-label { width: 22%; } .dt-c-raise { width: 5.5rem; }
+.dt-c-prio { width: 7rem; } .dt-c-x { width: 2rem; }
+.dt-mid { text-align: center; }
+.dt-table input[type=text], .dt-table select { width: 100%; }
+.dt-row-locked td { background: #fafafa; color: #64748b; }
+.dt-lock-label { display: block; font-weight: 500; color: #334155; }
+.dt-lock-note { display: block; font-size: .6875rem; color: #94a3b8; }
+.dt-lock-instr { font-size: .75rem; line-height: 1.45; }
+.dt-prio-high { display: inline-block; font-size: .75rem; padding: .1rem .5rem;
+  border-radius: .75rem; background: #fee2e2; color: #b91c1c; }
+.dt-x { border: 0; background: none; cursor: pointer; color: #94a3b8;
+  font-size: 1.1rem; line-height: 1; padding: 0 .25rem; }
+.dt-x:hover { color: #b91c1c; }
+.dt-add { margin-top: .6rem; font-size: .8125rem; padding: .3rem .7rem;
+  border: 1px solid #cbd5e1; border-radius: .375rem; background: #fff; cursor: pointer; }
+.dt-help { font-size: .75rem; color: #64748b; margin: .5rem 0 0; }
+</style>
+"""
+
+    def _script(self):
+        return """
+<script>
+(function () {
+  document.querySelectorAll('[data-dt]:not([data-dt-ready])').forEach(function (w) {
+    w.setAttribute('data-dt-ready', '1');
+    var body = w.querySelector('[data-dt-body]');
+    var name = w.getAttribute('data-dt-name');
+    var next = parseInt(w.getAttribute('data-dt-next'), 10) || 0;
+    w.querySelector('[data-dt-add]').addEventListener('click', function () {
+      var i = next++;
+      var tr = document.createElement('tr');
+      tr.className = 'dt-row';
+      tr.innerHTML =
+        '<td><input type="text" class="form-control" name="' + name + '_label_' + i + '"></td>' +
+        '<td><input type="text" class="form-control" name="' + name + '_instr_' + i + '"></td>' +
+        '<td class="dt-mid"><input type="checkbox" name="' + name + '_raise_' + i + '"></td>' +
+        '<td><select class="form-select" name="' + name + '_prio_' + i + '">' +
+          '<option value="1">High</option>' +
+          '<option value="2" selected>Medium</option>' +
+          '<option value="3">Low</option></select></td>' +
+        '<td class="dt-mid"><button type="button" class="dt-x" data-dt-x>&times;</button></td>';
+      body.appendChild(tr);
+      tr.querySelector('input').focus();
+    });
+    body.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-dt-x]');
+      if (btn) btn.closest('tr').remove();
+    });
+  });
+})();
+</script>
+"""
 
 
 class AgentForm(forms.ModelForm):
@@ -513,7 +747,7 @@ class AgentForm(forms.ModelForm):
             "port": forms.NumberInput(attrs=_INPUT),
             "classification_role": forms.Textarea(attrs={**_INPUT, "rows": 4}),
             "abstract_instruction": forms.TextInput(attrs=_INPUT),
-            "detectors": forms.Textarea(attrs={**_INPUT, "rows": 4, "placeholder": '{"label": "instruction", ...}'}),
+            "detectors": DetectorTableWidget(),
             "tts_voice_id": forms.TextInput(attrs=_INPUT),
         }
 
@@ -570,7 +804,7 @@ class PromptAgentForm(forms.ModelForm):
             "realtime_enabled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "classification_role": forms.Textarea(attrs={**_INPUT, "rows": 4}),
             "abstract_instruction": forms.TextInput(attrs=_INPUT),
-            "detectors": forms.Textarea(attrs={**_INPUT, "rows": 4, "placeholder": '{"label": "instruction", ...}'}),
+            "detectors": DetectorTableWidget(),
             "tts_voice_id": forms.TextInput(attrs=_INPUT),
         }
 
@@ -697,13 +931,20 @@ class PatientForm(forms.ModelForm):
 
     class Meta:
         model = Patient
-        fields = ["name", "lastname", "phone_number", "email", "navigator", "agent"]
+        fields = ["name", "lastname", "phone_number", "email", "navigator", "agent",
+                  "protocols"]
         labels = {
             "name": _("First name"), "lastname": _("Last name"), "phone_number": _("Phone"),
             "email": _("E-mail"), "navigator": _("Navigator"), "agent": _("Agent"),
+            "protocols": _("Protocols"),
         }
         help_texts = {
             "email": _("Used for email reminders when the caregiver has no address."),
+            "protocols": _(
+                "The protocols this client works through. Only these appear in "
+                "their call panel. Unticking one never deletes answers already "
+                "recorded against it."
+            ),
         }
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
@@ -712,6 +953,7 @@ class PatientForm(forms.ModelForm):
             "email": forms.EmailInput(attrs={**_INPUT, "placeholder": "client@example.com"}),
             "navigator": forms.Select(attrs=_SELECT),
             "agent": forms.Select(attrs=_SELECT),
+            "protocols": forms.CheckboxSelectMultiple(),
         }
 
     def __init__(self, *args, is_admin=False, **kwargs):
@@ -719,6 +961,13 @@ class PatientForm(forms.ModelForm):
         self.fields["name"].required = True
         self.fields["lastname"].required = True
         self.fields["agent"].required = False
+        # A new client starts on nothing. An empty panel asks which protocols
+        # this person is on; a full one answers it wrongly, for everybody, which
+        # is the state this replaces.
+        self.fields["protocols"].required = False
+        self.fields["protocols"].queryset = (
+            self.fields["protocols"].queryset.order_by("number")
+        )
         if is_admin:
             self.fields["navigator"].required = False
             self.fields["navigator"].queryset = get_user_model().objects.filter(

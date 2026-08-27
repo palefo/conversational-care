@@ -99,6 +99,8 @@
       </div>
     </div>
 
+    {% include "patients/_protocols_field.html" %}
+
     <div class="flex gap-2 mt-6 pt-4 border-t border-gray-100">
       <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Save changes" %}</button>
       <a href="{% url 'patient_detail' patient.pk %}" class="button-secondary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Cancel" %}</a>

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import ConvAIUser, Message, CallRecording, Caregiver, Patient, Meeting, Protocol, Question, Answer, Agent, Conversation, SelfRegistration, Alert, RagDocument
+from .models import ConvAIUser, Message, CallLeg, CallRecording, Caregiver, Patient, Meeting, Protocol, Question, Answer, Agent, Conversation, SelfRegistration, Alert, RagDocument
 from django.db.models import Q
 from django.utils.html import format_html, escape
 from django.utils.safestring import mark_safe
@@ -192,6 +192,7 @@ class MessageAdmin(admin.ModelAdmin):
         qs.update(liked=False, disliked=False, warning=False, dangerous=False)
 
 admin.site.register(CallRecording)
+admin.site.register(CallLeg)
 admin.site.register(Caregiver)
 admin.site.register(Patient)
 admin.site.register(Meeting)
@@ -223,166 +224,14 @@ from django.utils.html import format_html, escape
 from django.utils.safestring import mark_safe
 
 from .models import Agent
-
-
-class DetectorsKeyValueWidget(forms.Widget):
-    """
-    Renders Agent.detectors (JSON) as a dynamic table:
-      Label | Instruction | [remove]
-    Adds + button to append rows. On submit, pairs are reconstructed into a dict.
-    """
-
-    def render(self, name, value, attrs=None, renderer=None):
-        value = value or {}
-        if not isinstance(value, dict):
-            # tolerate bad/legacy data
-            value = {}
-
-        # rows html
-        rows_html = []
-        idx = 0
-        for label, instr in value.items():
-            rows_html.append(self._row_html(name, idx, label, instr))
-            idx += 1
-
-        # if empty, render one blank starter row
-        if not rows_html:
-            rows_html.append(self._row_html(name, 0, "", ""))
-
-        table = f"""
-        <div class="det-kv" id="det-kv-{escape(name)}">
-          <table class="det-kv__table">
-            <thead>
-              <tr>
-                <th style="width:28%;">Label</th>
-                <th>Instruction (how to detect)</th>
-                <th style="width:40px;"></th>
-              </tr>
-            </thead>
-            <tbody id="{escape(name)}-tbody">
-              {''.join(rows_html)}
-            </tbody>
-          </table>
-          <button type="button" class="button det-kv__add" data-target="{escape(name)}-tbody">+ Add detector</button>
-        </div>
-        {self._script_block(name, idx)}
-        {self._style_block()}
-        """
-        return mark_safe(table)
-
-    def value_from_datadict(self, data, files, name):
-        """
-        Collect all inputs like:
-          {name}_key_<id>, {name}_val_<id>
-        and build a dict. Blank labels are ignored.
-        """
-        prefix_key = f"{name}_key_"
-        prefix_val = f"{name}_val_"
-        out = {}
-        # iterate over keys; pick those with our prefix
-        for k in list(data.keys()):
-            if not k.startswith(prefix_key):
-                continue
-            suffix = k[len(prefix_key):]
-            label = (data.get(k, "") or "").strip()
-            instr = (data.get(f"{prefix_val}{suffix}", "") or "").strip()
-            if label:
-                out[label] = instr
-        return out
-
-    # ---- helpers ----
-    def _row_html(self, name, idx, label, instr):
-        return f"""
-          <tr class="det-kv__row" data-row="{idx}">
-            <td>
-              <input type="text"
-                     name="{escape(name)}_key_{idx}"
-                     value="{escape(label)}"
-                     class="vTextField det-kv__label"
-                     placeholder="e.g. Medication confusion"/>
-            </td>
-            <td>
-              <textarea name="{escape(name)}_val_{idx}"
-                        rows="2"
-                        class="vLargeTextField det-kv__instr"
-                        placeholder="Instruction: when should this be true?">{escape(instr)}</textarea>
-            </td>
-            <td class="det-kv__actions">
-              <button type="button" class="button det-kv__remove" title="Remove">–</button>
-            </td>
-          </tr>
-        """
-
-    def _script_block(self, name, start_idx):
-        # small inline JS to add/remove rows
-        return f"""
-<script>
-(function() {{
-  const tbodyId = "{escape(name)}-tbody";
-  let nextIdx = {int(start_idx) + 1};
-
-  function mkRowHTML(i) {{
-    return `
-      <tr class="det-kv__row" data-row="${{i}}">
-        <td>
-          <input type="text" name="{escape(name)}_key_${{i}}" class="vTextField det-kv__label" placeholder="e.g. Medication confusion"/>
-        </td>
-        <td>
-          <textarea name="{escape(name)}_val_${{i}}" rows="2" class="vLargeTextField det-kv__instr" placeholder="Instruction: when should this be true?"></textarea>
-        </td>
-        <td class="det-kv__actions">
-          <button type="button" class="button det-kv__remove" title="Remove">–</button>
-        </td>
-      </tr>`;
-  }}
-
-  document.addEventListener('click', function(ev) {{
-    const t = ev.target;
-
-    // Add row
-    if (t.classList.contains('det-kv__add')) {{
-      const targetId = t.getAttribute('data-target');
-      const tbody = document.getElementById(targetId);
-      tbody.insertAdjacentHTML('beforeend', mkRowHTML(nextIdx++));
-      ev.preventDefault();
-      return;
-    }}
-
-    // Remove row
-    if (t.classList.contains('det-kv__remove')) {{
-      const row = t.closest('.det-kv__row');
-      if (!row) return;
-      const tbody = row.parentElement;
-      // If it's the only row, clear inputs instead of removing to keep one blank row
-      if (tbody.querySelectorAll('.det-kv__row').length <= 1) {{
-        row.querySelector('.det-kv__label').value = '';
-        row.querySelector('.det-kv__instr').value = '';
-      }} else {{
-        row.remove();
-      }}
-      ev.preventDefault();
-      return;
-    }}
-  }});
-}})();
-</script>
-        """
-
-    def _style_block(self):
-        return """
-<style>
-  .det-kv__table { width:100%; border-collapse: collapse; margin-bottom: .5rem; }
-  .det-kv__table th, .det-kv__table td { border-bottom: 1px solid #eee; padding: .4rem .5rem; vertical-align: top; }
-  .det-kv__label { width: 100%; }
-  .det-kv__instr { width: 100%; min-height: 2.5rem; }
-  .det-kv__actions { text-align: center; }
-  .det-kv__add { margin-top: .25rem; }
-</style>
-        """
+from .forms import DetectorTableWidget
 
 
 class AgentForm(forms.ModelForm):
-    detectors = forms.Field(widget=DetectorsKeyValueWidget(), required=False)
+    # The same table the Agents page uses. There were two detector editors and
+    # only one of them ever learned about raising alerts; sharing the widget is
+    # what stops that happening again.
+    detectors = forms.JSONField(widget=DetectorTableWidget(), required=False)
 
     class Meta:
         model = Agent

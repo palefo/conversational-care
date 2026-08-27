@@ -53,7 +53,7 @@
       {% csrf_token %}
       <input type="hidden" name="schedule" value="1">
       {% for field in schedule_form %}
-        <div class="cm-field" {% if field.name == 'location' %}data-location{% endif %}>
+        <div class="cm-field" {% if field.name == 'location' %}data-location{% endif %}{% if field.name == 'scheduled_protocols' %} data-protocols{% endif %}>
           <label for="{{ field.id_for_label }}">{{ field.label }}</label>
           {{ field }}
           {% for e in field.errors %}<p class="err">{{ e }}</p>{% endfor %}

@@ -32,11 +32,12 @@ from django.conf import settings
 from django.core.cache import cache
 from django.contrib.auth.decorators import user_passes_test
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Q
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 # Local apps
-from .models import CallRecording, Caregiver, Conversation, Message, Patient, Agent
+from .models import CallLeg, CallRecording, Caregiver, Conversation, Message, Patient, Agent
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,14 @@ def make_phone_conference(phone_numbers, record_ctn=True, record_dyad=True):
       - Dyad : Phone number for the Dyad (carer + PlWD)
 
     record is a boolean value that requests recording of the call in twilio
+
+    Returns what was placed: the conference name, and for each leg its side of
+    the conference and the Call SID Twilio answered with. Those SIDs are the
+    only thing that ties the recordings arriving later back to this call. This
+    function used to return nothing at all — the SIDs were created and dropped
+    on the floor, views/calls.py reported {"conference": null} to the browser on
+    every call, and whose recording it was had to be guessed from phone numbers
+    afterwards. See CallLeg, which is what the caller writes them into.
     '''
     account_sid = get_setting("TWILIO_ACCOUNT_SID")
     auth_token = get_setting("TWILIO_AUTH_TOKEN")
@@ -77,6 +86,23 @@ def make_phone_conference(phone_numbers, record_ctn=True, record_dyad=True):
       twiml=f'<Response><Dial><Conference endConferenceOnExit="true">{conference_name}</Conference></Dial></Response>'
     )
     logger.info("Calls initiated; both participants join the conference on answer.")
+    return {
+        "conference": conference_name,
+        "legs": [
+            {
+                "leg": int(CallRecording.Leg.CTN),
+                "call_sid": call1.sid,
+                "to_number": str(phone_numbers.get("CTN") or ""),
+                "recorded": bool(record_ctn),
+            },
+            {
+                "leg": int(CallRecording.Leg.DYAD),
+                "call_sid": call2.sid,
+                "to_number": str(phone_numbers.get("Dyad") or ""),
+                "recorded": bool(record_dyad),
+            },
+        ],
+    }
 
 def send_sms_with_template(to_e164: str | None, content_sid: str, content_variables: dict | None = None) -> bool:
     """
@@ -111,6 +137,108 @@ def send_sms_with_template(to_e164: str | None, content_sid: str, content_variab
         return True
     except Exception:
         return False
+
+# WhatsApp delivery failures that a navigator can actually do something about.
+# 63016 is the one that matters here: outside the 24-hour customer-service
+# window WhatsApp only accepts an approved template, and this platform has none
+# (the account is currently restricted from creating them). Twilio *accepts*
+# such a message and fails it a moment later, so the reason only exists on the
+# message resource — see send_whatsapp_text_result.
+WHATSAPP_ERRORS = {
+    63016: _("WhatsApp only allows a new conversation to be started with an "
+             "approved template, and they have not replied in the last 24 hours."),
+    63024: _("WhatsApp rejected the number."),
+    63003: _("That number is not reachable on WhatsApp."),
+    63015: _("That number is not reachable on WhatsApp."),
+    21610: _("They have unsubscribed from messages from this number."),
+}
+
+# Statuses Twilio will not move off again.
+_WA_FAILED = ("failed", "undelivered")
+_WA_DONE = ("delivered", "read")
+
+
+def send_whatsapp_text_result(to_e164: str | None, body: str,
+                              *, wait_s: float = 8.0) -> dict:
+    """Send a WhatsApp text and report what actually happened to it.
+
+    ``send_whatsapp_text`` below returns True as soon as Twilio *accepts* the
+    message, which is not the same as it arriving. The failure that matters most
+    here — 63016, freeform text outside the 24-hour window — is reported
+    asynchronously, seconds after a successful create(). Callers that acted on
+    the bool therefore told the navigator the caregiver had been asked something
+    they were never asked.
+
+    So this creates the message and then watches it until Twilio settles on a
+    status or ``wait_s`` runs out. Returns::
+
+        {'ok': bool, 'sid': str|None, 'status': str,
+         'error_code': int|None, 'reason': str}
+
+    ``ok`` is True while nothing has gone wrong — including the still-in-flight
+    case, where the message has been handed over and no failure has come back.
+    A late failure after that is for the status callback to catch, not this.
+    """
+    blank = {'ok': False, 'sid': None, 'status': 'not-sent',
+             'error_code': None, 'reason': ''}
+
+    if not to_e164 or not body:
+        return dict(blank, reason=str(_("There was nothing to send.")))
+
+    account_sid = get_setting("TWILIO_ACCOUNT_SID")
+    auth_token  = get_setting("TWILIO_AUTH_TOKEN")
+    platform_phone = get_setting("PLATFORM_PHONE")
+
+    if not (account_sid and auth_token and platform_phone):
+        return dict(blank, status='unconfigured',
+                    reason=str(_("WhatsApp is not configured on this platform.")))
+
+    try:
+        client = Client(account_sid, auth_token)
+        from_whatsapp = f"whatsapp:{platform_phone}" if not str(platform_phone).startswith("whatsapp:") else platform_phone
+        to_whatsapp   = f"whatsapp:{to_e164}"     if not str(to_e164).startswith("whatsapp:")     else to_e164
+        msg = client.messages.create(
+            from_=from_whatsapp,
+            to=to_whatsapp,
+            body=body.strip(),
+        )
+    except Exception as exc:
+        # A refusal at create() time — bad credentials, malformed number. The
+        # exception is the only description of it that exists.
+        logger.warning("WhatsApp create failed for %s: %s", to_e164, exc)
+        return dict(blank, status='rejected', reason=str(exc))
+
+    sid = msg.sid
+    status = msg.status or 'queued'
+    code = msg.error_code
+
+    # Poll rather than trust the create(). Twilio rejects a 63016 within a
+    # second or two, which is well inside the time this request already spends
+    # generating the message it just sent.
+    deadline = time.monotonic() + max(0.0, wait_s)
+    while status not in _WA_FAILED + _WA_DONE and time.monotonic() < deadline:
+        time.sleep(0.75)
+        try:
+            fetched = client.messages(sid).fetch()
+        except Exception:
+            break  # Sent; we simply cannot watch it. Not a failure.
+        status = fetched.status or status
+        code = fetched.error_code or code
+
+    if status in _WA_FAILED:
+        reason = WHATSAPP_ERRORS.get(code)
+        if reason is None:
+            reason = (
+                str(_("WhatsApp could not deliver it (error %s).")) % code
+                if code else str(_("WhatsApp could not deliver it."))
+            )
+        logger.warning("WhatsApp %s to %s: %s (%s)", status, to_e164, code, sid)
+        return {'ok': False, 'sid': sid, 'status': status,
+                'error_code': code, 'reason': str(reason)}
+
+    return {'ok': True, 'sid': sid, 'status': status,
+            'error_code': code, 'reason': ''}
+
 
 def send_whatsapp_text(to_e164: str | None, body: str) -> bool:
     """
@@ -453,6 +581,32 @@ def automation_turn(patient: Patient) -> dict | None:
     return automation_context(patient)
 
 
+def _review_after_message(message, inbound_text: str) -> None:
+    """Queue a classifier pass over the conversation this message landed in.
+
+    Keyed off the saved Message rather than the thread id it was saved under.
+    ``save_message`` normalises a thread id it cannot read as a UUID into a
+    fresh one, so the two can differ — and a review aimed at the id that got
+    replaced would find no conversation and quietly do nothing, which is the
+    exact failure this whole path exists to stop happening.
+
+    Skipped when the caregiver said nothing — outbound-only turns (reminders,
+    templates) add no new evidence, and classifying them again would be one
+    model call per reminder for a verdict that cannot have changed.
+    """
+    if message is None or not (inbound_text or "").strip():
+        return
+    try:
+        from .conversation_alerts import review_conversation_async
+        review_conversation_async(message.conversation_id)
+    except Exception:
+        # Detection is not allowed to break delivery. The message is already
+        # saved and the reply already sent; the batch pass in Settings remains
+        # the backstop for anything this drops.
+        logger.exception("Could not queue conversation review for %s",
+                         message.conversation_id)
+
+
 def process_message_for_patient(patient: Patient, raw_message: str, *, user_label: str | None = None) -> str:
     """
     Process a chat message for an already-resolved patient.
@@ -469,7 +623,12 @@ def process_message_for_patient(patient: Patient, raw_message: str, *, user_labe
     # one place that has to honour it. The message is still recorded — what is
     # suspended is the agent answering, not the caregiver being heard.
     if not patient.chatbot_enabled:
-        save_message(label, text, "", _get_or_create_thread(patient), patient=patient)
+        msg = save_message(label, text, "", _get_or_create_thread(patient), patient=patient)
+        # Reviewed even though nothing answered — arguably especially then. The
+        # switch suspends the agent replying, not the caregiver being heard,
+        # and a crisis disclosed while the agent is off is the one nobody is
+        # already reading.
+        _review_after_message(msg, text)
         return ""
 
     # 1) reset thread on command
@@ -491,7 +650,12 @@ def process_message_for_patient(patient: Patient, raw_message: str, *, user_labe
                                         extra_configurable=extra_configurable)
 
     # 5) persist both sides and upsert Conversation metadata
-    save_message(label, text, reply, thread_id, patient=patient)
+    msg = save_message(label, text, reply, thread_id, patient=patient)
+
+    # 6) hand the exchange to the classifier. Off the reply path deliberately:
+    #    this is a second model call, and the caregiver should not wait behind
+    #    it to be answered.
+    _review_after_message(msg, text)
     return reply
 
 
@@ -565,7 +729,6 @@ def get_recordings_from_twilio():
     account_sid = get_setting("TWILIO_ACCOUNT_SID") 
     auth_token = get_setting("TWILIO_AUTH_TOKEN") 
     client = Client(account_sid, auth_token)
-    last_updated = CallRecording.objects.aggregate(max_value=Max('end_time'))['max_value']
     try:
         calls = client.calls.list() 
     except Exception as e:
@@ -579,12 +742,52 @@ def get_recordings_from_twilio():
 
     call_map = {call.sid: (call.from_formatted, call.to_formatted) for call in calls}
 
+    # What is already on file, asked by Twilio's own id for it.
+    #
+    # This used to be a high-water mark on end_time: anything Twilio had not
+    # touched since the newest recording stored was skipped. That answers a
+    # different question from the one being asked. A recording that arrives late
+    # — a long call whose audio Twilio finishes assembling after a shorter, later
+    # one — is behind the mark on the very first sync that sees it, and the mark
+    # only ever moves forward, so it is skipped not once but permanently. That is
+    # why some recordings never appeared at all. Asking which SIDs are already
+    # stored answers "is this new?" without a clock, and a late arrival is simply
+    # picked up on the next run.
+    known = set(CallRecording.objects.values_list("recording_sid", flat=True))
+
+    # What each call was, written down when it was placed. This is what lets a
+    # recording say whose it is instead of being matched by phone number; see
+    # CallLeg and make_phone_conference.
+    seen_call_sids = {getattr(rec, "call_sid", None) or "" for rec in recordings}
+    seen_call_sids.discard("")
+    legs = {
+        leg.call_sid: leg
+        for leg in CallLeg.objects.filter(call_sid__in=seen_call_sids)
+                                  .select_related("meeting", "patient")
+    } if seen_call_sids else {}
+
     for rec in recordings:
-        if (last_updated is not None) and (rec.date_updated <= last_updated):
-            #Only update new recordings!
-            continue 
         rec_sid = rec.sid
-        call_sid = getattr(rec, "call_sid", None)  # associated Call SID
+        call_sid = getattr(rec, "call_sid", None) or ""  # associated Call SID
+        leg = legs.get(call_sid)
+
+        if rec_sid in known:
+            # Already stored, so there is nothing to fetch again. A recording
+            # that landed before its leg was written down — or before there was
+            # anywhere to write it — can still be told what it belongs to now,
+            # which is what carries rows through the deploy that adds this.
+            # Guarded on patient being unset so this only ever fills a blank.
+            if leg is not None:
+                CallRecording.objects.filter(
+                    recording_sid=rec_sid, patient__isnull=True,
+                ).update(
+                    call_sid=call_sid,
+                    meeting=leg.meeting,
+                    patient=leg.patient,
+                    leg=leg.leg,
+                )
+            continue
+
         if call_sid and call_sid in call_map:
             from_num, to_num = call_map[call_sid]
         else:
@@ -593,7 +796,7 @@ def get_recordings_from_twilio():
         end_time = rec.date_updated    # datetime object
         duration = rec.duration or 0
         file_path = download_recording_mp3(rec_sid)
-        
+
         recording = CallRecording.objects.create(
             recording_sid = rec_sid,
             from_number = from_num,
@@ -601,8 +804,17 @@ def get_recordings_from_twilio():
             start_time = start_time,
             end_time = end_time,
             duration = duration,
-            filename = file_path)
-        
+            filename = file_path,
+            # The numbers above are still stored — they are what the fallback
+            # reads for anything placed outside this platform — but they are no
+            # longer how ownership is decided when the leg is known.
+            call_sid = call_sid,
+            meeting = leg.meeting if leg else None,
+            patient = leg.patient if leg else None,
+            leg = leg.leg if leg else None,
+        )
+        known.add(rec_sid)
+
 
 def get_path_audio(id):
     rec = (
@@ -813,7 +1025,7 @@ def _openai_client():
     return OpenAI(api_key=api_key) if api_key else OpenAI()
 
 
-def _whisper(file_path, client=None):
+def _whisper(file_path, client=None, prompt=None):
     """Whisper, asked for its segments instead of only the flat text.
 
     ``verbose_json`` costs nothing extra and returns every segment with a start
@@ -827,7 +1039,13 @@ def _whisper(file_path, client=None):
             model="whisper-1",
             file=audio_file,
             response_format="verbose_json",
-            timestamp_granularities=["segment"],
+            # Words as well as segments. A segment is a window, and on a single
+            # channel it happily spans half the call, because the other party
+            # falling silent is not a boundary Whisper can see from inside one
+            # track. Words carry their own timings, which is the only thing
+            # that can put two channels back into the order they were spoken.
+            timestamp_granularities=["segment", "word"],
+            **({"prompt": prompt} if prompt else {}),
         )
     text = (getattr(result, "text", "") or "").strip()
     segments = []
@@ -843,7 +1061,64 @@ def _whisper(file_path, client=None):
             "text": body,
             "speaker": None,
         })
-    return text, segments
+
+    words = []
+    for w in (getattr(result, "words", None) or []):
+        get = w.get if isinstance(w, dict) else lambda k, d=None: getattr(w, k, d)
+        token = (get("word", "") or "").strip()
+        if not token:
+            continue
+        words.append({
+            "start": round(float(get("start", 0.0) or 0.0), 2),
+            "end": round(float(get("end", 0.0) or 0.0), 2),
+            "word": token,
+        })
+
+    return text, segments, words
+
+
+def _join_word(text, word):
+    """Append a Whisper word, which arrives bare and punctuation-first."""
+    if not text:
+        return word
+    if word[0] in ",.!?;:%)]}" or word.startswith("'"):
+        return text + word
+    if text[-1] in "([{$\u00bf\u00a1":
+        return text + word
+    return text + " " + word
+
+
+def _turns_from_words(per_channel):
+    """Who was speaking when, rebuilt by interleaving both channels word by word.
+
+    Segments cannot do this. Each channel is transcribed on its own, so a
+    segment covers a window of *that track* — on the leg where one party was
+    mostly listening, Whisper returned a single segment spanning 0 to 28
+    seconds. Sorting spans like that by start time gives each side's monologue
+    end to end, which is why the transcript did not follow the call even once
+    the two speakers were correctly separated.
+
+    Word timings are per-word and do not overlap, so ordering them across both
+    channels reproduces the conversation, and a turn simply ends wherever the
+    next word belongs to the other speaker.
+    """
+    words = []
+    for speaker, channel in per_channel:
+        for w in channel or []:
+            words.append((w["start"], w["end"], speaker, w["word"]))
+    if not words:
+        return []
+    words.sort(key=lambda w: (w[0], w[1]))
+
+    turns = []
+    for start, end, speaker, word in words:
+        if turns and turns[-1]["speaker"] == speaker:
+            turns[-1]["text"] = _join_word(turns[-1]["text"], word)
+            turns[-1]["end"] = max(turns[-1]["end"], end)
+        else:
+            turns.append({"start": start, "end": end,
+                          "speaker": speaker, "text": word})
+    return turns
 
 
 def _split_stereo(file_path):
@@ -864,7 +1139,16 @@ def _split_stereo(file_path):
                 return None
             params = src.getparams()
             frames = src.readframes(params.nframes)
-    except (wave.Error, EOFError, FileNotFoundError):
+    except wave.Error as exc:
+        # Not a RIFF/WAV file at all — an mp3, which is what every stored
+        # recording actually is. "I cannot read this format" is a different
+        # fact from "this recording is mono", and returning None for both is
+        # exactly what hid speaker separation being broken on every Twilio
+        # recording the platform has ever transcribed. Say which one it was.
+        logger.info("%s is not readable as WAV (%s) — cannot split channels.",
+                    file_path, exc)
+        return None
+    except (EOFError, FileNotFoundError):
         return None
 
     width = params.sampwidth
@@ -883,37 +1167,106 @@ def _split_stereo(file_path):
     return out
 
 
-def transcribe_audio(file_path, with_segments=False):
+def _fetch_stereo_wav(recording_sid):
+    """Twilio's WAV rendering of a recording, in a temp file, or None.
+
+    The stored file is an mp3: a quarter of the size, and what the player
+    streams. But a conference leg is recorded with two channels — one party on
+    each — and Python's ``wave`` module cannot open an mp3 at all, so the
+    splitter was always handed a file it could never read. Twilio serves the
+    same recording as WAV with the channels intact, so transcription fetches
+    that, uses it, and throws it away. Nothing on disk changes.
+    """
+    import tempfile
+
+    account_sid = get_setting("TWILIO_ACCOUNT_SID")
+    auth_token = get_setting("TWILIO_AUTH_TOKEN")
+    if not (account_sid and auth_token and recording_sid):
+        return None
+
+    url = (f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}"
+           f"/Recordings/{recording_sid}.wav")
+    try:
+        resp = requests.get(url, auth=(account_sid, auth_token), timeout=60)
+    except Exception as exc:
+        logger.warning("Could not fetch WAV for %s: %s", recording_sid, exc)
+        return None
+    if resp.status_code != 200:
+        logger.warning("Could not fetch WAV for %s: HTTP %s",
+                       recording_sid, resp.status_code)
+        return None
+
+    fd, path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    with open(path, "wb") as out:
+        out.write(resp.content)
+    return path
+
+
+def transcribe_audio(file_path, with_segments=False, recording_sid=None, prompt=None):
     """Transcribe a recording.
 
     Returns the plain text by default, so every existing caller keeps working.
     Pass ``with_segments=True`` for ``(text, segments)``.
+
+    ``recording_sid`` lets a stored mp3 be transcribed from its WAV twin, which
+    is the only way the two parties can be told apart — see _fetch_stereo_wav.
+    Without it the mp3 is transcribed as one mixed track, which is what every
+    recording got until now: both voices in one line, and Whisper cutting
+    segments mid-sentence because it is segmenting an overlap as one stream.
     """
     client = _openai_client()
     channels = _split_stereo(file_path)
 
+    borrowed = None
+    if not channels and recording_sid:
+        borrowed = _fetch_stereo_wav(recording_sid)
+        if borrowed:
+            channels = _split_stereo(borrowed)
+            if not channels:
+                logger.info("WAV for %s is mono; nothing to separate.", recording_sid)
+
+    try:
+        return _transcribe_channels(file_path, channels, client, with_segments,
+                                    prompt=prompt)
+    finally:
+        if borrowed:
+            try:
+                os.remove(borrowed)
+            except OSError:
+                pass
+
+
+def _transcribe_channels(file_path, channels, client, with_segments, prompt=None):
     if not channels:
-        text, segments = _whisper(file_path, client)
+        text, segments, _words = _whisper(file_path, client, prompt=prompt)
     else:
-        # Two channels, so each side is transcribed on its own and the two are
-        # merged back in time order. Speaker 1 is the party the platform dialled
-        # out to; speaker 2 is the other side of the conference.
-        merged = []
+        # Two channels, so each side is transcribed on its own. Speaker 1 is
+        # the party the platform dialled out to; speaker 2 is the other side of
+        # the conference.
+        merged, per_channel = [], []
         try:
             for number, path in enumerate(channels, start=1):
-                _, segs = _whisper(path, client)
+                _text, segs, words = _whisper(path, client, prompt=prompt)
                 for seg in segs:
                     seg["speaker"] = number
                 merged.extend(segs)
+                per_channel.append((number, words))
         finally:
             for path in channels:
                 try:
                     os.remove(path)
                 except OSError:
                     pass
-        merged.sort(key=lambda s: s["start"])
-        segments = merged
-        text = "\n".join(s["text"] for s in merged)
+
+        # Word timings put the two sides back in the order they were spoken.
+        # Segments cannot — see _turns_from_words. Sorted segments stay as the
+        # fallback for a response that carries no words.
+        segments = _turns_from_words(per_channel)
+        if not segments:
+            merged.sort(key=lambda s: s["start"])
+            segments = merged
+        text = "\n".join(s["text"] for s in segments)
 
     return (text, segments) if with_segments else text
 
@@ -1025,7 +1378,7 @@ def _handle_self_registration_flow(phone: str, text: str) -> str | None:
     else:
         reply = _invoke_langgraph_for_agent(agent, text, thread_id, phone=phone)
 
-    conv, _ = Conversation.objects.get_or_create(
+    conv, _created = Conversation.objects.get_or_create(
         id=conv_uuid,
         defaults={"started_at": timezone.now(), "last_message_at": timezone.now()},
     )

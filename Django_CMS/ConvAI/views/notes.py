@@ -33,7 +33,12 @@ def _may_touch(request, note_or_parent):
     """A note is the client's, so whoever may see the client may write on it."""
     if is_admin(request.user):
         return True
-    patient = getattr(note_or_parent, "patient", None)
+    # A recording works out its client rather than simply having one — named by
+    # the call that placed it, or matched by number for rows that predate that.
+    # Reading `.patient` off it straight would see the bare column, which is
+    # null for every legacy recording, and refuse notes on all of them.
+    resolve = getattr(note_or_parent, "resolve_patient", None)
+    patient = resolve() if callable(resolve) else getattr(note_or_parent, "patient", None)
     if callable(patient):
         patient = patient()
     return bool(patient and patient.navigator_id == request.user.id)

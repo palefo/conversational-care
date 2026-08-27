@@ -38,10 +38,10 @@ def _run_llm(system_prompt: str, user_text: str) -> str:
 def build_meeting_protocol_text(meeting: Meeting) -> str:
     """Render a meeting's protocol(s) and recorded answers as plain text.
 
-    A meeting can reference several protocols but usually only one is filled in.
-    We include every protocol relevant to the meeting — the scheduled/executed
-    protocol plus any protocol that has answers — with each question and its
-    recorded answer (or a placeholder when blank).
+    A call can cover several protocols. We include every protocol relevant to
+    it — the ones it was booked for, the ones recorded as covered, and any that
+    has answers against this meeting — with each question and its recorded
+    answer (or a placeholder when blank).
     """
     answers = (
         Answer.objects
@@ -51,7 +51,10 @@ def build_meeting_protocol_text(meeting: Meeting) -> str:
     answer_by_qid = {a.question_id: (a.response or "").strip() for a in answers}
 
     numbers = []
-    for n in (meeting.executed_protocol, meeting.scheduled_protocol):
+    for n in (
+        list(meeting.executed_protocols.values_list("number", flat=True))
+        + list(meeting.scheduled_protocols.values_list("number", flat=True))
+    ):
         if n and n not in numbers:
             numbers.append(n)
     for a in answers:
@@ -96,6 +99,45 @@ def summarize_meeting(meeting: Meeting) -> str:
 
 
 # ─────────────────────────── call transcripts ────────────────────────────
+def recognition_hint(recording) -> str:
+    """Names this call is likely to contain, as a spelling prior for Whisper.
+
+    Whisper takes a short prompt and uses it as context. It cannot put words in
+    the transcript that nobody said — it biases spelling and vocabulary, which
+    is the difference between "Hi Pablo" and "Hi Pueblo", and between "IQCODE"
+    and "IQ code". Names are what a care call gets wrong most and what a reader
+    notices first.
+    """
+    from django.db.models import Q
+
+    from .models import Patient
+
+    nums = {str(recording.to_number or ""), str(recording.from_number or "")}
+    nums.discard("")
+    if not nums:
+        return ""
+
+    patient = (Patient.objects
+               .filter(Q(phone_number__in=nums) | Q(caregiver__phone_number__in=nums))
+               .select_related("caregiver", "navigator")
+               .first())
+    if not patient:
+        return ""
+
+    names = [patient.name, patient.lastname]
+    if patient.caregiver:
+        names += [patient.caregiver.name, patient.caregiver.lastname]
+    if patient.navigator:
+        names.append(patient.navigator.get_full_name() or patient.navigator.username)
+
+    names = [n.strip() for n in names if n and n.strip()]
+    if not names:
+        return ""
+    # dict.fromkeys rather than set: the order is the order they were added,
+    # so the hint reads the same way twice for the same call.
+    return "A care call. Names that may be spoken: %s." % ", ".join(dict.fromkeys(names))
+
+
 def transcribe_recording(recording) -> str:
     """Transcribe a call recording's audio with Whisper and persist it."""
     from .utils import transcribe_audio  # local import avoids import-time cycles
@@ -103,7 +145,11 @@ def transcribe_recording(recording) -> str:
     path = recording.filename
     if not path or not os.path.exists(path):
         raise FileNotFoundError("Recording audio file not found on disk.")
-    transcript, segments = transcribe_audio(path, with_segments=True)
+    # The sid lets transcribe_audio reach the WAV twin of this mp3, which is
+    # the only rendering that still has the two parties on separate channels.
+    transcript, segments = transcribe_audio(
+        path, with_segments=True, recording_sid=recording.recording_sid,
+        prompt=recognition_hint(recording) or None)
     transcript = (transcript or "").strip()
     recording.transcript = transcript
     recording.transcript_segments = segments

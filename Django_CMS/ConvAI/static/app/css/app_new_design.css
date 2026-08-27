@@ -145,10 +145,58 @@ body {
   margin-right: 0 !important;
 }
 
+/* The heading that separates the work from the setup, and what becomes of it
+   when the rail folds.
+
+   At full width it is the whole separation: a word, no rule under it. A line
+   and a label both, to hold two items apart from four, is more furniture than
+   the job needs.
+
+   Collapsed there is no room for the word — 5rem of rail against thirteen
+   characters — so the heading becomes the rule it was deliberately not given
+   at full width. Same element throughout: the box loses its text and keeps its
+   line, rather than one thing being swapped for another mid-fold.
+
+   The text only fades. Never `display: none`, so the heading stays in the
+   accessibility tree and the list it names keeps its name at both widths.
+   Height rather than the max-width the labels use — this box is already the
+   width of the rail, and it is the vertical space that has to close. */
+.sidebar-group {
+  height: 1rem;
+  margin: 1.25rem 0 .5rem;
+  padding: 0 .75rem;
+  overflow: hidden;
+  font-size: .6875rem;
+  font-weight: 600;
+  line-height: 1rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #94a3b8;
+  transition: height .22s cubic-bezier(.2, .8, .3, 1),
+              margin .22s cubic-bezier(.2, .8, .3, 1),
+              padding .22s cubic-bezier(.2, .8, .3, 1),
+              background-color .22s cubic-bezier(.2, .8, .3, 1);
+}
+/* Leads the fold by the same .12s the labels do, so the word is gone before
+   the box finishes closing rather than being sliced thin on the way out. */
+.sidebar-group-label {
+  display: block;
+  transition: opacity .12s ease;
+}
+.sidebar.collapsed .sidebar-group {
+  height: 1px;
+  margin: 1rem .75rem;
+  padding: 0;
+  background-color: #bae6fd;
+}
+.sidebar.collapsed .sidebar-group-label { opacity: 0; }
+
 /* The fold is travel, so under reduced motion it simply happens. */
 @media (prefers-reduced-motion: reduce) {
   .sidebar,
   .sidebar-logo, .sidebar-label, .sidebar-badge, .sidebar-caret,
+  .sidebar-group, .sidebar-group-label,
   .sidebar-item .material-icons-outlined { transition: none; }
 }
 
@@ -1164,8 +1212,46 @@ body.dp-settling .dp {
   font-size: .59375rem; letter-spacing: .07em; text-transform: uppercase;
   font-weight: 700; color: var(--brand-secondary);
 }
-.dp-kick-crit { color: #b91c1c; }
-.dp-kick-warn { color: #b45309; }
+
+/* The type mark, and the kicker beside it, in the tint the row's own icon
+   square carries — the same five-colour set as .cm-ic-* further down. Colour
+   says what kind of thing this is, in the list and in the panel alike; how
+   urgent it is is the tag beside the title, which is already red for a late
+   call and red for a high alert.
+
+   The kicker used to carry urgency instead (.dp-kick-crit / -warn, now gone),
+   which is why an overdue call was blue in the list and red in the panel, and
+   why a visit was orange in one and sky in the other. It never matched for any
+   kind. The ink is set once on the row and inherited, so a type is one line. */
+.dp-kickrow { display: flex; align-items: center; gap: 7px; }
+.dp-kickrow .dp-kick, .dp-kickrow .dp-tic { color: inherit; }
+.dp-tic {
+  width: 22px; height: 22px; border-radius: 6px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+}
+.dp-tic .material-icons-outlined { font-size: 14px; }
+.dp-t-call  { color: #1d4ed8; } .dp-t-call  .dp-tic { background: #eff6ff; }
+.dp-t-visit { color: #c2410c; } .dp-t-visit .dp-tic { background: #fff7ed; }
+.dp-t-chat  { color: #15803d; } .dp-t-chat  .dp-tic { background: #f0fdf4; }
+.dp-t-alert { color: #b91c1c; } .dp-t-alert .dp-tic { background: #fef2f2; }
+.dp-t-other { color: #6d28d9; } .dp-t-other .dp-tic { background: #f5f3ff; }
+
+/* Who the phone actually rings, or who wrote in. Under the dated facts because
+   it is one of them, and in the same quiet grey as the panel's other standing
+   blocks — except when it carries a reason the call cannot be placed, which is
+   the one thing here worth interrupting for. */
+.dp-to {
+  display: flex; gap: 8px; align-items: flex-start; margin-top: 10px;
+  padding: 8px 10px; background: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px;
+}
+.dp-to > .material-icons-outlined { font-size: 16px; color: #0369a1; flex: 0 0 auto; }
+.dp-to-t { font-size: .6875rem; color: #475569; line-height: 1.55; }
+.dp-to-t b { color: #0f172a; font-weight: 600; }
+.dp-to-t em { font-style: normal; color: #94a3b8; }
+.dp-to-warn { background: #fef2f2; border-color: #fecaca; }
+.dp-to-warn > .material-icons-outlined, .dp-to-warn .dp-to-t { color: #b91c1c; }
+.dp-to-warn .dp-to-t b { color: #7f1d1d; }
+
 .dp-title { font-size: .875rem; font-weight: 700; color: #1e293b; margin: .06rem 0 0; line-height: 1.35; }
 .dp-meta { font-size: .6875rem; color: #64748b; margin-top: .05rem; }
 /* The dated facts Rongqi kept at the top of her sidebars, made identical on
@@ -1189,6 +1275,22 @@ body.dp-settling .dp {
   border-bottom: 1px solid #e2e8f0; background: #fbfdff;
 }
 .dpc-ctl .dpc-attach { margin-top: .25rem; }
+/* Earlier attempts at the same call. Folded shut, because the recording above
+   is the one someone came for and a row of players competing with it is the
+   noise this change set out to remove. */
+.dpc-attempts { margin-top: .375rem; }
+.dpc-attempts > summary {
+  cursor: pointer; font-size: .6875rem; color: #64748b;
+  list-style: none;
+}
+.dpc-attempts > summary::-webkit-details-marker { display: none; }
+.dpc-attempts > summary::before { content: "▸ "; }
+.dpc-attempts[open] > summary::before { content: "▾ "; }
+.dpc-attempt { display: flex; align-items: center; gap: .5rem; margin-top: .375rem; }
+.dpc-attempt-when {
+  flex: 0 0 auto; font-size: .6875rem; color: #64748b; font-variant-numeric: tabular-nums;
+}
+.dpc-attempt .dp-player { flex: 1 1 auto; min-width: 0; }
 /* Tabs, ported from the panel prototype. Pinned between the header and the
    scrolling body — the point of them is that the header above and the actions
    below never move, so they cannot live inside the part that scrolls.
@@ -1219,6 +1321,36 @@ body.dp-settling .dp {
   border-radius: 9999px; padding: 1px 7px;
 }
 .dp-tab.on .dp-tab-n { background: #e0f2fe; color: #0369a1; }
+
+/* Why this alert exists, above the summary of what happened. Same grid and
+   rhythm as .dp-ov below, in the alert red the kicker already uses, because
+   the two blocks answer different questions and a navigator scanning a queue
+   has to be able to tell at a glance which one they are reading. Only the
+   classifier writes this; an alert a person raised has no trigger and the
+   block is not rendered. */
+.dp-trig {
+  display: grid; grid-template-columns: 28px minmax(0, 1fr);
+  gap: 2px 10px; align-items: start;
+  background: #fef2f2; border: 1px solid #fecaca; border-left: 3px solid #b91c1c;
+  border-radius: 0 .45rem .45rem 0; padding: .625rem .7rem; margin-bottom: .55rem;
+}
+.dp-trig::before {
+  content: "warning"; font-family: "Material Icons Outlined";
+  grid-column: 1; grid-row: 1 / span 2;
+  display: grid; place-items: center; width: 28px; height: 28px;
+  border-radius: .4rem; background: #fee2e2; color: #b91c1c;
+  font-size: 17px; line-height: 1;
+}
+.dp-trig-h {
+  grid-column: 2;
+  font-size: .59375rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: #b91c1c;
+}
+.dp-trig-t {
+  grid-column: 2;
+  font-size: .71875rem; color: #7f1d1d; line-height: 1.5;
+  margin-top: .1rem;
+}
 
 /* The overview callout, taken from Rongqi's sidebars. Violet rather than the
    product blue on purpose: everything else in the panel is something a person
@@ -1251,6 +1383,33 @@ body.dp-settling .dp {
   font-size: .71875rem; color: #354c63; line-height: 1.5;
   margin-top: .1rem; white-space: pre-line;
 }
+/* Said where the summary would be, in the block's own column but visibly not a
+   summary: this is the panel reporting an absence, not quoting one. */
+.dp-ov-none {
+  grid-column: 2;
+  font-size: .71875rem; color: #8b8ab8; line-height: 1.5; margin-top: .1rem;
+}
+
+/* An overview a person has rewritten is not the model's any more, so it loses
+   the one styling that says it is. Same block, same rhythm, ordinary panel
+   colours — and the mark changes from the generated sparkle to a written one,
+   because the icon is doing the same work as the palette. */
+.dp-ov-mine {
+  background: #f8fafc; border-color: #e2e8f0; border-left-color: #94a3b8;
+}
+.dp-ov-mine::before { content: "edit_note"; background: #f1f5f9; color: #475569; }
+.dp-ov-mine .dp-ov-h { color: #475569; }
+
+/* The byline under the block: whose words these are, and the way in to
+   changing them. Pulled up against the block it describes so the two read as
+   one unit rather than two stacked rows. */
+.dp-ov-bar {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: .5rem; margin: -.3rem 0 .6rem;
+}
+.dp-ov-src { font-size: .625rem; color: #94a3b8; line-height: 1.4; }
+.dp-ov-editor { margin-bottom: .6rem; }
+.dp-ov-editrow { display: flex; align-items: center; gap: .4rem; margin-top: .4rem; }
 
 /* Beats are rows on hairlines rather than boxes: the number sits in a small
    gutter and the stamp closes the row, which is the same left-gutter /
@@ -1285,7 +1444,11 @@ button.dp-stamp:hover { color: #075985; text-decoration: underline; }
 .dp-msg { max-width: 86%; display: flex; flex-direction: column; gap: 2px; }
 .dp-msg-in { align-self: flex-end; align-items: flex-end; }
 .dp-msg-out { align-self: flex-start; align-items: flex-start; }
-.dp-msg-b { font-size: .75rem; line-height: 1.5; padding: 7px 9px; border-radius: .55rem; }
+.dp-msg-b { font-size: .75rem; line-height: 1.5; padding: 7px 9px; border-radius: .55rem;
+  /* Bubbles carry the whole message now rather than 160 characters of it,
+     so an unbroken run — a URL, a long id — has to wrap instead of
+     pushing the bubble past the panel edge. */
+  overflow-wrap: anywhere; }
 .dp-msg-in .dp-msg-b { background: #0369a1; color: #fff; border-bottom-right-radius: 2px; }
 .dp-msg-out .dp-msg-b { background: #f1f5f9; color: #0f172a; border-bottom-left-radius: 2px; }
 .dp-msg time { font-size: .625rem; color: #94a3b8; font-variant-numeric: tabular-nums; }
@@ -1408,8 +1571,12 @@ button.dp-stamp:hover { color: #075985; text-decoration: underline; }
 /* No top padding: a sticky header rests at the scrollport's padding edge, so
    any padding here becomes a gap that question text scrolls through above the
    pinned protocol name. Spacing comes off the first child instead. */
-.dpc-body { flex: 1; overflow-y: auto; padding: 0 16px 10px; }
-.dpc-body > *:first-child { margin-top: .625rem; }
+/* The gap under the tab strip belongs to the body, not to whichever element
+   happens to be first in the DOM. It used to be a margin on `> *:first-child`,
+   which only ever reached one pane: the others are later siblings, so their
+   content sat flush against the tabs and the spacing changed as you switched
+   tab. Padding here is the same distance on every pane. */
+.dpc-body { flex: 1; overflow-y: auto; padding: .625rem 16px 10px; }
 .dpc-foot { padding: 10px 16px; border-top: 1px solid #e2e8f0; flex: 0 0 auto; }
 /* Call actions, immediately after the notes. */
 .dpc-acts { margin-top: .875rem; }
@@ -1639,6 +1806,116 @@ button.dp-stamp:hover { color: #075985; text-decoration: underline; }
 .dpc-pill-todo { background: #f1f5f9; color: #475569; }
 .dpc-pill-part { background: #fffbeb; color: #b45309; }
 .dpc-pill-done { background: #dcfce7; color: #166534; }
+/* A repeatable protocol with rounds behind it but none in this call. Sky rather
+   than green: there is history here, and the work is not over — "Complete" is
+   the wrong word for a questionnaire designed to be re-taken. */
+.dpc-pill-last { background: #f0f9ff; color: #075985; }
+
+/* ── Rounds of a repeatable protocol ─────────────────────────────────────
+   What was said on earlier calls, under the field this round is written into.
+   Read-only and undated-by-nothing: each row carries the day it came from,
+   because on a longitudinal instrument the date is half the answer. */
+.dpc-roundhead {
+  display: flex; align-items: center; gap: 6px;
+  font-size: .65625rem; color: #64748b; margin-bottom: .5625rem;
+  padding: .3125rem .5rem; background: #f0f9ff; border-radius: .3125rem;
+}
+.dpc-roundhead b { color: #075985; }
+.dpc-rounds { margin-top: .25rem; display: flex; flex-direction: column; gap: 2px; }
+.dpc-round {
+  display: flex; gap: 8px; align-items: baseline;
+  font-size: .65625rem; padding: .1875rem .4375rem;
+  background: #f8fafc; border: 1px solid #e2e8f0;
+  border-left: 2px solid #bae6fd; border-radius: 0 .25rem .25rem 0;
+}
+.dpc-round-w { color: #94a3b8; font-weight: 700; flex: none; font-variant-numeric: tabular-nums; }
+.dpc-round-v { color: #334155; flex: 1; min-width: 0; }
+
+/* Asking the caregiver, now inside the open card beside the questions it would
+   send rather than in a permanent row above it paired with a sentence
+   describing the fields below. */
+.dpc-askrow { display: flex; justify-content: flex-end; margin-bottom: .5rem; }
+
+/* ── "WhatsApp could not reach them — SMS instead?" ──────────────────────
+   Where Ask by text sits, after Ask by text has failed. Amber rather than red:
+   nothing is broken and nothing was lost, there is just a decision to make that
+   the platform will not make on the navigator's behalf. It takes the row's
+   place rather than appearing beside it, so there is never a live Ask by text
+   next to an explanation of why asking by text did not work. */
+.dpc-askoffer {
+  border: 1px solid #fcd34d; background: #fffbeb; border-radius: .5rem;
+  padding: .625rem .75rem; margin-bottom: .5rem;
+}
+.dpc-askoffer p { margin: 0; }
+.dpc-askoffer form { margin: 0; }
+.dpc-askoffer-t { font-size: .75rem; color: #78350f; font-weight: 600; }
+/* The Twilio reason, in the navigator's own terms. Lighter than the sentence
+   above it: it explains, it is not the news. */
+.dpc-askoffer-why { display: block; font-weight: 400; color: #92400e; margin-top: .125rem; }
+.dpc-askoffer-q { font-size: .75rem; color: #78350f; margin-top: .4375rem !important; }
+.dpc-askoffer-b { display: flex; gap: .5rem; margin-top: .5625rem; }
+
+/* ── Checkbox lists in the panel's dialogs ───────────────────────────────
+   A call can cover several protocols, so the pickers are lists rather than
+   dropdowns. Protocols outside the client's programme stay pickable — a
+   one-off is a real thing to want — and are marked rather than hidden. */
+.dp-fld-multi { display: block; }
+.dp-fld-multi > span {
+  display: block; font-size: .6875rem; color: #475569; margin-bottom: .25rem;
+}
+.dp-checks {
+  border: 1px solid #cbd5e1; border-radius: .375rem; background: #fff;
+  max-height: 190px; overflow-y: auto;
+}
+.dp-check {
+  display: flex; align-items: flex-start; gap: .5rem; cursor: pointer;
+  padding: .4375rem .5rem; font-size: .75rem; color: #1e293b;
+  border-bottom: 1px solid #e2e8f0;
+}
+.dp-check:last-child { border-bottom: 0; }
+.dp-check:hover { background: #f0f9ff; }
+.dp-check input[type="checkbox"] {
+  width: auto; min-width: 0; flex: none; margin: .125rem 0 0;
+  padding: 0; accent-color: #0369a1;
+}
+.dp-check-n { color: #94a3b8; font-weight: 700; font-size: .6875rem; flex: none; }
+.dp-check-t { flex: 1; min-width: 0; line-height: 1.35; }
+.dp-check-t em { color: #94a3b8; font-size: .6875rem; font-style: normal; }
+.dp-check-off { background: #f8fafc; }
+.dp-check-off .dp-check-t { color: #64748b; }
+
+/* ── The client's programme, on their profile ────────────────────────────
+   Same decision as the pickers above, made on a wider page, so the list can
+   run in columns instead of one long scroll. */
+.pf-checks {
+  display: grid; gap: .25rem;
+  border: 1px solid #e2e8f0; border-radius: .5rem; padding: .5rem;
+  background: #fff;
+}
+@media (min-width: 640px) { .pf-checks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.pf-check {
+  display: flex; align-items: flex-start; gap: .5rem; cursor: pointer;
+  padding: .4375rem .5rem; border-radius: .375rem;
+  font-size: .8125rem; color: #1e293b; line-height: 1.4;
+}
+.pf-check:hover { background: #f0f9ff; }
+.pf-check input[type="checkbox"] {
+  width: auto; min-width: 0; flex: none; margin: .1875rem 0 0;
+  padding: 0; border-radius: .1875rem; accent-color: #0369a1;
+}
+.pf-check-t { flex: 1; min-width: 0; }
+/* A protocol outside the chosen client's programme. Marked, not hidden: a
+   one-off is a real thing to want, and hiding it would mean editing a profile
+   to run one call and editing it back afterwards. */
+.pf-check-off { background: #f8fafc; }
+.pf-check-off .pf-check-t { color: #64748b; }
+.pf-off {
+  font-size: .6875rem; color: #94a3b8; flex: none; align-self: center;
+  white-space: nowrap;
+}
+/* The scheduling dialog holds the same list in less room. */
+.cal-protos { display: flex; flex-direction: column; max-height: 190px; overflow-y: auto; }
+@media (min-width: 640px) { .cal-protos { display: flex; } }
 
 .dpc-desc { font-size: .6875rem; color: #64748b; line-height: 1.45; margin-bottom: .5rem; }
 .dpc-q { margin-bottom: .6875rem; }
@@ -2225,6 +2502,22 @@ dialog[open]::backdrop { animation: dlg-scrim .2s ease both; }
   .cm-field input:focus, .cm-field select:focus { outline: 2px solid #0369a1; outline-offset: -1px; }
   .cm-field .err { font-size: 0.71875rem; color: #b91c1c; margin-top: 4px; }
   .cm-field .hint { font-size: 0.71875rem; color: #94a3b8; margin-top: 4px; }
+  /* The protocol picker is a list of checkboxes, not one control, so it needs
+     a box of its own rather than the full-width input rule above. */
+  .cm-field[data-protocols] > div {
+    border: 1px solid #cbd5e1; border-radius: .375rem; background: #fff;
+    max-height: 160px; overflow-y: auto; padding: .25rem;
+  }
+  .cm-field[data-protocols] > div > div { display: block; }
+  .cm-field[data-protocols] label {
+    display: flex; align-items: flex-start; gap: .5rem; cursor: pointer;
+    font-size: .75rem; font-weight: 400; letter-spacing: 0; text-transform: none;
+    color: #1e293b; padding: .3125rem .375rem; border-radius: .25rem;
+  }
+  .cm-field[data-protocols] label:hover { background: #f0f9ff; }
+  .cm-field[data-protocols] input {
+    width: auto; margin: .1875rem 0 0; accent-color: #0369a1; flex: none;
+  }
   .cm-dialog-f { display: flex; gap: 8px; justify-content: flex-end; padding-top: 3px; }
   .cm-btn { font-size: 0.8125rem; font-weight: 600; border-radius: 8px; padding: 9px 16px;
             cursor: pointer; border: 1px solid #cbd5e1; background: #fff; color: #475569;
@@ -2332,6 +2625,9 @@ dialog[open]::backdrop { animation: dlg-scrim .2s ease both; }
   font-size: .625rem; font-weight: 700; letter-spacing: .06em;
   text-transform: uppercase; color: #94a3b8; margin: 0 0 .4375rem;
 }
+/* What ticking one of these actually does, said only while you are editing —
+   in the read state the chips are a fact about the client, not an instruction. */
+.pd-terms-note { font-size: .71875rem; color: #94a3b8; margin: .4375rem 0 0; }
 .pd-chips { display: flex; gap: .375rem; flex-wrap: wrap; }
 .pd-chip {
   display: inline-flex; align-items: center; gap: .375rem; cursor: pointer;

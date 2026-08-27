@@ -31,8 +31,8 @@ from .views import (
     PasswordResetConfirmView, PasswordResetCompleteView,
     alerts_since,
     twilio_audio_download, send_care_plan_whatsapp, twilio_careplan_download,
-    start_protocol_automation, communications, panel_fragment,
-    summarize_meeting_view, transcribe_recording_view,
+    start_protocol_automation, dismiss_sms_offer, communications, panel_fragment,
+    summarize_meeting_view, transcribe_recording_view, edit_overview,
     download_client_sdk,
 )
 from .utils import navigator_required, patient_tester_required
@@ -114,6 +114,7 @@ urlpatterns = [
     path('meetings/<int:meeting_id>/send_whatsapp/', navigator_required(send_meeting_reminder_view), name='send_whatsapp_reminder'),
     path('meetings/<int:meeting_id>/summarize/', navigator_required(summarize_meeting_view), name='summarize_meeting'),
     path('recordings/<str:sid>/transcribe/', navigator_required(transcribe_recording_view), name='transcribe_recording'),
+    path('summaries/<str:kind>/<str:pk>/edit/', navigator_required(edit_overview), name='edit_overview'),
     path('client-sdk/download/', download_client_sdk, name='download_client_sdk'),
     path('chat/send/', navigator_required(send_chat_message), name='send_chat_message'),
     path("meeting/<int:meeting_id>/protocol/<int:protocol_num>/", navigator_required(protocol_view), name="protocol_view"),
@@ -150,5 +151,6 @@ urlpatterns = [
     path("patients/<int:pk>/send-care-plan/", send_care_plan_whatsapp, name="send_care_plan_whatsapp"),
     path("twilio/documents/careplan_<int:pk>.pdf/", twilio_careplan_download, name="twilio_careplan_download"),
     path("meetings/<int:meeting_id>/protocol/<int:protocol_num>/automation/start/", start_protocol_automation, name="start_protocol_automation"),
+    path("protocol/automation/sms-offer/dismiss/", dismiss_sms_offer, name="dismiss_sms_offer"),
     path("communications/", navigator_required(communications), name="communications"),
 ]

@@ -9,10 +9,16 @@
   than a dialog on every removal.
 
   Expects panel_item.notes_list, .note_parent and .note_parent_id.
+
+  note_parent_id can be empty: a chat day whose thread cannot be resolved to a
+  Conversation row has nothing for a note to hang off. Reversing add_note with
+  an empty pk raised NoReverseMatch and took the whole page down with it, so
+  the attribute is omitted rather than built from nothing — the composer above
+  is hidden in the same case, and the JS treats a missing addUrl as read-only.
 {% endcomment %}
 {% if panel_item.notes_list %}<div class="dpc-sect">{% trans "Earlier notes" %}</div>{% endif %}
 <div class="dp-notelist" id="dpNotes"
-     data-add-url="{% url 'add_note' panel_item.note_parent panel_item.note_parent_id %}">
+     {% if panel_item.note_parent_id %}data-add-url="{% url 'add_note' panel_item.note_parent panel_item.note_parent_id %}"{% endif %}>
 
   {% for n in panel_item.notes_list %}
     <article class="dp-note" data-note="{{ n.id }}"

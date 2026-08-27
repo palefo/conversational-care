@@ -81,6 +81,13 @@ class MeetingCreateInSerializer(serializers.Serializer):
     patient_id = serializers.IntegerField()
     scheduled_time = serializers.DateTimeField()
     type = serializers.IntegerField(required=False)
+    # A call can cover more than one protocol. `scheduled_protocol` is the
+    # single-value spelling this endpoint shipped with; it still works and means
+    # a list of one. Both are protocol *numbers*, and a number with no protocol
+    # behind it is rejected rather than stored.
+    scheduled_protocols = serializers.ListField(
+        child=serializers.IntegerField(), required=False, allow_empty=True,
+    )
     scheduled_protocol = serializers.IntegerField(required=False, allow_null=True)
 
 
@@ -88,6 +95,11 @@ class MeetingOutSerializer(serializers.ModelSerializer):
     patient = PatientOutSerializer(read_only=True)
     type_display = serializers.CharField(source="get_type_display", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+    scheduled_protocols = serializers.SerializerMethodField()
+    executed_protocols = serializers.SerializerMethodField()
+    # Kept so clients written against the old shape keep parsing. Both report
+    # the first protocol of what may now be several.
+    scheduled_protocol = serializers.SerializerMethodField()
     scheduled_protocol_display = serializers.SerializerMethodField()
 
     class Meta:
@@ -98,12 +110,32 @@ class MeetingOutSerializer(serializers.ModelSerializer):
             "created_time",
             "type", "type_display",
             "status", "status_display",
+            "scheduled_protocols", "executed_protocols",
             "scheduled_protocol", "scheduled_protocol_display",
             "patient",
         ]
 
+    @staticmethod
+    def _brief(protocols):
+        return [
+            {"id": p.pk, "number": p.number, "title": p.title,
+             "repeatable": p.repeatable}
+            for p in protocols
+        ]
+
+    def get_scheduled_protocols(self, obj):
+        return self._brief(obj.scheduled_protocols.order_by("number"))
+
+    def get_executed_protocols(self, obj):
+        return self._brief(obj.executed_protocols.order_by("number"))
+
+    def get_scheduled_protocol(self, obj):
+        first = obj.scheduled_protocols.order_by("number").first()
+        return first.number if first else None
+
     def get_scheduled_protocol_display(self, obj):
-        return obj.get_scheduled_protocol_display() if obj.scheduled_protocol else None
+        first = obj.scheduled_protocols.order_by("number").first()
+        return f"{first.number}. {first.title}" if first else None
 
 class AnswerUpsertItemSerializer(serializers.Serializer):
     question_id = serializers.IntegerField()

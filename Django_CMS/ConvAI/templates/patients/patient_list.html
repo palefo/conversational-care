@@ -1377,6 +1377,13 @@ pacRender();
           {{ client_form.caregiver_email }}
         </div>
       </div>
+      {% comment %}
+        The same fieldset the edit form uses. Nothing is ticked by default —
+        which protocols this person is on is a decision about them, and an empty
+        panel asks the question where a full one answered it wrongly.
+      {% endcomment %}
+      {% with form=client_form %}{% include "patients/_protocols_field.html" %}{% endwith %}
+
       <div class="flex justify-end gap-2">
         <button type="button" onclick="clientClose()" class="button-secondary py-2 px-4 rounded-lg text-sm">{% trans "Cancel" %}</button>
         <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Create" %}</button>

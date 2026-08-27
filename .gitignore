@@ -58,3 +58,6 @@ Django_CMS/ConvAI/static/app/css/tailwind.css
 # Fixture dumps that have carried credentials in the past
 users.json
 STYLING.md
+
+# Claude Code agent worktrees (a checkout of this repo, not source)
+.claude/worktrees/

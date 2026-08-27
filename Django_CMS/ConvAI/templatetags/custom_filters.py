@@ -11,6 +11,19 @@ import os
 
 register = template.Library()
 
+@register.filter(name='detector_label')
+def detector_label(title):
+    """Read a classifier alert's title in the viewer's language.
+
+    The title of an alert the classifier raised is the detector's label, and
+    built-in labels are stored in English so the stored string keeps matching
+    the config and the dedupe. This translates it for display only; labels an
+    admin wrote pass through as their own words.
+    """
+    from ..utils_conversation_classification import display_label
+    return display_label(title)
+
+
 @register.filter
 def get_item(dictionary, key):
     """Fetches a dictionary item by key"""

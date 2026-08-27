@@ -474,7 +474,7 @@ result = client.schedule_meeting(
     patient_id=10,
     scheduled_time_iso="2026-08-01T15:30:00Z",
     type=1,                # 0 Onboarding, 1 Regular, 2 Final, 3 Initial
-    scheduled_protocol=2,  # optional protocol number
+    scheduled_protocols=[2, 3],  # optional protocol numbers
 )
 print(result)</code></pre>
         </div>

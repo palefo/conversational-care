@@ -162,6 +162,22 @@ SELF_REGS = [
 ]
 
 
+def _book(meeting, number, done=False):
+    """Point a seeded meeting at a real protocol, and put the client on it.
+
+    What a call covers is a relation now. Seeding the old integer column left
+    meetings whose protocol the panel could not see, and clients whose panel was
+    empty because nothing was on their programme.
+    """
+    protocol = Protocol.objects.filter(number=number).first()
+    if protocol is None:
+        return
+    meeting.scheduled_protocols.add(protocol)
+    if done:
+        meeting.executed_protocols.add(protocol)
+    meeting.patient.protocols.add(protocol)
+
+
 class Command(BaseCommand):
     help = "Fill demo content across all pages (calls, protocols, conversations, users, self-registrations)."
 
@@ -209,21 +225,22 @@ class Command(BaseCommand):
                 ):
                     proto = 2 if (idx + k) % 2 == 0 else 3
                     st = getattr(Meeting.Status, status_name)
-                    Meeting.objects.create(
+                    m = Meeting.objects.create(
                         patient=p,
                         scheduled_time=now - timezone.timedelta(days=days_ago),
                         type=Meeting.MeetingType.REGULAR,
                         status=st,
-                        scheduled_protocol=proto,
-                        executed_protocol=proto if st == Meeting.Status.COMPLETED else None,
                     )
+                    _book(m, proto, done=st == Meeting.Status.COMPLETED)
                     n_meet += 1
 
             # ── completed meetings → answers + call recording ─────
             for m in p.meetings.filter(status=Meeting.Status.COMPLETED):
-                proto = m.executed_protocol or m.scheduled_protocol or (2 if idx % 2 == 0 else 3)
-                if not m.executed_protocol:
-                    m.executed_protocol = proto
+                covered = (list(m.executed_protocols.all())
+                           or list(m.scheduled_protocols.all()))
+                proto = covered[0].number if covered else (2 if idx % 2 == 0 else 3)
+                if not m.executed_protocols.exists():
+                    _book(m, proto, done=True)
                 for i in range(5):
                     setattr(m, f"step_{i}", True)
                 m.save()
@@ -250,6 +267,10 @@ class Command(BaseCommand):
                         end_time=m.scheduled_time + timezone.timedelta(seconds=dur),
                         duration=dur,
                         filename=wav_path,
+                        # Attributed at creation, as a real call now is.
+                        meeting=m,
+                        patient=p,
+                        leg=CallRecording.Leg.DYAD,
                     )
                     n_rec += 1
 
@@ -334,13 +355,13 @@ class Command(BaseCommand):
                 offsets = [-2, 1, 3]  # hours relative to now: one overdue, two upcoming
                 for k, hrs in enumerate(offsets):
                     tp = nav_patients[k % len(nav_patients)]
-                    Meeting.objects.create(
+                    today_m = Meeting.objects.create(
                         patient=tp,
                         scheduled_time=now + timezone.timedelta(hours=hrs),
                         type=Meeting.MeetingType.REGULAR,
                         status=Meeting.Status.PENDING,
-                        scheduled_protocol=2 if k % 2 == 0 else 3,
                     )
+                    _book(today_m, 2 if k % 2 == 0 else 3)
                     n_today += 1
 
             # Some messages timestamped *today* so the message-trend chart isn't flat.

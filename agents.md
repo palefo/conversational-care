@@ -279,6 +279,76 @@ their server owns the model.
   compatible) each have their own endpoint/key vars. Under Azure OpenAI the model
   string is the **deployment name**. See `.env.sample` for the full list.
 
+## Classification and alerts
+
+Every agent carries three optional classification settings, edited under
+**Agents → edit → Advanced: conversation classification** (and mirrored in
+Django admin):
+
+| Field | What it does |
+|---|---|
+| `classification_role` | The persona the classifier adopts. Continues the phrase "You are …". |
+| `abstract_instruction` | How the conversation summary should be written. |
+| `detectors` | What this agent watches for, and what it does when it finds it. |
+
+### Detectors
+
+`Agent.detectors` is a JSON object keyed by detector label:
+
+```json
+{
+  "Missed medication": {
+    "instruction": "Mentions skipping or forgetting doses",
+    "raises": true,
+    "priority": 2
+  },
+  "Asks about services": {
+    "instruction": "Questions about day centres, respite, benefits",
+    "raises": false
+  }
+}
+```
+
+`priority` mirrors `Alert.Priority` (1 High, 2 Medium, 3 Low) and only matters
+when `raises` is true. The older shape — `{"label": "instruction"}` — still
+reads, and means *detect but do not raise*, which is what those rows did before
+alerts existed; they are not silently promoted.
+
+`ConvAI/forms.py:DetectorTableWidget` is the editor, shared by the Agents page
+and Django admin so the two cannot drift.
+
+### The self-harm floor
+
+One detector is compiled in and applies to every agent, configured or not:
+`SAFETY_DETECTOR` in `ConvAI/utils_conversation_classification.py`. An admin can
+reword its instruction by using the same label; they cannot stop it raising or
+lower it below High. The reasoning is in the code comment — a forgotten config
+field must not be the only thing between a disclosure and a navigator.
+
+### When classification runs
+
+`process_message_for_patient` hands each inbound turn to
+`conversation_alerts.review_conversation` on the **ingest** thread pool, so the
+classifier never delays the caregiver's reply. Turns with no inbound text
+(outbound reminders and templates) are skipped — no new evidence, no new
+verdict. The Settings → **Classify conversations** button calls the same
+function over anything unanalysed, as a backstop for conversations that predate
+the hook or that the pool dropped.
+
+`review_conversation` writes `summary`, `topic`, `is_important` and
+`auto_flags` onto the Conversation, then raises one `Alert` per firing detector
+that has `raises` set, with:
+
+* `alert_type = CONVERSATION` and no `created_by` — nobody created it
+* `data["conversation_id"]` — what the detail panel resolves the exchange from
+* `data["trigger"]` — one sentence naming the moment, shown above the summary
+* `description` — the abstract, editable in the panel like any other overview
+
+`important` on its own does **not** raise; it is a review flag. Alerts come only
+from detectors somebody chose in advance, plus the floor. One open alert per
+conversation per detector, so a long crisis chat is one row rather than
+fourteen.
+
 ## Which surface uses which agent
 
 - **External chat / voice** (`external_chat`, `send_external_message`,

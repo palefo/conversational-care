@@ -102,10 +102,16 @@
   }
 
   /* ───────── Schedule modal ───────── */
-  .cal-modal-card input:not([type=hidden]), .cal-modal-card select {
+  /* Checkboxes are excluded: this rule is for the one-per-row text and select
+     controls, and it was stretching each protocol tick box into a full-width
+     bordered field with the label squeezed into the column beside it. */
+  .cal-modal-card input:not([type=hidden]):not([type=checkbox]),
+  .cal-modal-card select {
     width:100%; border-radius:.5rem; border:1px solid #d1d5db; padding:.5rem .7rem; font-size:.875rem; background:#fff; color:#111827; }
-  .cal-modal-card input:focus, .cal-modal-card select:focus {
+  .cal-modal-card input:not([type=checkbox]):focus, .cal-modal-card select:focus {
     outline:none; border-color:var(--brand-primary); box-shadow:0 0 0 3px rgba(3,105,161,.15); }
+  .cal-modal-card input[type=checkbox]:focus-visible {
+    outline:2px solid var(--brand-primary); outline-offset:2px; }
 </style>
 {% endblock %}
 
@@ -278,9 +284,34 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.type.label }}</label>
           {{ meeting_form.type }}
         </div>
+        {% comment %}
+          A call can cover more than one protocol, so this is a list rather than
+          a dropdown that could only hold one. Every row is a real protocol
+          record — the old dropdown was built from a hard-coded list of ten
+          placeholder names and offered protocols nobody had created.
+
+          The chosen client's own protocols float to the top as soon as a client
+          is picked; the rest stay pickable and are marked, so a one-off does
+          not mean editing a profile and editing it back.
+        {% endcomment %}
         <div class="mb-5">
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.scheduled_protocol.label }}</label>
-          {{ meeting_form.scheduled_protocol }}
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.scheduled_protocols.label }}</label>
+          {% if meeting_form.scheduled_protocols.field.queryset %}
+            <div class="pf-checks cal-protos" id="calProtos">
+              {% for box in meeting_form.scheduled_protocols %}
+                <label class="pf-check" data-protocol="{{ box.data.value }}">
+                  {{ box.tag }}
+                  <span class="pf-check-t">{{ box.choice_label }}</span>
+                  <span class="pf-off" hidden>{% trans "not on their programme" %}</span>
+                </label>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-sm text-gray-500">
+              {% trans "No protocols exist yet." %}
+              <a href="{% url 'config' %}?tab=protocols#protocols" class="text-sky-700 underline">{% trans "Create one first." %}</a>
+            </p>
+          {% endif %}
         </div>
         <div class="flex justify-end gap-2">
           <button type="button" onclick="calClose()" class="button-secondary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Cancel" %}</button>
@@ -295,6 +326,40 @@
 
 {% block scripts %}
 {{ block.super }}
+{{ protocol_owners|json_script:"calProtoOwners" }}
+<script>
+  // The chosen client's own protocols first, the rest marked and still
+  // pickable. Done here rather than server-side because the client is chosen in
+  // this same dialog: there is nothing to sort by until they are.
+  (function () {
+    var list = document.getElementById('calProtos');
+    var who  = document.querySelector('#calModal [name="patient"]');
+    var raw  = document.getElementById('calProtoOwners');
+    if (!list || !who || !raw) return;
+
+    var owners = {};
+    try { owners = JSON.parse(raw.textContent || '{}'); } catch (e) { return; }
+
+    var rows = Array.prototype.slice.call(list.querySelectorAll('.pf-check'));
+
+    function reorder() {
+      var patient = who.value;
+      rows.forEach(function (row) {
+        var on = !patient
+          || (owners[row.getAttribute('data-protocol')] || [])
+               .map(String).indexOf(String(patient)) !== -1;
+        row.classList.toggle('pf-check-off', !on);
+        row.querySelector('.pf-off').hidden = on || !patient;
+        // Ordered by a flex order rather than moving nodes, so a half-ticked
+        // list does not lose its checkboxes when the client changes.
+        row.style.order = on ? 0 : 1;
+      });
+    }
+
+    who.addEventListener('change', reorder);
+    reorder();
+  })();
+</script>
 <script>
   function calFmt(dt){
     try {

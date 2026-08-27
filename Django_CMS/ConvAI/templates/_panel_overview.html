@@ -1,0 +1,60 @@
+{% load i18n tz %}
+{% comment %}
+  The overview block, shared by the meeting, recording, conversation and alert
+  panels so the four cannot drift apart.
+
+  The violet treatment means "the model wrote this" — it is the one place the
+  panel's palette breaks, which is what makes the break carry information. So
+  editing does two things, not one: it changes the words, and it drops the
+  claim. An overview a person has rewritten is drawn as ordinary panel content
+  and says who wrote it.
+
+  Expects panel_item.overview. The rest is optional: without
+  .overview_edit_url the block is read-only, which is how the alert panel gets
+  it — its "overview" is the alert description, written by whoever raised it,
+  and never generated in the first place.
+{% endcomment %}
+<div class="dp-ovwrap" data-ov {% if panel_item.overview_edit_url %}data-ov-url="{{ panel_item.overview_edit_url }}"{% endif %}>
+
+  <div class="dp-ov{% if panel_item.overview_edited %} dp-ov-mine{% endif %}" data-ov-view>
+    {% if panel_item.overview_heading %}<div class="dp-ov-h" data-ov-head>{{ panel_item.overview_heading }}</div>{% endif %}
+    <div class="dp-ov-t" data-ov-body>{{ panel_item.overview }}</div>
+    {% comment %}
+      What the absence means, when the panel knows. A separate element rather
+      than placeholder text inside the body, because the body is what Edit
+      reads into its textarea — a placeholder there would be prefilled as if
+      somebody had written it. Removed by the save handler.
+    {% endcomment %}
+    {% if not panel_item.overview and panel_item.overview_empty %}
+      <div class="dp-ov-none" data-ov-none>{{ panel_item.overview_empty }}</div>
+    {% endif %}
+  </div>
+
+  {% if panel_item.overview_edit_url %}
+    <div class="dp-ov-editor" data-ov-editor hidden>
+      <textarea class="dpc-ta" rows="5" data-ov-input
+                aria-label="{% trans 'Overview' %}">{{ panel_item.overview }}</textarea>
+      <div class="dp-ov-editrow">
+        <button type="button" class="dp-btn" data-ov-cancel>{% trans "Cancel" %}</button>
+        <button type="button" class="dp-btn dp-btn-pri" data-ov-save>{% trans "Save" %}</button>
+        <span class="dpc-saved" data-ov-state hidden></span>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if panel_item.overview_when or panel_item.overview_edit_url %}
+    <div class="dp-ov-bar">
+      <span class="dp-ov-src" data-ov-src>
+        {% if panel_item.overview_edited %}
+          {% blocktrans with who=panel_item.overview_by when=panel_item.overview_when|localtime|date:"j M · H:i" %}Edited by {{ who }} · {{ when }}{% endblocktrans %}
+        {% elif panel_item.overview_when %}
+          {% blocktrans with when=panel_item.overview_when|localtime|date:"j M · H:i" %}Generated {{ when }}{% endblocktrans %}
+        {% endif %}
+      </span>
+      {% if panel_item.overview_edit_url %}
+        <button type="button" class="dpc-lnk" data-ov-start>{% trans "Edit" %}</button>
+      {% endif %}
+    </div>
+  {% endif %}
+
+</div>

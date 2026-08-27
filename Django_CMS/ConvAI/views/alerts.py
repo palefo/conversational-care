@@ -500,8 +500,8 @@ def alerts_since(request):
         out.append({
             "id": a.pk,
             "high": high,
-            "title": f"{label} — {who}" if who else (a.title or str(label)),
-            "body": a.title or a.description or "",
+            "title": f"{label} — {who}" if who else (display_label(a.title) or str(label)),
+            "body": display_label(a.title) or a.description or "",
             # Just the panel token. The browser hangs it off whatever page it
             # is on, keeping the filters and sort already in the URL, so acting
             # on an alert never costs you the list you were working.

@@ -1,0 +1,220 @@
+{% load i18n tz markdownify custom_filters %}
+{% comment %}
+  One protocol card, used under both headings in the protocols pane.
+
+  It was inline in _detail_panel.html when there was one list. There are two now
+  — what this call is for, and the rest of the client's programme — and the card
+  has to be identical in both or the split reads as two different things rather
+  than the same thing sorted.
+
+  Expects `p` (a card dict from _protocol_card) and `panel_item`.
+{% endcomment %}
+<div class="dpc-card" data-protocol="{{ p.number }}" data-total="{{ p.total }}">
+  <div class="dpc-card-hrow">
+    {% comment %}
+      The header row is about the protocol; the body below it is about this
+      meeting. Editing the structure changes the questions for every client on
+      it, so it sits up here as a quiet link rather than down beside Save
+      answers as a button the same size and colour.
+    {% endcomment %}
+    <button type="button" class="dpc-card-h" aria-expanded="false">
+      <span class="dpc-chev" aria-hidden="true">›</span>
+      <span class="dpc-card-n">{{ p.number }}. {{ p.title }}</span>
+      {% if p.repeatable %}
+        {% comment %}
+          A questionnaire meant to be re-taken is never finished, so it never
+          says Complete. It says which round this is, or when the last one was.
+        {% endcomment %}
+        {% if p.complete %}
+          <span class="dpc-pill dpc-pill-done" data-pill>{% blocktrans with n=p.round_no %}Round {{ n }} done{% endblocktrans %}</span>
+        {% elif p.started %}
+          <span class="dpc-pill dpc-pill-part" data-pill>{{ p.answered }} {% trans "of" %} {{ p.total }}</span>
+        {% elif p.last_round %}
+          <span class="dpc-pill dpc-pill-last" data-pill>{% blocktrans with d=p.last_round|localtime|date:"j M" %}Last done {{ d }}{% endblocktrans %}</span>
+        {% else %}
+          <span class="dpc-pill dpc-pill-todo" data-pill>{% blocktrans count n=p.total %}{{ n }} question{% plural %}{{ n }} questions{% endblocktrans %}</span>
+        {% endif %}
+      {% else %}
+        {% if p.complete %}
+          <span class="dpc-pill dpc-pill-done" data-pill>{% trans "Complete" %}</span>
+        {% elif p.started %}
+          <span class="dpc-pill dpc-pill-part" data-pill>{{ p.answered }} {% trans "of" %} {{ p.total }}</span>
+        {% else %}
+          <span class="dpc-pill dpc-pill-todo" data-pill>{% blocktrans count n=p.total %}{{ n }} question{% plural %}{{ n }} questions{% endblocktrans %}</span>
+        {% endif %}
+      {% endif %}
+    </button>
+    {% if panel_item.can_edit_answers %}
+      <a class="dpc-card-edit" href="{% url 'protocol_editor' p.number %}"
+         title="{% trans 'Changes the questions for every client on this protocol' %}">{% trans "Edit" %}</a>
+    {% endif %}
+  </div>
+
+  {% comment %}
+    While a protocol is out with the caregiver by text, the card says so. There
+    is no longer a line for the ordinary state: "Type the answers, or ask the
+    caregiver" described the two fields below it, which describe themselves.
+    Asking is a button in the body, next to the questions it would send.
+  {% endcomment %}
+  {% if panel_item.automations_enabled and panel_item.can_edit_answers %}
+    {% if panel_item.automation and panel_item.automation.protocol == p.number %}
+      <div class="dpc-mode dpc-mode-live">
+        <span class="dpc-mode-dot{% if not p.by_text_count %} dpc-mode-wait{% endif %}"></span>
+        <span class="dpc-mode-t">
+          {% if p.by_text_count %}
+            {% blocktrans count n=p.by_text_count %}<b>{{ n }} answer</b> came back by text{% plural %}<b>{{ n }} answers</b> came back by text{% endblocktrans %}
+          {% else %}
+            {% blocktrans with who=panel_item.patient.caregiver %}Asked {{ who }} by text &middot; no replies yet{% endblocktrans %}
+          {% endif %}
+        </span>
+        <button type="button" class="dp-btn" onclick="window.location.reload()">
+          <span class="dpc-mode-ico" aria-hidden="true">refresh</span>{% trans "Check for replies" %}
+        </button>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  <div class="dpc-card-b">
+    {% if p.description %}<div class="dpc-desc">{{ p.description|markdownify }}</div>{% endif %}
+
+    {% if p.repeatable and p.prior_rounds %}
+      <div class="dpc-roundhead">
+        <b>{% blocktrans with n=p.round_no %}Round {{ n }}{% endblocktrans %}</b>
+        <span>{% blocktrans count n=p.prior_rounds %}· {{ n }} earlier round{% plural %}· {{ n }} earlier rounds{% endblocktrans %}</span>
+      </div>
+    {% endif %}
+
+    {% comment %}
+      Asking the caregiver, where the questions it would send are visible. It
+      was a permanent row above the card paired with a sentence explaining the
+      fields; the sentence is gone and the button came inside.
+    {% endcomment %}
+    {% if panel_item.automations_enabled and panel_item.can_edit_answers and panel_item.is_pending %}
+      {% if not panel_item.automation or panel_item.automation.protocol != p.number %}
+        {% if panel_item.sms_offer and panel_item.sms_offer.protocol == p.number %}
+          {% comment %}
+            WhatsApp refused the opening message. Nothing was sent and the
+            protocol is not out with anyone — so this is the button again, in a
+            different channel, with the reason it needs one. Asked rather than
+            done silently: these are health questions, and SMS is not private
+            the way WhatsApp is. Declining leaves the ordinary Ask by text.
+          {% endcomment %}
+          <div class="dpc-askoffer" role="group"
+               aria-label="{% trans 'WhatsApp could not deliver this' %}">
+            <p class="dpc-askoffer-t">
+              {% blocktrans with who=panel_item.sms_offer.who %}WhatsApp could not reach {{ who }}, so nothing was sent.{% endblocktrans %}
+              {% if panel_item.sms_offer.reason %}
+                <span class="dpc-askoffer-why">{{ panel_item.sms_offer.reason }}</span>
+              {% endif %}
+            </p>
+            <p class="dpc-askoffer-q">{% trans "Send it as an SMS instead? An SMS is not encrypted the way WhatsApp is." %}</p>
+            <div class="dpc-askoffer-b">
+              <form method="post" action="{% url 'start_protocol_automation' panel_item.meeting.pk p.number %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <input type="hidden" name="channel" value="sms">
+                <button type="submit" class="dp-btn">
+                  <span class="dpc-mode-ico" aria-hidden="true">send</span>{% trans "Send by SMS" %}
+                </button>
+              </form>
+              <form method="post" action="{% url 'dismiss_sms_offer' %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="dp-btn dp-btn-ghost">{% trans "Not now" %}</button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <div class="dpc-askrow">
+            <form method="post" action="{% url 'start_protocol_automation' panel_item.meeting.pk p.number %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="dp-btn dp-btn-ghost">
+                <span class="dpc-mode-ico" aria-hidden="true">send</span>{% trans "Ask by text" %}
+              </button>
+            </form>
+          </div>
+        {% endif %}
+      {% endif %}
+    {% endif %}
+
+    <form class="dpc-form" method="post"
+          action="{% url 'protocol_view' panel_item.meeting.pk p.number %}"
+          data-protocol="{{ p.number }}">
+      {% csrf_token %}
+      {% for q in p.questions %}
+        {% comment %}
+          A finished call keeps the field rather than collapsing the answer into
+          a paragraph: the same layout in both states, read-only in one of them.
+          Question and answer were reading as one run of text, so the question
+          is now a numbered label above a field that is visibly a field whether
+          or not it was answered.
+        {% endcomment %}
+        <div class="dpc-q">
+          <div class="dpc-qp markdown-content"><span class="dpc-qn">{{ forloop.counter }}.</span>{{ q.prompt_md|markdownify }}</div>
+          {% if panel_item.can_edit_answers %}
+            {% if q.answer and not q.mine %}
+              {% comment %}
+                Answered on an earlier call. Disabled rather than read-only on
+                purpose: a disabled field is not submitted, so saving this call
+                cannot copy another call's answers into it and end up with the
+                same words recorded twice. Update hands the question to this
+                call. A repeatable protocol never reaches this branch — it gets
+                an empty field and its earlier rounds below.
+              {% endcomment %}
+              <textarea class="dpc-ta dpc-ta-carried" rows="3" disabled
+                        data-carried="{{ q.field }}">{{ q.answer }}</textarea>
+              <div class="dpc-carried">
+                <span>{% blocktrans with d=q.when|localtime|date:"j M" %}Answered on {{ d }}{% endblocktrans %}</span>
+                <button type="button" class="dpc-carried-edit" data-uncarry>{% trans "Update" %}</button>
+              </div>
+            {% else %}
+              <textarea class="dpc-ta{% if q.by_text %} dpc-ta-bytext{% endif %}" name="{{ q.field }}" rows="3"
+                        {% if q.by_text %}title="{% trans 'Came back by text' %}"{% endif %}
+                        placeholder="{% trans 'Type what they said' %}">{{ q.answer }}</textarea>
+            {% endif %}
+          {% else %}
+            <textarea class="dpc-ta{% if not q.answer %} dpc-ta-empty{% endif %}{% if q.answer and not q.mine %} dpc-ta-carried{% endif %}" rows="3" readonly
+                      placeholder="{% trans 'Not answered' %}">{{ q.answer }}</textarea>
+            {% if q.answer and not q.mine %}
+              <div class="dpc-carried"><span>{% blocktrans with d=q.when|localtime|date:"j M" %}Answered on {{ d }}{% endblocktrans %}</span></div>
+            {% endif %}
+          {% endif %}
+
+          {% comment %}
+            What was said in earlier rounds, dated and read-only, under the
+            field this round is written into. There is no Update here on
+            purpose: a mistake in February is corrected from February's call,
+            where that answer belongs, which keeps every round a record of one
+            conversation rather than a running total reachable from anywhere.
+          {% endcomment %}
+          {% if q.rounds %}
+            <div class="dpc-rounds">
+              {% for r in q.rounds %}
+                <div class="dpc-round">
+                  <span class="dpc-round-w">{{ r.when|localtime|date:"j M" }}</span>
+                  <span class="dpc-round-v">{{ r.text }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </form>
+
+    {% comment %}
+      Saving is a button rather than a debounce. It was already being written a
+      beat after you stopped typing, but nothing on screen moved — so there was
+      no way to tell a saved answer from an unsaved one, and the protocol never
+      appeared to complete. The state is named here instead: the field goes
+      amber while it differs from what is stored, the row says how many are
+      unsaved, and saving moves the pill and the tab count with it.
+    {% endcomment %}
+    {% if panel_item.can_edit_answers %}
+      <div class="dpc-cardfoot">
+        <span class="dpc-saved" data-cardsaved hidden></span>
+        <button type="button" class="dp-btn" data-savecard disabled>{% trans "Save answers" %}</button>
+      </div>
+    {% endif %}
+  </div>
+</div>

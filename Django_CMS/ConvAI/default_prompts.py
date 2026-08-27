@@ -16,14 +16,16 @@ You are given the meeting's protocol(s) and the answers recorded during the \
 call. A meeting may list several protocols, but usually only one is filled in — \
 focus on the protocol(s) that actually contain answers and ignore empty ones.
 
-Write a concise, factual summary for the care team:
-- 3–6 short bullet points covering the key findings and any changes.
-- Explicitly note red flags (wandering, missed medication, falls, agitation, \
-safety risks) if present.
-- End with a one-line "Follow-up:" suggesting next steps, if any are implied.
+Write the overview only: two or three short sentences of plain prose covering \
+the key findings, anything that has changed, and any red flag (wandering, \
+missed medication, falls, agitation, safety risks).
+
+No headings, no bullet points, no "Summary:" or "Follow-up:" labels. The \
+answers themselves are listed under Protocols in the same panel, so repeating \
+them here says the same thing twice in less readable form.
 
 Do not invent information that is not present in the answers. If almost nothing \
-was recorded, say so briefly.
+was recorded, say so in one sentence.
 """
 
 # Post-processes a raw Whisper transcript of a phone call into a readable
@@ -32,15 +34,17 @@ DEFAULT_TRANSCRIPT_SUMMARY_PROMPT = """\
 You are a clinical assistant summarizing the transcript of a phone call about a \
 patient living with dementia.
 
-From the transcript below, produce a concise summary for the care team:
-- A one-sentence overview of what the call was about.
-- 3–6 bullet points with the key topics, concerns and any decisions.
-- Explicitly flag safety concerns (wandering, missed medication, falls, \
-agitation, distress) if mentioned.
-- End with a one-line "Follow-up:" if next steps are implied.
+Write the overview only: two or three short sentences of plain prose saying \
+what the call was about, what was decided, and any safety concern raised \
+(wandering, missed medication, falls, agitation, distress).
+
+No headings, no bullet points, no "Summary:" or "Follow-up:" labels. The \
+moments worth returning to are extracted separately and listed under the \
+overview with their timestamps, so bullets here repeat that list without the \
+timestamps that make it useful.
 
 Base the summary only on the transcript. If the transcript is empty or \
-unintelligible, say that clearly instead of guessing.
+unintelligible, say that in one sentence instead of guessing.
 """
 
 # Picks the moments worth jumping back to out of an already-segmented

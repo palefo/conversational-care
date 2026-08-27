@@ -579,7 +579,8 @@ class MeetingCreateView(APIView):
       "patient_id": int,
       "scheduled_time": ISO8601,
       "type": int (optional),
-      "scheduled_protocol": int|null (optional)
+      "scheduled_protocols": [int, ...] (optional, protocol numbers),
+      "scheduled_protocol": int|null (optional, deprecated — one protocol number)
     }
 
     Rules:
@@ -611,8 +612,24 @@ class MeetingCreateView(APIView):
         )
         if "type" in v:
             meeting.type = v["type"]
-        if "scheduled_protocol" in v:
-            meeting.scheduled_protocol = v["scheduled_protocol"]
+
+        # Numbers in, protocols out. Both spellings are accepted; the singular
+        # one is the shape this endpoint shipped with and means a list of one.
+        # A number nothing answers to is an error rather than a silent no-op —
+        # the old field took any integer 1..10 and most of them were nobody's
+        # protocol, which is how calls ended up booked against nothing.
+        wanted = list(v.get("scheduled_protocols") or [])
+        if v.get("scheduled_protocol"):
+            wanted.append(v["scheduled_protocol"])
+        booked = list(Protocol.objects.filter(number__in=set(wanted)))
+        missing = sorted(set(wanted) - {p.number for p in booked})
+        if missing:
+            return Response(
+                {"ok": False,
+                 "detail": "No protocol with number(s): %s"
+                           % ", ".join(str(n) for n in missing)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Conflict check: ±59 minutes for THIS navigator's patient list
         mt = meeting.scheduled_time
@@ -631,6 +648,8 @@ class MeetingCreateView(APIView):
             )
 
         meeting.save()
+        if booked:
+            meeting.scheduled_protocols.set(booked)
         out = MeetingOutSerializer(meeting).data
         return Response({"ok": True, "meeting": out}, status=status.HTTP_201_CREATED)
 
@@ -638,7 +657,11 @@ class PatientProtocolsFilledView(APIView):
     """
     GET /api/v1/patients/<patient_id>/protocols/filled/
     Returns meetings for the patient where at least one answer exists:
-    [{meeting_id, scheduled_time, protocol_number, answered_count}, ...]
+    [{meeting_id, scheduled_time, protocol_numbers, protocol_number,
+      answered_count}, ...]
+
+    `protocol_number` is the first of `protocol_numbers` and is kept for
+    clients written before a call could cover more than one.
     """
     authentication_classes = AUTH_CLASSES
     permission_classes = [IsAuthenticated]
@@ -656,23 +679,27 @@ class PatientProtocolsFilledView(APIView):
         meetings = (
             Meeting.objects
             .filter(patient_id=patient.id)
+            .prefetch_related("executed_protocols", "scheduled_protocols")
             .order_by("-scheduled_time")
         )
 
         payload = []
         for m in meetings:
-            proto_number = m.executed_protocol or m.scheduled_protocol
-            if not proto_number:
+            covered = (list(m.executed_protocols.all())
+                       or list(m.scheduled_protocols.all()))
+            if not covered:
                 continue
 
             answered_count = Answer.objects.filter(meeting=m).count()
             if answered_count == 0:
                 continue
 
+            numbers = sorted(p.number for p in covered)
             payload.append({
                 "meeting_id": m.id,
                 "scheduled_time": m.scheduled_time,
-                "protocol_number": proto_number,
+                "protocol_numbers": numbers,
+                "protocol_number": numbers[0],
                 "answered_count": answered_count,
             })
 

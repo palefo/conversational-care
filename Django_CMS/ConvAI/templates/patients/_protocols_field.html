@@ -1,0 +1,29 @@
+{% load i18n %}
+{% comment %}
+  The client's programme, as a checkbox group. Shared by the create form and the
+  edit form so the two cannot drift — they are the same fieldset about the same
+  decision, and a protocol offered on one and missing on the other would be a
+  client set up differently depending on which screen they were made from.
+
+  Expects `form` to carry a `protocols` field.
+{% endcomment %}
+<div class="mt-2 mb-4 pt-4 border-t border-gray-100">
+  <h2 class="text-sm font-semibold text-gray-700 mb-1">{{ form.protocols.label }}</h2>
+  <p class="text-xs text-gray-500 mb-3">{{ form.protocols.help_text }}</p>
+</div>
+{% if form.protocols.field.queryset %}
+  <div class="pf-checks">
+    {% for box in form.protocols %}
+      <label class="pf-check">
+        {{ box.tag }}
+        <span class="pf-check-t">{{ box.choice_label }}</span>
+      </label>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-sm text-gray-500">
+    {% trans "No protocols exist yet." %}
+    <a href="{% url 'config' %}?tab=protocols#protocols" class="text-sky-700 underline">{% trans "Create one first." %}</a>
+  </p>
+{% endif %}
+{% for e in form.protocols.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}

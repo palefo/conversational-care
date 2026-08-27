@@ -160,7 +160,16 @@ def _row(event, now):
             if event['status_code'] == Meeting.Status.CANCELLED:
                 row['cancelled'] = True
             if event.get('recording'):
+                # The duration is the substantive recording's, and the count
+                # says when there were earlier attempts, so a call that took
+                # three tries to connect reads as one call rather than going
+                # missing behind a single number.
+                extra = event.get('recording_count', 1) - 1
                 row['sub'] = "%s · %s" % (event['status'], event['recording']['duration_str'])
+                if extra > 0:
+                    row['sub'] = "%s %s" % (row['sub'], ngettext(
+                        "(+%(n)d earlier attempt)", "(+%(n)d earlier attempts)",
+                        extra) % {'n': extra})
 
     elif kind == 'chat':
         row['line2'] = _("Chatbot conversation")
@@ -179,10 +188,15 @@ def _row(event, now):
         row['sub'] = event['status']
 
     else:
-        # An unmatched recording. Rare, but it still needs somewhere to be.
-        row['line2'] = _("Call recording")
+        # A recording that belongs to no call. Rare now that a call holds every
+        # recording it produced, and named for what it is rather than "Call
+        # recording": sitting in a list of calls under a title that reads like
+        # one, it looked like a duplicate of the call above it. It is the
+        # opposite — audio with no call to sit under, and this row is the only
+        # way to reach it.
+        row['line2'] = _("Recording with no call")
         row['detail'] = event.get('duration_str', '')
-        row['sub'] = _("Recording")
+        row['sub'] = _("Unattached")
 
     return row
 

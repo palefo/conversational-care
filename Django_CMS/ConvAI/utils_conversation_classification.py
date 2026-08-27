@@ -2,7 +2,8 @@
 
 import json
 import re
-from typing import Iterable, Dict, Any, List, Tuple, Optional
+from typing import Iterable, Dict, Any, List, NamedTuple, Optional
+from django.utils.translation import gettext_lazy as _
 from langchain.prompts import ChatPromptTemplate
 
 DEFAULT_MODEL = "gpt-4.1"  # change if you prefer
@@ -18,22 +19,109 @@ CATEGORIES = (
     "Burden of care, Requires medical attention, Emergency]"
 )
 
+# Priority values, mirroring Alert.Priority. Kept as plain ints so this module
+# stays importable without dragging in the model layer.
+PRIORITY_HIGH, PRIORITY_MEDIUM, PRIORITY_LOW = 1, 2, 3
 
-def _detector_items(agent: Optional[Any]) -> List[Tuple[str, str]]:
+
+class Detector(NamedTuple):
+    """One thing an agent watches for, and what happens when it finds it.
+
+    ``raises`` is the difference between a detector that only tints the review
+    panel — which is all any of them did before — and one that puts a row in
+    somebody's queue.
     """
-    Return list of (label, instruction) pairs from Agent.detectors.
-    Agent.detectors is expected to be a JSON object: {label: instruction}.
+    label: str
+    instruction: str
+    raises: bool
+    priority: int
+
+
+# The one detector an admin cannot switch off. Every other rule here is theirs
+# to write, which is right for missed medication and wrong for this: a platform
+# talking to caregivers in distress cannot let "nobody filled in that JSON
+# field" be the thing standing between a disclosure and a navigator seeing it.
+SAFETY_LABEL = "Self-harm"
+SAFETY_DETECTOR = Detector(
+    label=SAFETY_LABEL,
+    instruction=(
+        "The person expresses wanting to die, wanting to hurt themselves, not "
+        "wanting to go on, or a plan to end their life — stated plainly or "
+        "hinted at. Set true on any such expression, including a single line "
+        "with nothing after it. When in doubt, set true."
+    ),
+    raises=True,
+    priority=PRIORITY_HIGH,
+)
+
+
+# Built-in labels are stored in English and read back in English: the stored
+# string is the key that dedupe, the agent's own config and the audit trail all
+# match on, and a key that moved with whoever was logged in would quietly stop
+# matching itself. Only the reading of it is translated.
+#
+# Detectors an admin wrote are their own words in their own language, so they
+# pass through untouched — there is nothing here to translate them against.
+BUILTIN_LABELS = {SAFETY_LABEL: _("Self-harm")}
+
+
+def display_label(label: str) -> str:
+    """How a detector label should read to whoever is looking at it."""
+    return BUILTIN_LABELS.get(label, label)
+
+
+def normalize_detectors(raw: Any) -> Dict[str, Detector]:
+    """Read ``Agent.detectors`` in either shape it has ever been stored in.
+
+    The original shape was ``{label: "instruction"}`` and drove nothing but a
+    checkbox in the review panel, so those rows keep that meaning: detect, do
+    not raise. The current shape is
+    ``{label: {"instruction": ..., "raises": bool, "priority": int}}``.
     """
-    if not agent:
-        return []
-    det = getattr(agent, "detectors", None)
-    if isinstance(det, dict):
-        # preserve insertion order
-        return [(str(k), str(v or "").strip()) for k, v in det.items()]
-    # tolerate legacy string lists if ever present
-    if isinstance(det, str) and det.strip():
-        return [(ln.strip(), "") for ln in det.splitlines() if ln.strip()]
-    return []
+    out: Dict[str, Detector] = {}
+    if isinstance(raw, str) and raw.strip():
+        # Tolerate the legacy newline-separated list of bare labels.
+        raw = {ln.strip(): "" for ln in raw.splitlines() if ln.strip()}
+    if not isinstance(raw, dict):
+        return out
+
+    for label, spec in raw.items():
+        label = str(label).strip()
+        if not label:
+            continue
+        if isinstance(spec, dict):
+            instruction = str(spec.get("instruction") or "").strip()
+            raises = bool(spec.get("raises"))
+            try:
+                priority = int(spec.get("priority") or PRIORITY_MEDIUM)
+            except (TypeError, ValueError):
+                priority = PRIORITY_MEDIUM
+            if priority not in (PRIORITY_HIGH, PRIORITY_MEDIUM, PRIORITY_LOW):
+                priority = PRIORITY_MEDIUM
+        else:
+            instruction, raises, priority = str(spec or "").strip(), False, PRIORITY_MEDIUM
+        out[label] = Detector(label, instruction, raises, priority)
+    return out
+
+
+def detectors_for(agent: Optional[Any]) -> Dict[str, Detector]:
+    """Every detector that applies to ``agent``, safety floor included.
+
+    The agent's own rows win on the label, so an admin who writes their own
+    self-harm wording gets it — what they cannot do is take the label away.
+    """
+    dets = {SAFETY_LABEL: SAFETY_DETECTOR}
+    dets.update(normalize_detectors(getattr(agent, "detectors", None) if agent else None))
+    # Whatever an admin wrote for the safety label, it still raises, and it
+    # still raises high.
+    if SAFETY_LABEL in dets:
+        own = dets[SAFETY_LABEL]
+        dets[SAFETY_LABEL] = own._replace(
+            instruction=own.instruction or SAFETY_DETECTOR.instruction,
+            raises=True,
+            priority=PRIORITY_HIGH,
+        )
+    return dets
 
 
 def _agent_role(agent: Optional[Any]) -> str:
@@ -58,7 +146,7 @@ def _build_prompt(agent: Optional[Any], transcript: str):
     """
     role = _agent_role(agent)
     abstract_line = _abstract_instruction(agent)
-    det_pairs = _detector_items(agent)
+    dets = detectors_for(agent)
 
     system_base = (
         f"You are {role}. "
@@ -68,19 +156,23 @@ def _build_prompt(agent: Optional[Any], transcript: str):
         "- important: true if a human must review following your previous instructions.\n"
     )
 
-    if det_pairs:
-        # Add detector schema and per-label guidance
+    if dets:
         lines = []
-        for label, instr in det_pairs:
-            if instr:
-                lines.append(f'- "{label}": {instr}')
-            else:
-                lines.append(f'- "{label}": (binary detector; set true only if clearly present)')
+        for d in dets.values():
+            lines.append(f'- "{d.label}": {d.instruction}' if d.instruction
+                         else f'- "{d.label}": (binary detector; set true only if clearly present)')
         system_base += (
             '\nAdditionally, include a key "detectors" as an object with EXACTLY these keys, '
             "each boolean (true/false). If unsure, default to false.\n"
             + "\n".join(lines)
             + "\n"
+            # The abstract describes the exchange; this describes why somebody
+            # is being interrupted. A navigator opening the alert reads it
+            # first, so it has to name the moment rather than the theme.
+            + '\nAlso include a key "triggers": an object keyed by ONLY the detector '
+            "labels you set to true. Each value is ONE sentence, in the conversation "
+            "language, saying what in this exchange set that detector off — quote the "
+            "words the person used where you can. Omit labels you set to false.\n"
         )
 
     prompt_tmpl = ChatPromptTemplate.from_messages([
@@ -88,7 +180,6 @@ def _build_prompt(agent: Optional[Any], transcript: str):
         ("user", "Transcript:\n{transcript}\n\nRespond with JSON only.")
     ])
     return prompt_tmpl.format_messages(transcript=transcript)
-
 
 def _format_transcript(messages: Iterable[Dict[str, Any]]) -> str:
     """
@@ -118,7 +209,8 @@ def classify_conversation_with_llm(
         "abstract": str,
         "classification": str,
         "important": bool,
-        "detectors": { <label>: bool, ... }  # only if Agent defines detectors
+        "detectors": { <label>: bool, ... },
+        "triggers":  { <label>: str, ... }   # only for detectors that fired
       }
     """
     transcript = _format_transcript(messages)
@@ -152,11 +244,21 @@ def classify_conversation_with_llm(
         # normalize to bool
         dets = {str(k): bool(v) for k, v in det_obj.items()}
 
+    # One sentence per fired detector, saying what set it off. Kept only for
+    # labels actually set true, so a model that answers for every label cannot
+    # put an explanation on an alert that was never raised.
+    trigs: Dict[str, str] = {}
+    trig_obj = data.get("triggers")
+    if isinstance(trig_obj, dict):
+        trigs = {str(k): str(v).strip() for k, v in trig_obj.items()
+                 if dets.get(str(k)) and str(v or "").strip()}
+
     return {
         "abstract": abstract,
         "classification": classification,
         "important": important,
         "detectors": dets,
+        "triggers": trigs,
     }
 
 

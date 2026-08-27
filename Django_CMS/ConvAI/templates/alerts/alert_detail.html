@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n tz %}
+{% load i18n tz custom_filters %}
 
 {% block title %}{% trans "Alert review" %} #{{ alert.id }}{% endblock %}
 
@@ -232,7 +232,7 @@
           {% elif alert.data.topic %}
             {{ alert.data.topic }}
           {% else %}
-            {{ alert.title|default:"Alert" }}
+            {{ alert.title|detector_label|default:_("Alert") }}
           {% endif %}
         </h1>
       </div>

@@ -4120,3 +4120,13 @@ msgstr "Chinese (Simplified)"
 #: Django_CMS/settings_default.py:233
 msgid "Standard"
 msgstr "Standard"
+
+#: ConvAI/templates/sidebar.html:95
+msgid "Configuration"
+msgstr "Configuration"
+
+#: ConvAI/utils_conversation_classification.py
+# The label of the built-in self-harm detector. Stored in English so the
+# key keeps matching the config and the dedupe; only shown translated.
+msgid "Self-harm"
+msgstr "Self-harm"

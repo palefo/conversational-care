@@ -265,68 +265,41 @@ def run_conversation_classification(request):
     Classify:
       • conversations never analyzed, OR
       • conversations whose last_message_at is newer than analyzed_at.
-    Prefer the Agent stored on Conversation; fall back to patient->agent if missing.
+
+    Inbound messages are classified as they arrive, so this is now a backstop
+    rather than the only way it ever happens: it catches conversations that
+    predate the hook, and anything the ingest pool dropped while the model or
+    the process was down. It goes through the same
+    ``review_conversation`` the hook does, so a re-run cannot reach a
+    different verdict than a live message would have.
+
     Configuration action — admins only.
     """
+    from ..conversation_alerts import review_conversation
+
     to_analyze = (
         Conversation.objects
         .filter(Q(analyzed=False) | Q(analyzed_at__isnull=True) | Q(last_message_at__gt=F("analyzed_at")))
         .order_by("started_at")
+        .values_list("id", flat=True)
     )
 
     processed = 0
-    for conv in to_analyze.iterator(chunk_size=100):
-        conv_id_str = str(conv.id)
-        rows = build_message_rows_for_conv(conv_id_str, Message)
-        if not rows:
-            conv.analyzed = True
-            conv.analyzed_at = timezone.now()
-            conv.save(update_fields=["analyzed", "analyzed_at"])
-            continue
-
-        # 1) Primary: agent from Conversation
-        agent = getattr(conv, "agent", None)
-
-        # 2) Fallback: infer from the first message → Patient.agent
-        if agent is None:
-            first_msg = (
-                Message.objects
-                .filter(conversation_id=conv_id_str)
-                .order_by("timestamp")
-                .first()
-            )
-            if first_msg:
-                ms_user = (first_msg.user or "").strip()
-                p = (
-                    Patient.objects
-                    .filter(Q(phone_number=ms_user) | Q(caregiver__phone_number=ms_user))
-                    .select_related("agent")
-                    .first()
-                )
-                agent = getattr(p, "agent", None) if p else None
-
-        try:
-            result = classify_conversation_with_llm(rows, agent=agent)
-            conv.summary      = (result.get("abstract") or "")[:2000]
-            conv.topic        = (result.get("classification") or "")[:120]
-            conv.is_important = bool(result.get("important"))
-            auto_flags        = result.get("detectors") or {}
-            conv.auto_flags   = auto_flags if isinstance(auto_flags, dict) else {}
-            conv.analyzed     = True
-            conv.analyzed_at  = timezone.now()
-            conv.visited      = False
-
-            conv.save(update_fields=[
-                "summary", "topic", "is_important", "auto_flags", "analyzed", "analyzed_at", "visited"
-            ])
+    raised = 0
+    for conv_id in list(to_analyze):
+        outcome = review_conversation(conv_id)
+        if outcome["analyzed"]:
             processed += 1
-        except Exception:
-            # Skip this conversation on model/API errors
-            continue
+        raised += len(outcome["alerts"])
 
-
-
-    messages.success(request, _("Classification completed. Conversations processed: %(n)s.") % {"n": processed})
+    if raised:
+        messages.success(request, _(
+            "Classification completed. Conversations processed: %(n)s. Alerts raised: %(a)s."
+        ) % {"n": processed, "a": raised})
+    else:
+        messages.success(request, _(
+            "Classification completed. Conversations processed: %(n)s."
+        ) % {"n": processed})
     return redirect("config")
 
 

@@ -77,7 +77,24 @@
             <span class="sidebar-label">{% trans "Calendar" %}</span>
           </a>
         </li>
-        {% if perms.ConvAI.access_configuration %}
+      </ul>
+
+      {% comment %}
+        The rail carries two kinds of destination: the four places the work
+        happens, and the two where the system is set up. They were one list, so
+        Settings sat directly under Calendar as though it were somewhere you go
+        during a shift. The heading is the whole separation — no rule under it,
+        because a line *and* a word is a lot of furniture for two items.
+
+        It lives inside the permission check on purpose: without configuration
+        access there is no second group, and a heading standing over nothing is
+        worse than no heading. Same check, one block, so the two cannot drift.
+      {% endcomment %}
+      {% if perms.ConvAI.access_configuration %}
+      <h2 id="sidebarConfigGroup" class="sidebar-group">
+        <span class="sidebar-group-label">{% trans "Configuration" %}</span>
+      </h2>
+      <ul aria-labelledby="sidebarConfigGroup">
         <li class="mb-2">
           <a
             href="{% url 'agents' %}"
@@ -100,8 +117,8 @@
             <span class="sidebar-label">{% trans "Settings" %}</span>
           </a>
         </li>
-        {% endif %}
       </ul>
+      {% endif %}
     </nav>
   </div>
 

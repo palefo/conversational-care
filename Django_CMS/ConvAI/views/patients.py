@@ -1,5 +1,5 @@
 from ._base import *  # noqa: F401,F403
-from ._panel import panel_context
+from ._panel import panel_context, fold_recordings
 from django.db.models import Max
 from ..forms import ClientForm, PatientForm
 
@@ -190,6 +190,10 @@ def create_client(request):
                 email=(cd.get("caregiver_email") or "").strip(),
             )
         patient.save()
+        # save(commit=False) defers every m2m on the form, so without this the
+        # protocols ticked at creation are silently dropped and the client's
+        # first call panel is empty for no visible reason.
+        form.save_m2m()
         messages.success(request, _("Client created."))
     else:
         errs = "; ".join(f"{f}: {', '.join(e)}" for f, e in form.errors.items())
@@ -231,6 +235,7 @@ def edit_patient(request, pk):
                 obj.caregiver = caregiver
 
             obj.save()
+            form.save_m2m()
             messages.success(request, _("Client updated."))
             return redirect('patient_detail', pk=patient.pk)
     else:
@@ -285,14 +290,22 @@ def build_patient_events(patient, protocol_numbers=None):
             'archive_bucket': (al.data or {}).get('archive_bucket', '') if isinstance(al.data, dict) else '',
         })
 
-    # Phone-call recordings, matched by callee number = patient or caregiver.
+    # Phone-call recordings belonging to this client.
+    #
+    # A recording placed through this platform names its client outright; the
+    # numbers are consulted only for rows made before it could. That distinction
+    # is the whole point — a number shared between two clients used to draw the
+    # same call on both their timelines, and the navigator's own leg of a
+    # conference, which carries a staff number, was filed against whichever
+    # client shared it. CallRecording.for_patient is where both rules live, and
+    # it is also what leaves the navigator's leg out.
+    #
     # A recording is not an event in its own right: it is something attached to
     # the meeting it came from, so it is folded onto that meeting below rather
     # than listed beside it. Anything that cannot be matched still gets its own
     # row, because a recording nobody can reach is worse than a duplicate.
     recordings = list(
-        CallRecording.objects.filter(to_number__in=nums).order_by('-start_time')
-        if nums else CallRecording.objects.none()
+        CallRecording.for_patient(patient, nums).select_related('meeting')
     )
 
     def _rec_dict(rec):
@@ -311,31 +324,38 @@ def build_patient_events(patient, protocol_numbers=None):
     # Annotated rather than counted per row: `has_notes` is read once for every
     # meeting on the timeline, and a note is a row now, so asking per meeting
     # would be one query each.
-    meetings = list(patient.meetings.annotate(note_count=Count('notes_list')))
-    claimed = {}
-    for rec in recordings:
-        best, gap = None, None
-        for mt in meetings:
-            d = abs((mt.scheduled_time - rec.start_time).total_seconds())
-            if gap is None or d < gap:
-                best, gap = mt, d
-        # An hour and a half either side: calls start late and run long, but a
-        # recording further out than that belongs to a different conversation.
-        if best is not None and gap is not None and gap <= 5400 and best.pk not in claimed:
-            claimed[best.pk] = rec
-        else:
-            events.append({
-                'kind': 'recording',
-                'ts': rec.start_time,
-                'panel_token': f'recording-{rec.pk}',
-                'patient': patient,
-                **_rec_dict(rec),
-            })
+    # Both protocol relations are prefetched: the loop below reads them on
+    # every meeting, and without this a client with fifty calls costs a hundred
+    # queries to draw one timeline.
+    meetings = list(
+        patient.meetings
+        .annotate(note_count=Count('notes_list'))
+        .prefetch_related('executed_protocols', 'scheduled_protocols')
+    )
+    claimed, orphans = fold_recordings(meetings, recordings)
+
+    # Whatever belongs to no call at all — a number dialled from a handset, an
+    # inbound call nobody booked. Still a row, because a recording nobody can
+    # reach is worse than a loose entry, and this is the only way to open one.
+    for rec in orphans:
+        events.append({
+            'kind': 'recording',
+            'ts': rec.start_time,
+            'panel_token': f'recording-{rec.pk}',
+            'patient': patient,
+            **_rec_dict(rec),
+        })
 
     # Scheduled / executed meetings — a phone call or an in-person visit.
     for mt in meetings:
-        proto_num = mt.executed_protocol or mt.scheduled_protocol
-        rec = claimed.get(mt.pk)
+        # What the call covered, or failing that what it was booked to cover.
+        # A call can carry more than one now, so the row names them all rather
+        # than picking the first and calling it the protocol.
+        covered = list(mt.executed_protocols.all()) or list(mt.scheduled_protocols.all())
+        proto_num = covered[0].number if len(covered) == 1 else None
+        # Every recording this call produced, the substantive one first; the
+        # row names that one and counts the rest.
+        recs = claimed.get(mt.pk, [])
         events.append({
             'kind': 'meeting',
             # When it happened, not when it was booked. A call recorded from a
@@ -357,16 +377,14 @@ def build_patient_events(patient, protocol_numbers=None):
             'modality_label': mt.get_modality_display(),
             'in_person': mt.modality == Meeting.Modality.IN_PERSON,
             'location': mt.location,
-            'protocol': (
-                f"{proto_num}. {protocol_numbers[proto_num]}"
-                if protocol_numbers.get(proto_num)
-                else (mt.get_executed_protocol_display()
-                      or mt.get_scheduled_protocol_display())
-            ),
-            'protocol_num': proto_num if proto_num in protocol_numbers else None,
+            'protocol': ", ".join(f"{p.number}. {p.title}" for p in covered),
+            # Only linkable when the row names exactly one — a link has to go
+            # somewhere, and two protocols have two somewheres.
+            'protocol_num': proto_num,
             'protocol_summary': mt.protocol_summary,
             'has_notes': bool(mt.note_count),
-            'recording': _rec_dict(rec) if rec else None,
+            'recording': _rec_dict(recs[0]) if recs else None,
+            'recording_count': len(recs),
         })
 
     # Chatbot conversations, grouped by local day (one entry per active day).
@@ -431,19 +449,19 @@ def patient_detail(request, pk):
     # Only the protocols this client has actually had. The old list walked all
     # ten of Meeting.Protocol and printed eight zeroes; which protocols exist is
     # a per-deployment question, so it comes from the Protocol records.
-    counts = {
-        row['executed_protocol']: row['count']
-        for row in (patient.meetings
-                    .filter(status=Meeting.Status.COMPLETED)
-                    .values('executed_protocol')
-                    .annotate(count=Count('id')))
-    }
-    titles = dict(Protocol.objects.values_list('number', 'title'))
+    #
+    # Counted through the relation, so a call that covered two protocols counts
+    # once against each rather than once against whichever was picked first.
     protocols_executed = [
-        {'number': num, 'title': titles.get(num) or _("Protocol %s") % num,
-         'count': counts[num]}
-        for num in sorted(counts)
-        if num and counts[num]
+        {'number': row['executed_protocols__number'],
+         'title': row['executed_protocols__title'],
+         'count': row['count']}
+        for row in (patient.meetings
+                    .filter(status=Meeting.Status.COMPLETED,
+                            executed_protocols__isnull=False)
+                    .values('executed_protocols__number', 'executed_protocols__title')
+                    .annotate(count=Count('id'))
+                    .order_by('executed_protocols__number'))
     ]
 
     # Every term the service knows about, with this client's marked. The five
@@ -453,6 +471,17 @@ def patient_detail(request, pk):
         {'key': t.slug, 'label': t.label, 'standard': t.is_standard,
          'on': t.slug in chosen}
         for t in ContactTerm.objects.all()
+    ]
+
+    # This client's programme, marked against every protocol in the platform.
+    # Editable here rather than only on the edit form: which protocols someone
+    # is on is a thing you change while reading about them, and a decision kept
+    # behind its own page is a decision nobody revisits.
+    on_programme = set(patient.protocols.values_list('pk', flat=True))
+    protocol_chips = [
+        {'pk': p.pk, 'number': p.number, 'title': p.title,
+         'on': p.pk in on_programme}
+        for p in Protocol.objects.order_by('number')
     ]
 
     # The same list as the Communications page, scoped to this client. Sharing
@@ -482,6 +511,7 @@ def patient_detail(request, pk):
             and patient.caregiver.phone_number
         ),
         'contact_terms': contact_terms,
+        'protocol_chips': protocol_chips,
         'client_since': timeline[-1]['ts'] if timeline else None,
         'agents': Agent.objects.order_by('name'),
         'SEND_CARE_PLAN' : get_bool("SEND_CARE_PLAN"),
@@ -740,6 +770,21 @@ def update_client_terms(request, pk):
         patient.details = (request.POST.get('details') or '').strip()
 
     patient.save(update_fields=['agent', 'contact_terms', 'details'])
+
+    # The client's programme, from the same block.
+    #
+    # Guarded on a marker rather than on the values: unticked checkboxes are not
+    # submitted at all, so "every protocol turned off" and "this form never had
+    # the section" arrive identically. Without the marker, anything else posting
+    # here would wipe the programme it never meant to touch.
+    if request.POST.get('protocols_present'):
+        picked = []
+        for raw in request.POST.getlist('protocols'):
+            try:
+                picked.append(int(raw))
+            except (TypeError, ValueError):
+                continue
+        patient.protocols.set(Protocol.objects.filter(pk__in=picked))
 
     caregiver = patient.caregiver
     if caregiver and ('relationship' in request.POST or 'involvement' in request.POST):

@@ -125,7 +125,11 @@ def dashboard(request):
     # Meetings this user is responsible for. Staff see every meeting, matching
     # how alerts already behave below — without this an admin who schedules a
     # call for another navigator's client never sees it again on Home.
-    user_meetings = Meeting.objects.select_related('patient', 'patient__caregiver')
+    user_meetings = (Meeting.objects
+                     .select_related('patient', 'patient__caregiver')
+                     # Every row on Home reads both, so they come along
+                     # rather than costing two queries per meeting.
+                     .prefetch_related('executed_protocols', 'scheduled_protocols'))
     if not is_admin(user):
         user_meetings = user_meetings.filter(patient__navigator=user)
 
@@ -229,18 +233,24 @@ def dashboard(request):
                 else _("Good evening"))
     first_name = (user.get_short_name() or user.get_full_name() or user.username).split(" ")[0]
 
-    # Protocol names live on the Protocol record; Meeting.Protocol only carries
-    # placeholders like "3. Protocol 3", which is what the rows used to show.
-    proto_titles = {p.number: p.title for p in Protocol.objects.all()}
+    # How many questions each protocol carries, for the "3 of 8 recorded" line.
     proto_questions = dict(
-        Protocol.objects.annotate(n=Count("questions")).values_list("number", "n")
+        Protocol.objects.annotate(n=Count("questions")).values_list("pk", "n")
     )
 
+    def _covered(meeting):
+        """The protocols this call covered, or failing that what it is booked for."""
+        return (list(meeting.executed_protocols.all())
+                or list(meeting.scheduled_protocols.all()))
+
     def _protocol_label(meeting):
-        num = meeting.executed_protocol or meeting.scheduled_protocol
-        if num and num in proto_titles:
-            return f"{num}. {proto_titles[num]}"
-        return meeting.get_scheduled_protocol_display() or meeting.get_type_display()
+        covered = _covered(meeting)
+        if covered:
+            return ", ".join(f"{p.number}. {p.title}" for p in covered)
+        # A call with no protocol against it is ordinary — a check-in, a
+        # conversation that went elsewhere. The row says what kind of call it
+        # is rather than leaving the column blank.
+        return meeting.get_type_display()
 
     def _meeting_row(m, answered=None):
         day, hour = _when_labels(m.scheduled_time, now)
@@ -266,7 +276,9 @@ def dashboard(request):
         }
         if answered is not None:
             # Whether the call produced anything is the useful half of "complete".
-            total = proto_questions.get(m.executed_protocol or m.scheduled_protocol, 0)
+            # Summed across every protocol the call covered, since it can cover
+            # more than one.
+            total = sum(proto_questions.get(p.pk, 0) for p in _covered(m))
             row["recorded"] = (
                 _("nothing recorded") if not answered
                 else _("%(a)d of %(t)d recorded") % {"a": answered, "t": total}
@@ -304,7 +316,9 @@ def dashboard(request):
         keep = {k: v for k, v in (("q", query), ("sort", sort if sort != "priority" else "")) if v}
         return {
             "id": a.id,
-            "title": a.title or "(sin título)",
+            # A classifier alert's title is the detector label, stored in
+            # English so it keeps matching itself. Read in the viewer's own.
+            "title": display_label(a.title) or "(sin título)",
             "patient": f"{a.patient.name} {a.patient.lastname}" if a.patient else "",
             "description": a.description,
             "priority": a.get_priority_display(),

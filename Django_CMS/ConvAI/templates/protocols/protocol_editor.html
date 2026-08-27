@@ -31,6 +31,18 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   .pe-textarea:focus { outline:none; border-color: var(--brand-primary); box-shadow:0 0 0 2px #bae6fd; }
+  /* The one control that stays live when the protocol is locked, so it is
+     tinted rather than sitting flat among the greyed-out fields above it. */
+  .pe-flag {
+    display:flex; gap:.625rem; align-items:flex-start; cursor:pointer;
+    margin-top:1.25rem; padding:.75rem .875rem;
+    border:1px solid #bae6fd; background:#f0f9ff; border-radius:.5rem;
+  }
+  .pe-flag input { margin:.15rem 0 0; accent-color: var(--brand-primary); flex:none; }
+  .pe-flag b { display:block; font-size:.8125rem; font-weight:600; color:#1e293b; }
+  .pe-flag > span > span {
+    display:block; font-size:.75rem; color:#64748b; line-height:1.45; margin-top:.125rem;
+  }
   .pe-iconbtn {
     display:inline-flex; align-items:center; justify-content:center;
     width:2rem; height:2rem; border-radius:.5rem; color: var(--text-muted);
@@ -115,6 +127,23 @@
               {% if locked %}disabled{% endif %}
               class="pe-textarea"
               placeholder="{% trans 'Describe the goal of this protocol…' %}">{{ protocol.description }}</textarea>
+
+    {% comment %}
+      Not disabled when the protocol is locked, unlike everything above it.
+      Whether a protocol is asked once or on every call is something you learn
+      after using it — so this has to stay reachable on exactly the protocols
+      the rest of this card is closed on. It changes how answers are read, never
+      what they say. It saves itself; there is no Save button on a locked page.
+    {% endcomment %}
+    {% if may_edit %}
+      <label class="pe-flag" for="pe-repeatable">
+        <input id="pe-repeatable" type="checkbox" {% if protocol.repeatable %}checked{% endif %}>
+        <span>
+          <b>{% trans "This protocol is answered more than once" %}</b>
+          <span>{% trans "Each call records its own round. Earlier rounds stay visible and read-only, and the protocol never reads as finished." %}</span>
+        </span>
+      </label>
+    {% endif %}
   </div>
 
   {# ── Questions ── #}
@@ -157,6 +186,39 @@
   const SAVE_URL = "{% url 'protocol_editor_save' protocol.number %}";
 
   const initial = JSON.parse(document.getElementById('pe-initial').textContent || '[]');
+
+  // On a locked protocol every other control is disabled and the Save button is
+  // not rendered at all, so the one field that survives the lock saves itself.
+  // The endpoint accepts a payload of just this field and nothing else.
+  const $repeat = document.getElementById('pe-repeatable');
+  if ($repeat && LOCKED) {
+    $repeat.addEventListener('change', async () => {
+      $repeat.disabled = true;
+      try {
+        const resp = await fetch(SAVE_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('input[name="csrfmiddlewaretoken"]').value
+          },
+          body: JSON.stringify({ repeatable: $repeat.checked })
+        });
+        const data = await resp.json();
+        if (resp.ok && data.ok) {
+          showToast($repeat.checked
+            ? '{% trans "This protocol now records a round per call." %}'
+            : '{% trans "This protocol is now answered once." %}', true);
+        } else {
+          $repeat.checked = !$repeat.checked;
+          showToast(data.message || '{% trans "Could not save." %}', false);
+        }
+      } catch (e) {
+        $repeat.checked = !$repeat.checked;
+        showToast('{% trans "Network error while saving." %}', false);
+      }
+      $repeat.disabled = false;
+    });
+  }
 
   const $questions = document.getElementById('pe-questions');
   const $count = document.getElementById('pe-count');
@@ -365,7 +427,8 @@
       const payload = {
         title: title,
         description: document.getElementById('pe-description').value,
-        questions: questions
+        questions: questions,
+        repeatable: !!(document.getElementById('pe-repeatable') || {}).checked
       };
 
       const btn = document.getElementById('pe-save');

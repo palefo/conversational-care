@@ -4035,3 +4035,13 @@ msgstr "중국어(간체)"
 #: Django_CMS/settings_default.py:233
 msgid "Standard"
 msgstr "표준"
+
+#: ConvAI/templates/sidebar.html:95
+msgid "Configuration"
+msgstr "구성"
+
+#: ConvAI/utils_conversation_classification.py
+# The label of the built-in self-harm detector. Stored in English so the
+# key keeps matching the config and the dedupe; only shown translated.
+msgid "Self-harm"
+msgstr "자해"

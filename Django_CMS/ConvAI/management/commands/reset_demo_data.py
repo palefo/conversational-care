@@ -226,6 +226,22 @@ class Command(BaseCommand):
             for p in Protocol.objects.prefetch_related("questions")
         }
         protocol_numbers = sorted(questions_by_proto) or [1]
+        protocols_by_number = {p.number: p for p in Protocol.objects.all()}
+
+        def book(meeting, number, done=False):
+            """Point a demo meeting at a real protocol record.
+
+            What a call covers is a relation now, so a demo built with the old
+            integer column produced meetings whose protocol the panel could not
+            see. Silently does nothing for a number with no protocol behind it,
+            which is the same thing the rest of the platform does.
+            """
+            protocol = protocols_by_number.get(number)
+            if protocol is None:
+                return
+            meeting.scheduled_protocols.add(protocol)
+            if done:
+                meeting.executed_protocols.add(protocol)
 
         want = max(1, min(options["clients"], len(CLIENTS)))
         counts = dict.fromkeys(
@@ -263,6 +279,13 @@ class Command(BaseCommand):
                     + CARE_PLANS[idx % len(CARE_PLANS)]
                 ),
             )
+            # Demo clients are set up, not brand new: they carry a programme, so
+            # the panel they open on has something in it. A real new client
+            # starts on nothing and someone chooses.
+            patient.protocols.set(
+                [protocols_by_number[n] for n in protocol_numbers
+                 if n in protocols_by_number]
+            )
             counts["patients"] += 1
 
             phones = [str(patient.phone_number), str(caregiver.phone_number)]
@@ -297,10 +320,9 @@ class Command(BaseCommand):
                     scheduled_time=when,
                     status=status,
                     type=Meeting.MeetingType.ONBOARDING if days_ago >= weeks_back * 7 else Meeting.MeetingType.REGULAR,
-                    scheduled_protocol=proto,
-                    executed_protocol=proto if status == Meeting.Status.COMPLETED else None,
                     retries=0 if status == Meeting.Status.COMPLETED else rng.randint(1, 3),
                 )
+                book(m, proto, done=status == Meeting.Status.COMPLETED)
                 counts["meetings"] += 1
 
                 if status != Meeting.Status.COMPLETED:
@@ -332,6 +354,12 @@ class Command(BaseCommand):
                     end_time=when + timezone.timedelta(seconds=dur),
                     duration=dur,
                     filename=f"{sid}.wav",
+                    # Seeded already attributed, the way a call placed through the
+                    # platform records itself now. Without this the demo data would
+                    # only ever exercise the number-matching fallback.
+                    meeting=m,
+                    patient=patient,
+                    leg=CallRecording.Leg.DYAD,
                 )
                 counts["recordings"] += 1
                 try:
@@ -350,13 +378,13 @@ class Command(BaseCommand):
                         timezone.datetime.min.time().replace(hour=10, minute=0),
                     )
                 )
-                Meeting.objects.create(
+                overdue = Meeting.objects.create(
                     patient=patient, scheduled_time=when,
                     status=Meeting.Status.PENDING,
                     type=Meeting.MeetingType.REGULAR,
-                    scheduled_protocol=protocol_numbers[idx % len(protocol_numbers)],
                     retries=2,
                 )
+                book(overdue, protocol_numbers[idx % len(protocol_numbers)])
                 counts["meetings"] += 1
 
             # ── today ──────────────────────────────────────────
@@ -379,9 +407,8 @@ class Command(BaseCommand):
                 m = Meeting.objects.create(
                     patient=patient, scheduled_time=when, status=status,
                     type=Meeting.MeetingType.REGULAR,
-                    scheduled_protocol=proto,
-                    executed_protocol=proto if status == Meeting.Status.COMPLETED else None,
                 )
+                book(m, proto, done=status == Meeting.Status.COMPLETED)
                 counts["meetings"] += 1
                 if status == Meeting.Status.COMPLETED:
                     dur = rng.randint(200, 500)
@@ -391,6 +418,7 @@ class Command(BaseCommand):
                         to_number=str(patient.phone_number),
                         start_time=when, end_time=when + timezone.timedelta(seconds=dur),
                         duration=dur, filename=f"{sid}.wav",
+                        meeting=m, patient=patient, leg=CallRecording.Leg.DYAD,
                     )
                     counts["recordings"] += 1
                     try:
@@ -406,12 +434,12 @@ class Command(BaseCommand):
                         day, timezone.datetime.min.time().replace(hour=call_hour, minute=0)
                     )
                 )
-                Meeting.objects.create(
+                upcoming = Meeting.objects.create(
                     patient=patient, scheduled_time=when,
                     status=Meeting.Status.PENDING,
                     type=Meeting.MeetingType.REGULAR,
-                    scheduled_protocol=protocol_numbers[(occurrence + k) % len(protocol_numbers)],
                 )
+                book(upcoming, protocol_numbers[(occurrence + k) % len(protocol_numbers)])
                 counts["meetings"] += 1
 
             # ── conversations ──────────────────────────────────

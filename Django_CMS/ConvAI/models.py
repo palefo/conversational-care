@@ -89,6 +89,16 @@ class Message(models.Model):
         return f"[{self.timestamp}] {self.user} → {self.conversation_id}"
 
 class CallRecording(models.Model):
+    class Leg(models.IntegerChoices):
+        """Which side of a conference this is a recording of.
+
+        A conference is two calls, not one — see make_phone_conference. One
+        goes out to the client side and one to the navigator's own phone, and
+        both are recorded. Only the first is a record of the client.
+        """
+        DYAD = 0, _("Client side")
+        CTN = 1, _("Navigator side")
+
     recording_sid = models.CharField(max_length=100)
     from_number = models.CharField(max_length=100)
     to_number = models.CharField(max_length=100)
@@ -96,6 +106,46 @@ class CallRecording(models.Model):
     end_time = models.DateTimeField()
     duration = models.IntegerField()
     filename = models.CharField(max_length=100, null=True)
+
+    # Whose recording this is, and which call it came from.
+    #
+    # The two phone numbers above used to be the only answer to both questions,
+    # and a phone number is not an identity. It cannot say *which* client: one
+    # number can belong to two of them — a caregiver who looks after one client
+    # and is themself another, or a shared household line — and the same call
+    # was then drawn on both timelines. It cannot even say whether a client is
+    # involved at all: the navigator's own leg of a conference has a staff
+    # number on it, and matching on numbers filed it against whichever client
+    # happened to share that number.
+    #
+    # None of this ever had to be inferred. Twilio hands back a Call SID for
+    # each leg at the moment it is placed, when the meeting and the client are
+    # both in hand; see CallLeg, which is where that is written down, and
+    # get_recordings_from_twilio, which joins the audio back to it on call_sid.
+    #
+    # All four stay nullable. Recordings made before any of this exists have
+    # none of it and must keep rendering, so every surface falls back to
+    # matching numbers for rows where `patient` is null.
+    meeting = models.ForeignKey(
+        'Meeting', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="recordings",
+        help_text=_("The call this recording came from, where it is known."),
+    )
+    patient = models.ForeignKey(
+        'Patient', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="recordings",
+        help_text=_("Whose recording this is. Kept alongside the meeting rather "
+                    "than read through it, so a call placed outside a meeting "
+                    "still has an owner."),
+    )
+    leg = models.SmallIntegerField(
+        choices=Leg.choices, null=True, blank=True,
+        help_text=_("Which side of the conference this recording is of."),
+    )
+    call_sid = models.CharField(
+        max_length=64, blank=True, default="", db_index=True,
+        help_text=_("Twilio's Call SID — the join back to the leg that was placed."),
+    )
 
     # Whisper transcription + LLM post-processed summary (filled on demand).
     transcript = models.TextField(blank=True, default="", help_text="Whisper transcription of the call audio")
@@ -113,6 +163,74 @@ class CallRecording(models.Model):
     # is not there. [{"text": "…", "segment": 4, "start": 132.0}]
     transcript_moments = models.JSONField(blank=True, default=list,
                                           help_text="Key moments, each anchored to a segment")
+
+    @property
+    def is_navigator_leg(self):
+        """True when this is a recording of the navigator's own phone.
+
+        Their leg is close to a duplicate of the client's — that one is
+        dual-channel and already carries both sides of the conference — and it
+        is never a record of contact with the client, so client-facing lists
+        leave it out.
+        """
+        return self.leg == self.Leg.CTN
+
+    def owner_patients(self):
+        """Every client this recording could belong to.
+
+        Exactly one where the recording names one. Where it does not, this is
+        the old rule — match the numbers — and it can legitimately return more
+        than one client, which is the whole problem the relation above exists to
+        stop. Callers that need a single answer use resolve_patient; callers
+        deciding whether someone may reach the audio use this, because a legacy
+        recording on a shared number belongs, as far as anything can tell, to
+        every client on that number.
+        """
+        if self.patient_id:
+            return Patient.objects.filter(pk=self.patient_id)
+        nums = {str(self.to_number or ""), str(self.from_number or "")}
+        nums.discard("")
+        if not nums:
+            return Patient.objects.none()
+        return Patient.objects.filter(
+            Q(phone_number__in=nums) | Q(caregiver__phone_number__in=nums)
+        )
+
+    def resolve_patient(self):
+        """The one client this recording belongs to, or None.
+
+        Prefers what the call wrote down when it was placed. Falls back to
+        matching numbers only for rows that have nothing written down, where it
+        picks the first of possibly several — a guess, kept because a legacy
+        recording nobody can reach is worse than one filed under the wrong name.
+        """
+        if self.patient_id:
+            return self.patient
+        return self.owner_patients().select_related("caregiver", "navigator").first()
+
+    @classmethod
+    def for_patient(cls, patient, numbers=()):
+        """This client's recordings, newest first.
+
+        Two rules rather than one. A recording that names its client is that
+        client's and nobody else's — that is what the relation is for, and a
+        number it happens to share with someone else no longer drags it onto
+        their timeline. A recording that names nobody falls back to matching
+        `numbers`, which is how rows made before the relation existed still find
+        their way home.
+
+        The navigator's own leg is left out of both. It is filed under the call
+        it belongs to and reachable from there, but it is a recording of staff
+        and was never this client's contact history.
+        """
+        cond = Q(patient=patient)
+        nums = [n for n in (numbers or ()) if n]
+        if nums:
+            cond |= Q(patient__isnull=True, to_number__in=nums)
+        return (cls.objects
+                .filter(cond)
+                .exclude(leg=cls.Leg.CTN)
+                .order_by('-start_time'))
 
 
 class Caregiver(models.Model):
@@ -203,6 +321,20 @@ class Patient(models.Model):
         blank=True,
         null=True,
         help_text="Sube aquí el Plan de Cuidado en PDF (máx. 5 MB)."
+    )
+
+    # The protocols this person actually works through — their programme.
+    #
+    # The panel used to list every protocol in the platform for every client,
+    # because existing was the only thing that put one on screen. Which
+    # protocols apply to someone is a decision about them, so it is recorded
+    # against them. Empty on a new client on purpose: an empty panel asks the
+    # question, a full one answers it wrongly.
+    protocols = models.ManyToManyField(
+        'Protocol',
+        blank=True,
+        related_name='patients',
+        help_text="Protocols this client works through. Shown in their call panel.",
     )
 
     agent = models.ForeignKey(
@@ -350,6 +482,17 @@ class Meeting(models.Model):
         IN_PERSON = 1, _("In person")
 
     class Protocol(models.IntegerChoices):
+        """Legacy. Frozen — do not add to it, do not offer it to anyone.
+
+        These labels are placeholders that were never the names of any real
+        protocol: a picker built from them offered eight protocols nobody had
+        created and could never offer an eleventh that someone had. What a call
+        covers now lives in `scheduled_protocols` / `executed_protocols`, which
+        point at actual Protocol records.
+
+        Kept only so the two integer columns below still validate while they
+        wait to be dropped.
+        """
         PROTOCOL_1  = 1, _("1. Protocol 1")
         PROTOCOL_2  = 2, _("2. Protocol 2")
         PROTOCOL_3  = 3, _("3. Protocol 3")
@@ -372,17 +515,39 @@ class Meeting(models.Model):
         help_text="Where an in-person meeting takes place",
     )
 
+    # What this call covers, and what it turned out to cover.
+    #
+    # Both were a single integer against the placeholder list above, so a call
+    # that worked through the session note and the IQCODE had to claim it did
+    # one of them. They are relations now, and they point at protocols that
+    # exist.
+    scheduled_protocols = models.ManyToManyField(
+        'Protocol',
+        blank=True,
+        related_name='scheduled_meetings',
+        help_text="Protocols this call is booked to address.",
+    )
+    executed_protocols = models.ManyToManyField(
+        'Protocol',
+        blank=True,
+        related_name='executed_meetings',
+        help_text="Protocols actually covered, recorded when the call is closed.",
+    )
+
+    # Legacy, read once by migration 0077 and never written again. They are the
+    # single-protocol version of the two relations above and are scheduled for
+    # removal; nothing should read them.
     scheduled_protocol = models.IntegerField(
         choices=Protocol.choices,
         null=True,
         blank=True,
-        help_text="Protocolo programado (1–8) o llamada final (9)"
+        help_text="Deprecated — superseded by scheduled_protocols.",
     )
     executed_protocol = models.IntegerField(
         choices=Protocol.choices,
         null=True,
         blank=True,
-        help_text="Protocolo ejecutado (1–8) o llamada final (9)"
+        help_text="Deprecated — superseded by executed_protocols.",
     )
 
     scheduled_time = models.DateTimeField()
@@ -451,11 +616,75 @@ class Meeting(models.Model):
         return f"Meeting with {self.patient} at {self.scheduled_time}"
 
 
+class CallLeg(models.Model):
+    """One outbound call placed for one meeting.
+
+    A conference is two calls — the navigator's phone and the client side — and
+    Twilio answers each with a Call SID the instant it is placed. Those SIDs
+    were being discarded: make_phone_conference had no return statement at all,
+    so the one fact that ties a recording to the call it came from was created
+    and thrown away, and every surface downstream was left to work it out again
+    from phone numbers, which cannot.
+
+    This is where that fact waits. The audio arrives minutes or hours later
+    carrying nothing but its own SID and two numbers; get_recordings_from_twilio
+    joins on call_sid and copies meeting, patient and leg onto the recording.
+
+    A row here records a call that was placed, not a recording that exists. A
+    leg nobody answered, or one placed with recording switched off, simply never
+    gets one, and that is not a fault — it is what an unanswered call looks
+    like.
+    """
+
+    call_sid = models.CharField(
+        max_length=64, unique=True,
+        help_text=_("Twilio's Call SID for this leg."),
+    )
+    meeting = models.ForeignKey(
+        Meeting, on_delete=models.CASCADE, related_name="legs",
+    )
+    # Denormalised from the meeting for the same reason CallRecording keeps it:
+    # so the answer survives the meeting being deleted, and so filling in a
+    # recording costs one read rather than a join.
+    patient = models.ForeignKey(
+        Patient, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="call_legs",
+    )
+    leg = models.SmallIntegerField(choices=CallRecording.Leg.choices)
+    to_number = models.CharField(max_length=100, blank=True, default="")
+    conference_name = models.CharField(max_length=64, blank=True, default="")
+    placed_at = models.DateTimeField(auto_now_add=True)
+    placed_by = models.ForeignKey(
+        'ConvAIUser', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="call_legs_placed",
+    )
+
+    class Meta:
+        ordering = ["-placed_at"]
+
+    def __str__(self):
+        return f"{self.get_leg_display()} leg {self.call_sid} of meeting {self.meeting_id}"
+
+
 class Protocol(models.Model):
     """A self-contained protocol (1 … 8, llamada final, etc.)."""
     number      = models.PositiveSmallIntegerField(unique=True)
     title       = models.CharField(max_length=120)
     description = models.TextField(blank=True)
+
+    # Some protocols are asked once — the Basic Information Request, where
+    # asking twice would be a mistake. Others are instruments meant to be
+    # re-taken: the IQCODE compares someone with how they were, and a score
+    # only means anything next to the last one.
+    #
+    # This changes how answers are *read*, never how they are stored — they
+    # have always been kept one per question per call. A repeatable protocol
+    # gives each call its own round with the earlier ones beneath it, and never
+    # reads as finished.
+    repeatable = models.BooleanField(
+        default=False,
+        help_text="This protocol is answered again on later calls, each call its own round.",
+    )
 
     class Meta:
         ordering = ["number"]
@@ -1154,13 +1383,54 @@ class Note(models.Model):
         if parent is None:
             return None
         if isinstance(parent, CallRecording):
-            # A recording carries phone numbers rather than a client FK, so it
-            # is matched the same way views/summaries.py matches it.
-            nums = {str(parent.to_number or ""), str(parent.from_number or "")}
-            nums.discard("")
-            if not nums:
-                return None
-            return Patient.objects.filter(
-                models.Q(phone_number__in=nums) | models.Q(caregiver__phone_number__in=nums)
-            ).first()
+            # A recording names its client where the call wrote one down, and
+            # falls back to matching numbers where it did not — one rule, kept
+            # on the model so every surface asks the same question.
+            return parent.resolve_patient()
         return getattr(parent, "patient", None)
+
+
+class SummaryEdit(models.Model):
+    """Who last replaced a generated overview with their own words.
+
+    The overview is the one block in a panel the model writes rather than a
+    person, which is the whole reason it is drawn in violet instead of the
+    product blue. The moment someone edits it that stops being true, so the
+    fact is recorded rather than guessed at: the panel drops the generated
+    styling, names the author, and warns before regenerating over the top of
+    what they wrote.
+
+    The parent is an explicit nullable one-to-one per kind, following Note
+    rather than a generic relation, so a deleted parent takes its edit record
+    with it and permission checks can follow the parent object through code
+    that already knows how to authorise it. One row per parent: this records
+    the current state of the text, not a revision history.
+    """
+
+    author = models.ForeignKey(
+        'ConvAIUser', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="summary_edits",
+    )
+    edited_at = models.DateTimeField(auto_now=True)
+
+    meeting = models.OneToOneField(
+        Meeting, null=True, blank=True, on_delete=models.CASCADE, related_name="summary_edit")
+    recording = models.OneToOneField(
+        CallRecording, null=True, blank=True, on_delete=models.CASCADE, related_name="summary_edit")
+    conversation = models.OneToOneField(
+        Conversation, null=True, blank=True, on_delete=models.CASCADE, related_name="summary_edit")
+    # Only alerts the classifier raised have a generated overview to correct.
+    # One a person raised is already their own words, and the panel leaves it
+    # read-only rather than offering to edit what they just typed.
+    alert = models.OneToOneField(
+        'Alert', null=True, blank=True, on_delete=models.CASCADE, related_name="summary_edit")
+
+    class Meta:
+        ordering = ["-edited_at"]
+
+    def __str__(self):
+        return f"SummaryEdit {self.pk} by {self.author or 'unknown'}"
+
+    @property
+    def parent(self):
+        return self.meeting or self.recording or self.conversation or self.alert

@@ -158,6 +158,41 @@
       </div>
     </div>
 
+    {% comment %}
+      The client's programme, edited where it is read. It decides what their
+      call panel shows, so it belongs beside the rest of what is true about
+      them rather than behind the edit form — a decision kept on its own page
+      is a decision nobody revisits.
+
+      The marker below travels with the block: unticked boxes are not submitted,
+      so without it "every protocol off" and "this form had no protocols
+      section" would arrive at the endpoint looking identical.
+    {% endcomment %}
+    <div class="pd-terms">
+      <p class="pd-terms-h">{% trans "Protocols they work through" %}</p>
+      {% if protocol_chips %}
+        <input type="hidden" name="protocols_present" value="1">
+        <div class="pd-chips">
+          {% for p in protocol_chips %}
+            <label class="pd-chip {% if p.on %}on{% endif %}">
+              <input type="checkbox" name="protocols" value="{{ p.pk }}" {% if p.on %}checked{% endif %}>
+              <span class="material-icons-outlined">check</span>{{ p.number }}. {{ p.title }}
+            </label>
+          {% endfor %}
+        </div>
+        <p class="pd-terms-note" data-edit hidden>
+          {% trans "Only these appear in this client's call panel. Unticking one never deletes answers already recorded." %}
+        </p>
+      {% else %}
+        <p class="pd-none">
+          {% trans "No protocols exist yet." %}
+          {% if request.user.is_staff %}
+            <a href="{% url 'config' %}?tab=protocols#protocols">{% trans "Create one first." %}</a>
+          {% endif %}
+        </p>
+      {% endif %}
+    </div>
+
     <div class="pd-bg">
       <p class="pd-bg-h">{% trans "Background" %}</p>
       <div data-view>

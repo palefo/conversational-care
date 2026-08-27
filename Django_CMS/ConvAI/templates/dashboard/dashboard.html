@@ -176,8 +176,11 @@
     .dash-row-bar { width: 3px; align-self: stretch; border-radius: 2px; background: #e2e8f0; flex-shrink: 0; }
     .dash-row-bar-red { background: #ef4444; }
     .dash-row-main { flex: 1; min-width: 0; }
-    .dash-row-l1 { display: flex; align-items: center; gap: 8px; }
-    .dash-row-name { font-weight: 600; color: #1e293b; font-size: 0.875rem; }
+    .dash-row-l1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .dash-row-name {
+      font-weight: 600; color: #1e293b; font-size: 0.875rem;
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     .dash-row-l2 {
       font-size: 0.75rem;
       color: #64748b;
@@ -194,6 +197,10 @@
       background: #fef2f2;
       color: #b91c1c;
       white-space: nowrap;
+      /* A detector label is whatever an admin typed, so it is capped rather
+         than trusted — the client's name is the half of this line that has to
+         survive. */
+      flex: 0 1 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis;
     }
     .dash-utag-high { background: #fef2f2; color: #b91c1c; }
     .dash-utag-med  { background: #fffbeb; color: #b45309; }
@@ -514,19 +521,24 @@
                 <span class="material-icons-outlined">notification_important</span>
               </span>
               <div class="dash-row-main">
+                {% comment %}
+                  The title repeats across rows — since the classifier started
+                  raising them it is a detector label, so a dozen alerts really
+                  do share one — while the summary underneath never does. So the
+                  name leads, the kind sits beside it as a tag, and the whole of
+                  the second line belongs to the sentence that differs. It used
+                  to prefix that line and cost it its opening words, which is
+                  the part a truncated row can least afford to lose.
+
+                  Not tinted by priority: the priority column already says that,
+                  and a row that says it twice is louder without being clearer.
+                {% endcomment %}
                 <div class="dash-row-l1">
                   <span class="dash-row-name">{% if it.patient %}{{ it.patient }}{% else %}{{ it.title }}{% endif %}</span>
+                  {% if it.patient and it.title %}<span class="dash-utag dash-utag-prog">{{ it.title }}</span>{% endif %}
                   {% if it.status_code == 1 %}<span class="dash-wip">{{ it.status }}</span>{% endif %}
                 </div>
-                {% comment %}
-                  The title repeats across rows — a dozen alerts share "Caregiver
-                  requested respite" — so it leads quietly and the description,
-                  which is what differs, gets the room.
-                {% endcomment %}
-                <div class="dash-row-l2">
-                  {% if it.patient %}<span class="dash-kick">{{ it.title }}</span>{% if it.description %} · {{ it.description }}{% endif %}
-                  {% else %}{{ it.description }}{% endif %}
-                </div>
+                <div class="dash-row-l2">{{ it.description }}</div>
               </div>
               <div class="dash-row-right">
                 <span class="dash-prio">
