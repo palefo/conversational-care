@@ -32,10 +32,84 @@
         {% endif %}
       </div>
     </div>
-    <button type="button" class="pd-btn pd-hd-edit" id="pdEdit">
-      <span class="material-icons-outlined">edit</span>{% trans "Edit details" %}
-    </button>
+    <div class="pd-hd-acts">
+      <button type="button" class="pd-btn pd-hd-edit" id="pdEdit">
+        <span class="material-icons-outlined">edit</span>{% trans "Edit details" %}
+      </button>
+      {% comment %}
+        Ringing someone without an appointment for it.
+
+        Calling used to be reachable only from a booked call, which meant the
+        one page that is entirely about a person had no way to reach them. The
+        button places a real call to a real phone, so it opens the picker rather
+        than dialling on the press: with two people it could ring, a single
+        press would be guessing which.
+
+        Disabled only when neither of them has a number — there is nothing to
+        ring, and no dialog would help. A missing number of the navigator's own
+        is left to the dialog, which can carry the link to the profile page that
+        fixes it.
+      {% endcomment %}
+      {% if can_call %}
+        <button type="button" class="pd-btn pd-btn-pri" id="pdCall"
+                data-url="{% url 'start_client_call' patient.pk %}">
+          <span class="material-icons-outlined">call</span>{% trans "Call" %}
+        </button>
+      {% else %}
+        <button type="button" class="pd-btn" disabled
+                title="{% trans 'Neither this client nor their caregiver has a phone number on file.' %}">
+          <span class="material-icons-outlined">call</span>{% trans "Call" %}
+        </button>
+      {% endif %}
+    </div>
   </header>
+
+  {% comment %}
+    Who to ring. Both people are listed whether or not they can be rung, so the
+    one without a number reads as a missing number rather than as an absence.
+
+    The sentence says what the call becomes, because that is the part that is
+    not obvious: this is not a note about a call, it is a Meeting the platform
+    will hold — the recording lands on it, the protocols hang off it, and it
+    will ask for an outcome afterwards.
+  {% endcomment %}
+  <dialog class="dp-dialog pd-calldlg" id="pdCallDlg">
+    <form method="dialog">
+      <h3>{% trans "Start a call" %}</h3>
+      <p class="dp-dialog-sub">{% trans "This call will be recorded as unscheduled in Communications." %}</p>
+
+      <div class="pd-callwho" role="radiogroup" aria-label="{% trans 'Who to call' %}">
+        {% for o in call_options %}
+          <label class="pd-callopt{% if not o.phone %} is-off{% endif %}">
+            <input type="radio" name="to" value="{{ o.value }}"
+                   {% if o.value == call_default %}checked{% endif %}
+                   {% if not o.phone %}disabled{% endif %}>
+            <span class="pd-callopt-t">
+              <span class="pd-callopt-n">{{ o.name }} <span>· {{ o.role }}</span></span>
+              <span class="pd-callopt-p">
+                {% if o.phone %}{{ o.phone }}{% else %}{% trans "No number on file" %}{% endif %}
+              </span>
+            </span>
+          </label>
+        {% endfor %}
+      </div>
+
+      {% comment %}
+        The refusal the endpoint sends back, in the dialog that asked for it —
+        including its link, which is the whole point of it: "your own number is
+        not set" is a minute's work if you are told where to go.
+      {% endcomment %}
+      <p class="dpc-dialerr" id="pdCallErr" role="alert" hidden></p>
+
+      <div class="dp-dialog-f">
+        <button type="submit" class="dp-btn" value="cancel">{% trans "Cancel" %}</button>
+        <button type="button" class="dp-btn dpc-go" id="pdCallGo">
+          <span class="dpc-go-dot" aria-hidden="true"></span>
+          <span class="dpc-go-t">{% trans "Call" %}</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
 
 
   <!-- Tabs: the record splits into who they are, and what has happened with them. -->
@@ -353,6 +427,97 @@
         window.location = window.location.pathname + window.location.search;
       });
     }
+
+    // ── Call this client now ──────────────────────────────────────────────
+    // The press places a real call to a real phone, so everything here is
+    // written around that: one press only, the reason shown when it fails, and
+    // the live call handed straight to the panel that knows how to work it.
+    (function () {
+      var open = document.getElementById('pdCall');
+      var dlg  = document.getElementById('pdCallDlg');
+      if (!open || !dlg || !dlg.showModal) return;
+      var go   = document.getElementById('pdCallGo');
+      var err  = document.getElementById('pdCallErr');
+      var busy = false;
+
+      open.addEventListener('click', function () {
+        if (err) err.hidden = true;
+        dlg.showModal();
+      });
+
+      function fail(msg, fix) {
+        if (err) {
+          err.hidden = false;
+          err.textContent = msg || '{% trans "Could not start the call." %}';
+          // The link is the actionable half of two of the three refusals — a
+          // number missing from the profile is a minute's work once you are
+          // told which page to go to.
+          if (fix && fix.href) {
+            var a = document.createElement('a');
+            a.className = 'dpc-dialerr-a';
+            a.href = fix.href;
+            a.textContent = fix.label;
+            err.appendChild(document.createTextNode(' '));
+            err.appendChild(a);
+          }
+        }
+        if (window.toast) {
+          window.toast('err', '{% trans "Call not placed" %}',
+                       msg || '{% trans "Could not start the call." %}',
+                       { life: 12000, href: fix ? fix.href : '', action: fix ? fix.label : '' });
+        }
+      }
+
+      function dialling(on) {
+        busy = on;
+        go.disabled = on;
+        go.classList.toggle('is-dialling', on);
+        go.querySelector('.dpc-go-t').textContent =
+          on ? '{% trans "Calling…" %}' : '{% trans "Call" %}';
+      }
+
+      go.addEventListener('click', function () {
+        if (busy) return;
+        var picked = dlg.querySelector('input[name=to]:checked');
+        if (!picked) return fail('{% trans "Choose who to call first." %}');
+        if (err) err.hidden = true;
+        dialling(true);
+
+        var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+        fetch(open.dataset.url, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrf ? csrf.value : '',
+            'Accept': 'application/json'
+          },
+          body: 'to=' + encodeURIComponent(picked.value)
+        }).then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (d) {
+            if (!r.ok) throw d;
+            return d;
+          });
+        }).then(function (d) {
+          // The call is out. Hand it to the panel the way the panel hands it to
+          // itself — sessionStorage under the meeting's own key — so the
+          // stopwatch, the app-wide bar and End call all find it already
+          // running when the page it is on comes back.
+          var mid = String(d.item || '').replace('meeting-', '');
+          try {
+            sessionStorage.setItem('dpCall:' + mid, JSON.stringify({
+              started: Date.now(), attempt: 1, who: d.who || ''
+            }));
+          } catch (e) {}
+          var url = new URL(window.location.href);
+          url.searchParams.set('item', d.item);
+          window.location = url.pathname + url.search;
+        }, function (d) {
+          dialling(false);
+          fail((d || {}).error, (d || {}).fix);
+        });
+      });
+    })();
 
     // ── Handover note ─────────────────────────────────────────────────────
     var form = document.getElementById('pdNoteForm');

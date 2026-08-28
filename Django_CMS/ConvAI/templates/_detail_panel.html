@@ -380,8 +380,8 @@ themselves — see the autosave note in the script below.
           {% endcomment %}
           <button type="button" class="dp-btn dpc-go" id="dpcStart"
                   data-url="{% url 'make_phone_call' panel_item.meeting.pk %}"
-                  data-dialling="{% blocktrans with c=panel_item.patient.caregiver %}Calling {{ c }}…{% endblocktrans %}"
-                  data-who="{{ panel_item.patient.caregiver }}">
+                  data-dialling="{% blocktrans with c=panel_item.dial_who %}Calling {{ c }}…{% endblocktrans %}"
+                  data-who="{{ panel_item.dial_who }}">
             <span class="dpc-go-dot" aria-hidden="true"></span>
             <span class="dpc-go-t">{% trans "Start call" %}</span>
           </button>
@@ -392,7 +392,7 @@ themselves — see the autosave note in the script below.
           <p class="dpc-dialerr" id="dpcErr" role="alert" hidden></p>
         {% else %}
           <button type="button" class="dp-btn" disabled
-                  title="{% trans 'A phone number is missing for you or the caregiver.' %}">{% trans "Start call" %}</button>
+                  title="{% trans 'A phone number is missing for you or for whoever this call is with.' %}">{% trans "Start call" %}</button>
         {% endif %}
         {% if panel_item.can_remind or not panel_item.in_person %}
           <div class="dp-acts-row">
@@ -1284,13 +1284,6 @@ whatever you opened, and neither moves when the body scrolls.
     var body = panel.querySelector('.dpc-body');
     var pad = panel.querySelector('.dpc-pad');
 
-    function fitPad() {
-      if (!pad || !body) return;
-      var natural = body.scrollHeight - pad.offsetHeight;
-      pad.style.height = Math.max(0, body.scrollTop + body.clientHeight - natural) + 'px';
-    }
-    if (body) body.addEventListener('scroll', fitPad, { passive: true });
-
     panel.addEventListener('click', function (e) {
       var h = e.target.closest('.dpc-card-h');
       if (!h) return;
@@ -1305,8 +1298,10 @@ whatever you opened, and neither moves when the body scrolls.
       // when something above it changed size, which is exactly the movement
       // worth cancelling.
       var before = card.getBoundingClientRect().top;
-      // Generous on purpose: it only has to outlast the collapse, and fitPad
-      // trims it back to the minimum a moment later.
+      // Generous on purpose: it only has to outlast the collapse, and it comes
+      // down again the moment the correction has its measurement. Anything it
+      // kept past that would be scrollable emptiness under the last card — a
+      // column of cards that fits the panel could be scrolled into nothing.
       if (pad && body) pad.style.height = body.scrollHeight + 'px';
 
       var open = card.classList.toggle('open');
@@ -1316,7 +1311,7 @@ whatever you opened, and neither moves when the body scrolls.
         var delta = card.getBoundingClientRect().top - before;
         if (delta) body.scrollTop += delta;
       }
-      fitPad();
+      if (pad) pad.style.height = '';
       writeOpen();
 
       // The card's height changes in one step, because the anchoring above

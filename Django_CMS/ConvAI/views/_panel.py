@@ -646,6 +646,14 @@ def _meeting_panel(request, pk):
     # disabled button — discoverable by hovering something that looks dead. Both
     # reasons are the ones make_phone_call itself would return, so the panel now
     # says up front what the POST would have said.
+    # Which of the client's two numbers this call rings, and whether there is
+    # one to ring. Both come off the meeting rather than being assumed to be the
+    # caregiver: since the Call button on the client page, a call can be to the
+    # client themself, and a panel still saying "To: Ana" over a call that rang
+    # Manuel would be describing a different call.
+    rings_client = meeting.dial_target == Meeting.DialTarget.CLIENT
+    recipient = meeting.dial_recipient
+
     if in_person:
         # Nobody is dialled, so this is not a recipient — it is who the meeting
         # was arranged with, which is the same person the reminder goes to. Left
@@ -660,11 +668,13 @@ def _meeting_panel(request, pk):
             'phone': '',
             'note': _("Nobody is dialled — you turn up"),
         } if caregiver else None
-    elif not (caregiver and caregiver.phone_number):
+    elif recipient is None:
         to = {
             'icon': 'phone_disabled',
             'warn': True,
-            'lead': _("No caregiver with a phone number, so this call cannot be placed."),
+            'lead': (_("This client has no number of their own, so this call cannot be placed.")
+                     if rings_client
+                     else _("No caregiver with a phone number, so this call cannot be placed.")),
             'who': '', 'role': '', 'phone': '',
             'note': _("Add one on the client"),
         }
@@ -681,10 +691,15 @@ def _meeting_panel(request, pk):
             'icon': 'phone_forwarded',
             'warn': False,
             'lead': _("To"),
-            'who': str(caregiver),
-            'role': _caregiver_role(caregiver),
-            'phone': str(caregiver.phone_number),
-            'note': _("%(c)s is not on this call") % {'c': meeting.patient.name},
+            'who': str(recipient),
+            'role': _("the client") if rings_client else _caregiver_role(caregiver),
+            'phone': str(recipient.phone_number),
+            # Nothing to add when the client is the one being rung: the panel is
+            # headed with their name and the line above now names them again.
+            # The note exists for the other case, where the name at the top of
+            # the panel belongs to someone who is not on the call.
+            'note': ('' if rings_client
+                     else _("%(c)s is not on this call") % {'c': meeting.patient.name}),
         }
 
     return {
@@ -703,11 +718,20 @@ def _meeting_panel(request, pk):
         'tag_label': (_("To do") if is_pending else meeting.get_status_display()),
         'kicker': (
             (_("In-person meeting") if is_pending else _("Meeting ended")) if in_person
-            else (_("Scheduled call") if is_pending else _("Call ended"))
+            # "Scheduled call" is the one thing an unscheduled one is not, and
+            # the distinction is worth keeping after it has ended too: a call
+            # nobody booked is a different account of the day than one that was.
+            else ((_("Unscheduled call") if meeting.unscheduled else _("Scheduled call"))
+                  if is_pending else _("Call ended"))
         ),
+        # Named after whoever is actually on it. This said the caregiver even
+        # for a call placed to the client, which is the wrong name on the one
+        # line the panel leads with.
         'title': (
-            ((_("Meeting with %s") if in_person else _("Call with %s")) % caregiver)
-            if caregiver else meeting.get_type_display()
+            ((_("Meeting with %s") % caregiver) if in_person and caregiver
+             else (_("Call with %s") % recipient) if not in_person and recipient
+             else (_("Meeting with %s") % caregiver) if caregiver
+             else meeting.get_type_display())
         ),
         'when': meeting.scheduled_time,
         'patient': meeting.patient,
@@ -742,10 +766,12 @@ def _meeting_panel(request, pk):
             "%d:%02d" % divmod(recording.duration or 0, 60) if recording else ''
         ),
 
-        # Start call bridges the navigator's own phone to the caregiver's, so
-        # both numbers have to exist before the button means anything.
-        'can_call': bool(not in_person and caregiver and caregiver.phone_number
-                         and request.user.phone_number),
+        # Start call bridges the navigator's own phone to whoever this call is
+        # with, so both numbers have to exist before the button means anything.
+        'can_call': bool(not in_person and recipient and request.user.phone_number),
+        # Who the dialling label and the app-wide call bar name. Empty when
+        # there is nobody to ring, which is also when there is no button.
+        'dial_who': str(recipient) if recipient else '',
         # Whether a reminder has anywhere to go depends on the channel the
         # platform is configured for, so the check lives with the sending code
         # rather than being a phone-number test repeated here.

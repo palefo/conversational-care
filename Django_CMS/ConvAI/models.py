@@ -504,10 +504,40 @@ class Meeting(models.Model):
         FINAL_CALL  = 9, _("9. Final call")
         SEGUIMIENTO = 10, _("10. Follow-up")
 
+    class DialTarget(models.IntegerChoices):
+        """Whose phone this call rings on the client side.
+
+        Every call the platform had ever placed went to the caregiver — see
+        make_phone_call — so CAREGIVER is 0 and every row written before this
+        keeps meaning exactly what it did. CLIENT is new: a client with a phone
+        of their own could not be reached at all, and "we rang Manuel himself"
+        is a fact about the call worth keeping rather than one to be guessed
+        back out of a phone number afterwards.
+        """
+        CAREGIVER = 0, _("Caregiver")
+        CLIENT = 1, _("Client")
+
     modality = models.IntegerField(
         choices=Modality.choices,
         default=Modality.PHONE,
         help_text="Phone call or in-person meeting",
+    )
+    dial_target = models.IntegerField(
+        choices=DialTarget.choices,
+        default=DialTarget.CAREGIVER,
+        help_text="Which of the client's two numbers the bridge rings",
+    )
+    # A call placed from the client page rather than one that was booked.
+    #
+    # It is a Meeting like any other, because that is what makes it a call the
+    # platform can hold: the recording is attributed through it, it carries the
+    # protocols and the notes, and it is closed with an outcome like the rest.
+    # What this flag says is only that nobody arranged it beforehand — so the
+    # lists can stop calling it a "Scheduled call", which is the one thing it
+    # is not.
+    unscheduled = models.BooleanField(
+        default=False,
+        help_text="Placed on the spot rather than booked in advance",
     )
     location = models.CharField(
         max_length=200,
@@ -599,6 +629,29 @@ class Meeting(models.Model):
         different fact and worth keeping.
         """
         return self.ended_at or self.cancelled_at or self.scheduled_time
+
+    @property
+    def dial_recipient(self):
+        """Who this call rings, or None when there is nobody to ring.
+
+        The two sides of dial_target are different kinds of object — a
+        Caregiver row and the Patient themself — and every surface that asks
+        "who is on this call" wants the same three things off either one. So
+        they are answered here rather than by an `if` repeated in the view, the
+        panel and the picker.
+
+        None when the chosen side has no number: a caregiver who was never
+        recorded, or a client whose own number is blank. That is the same
+        answer as "this call cannot be placed", which is what the callers do
+        with it.
+        """
+        if self.modality == Meeting.Modality.IN_PERSON:
+            return None
+        if self.dial_target == Meeting.DialTarget.CLIENT:
+            who = self.patient
+        else:
+            who = self.patient.caregiver if self.patient_id else None
+        return who if (who and who.phone_number) else None
 
     @property
     def panel_token(self):
@@ -746,6 +799,15 @@ class Agent(models.Model):
         PROMPT = "prompt", _("Prompt-based")
 
     name = models.CharField(max_length=100, unique=True)
+
+    # One line on what the agent is *for*, shown on its card on the Agents page
+    # so the list reads as a roster rather than four names and a model id. Native
+    # agents ship with one (seeded in migration 0082); every kind can edit it.
+    description = models.CharField(
+        max_length=200, blank=True, default="",
+        help_text=_("One line on what this agent does. Shown on its card on the "
+                    "Agents page, where about 90 characters fit."),
+    )
 
     kind = models.CharField(
         max_length=16, choices=Kind.choices, default=Kind.REMOTE, db_index=True,

@@ -1359,7 +1359,7 @@ msgstr "padrão"
 msgid "Real-time voice"
 msgstr "Voz em tempo real"
 
-#: ConvAI/templates/agents/_agent_card.html:56
+#: ConvAI/templates/agents/_agent_card.html:58
 msgid "Voice ID"
 msgstr "ID de voz"
 
@@ -4150,3 +4150,23 @@ msgstr "Administração"
 # key keeps matching the config and the dedupe; only shown translated.
 msgid "Self-harm"
 msgstr "Autolesão"
+
+#: ConvAI/forms.py:740
+msgid "Answers questions about medication from the uploaded leaflets."
+msgstr "Responde a perguntas sobre medicamentos a partir das bulas enviadas."
+
+#: ConvAI/models.py:808
+msgid ""
+"One line on what this agent does. Shown on its card on the Agents page, "
+"where about 90 characters fit."
+msgstr ""
+"Uma linha sobre o que este agente faz. Aparece no cartão dele na página "
+"de Agentes, onde cabem cerca de 90 caracteres."
+
+#: ConvAI/templates/agents/_agent_card.html:53
+msgid "Built-in graph this agent runs"
+msgstr "Grafo integrado que este agente executa"
+
+#: ConvAI/templates/agents/_agent_card.html:58
+msgid "LangGraph name"
+msgstr "Nome do LangGraph"

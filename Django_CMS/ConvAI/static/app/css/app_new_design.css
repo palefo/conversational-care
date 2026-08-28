@@ -2555,13 +2555,44 @@ dialog[open]::backdrop { animation: dlg-scrim .2s ease both; }
 .pd-hd-meta span { display: inline-flex; align-items: center; gap: .3125rem; min-width: 0; }
 .pd-hd-meta b { color: #1e293b; font-weight: 600; }
 .pd-hd-meta .material-icons-outlined { font-size: .8125rem; opacity: .55; }
+.pd-hd-acts { flex: 0 0 auto; display: flex; gap: .4375rem; }
 .pd-hd-edit { flex: 0 0 auto; }
-.pd-hd-edit .material-icons-outlined { font-size: .875rem; }
+.pd-hd-acts .material-icons-outlined { font-size: .875rem; }
 .pd-hd-edit[hidden] { display: none; }
 @media (max-width: 560px) {
   .pd-hd { flex-wrap: wrap; }
-  .pd-hd-edit { flex: 1 1 100%; }
+  .pd-hd-acts { flex: 1 1 100%; }
+  .pd-hd-acts .pd-btn { flex: 1 1 auto; }
 }
+
+/* ── Client page: who to call ────────────────────────────────────────────
+   One row per person, the whole row a target rather than the dot beside it —
+   a phone number is a small thing to have to hit accurately before ringing
+   someone. The radio itself stays in the markup and stays focusable, so the
+   keyboard works the way a radiogroup should. */
+.pd-callwho { display: flex; flex-direction: column; gap: .375rem; margin-bottom: .75rem; }
+.pd-callopt {
+  display: flex; align-items: center; gap: .625rem; cursor: pointer;
+  border: 1px solid #e6edf5; border-radius: .5rem; padding: .5rem .6875rem;
+}
+.pd-callopt:hover { border-color: #cbd5e1; }
+/* The selected row carries the accent on its own border rather than a tick
+   somewhere else: what is chosen and what is about to be rung should be the
+   same object on screen. */
+.pd-callopt:has(input:checked) { border-color: #0369a1; box-shadow: inset 0 0 0 1px #0369a1; }
+.pd-callopt input { margin: 0; flex: 0 0 auto; accent-color: #0369a1; }
+.pd-callopt-t { display: flex; flex-direction: column; gap: .0625rem; min-width: 0; }
+.pd-callopt-n { font-size: .8125rem; font-weight: 600; color: #0f172a; }
+.pd-callopt-n span { font-weight: 400; color: #64748b; }
+.pd-callopt-p { font-size: .75rem; color: #64748b; }
+/* Nobody to ring on this row. Shown rather than dropped — a row that vanishes
+   is a navigator wondering where the person went; this one says what is
+   missing. */
+.pd-callopt.is-off { cursor: default; background: #f8fafc; }
+.pd-callopt.is-off:hover { border-color: #e6edf5; }
+.pd-callopt.is-off .pd-callopt-n { color: #64748b; }
+.pd-callopt.is-off .pd-callopt-p { font-style: italic; }
+.pd-calldlg .dpc-dialerr { margin-bottom: .75rem; }
 
 /* ── Client page: who this person is ─────────────────────────────────────
    One block for the caregiver, the numbers, the agent, their stated terms and

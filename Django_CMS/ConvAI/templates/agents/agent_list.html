@@ -20,6 +20,12 @@
     box-shadow: 0 1px 2px rgba(16,24,40,.04); transition: box-shadow .15s, border-color .15s; display: flex; flex-direction: column; }
   .agent-card:hover { box-shadow: 0 8px 20px -6px rgba(16,24,40,.14); border-color: #e2e8f0; }
   .agent-avatar { width: 2.5rem; height: 2.5rem; border-radius: .6rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  /* Two lines, then ellipsis: enough for a description to say something, few
+     enough that cards in a row stay the same height. */
+  .agent-desc { font-size: .75rem; line-height: 1.35; color: #64748b;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    overflow: hidden; }
+  .agent-desc code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .agent-chip { display: inline-flex; align-items: center; gap: .3rem; padding: .18rem .5rem; border-radius: 9999px;
     background: #f1f5f9; color: #475569; font-size: .72rem; font-weight: 500; max-width: 100%; }
   .agent-chip code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

@@ -376,6 +376,12 @@ def build_patient_events(patient, protocol_numbers=None):
             'modality': mt.modality,
             'modality_label': mt.get_modality_display(),
             'in_person': mt.modality == Meeting.Modality.IN_PERSON,
+            # Placed on the spot rather than booked, and who it rang. The list
+            # calls every pending call a "Scheduled call", which is the one
+            # thing an unscheduled one is not — and names the caregiver on every
+            # row, which is the wrong person once a call can go to the client.
+            'unscheduled': mt.unscheduled,
+            'dial_who': str(mt.dial_recipient or ''),
             'location': mt.location,
             'protocol': ", ".join(f"{p.number}. {p.title}" for p in covered),
             # Only linkable when the row names exactly one — a link has to go
@@ -464,6 +470,34 @@ def patient_detail(request, pk):
                     .order_by('executed_protocols__number'))
     ]
 
+    # Who the Call button can ring, in the order the picker offers them.
+    #
+    # Two, always — the caregiver and the client themself — and both are listed
+    # even when one has no number, greyed rather than dropped. A row that
+    # silently disappears is a navigator wondering why the person they meant to
+    # ring is not there; a row saying "No number on file" is one who knows what
+    # to fix. Same reasoning as the panel's To block.
+    caregiver = patient.caregiver
+    call_options = []
+    if caregiver:
+        call_options.append({
+            'value': 'caregiver',
+            'name': str(caregiver),
+            'role': (caregiver.relationship or '').strip() or _("caregiver"),
+            'phone': str(caregiver.phone_number or ''),
+        })
+    call_options.append({
+        'value': 'client',
+        'name': f"{patient.name} {patient.lastname}".strip(),
+        'role': _("client"),
+        'phone': str(patient.phone_number or ''),
+    })
+    # The caregiver is the platform's long-standing default — every call it has
+    # ever placed went to them — so they stay the pre-selected row whenever they
+    # can be rung, and the client is only pre-selected when they are the one
+    # number there is.
+    call_default = next((o['value'] for o in call_options if o['phone']), '')
+
     # Every term the service knows about, with this client's marked. The five
     # standard ones lead; anything a colleague has added follows.
     chosen = patient.contact_terms if isinstance(patient.contact_terms, list) else []
@@ -511,6 +545,13 @@ def patient_detail(request, pk):
             and patient.caregiver.phone_number
         ),
         'contact_terms': contact_terms,
+        'call_options': call_options,
+        'call_default': call_default,
+        # Nothing to ring at all. A missing number of the navigator's own is not
+        # checked here on purpose: it is the one refusal that comes with a link
+        # to the page that fixes it, so it is better said by the dialog — where
+        # that link can be pressed — than by a button that has gone grey.
+        'can_call': bool(call_default),
         'protocol_chips': protocol_chips,
         'client_since': timeline[-1]['ts'] if timeline else None,
         'agents': Agent.objects.order_by('name'),

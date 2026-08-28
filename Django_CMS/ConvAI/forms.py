@@ -732,16 +732,27 @@ class DetectorTableWidget(forms.Widget):
 """
 
 
+# The description is one line about what the agent is for, shown on its card on
+# the Agents page. Two rows rather than a single-line input: an admin writing one
+# should see the whole sentence, and 200 characters do not fit in a text box.
+_DESCRIPTION_WIDGET = forms.Textarea(attrs={
+    **_INPUT, "rows": 2, "maxlength": 200,
+    "placeholder": _("Answers questions about medication from the uploaded leaflets."),
+})
+
+
 class AgentForm(forms.ModelForm):
     """App-level create/edit form for **remote** agents (LangGraph server)."""
     class Meta:
         model = Agent
         fields = [
-            "name", "langgraph_name", "host", "port",
+            "name", "description", "langgraph_name", "host", "port",
             "classification_role", "abstract_instruction", "detectors", "tts_voice_id",
         ]
+        labels = {"description": _("Description")}
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
+            "description": _DESCRIPTION_WIDGET,
             "langgraph_name": forms.TextInput(attrs=_INPUT),
             "host": forms.TextInput(attrs=_INPUT),
             "port": forms.NumberInput(attrs=_INPUT),
@@ -769,11 +780,12 @@ class PromptAgentForm(forms.ModelForm):
     class Meta:
         model = Agent
         fields = [
-            "name", "system_prompt", "model", "rag_enabled", "rag_top_k",
+            "name", "description", "system_prompt", "model", "rag_enabled", "rag_top_k",
             "realtime_enabled",
             "classification_role", "abstract_instruction", "detectors", "tts_voice_id",
         ]
         labels = {
+            "description": _("Description"),
             "realtime_enabled": _("Real-time voice agent"),
             "rag_enabled": _("Knowledge base (RAG)"),
             "rag_top_k": _("Extracts per search"),
@@ -796,6 +808,7 @@ class PromptAgentForm(forms.ModelForm):
         }
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
+            "description": _DESCRIPTION_WIDGET,
             "system_prompt": forms.Textarea(attrs={**_INPUT, "rows": 10,
                 "placeholder": "You are a helpful assistant…"}),
             "model": forms.TextInput(attrs=_MODEL_INPUT),
@@ -834,13 +847,15 @@ class NativeAgentForm(forms.ModelForm):
     """Edit form for **native** agents.
 
     Native agents ship with the platform (their graph/tools are code), so only
-    the admin-tunable knobs are editable here: the model behind the agent and the
-    TTS voice.
+    the admin-tunable knobs are editable here: the description shown on the
+    Agents page, the model behind the agent, and the TTS voice.
     """
     class Meta:
         model = Agent
-        fields = ["model", "tts_voice_id"]
+        fields = ["description", "model", "tts_voice_id"]
+        labels = {"description": _("Description")}
         widgets = {
+            "description": _DESCRIPTION_WIDGET,
             "model": forms.TextInput(attrs=_MODEL_INPUT),
             "tts_voice_id": forms.TextInput(attrs=_INPUT),
         }

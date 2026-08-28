@@ -24,8 +24,18 @@
           <span class="agent-badge bg-emerald-100 text-emerald-700">{% trans "Native" %}</span>
         {% endif %}
       </div>
-      <p class="text-xs text-gray-500 truncate mt-0.5">
-        {% if a.kind == 'prompt' %}
+      {% comment %}
+        What the agent is *for*, in the admin's own words. Without one, fall back
+        to the line this used to show — the technical identity, which at least
+        tells the cards apart. The identity is repeated as a chip below either
+        way, so writing a description never hides it.
+      {% endcomment %}
+      {# The title is the whole sentence, for the rare description that still #}
+      {# runs past the two lines the card can show. #}
+      <p class="agent-desc mt-0.5"{% if a.description %} title="{{ a.description }}"{% endif %}>
+        {% if a.description %}
+          {{ a.description }}
+        {% elif a.kind == 'prompt' %}
           {{ a.system_prompt|truncatechars:70|default:_("No prompt set") }}
         {% elif a.kind == 'remote' %}
           {{ a.langgraph_name|default:_("Remote LangGraph agent") }}
@@ -38,6 +48,19 @@
 
   {# ── meta chips ── #}
   <div class="mt-3 flex flex-wrap gap-1.5">
+    {% if a.description %}
+      {% if a.kind == 'native' %}
+        <span class="agent-chip" title="{% trans 'Built-in graph this agent runs' %}">
+          <span class="material-icons-outlined text-[13px]">bolt</span>
+          <code class="truncate">{{ a.native_key }}</code>
+        </span>
+      {% elif a.kind == 'remote' and a.langgraph_name %}
+        <span class="agent-chip" title="{% trans 'LangGraph name' %}">
+          <span class="material-icons-outlined text-[13px]">account_tree</span>
+          <span class="truncate">{{ a.langgraph_name }}</span>
+        </span>
+      {% endif %}
+    {% endif %}
     {% if a.kind == 'remote' %}
       <span class="agent-chip" title="{% trans 'Host' %}">
         <span class="material-icons-outlined text-[13px]">dns</span>

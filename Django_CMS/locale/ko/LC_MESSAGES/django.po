@@ -1331,7 +1331,7 @@ msgstr "기본값"
 msgid "Real-time voice"
 msgstr "실시간 음성"
 
-#: ConvAI/templates/agents/_agent_card.html:56
+#: ConvAI/templates/agents/_agent_card.html:58
 msgid "Voice ID"
 msgstr "음성 ID"
 
@@ -4045,3 +4045,21 @@ msgstr "구성"
 # key keeps matching the config and the dedupe; only shown translated.
 msgid "Self-harm"
 msgstr "자해"
+
+#: ConvAI/forms.py:740
+msgid "Answers questions about medication from the uploaded leaflets."
+msgstr "업로드된 설명서를 바탕으로 약에 대한 질문에 답합니다."
+
+#: ConvAI/models.py:808
+msgid ""
+"One line on what this agent does. Shown on its card on the Agents page, "
+"where about 90 characters fit."
+msgstr "이 에이전트가 무엇을 하는지 한 줄로 적습니다. 에이전트 페이지의 카드에 표시되며 약 90자까지 들어갑니다."
+
+#: ConvAI/templates/agents/_agent_card.html:53
+msgid "Built-in graph this agent runs"
+msgstr "이 에이전트가 실행하는 내장 그래프"
+
+#: ConvAI/templates/agents/_agent_card.html:58
+msgid "LangGraph name"
+msgstr "LangGraph 이름"

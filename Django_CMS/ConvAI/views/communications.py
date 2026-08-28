@@ -121,11 +121,16 @@ def _row(event, now):
     }
 
     if kind in ('call', 'visit'):
-        row['line2'] = event['protocol'] or event['meeting_type']
+        # A call nobody booked has no protocol to be named after, and naming it
+        # after its type printed "Protocol" over a row that covered none.
+        row['line2'] = event['protocol'] or (
+            _("Unscheduled call") if event.get('unscheduled') else event['meeting_type'])
         if kind == 'visit':
             row['detail'] = event['location'] or _("Location not set")
-        elif caregiver:
-            row['detail'] = _("with %s") % caregiver
+        elif event.get('dial_who') or caregiver:
+            # Whoever the call actually rang. It was always the caregiver until
+            # the client page could ring the client instead.
+            row['detail'] = _("with %s") % (event.get('dial_who') or caregiver)
 
         if event['status_code'] == Meeting.Status.PENDING:
             if event.get('outcome_missing'):
@@ -147,7 +152,10 @@ def _row(event, now):
                 row['badge'] = _("To do")
                 row['badge_class'] = 'todo'
             if not event.get('outcome_missing'):
-                row['sub'] = _("In-person meeting") if kind == 'visit' else _("Scheduled call")
+                row['sub'] = (
+                    _("In-person meeting") if kind == 'visit'
+                    else _("Unscheduled call") if event.get('unscheduled')
+                    else _("Scheduled call"))
         else:
             row['sub'] = event['status']
             row['dot'] = {

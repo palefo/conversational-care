@@ -641,22 +641,24 @@
         return null;
       }
 
-      function trim() {
-        var padded = parseFloat(main.style.paddingBottom) || 0;
-        var natural = main.scrollHeight - padded;
-        var need = Math.max(0, main.scrollTop + main.clientHeight - natural);
-        main.style.paddingBottom = need ? need + 'px' : '';
-        if (!need) main.removeEventListener('scroll', trim);
-      }
-
       // Pad the foot before mutating so a shorter page cannot clamp the scroll
-      // before the correction lands; the padding is trimmed on the next scroll.
+      // before the correction lands, then give the padding straight back. It
+      // is scaffolding for the mutation, not a floor to stand on: any of it
+      // left behind is scrollable space with no content under it, and the
+      // offset it was propping up is exactly as tall as the blank tail it
+      // leaves. A short page — the dashboard with a handful of rows — closed
+      // the panel and kept scrolling into most of a viewport of nothing,
+      // which only shrank if you scrolled back up. Where the content really
+      // does not reach that far, the browser settling the scroll at the end
+      // of it is the answer; the padding runs out within the same task, so
+      // the propped-up height is never painted.
+      //
       // Keeping the reader's place is a courtesy, not a precondition — so the
       // measuring is fenced off from the mutation. Anchoring reads layout, and
       // layout reads are the kind of thing that throws on an element that has
       // just been removed, or in an environment without elementFromPoint. If
       // any of it fails the panel must still open; it just opens without the
-      // scroll correction.
+      // scroll correction — and the foot is handed back either way.
       function keepPlace(mutate) {
         var anchor = null, before = 0;
         try {
@@ -672,9 +674,8 @@
             var delta = anchor.getBoundingClientRect().top - before;
             if (delta) main.scrollTop += delta;
           }
-          trim();
-          main.addEventListener('scroll', trim, { passive: true });
         } catch (e) {}
+        main.style.paddingBottom = '';
       }
 
       // ---- Teardown -----------------------------------------------------

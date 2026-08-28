@@ -9,6 +9,15 @@ resolves an `Agent` and asks it to generate a response. Agents come in three
 
 - An **`Agent`** row (`ConvAI.models.Agent`) describes one assistant: its name,
   its kind, and the connection/identity details for that kind.
+- **`Agent.description`** is one line on what the agent is *for*, in the admin's
+  own words. It is shown on the agent's card on the Agents page, so the list
+  reads as a roster instead of four names and a model id. Optional for every
+  kind; native agents ship with one (seeded by migration `0082`). A card with no
+  description falls back to the technical identity it always showed — the
+  `native_key`, the LangGraph name, or the first line of the system prompt.
+  The card gives it two lines and trims the rest — about 90 characters, which
+  is the budget the seeded descriptions are held to (`CARD_BUDGET` in that
+  migration). Longer text still reads in full by hovering the card.
 - A **`Patient`** (and, for the navigator bubble, a **user**) points at an agent
   via its `.agent` foreign key. That is the agent used for their conversations.
 - Every response goes through **`generate_response_with_agent(agent, …)`** in
@@ -20,7 +29,7 @@ resolves an `Agent` and asks it to generate a response. Agents come in three
 In the app UI (**Agents** page, admin only) agents are grouped by kind in tabs:
 **Prompt-based** and **Remote** are fully user-manageable (create / edit /
 delete); **Native** ship with the platform, so they can't be created or deleted,
-but admins **can edit** the model and TTS voice behind them. Every agent has a
+but admins **can edit** their description, model and TTS voice. Every agent has a
 **Test** button that opens the chat UI wired to just that agent (nothing is saved).
 
 ## The three kinds

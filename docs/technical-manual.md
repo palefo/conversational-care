@@ -396,6 +396,10 @@ Full detail in [agents.md](../agents.md). Summary:
   **Link Worker** (the navigator chatbot bubble; scaffolded), the
   **Protocol Q&A** agent, and the **Self Registration** agent that answers the
   WhatsApp QR flow (Settings → Registrations).
+- **`Agent.description`** — one line on what the agent does, shown on its card
+  on the Agents page and editable for every kind. Native agents are seeded with
+  one (migration `0082`); a blank description falls back to the card's old
+  technical subtitle.
 - **Model selection** is per agent (`Agent.model`, e.g.
   `anthropic/claude-sonnet-4-6`), built by the shared factory
   `llm_factory.make_llm()`; provider inferred from the prefix, keys resolved
@@ -403,8 +407,9 @@ Full detail in [agents.md](../agents.md). Summary:
 
 To add a native agent: create a module in `ConvAI/native_agents/` whose
 builder returns a compiled graph, decorate with `@register("your_key")`, keep
-optional imports inside the builder, and seed an `Agent` row with a data
-migration.
+optional imports inside the builder, and seed an `Agent` row — with a
+`description`, since that is all the Agents page can say about it — using a
+data migration.
 
 ## 10. Messaging: Twilio webhook & async replies
 

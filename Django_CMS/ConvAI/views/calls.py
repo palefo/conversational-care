@@ -7,7 +7,7 @@ from ._panel import panel_context
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['scoped_meeting_form', 'save_scheduled_meeting', 'calendar_view', 'calendar_create_meeting', 'complete_meeting', 'cancel_meeting', 'edit_meeting', 'pending_call', 'make_phone_call', 'schedule_call', 'send_whatsapp_reminder_view', 'send_meeting_reminder_view']
+__all__ = ['scoped_meeting_form', 'save_scheduled_meeting', 'calendar_view', 'calendar_create_meeting', 'complete_meeting', 'cancel_meeting', 'edit_meeting', 'pending_call', 'make_phone_call', 'start_client_call', 'schedule_call', 'send_whatsapp_reminder_view', 'send_meeting_reminder_view']
 
 
 @login_required
@@ -159,23 +159,26 @@ def _record_call_legs(meeting, conference, user):
         )
 
 
-@login_required
-def make_phone_call(request, meeting_id):
-    """
-    Inicia una conferencia telefónica para la reunión indicada.
-    """
-    meeting = get_object_or_404(
-        Meeting.objects.select_related('patient__caregiver', 'patient__navigator'),
-        pk=meeting_id
-    )
+def _place_call(request, meeting):
+    """Bridge the navigator's phone to whoever this meeting is with.
 
-    if not (is_admin(request.user) or meeting.patient.navigator_id == request.user.id):
-        return _call_error(_("You do not have permission to start this call."), 403)
-
-    caregiver = meeting.patient.caregiver
-    if not caregiver or not caregiver.phone_number:
+    Split out of make_phone_call so the Call button on the client page places
+    its call the same way a booked one is placed, rather than growing a second
+    copy of the Twilio round trip, the leg bookkeeping and the four refusals.
+    The only difference between the two entry points is where the meeting came
+    from; everything from here down is identical, and has to stay identical —
+    an unscheduled call that skipped _record_call_legs would lose its recording.
+    """
+    recipient = meeting.dial_recipient
+    if recipient is None:
+        # Named, rather than "no caregiver": with two people to choose between,
+        # the reason has to say which of them was chosen and came up short, or
+        # the navigator goes looking at the wrong record.
+        missing = (_("This client has no phone number of their own to call.")
+                   if meeting.dial_target == Meeting.DialTarget.CLIENT
+                   else _("This client has no caregiver with a phone number to call."))
         return _call_error(
-            _("This client has no caregiver with a phone number to call."), 400,
+            missing, 400,
             reverse('patient_detail', args=[meeting.patient_id]), _("Open the client"),
         )
 
@@ -188,7 +191,7 @@ def make_phone_call(request, meeting_id):
         )
 
     # Convertir a string para Twilio
-    dyad_phone = str(caregiver.phone_number)
+    dyad_phone = str(recipient.phone_number)
     ctn_phone  = str(request.user.phone_number)
     platform_phone = get_platform_phone()
 
@@ -222,6 +225,86 @@ def make_phone_call(request, meeting_id):
         'status': 'ok',
         'conference': (conference or {}).get('conference')
     })
+
+
+@login_required
+def make_phone_call(request, meeting_id):
+    """
+    Inicia una conferencia telefónica para la reunión indicada.
+    """
+    meeting = get_object_or_404(
+        Meeting.objects.select_related('patient__caregiver', 'patient__navigator'),
+        pk=meeting_id
+    )
+
+    if not (is_admin(request.user) or meeting.patient.navigator_id == request.user.id):
+        return _call_error(_("You do not have permission to start this call."), 403)
+
+    return _place_call(request, meeting)
+
+
+@require_POST
+@login_required
+def start_client_call(request, patient_id):
+    """Call this client now, without anything having been booked.
+
+    The Call button on the client page. It rings whichever of the client's two
+    numbers was picked — see Meeting.DialTarget — and the call it places is an
+    ordinary Meeting, created here and marked unscheduled.
+
+    A Meeting rather than a bare Twilio call, because a call outside one is a
+    call the platform cannot hold: CallLeg hangs off a meeting and is what ties
+    the recording arriving hours later back to this client, and the panel's
+    protocols, notes and outcome are all addressed to one. Placing this call
+    without a meeting would mean a call that is recorded nowhere, answered
+    nowhere, and closed nowhere.
+
+    Deliberately never reuses a booked call, even one due in ten minutes.
+    Folding an unscheduled call into a scheduled one would silently record the
+    booked call as made — and if this was a different conversation, that is a
+    call that now looks done and will not be made.
+    """
+    patient = get_object_or_404(
+        Patient.objects.select_related('caregiver', 'navigator'), pk=patient_id
+    )
+    if not (is_admin(request.user) or patient.navigator_id == request.user.id):
+        return _call_error(_("You do not have permission to call this client."), 403)
+
+    target = (Meeting.DialTarget.CLIENT
+              if (request.POST.get('to') or '').strip() == 'client'
+              else Meeting.DialTarget.CAREGIVER)
+
+    meeting = Meeting.objects.create(
+        patient=patient,
+        # Now, because that is when it is happening. ended_at is what dates it
+        # in Happened once the outcome is recorded; until then this is what the
+        # lists sort it by, and a call placed at 15:40 belongs at 15:40.
+        scheduled_time=timezone.now(),
+        modality=Meeting.Modality.PHONE,
+        status=Meeting.Status.PENDING,
+        dial_target=target,
+        unscheduled=True,
+    )
+
+    response = _place_call(request, meeting)
+
+    if response.status_code != 200:
+        # Nothing was placed, so there was no call — and a meeting left behind
+        # here would be one: a row on the timeline, in the navigator's queue,
+        # asking for an outcome nobody owes it. It only earns its place once
+        # the phones are actually ringing.
+        meeting.delete()
+        return response
+
+    # Where to carry on. The client page opens this meeting's panel rather than
+    # navigating anywhere new, so the call arrives with its protocols, its notes
+    # and its outcome already around it — the same panel a booked call is worked
+    # through in.
+    payload = {'status': 'ok', 'item': meeting.panel_token}
+    recipient = meeting.dial_recipient
+    if recipient is not None:
+        payload['who'] = str(recipient)
+    return JsonResponse(payload)
 
 
 @require_POST

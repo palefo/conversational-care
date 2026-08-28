@@ -691,9 +691,10 @@
 
   {% comment %}
     Collapsing a section while you are near the foot of the page makes the page
-    shorter than your scroll position, and the browser hauls you upward. This
-    grows just enough to hold your place and shrinks back to nothing as you
-    scroll up, so nothing under the cursor ever moves.
+    shorter than your scroll position, and the browser hauls you upward before
+    the correction can measure how far. This is raised for the length of that
+    one toggle and let straight back down: it buys the measurement, it is not
+    somewhere to stand. Left standing it is a screenful of scrollable nothing.
   {% endcomment %}
   <div id="dashPad" aria-hidden="true"></div>
 
@@ -830,15 +831,6 @@
     var main = document.querySelector('main');
     var pad = document.getElementById('dashPad');
 
-    // Only as tall as it needs to be to keep the current scroll reachable, so
-    // it melts away as you scroll back up without moving anything.
-    function fitPad() {
-      if (!pad || !main) return;
-      var natural = main.scrollHeight - pad.offsetHeight;
-      pad.style.height = Math.max(0, main.scrollTop + main.clientHeight - natural) + 'px';
-    }
-    if (main) main.addEventListener('scroll', fitPad, { passive: true });
-
     var state = read();
     document.querySelectorAll('.dash-acc[data-acc]').forEach(function (section) {
       var name = section.dataset.acc;
@@ -855,8 +847,8 @@
         // first because a collapse can leave the page shorter than the scroll
         // position, and the browser clamps before we get a chance to correct.
         var before = head.getBoundingClientRect().top;
-        // Generous on purpose: it only has to outlast the collapse, and
-        // fitPad trims it back to the minimum a moment later.
+        // Generous on purpose: it only has to outlast the collapse, and it
+        // comes down again the moment the correction has its measurement.
         if (pad) pad.style.height = main.scrollHeight + 'px';
 
         var collapsed = section.classList.toggle('collapsed');
@@ -878,7 +870,13 @@
 
         var delta = head.getBoundingClientRect().top - before;
         if (delta) main.scrollTop += delta;
-        fitPad();
+        // Down in the same breath. Whatever the spacer keeps once the
+        // correction has landed is scrollable emptiness: on a Home page that
+        // fits the window, collapsing a section left most of a screen of
+        // nothing to scroll through, and it only gave any of it back if you
+        // scrolled up. Where the page really is too short to hold the offset,
+        // the browser settling at the foot of what is left is the answer.
+        if (pad) pad.style.height = '';
 
         var s = read();
         s[name] = collapsed;

@@ -1325,7 +1325,7 @@ msgstr "默认"
 msgid "Real-time voice"
 msgstr "实时语音"
 
-#: ConvAI/templates/agents/_agent_card.html:56
+#: ConvAI/templates/agents/_agent_card.html:58
 msgid "Voice ID"
 msgstr "语音 ID"
 
@@ -4023,3 +4023,21 @@ msgstr "配置"
 # key keeps matching the config and the dedupe; only shown translated.
 msgid "Self-harm"
 msgstr "自我伤害"
+
+#: ConvAI/forms.py:740
+msgid "Answers questions about medication from the uploaded leaflets."
+msgstr "根据上传的说明书回答用药相关问题。"
+
+#: ConvAI/models.py:808
+msgid ""
+"One line on what this agent does. Shown on its card on the Agents page, "
+"where about 90 characters fit."
+msgstr "用一句话说明该智能体的用途，显示在“智能体”页面的卡片上，约可容纳 90 个字符。"
+
+#: ConvAI/templates/agents/_agent_card.html:53
+msgid "Built-in graph this agent runs"
+msgstr "该智能体运行的内置图"
+
+#: ConvAI/templates/agents/_agent_card.html:58
+msgid "LangGraph name"
+msgstr "LangGraph 名称"
