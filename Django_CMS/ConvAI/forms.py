@@ -1,4 +1,5 @@
 import json
+import secrets
 
 from django import forms
 from .models import Meeting, Patient, Question, Answer, Agent, SiteConfiguration
@@ -859,6 +860,77 @@ class NativeAgentForm(forms.ModelForm):
             "model": forms.TextInput(attrs=_MODEL_INPUT),
             "tts_voice_id": forms.TextInput(attrs=_INPUT),
         }
+
+
+class SenseiAgentForm(forms.ModelForm):
+    """App-level create/edit form for **Sensei** agents.
+
+    Deliberately thin. A Sensei agent has no connection settings of its own —
+    the endpoint, function key and id secret are installation-wide and live in
+    Settings -> Sensei — so what is left is how the agent presents itself and
+    how its conversations are classified. There is no model field either: the
+    answering model runs on Sensei's side, not ours.
+    """
+    class Meta:
+        model = Agent
+        fields = [
+            "name", "description",
+            "classification_role", "abstract_instruction", "detectors", "tts_voice_id",
+        ]
+        labels = {"description": _("Description")}
+        widgets = {
+            "name": forms.TextInput(attrs=_INPUT),
+            "description": _DESCRIPTION_WIDGET,
+            "classification_role": forms.Textarea(attrs={**_INPUT, "rows": 4}),
+            "abstract_instruction": forms.TextInput(attrs=_INPUT),
+            "detectors": DetectorTableWidget(),
+            "tts_voice_id": forms.TextInput(attrs=_INPUT),
+        }
+
+
+class SenseiConfigForm(SecretPreserveMixin, forms.ModelForm):
+    """Settings -> Sensei: the switch, the endpoint, and the two secrets."""
+    secret_fields = ("sensei_function_key", "sensei_user_id_secret")
+
+    class Meta:
+        model = SiteConfiguration
+        fields = [
+            "sensei_enabled", "sensei_api_url",
+            "sensei_function_key", "sensei_user_id_secret",
+        ]
+        labels = {
+            "sensei_enabled": _("Enable Sensei agents"),
+            "sensei_api_url": _("Sensei API URL"),
+            "sensei_function_key": _("Sensei function key"),
+            "sensei_user_id_secret": _("User-id secret"),
+        }
+        help_texts = {
+            "sensei_enabled": _("Off by default. When off, Sensei agents cannot "
+                                "be created and existing ones stop answering."),
+            "sensei_api_url": _("The full endpoint, e.g. "
+                                "https://<function-app>.azurewebsites.net/api/send_message"),
+            "sensei_function_key": _("Sent as the 'x-functions-key' header."),
+            "sensei_user_id_secret": _("Keys the opaque per-client id sent to Sensei, so "
+                                       "Sensei never sees a real client identifier. Generated "
+                                       "automatically if left blank. Changing it makes every "
+                                       "client log in to Sensei again."),
+        }
+        widgets = {
+            "sensei_enabled": forms.Select(attrs=_SELECT),
+            "sensei_api_url": forms.TextInput(attrs={
+                **_INPUT,
+                "placeholder": "https://<function-app>.azurewebsites.net/api/send_message",
+            }),
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        # A blank secret on first save is the normal case, not an error to make
+        # the admin solve: nobody should be inventing HMAC keys by hand, and an
+        # empty one would silently break every Sensei turn.
+        if not cleaned.get("sensei_user_id_secret"):
+            cleaned["sensei_user_id_secret"] = secrets.token_urlsafe(32)
+        return cleaned
 
 
 class NavigatorForm(forms.Form):

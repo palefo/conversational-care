@@ -373,6 +373,68 @@
   </section>
 
   {# ═════════ Prompts ═════════ #}
+  {# ═════════ Sensei ═════════ #}
+  <section class="settings-panel hidden" data-tab="sensei">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">sensors</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Sensei" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Sensei is an external service that answers questions about the wearable and phone health data a client has synced to it. Turn this on to allow Sensei agents; no health data is shared either way — only the text of the conversation. Secrets are never shown again after saving — leave them blank to keep the current value." %}</p>
+        </div>
+      </div>
+
+      {# Same check the adapter runs before every turn, so this cannot claim
+         Sensei is ready while calls are failing on a missing value. #}
+      {% if not sensei_status.enabled %}
+        <div class="px-4 py-3 mb-5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">toggle_off</span>
+          <div>{% trans "Sensei is off. While it is off, Sensei agents cannot be created and any that already exist stop answering." %}</div>
+        </div>
+      {% elif sensei_status.ok %}
+        <div class="px-4 py-3 mb-5 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">check_circle</span>
+          <div>
+            {% trans "Sensei is on and configured." %}
+            <a class="underline font-medium" href="{% url 'agents' %}#sensei">{% trans "Manage Sensei agents" %}</a>
+          </div>
+        </div>
+      {% else %}
+        <div class="px-4 py-3 mb-5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">warning_amber</span>
+          <div>{{ sensei_status.reason }}</div>
+        </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="sensei">
+        {% include "settings/_field.html" with field=sensei_form.sensei_enabled %}
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Connection" %}</div>
+          {% include "settings/_field.html" with field=sensei_form.sensei_api_url %}
+          {% include "settings/_field.html" with field=sensei_form.sensei_function_key %}
+        </div>
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Client identity" %}</div>
+          {% include "settings/_field.html" with field=sensei_form.sensei_user_id_secret %}
+        </div>
+
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+    </div>
+
+    <div class="card p-6 mt-6">
+      <h3 class="font-semibold text-gray-800 mb-2">{% trans "How clients sign in to Sensei" %}</h3>
+      <p class="text-sm text-gray-500 mb-3">{% trans "Sensei keeps its own accounts. A client links theirs by sending one of these to a Sensei agent — passcodes are removed before the message is stored." %}</p>
+      <pre class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs overflow-x-auto"><code>/login &lt;AppUserId&gt; &lt;Passcode&gt;
+/register_user &lt;NewAppUserId&gt; &lt;NewPasscode&gt;</code></pre>
+      <p class="text-xs text-gray-500 mt-2">{% trans "A newly registered account can chat straight away. Questions about sensor data also need the client to sign in to the Sensei mobile app with the same AppUserId and sync their health data." %}</p>
+    </div>
+  </section>
+
   <section class="settings-panel hidden" data-tab="prompts">
     <div class="card p-6">
       <div class="flex items-start gap-3 mb-5">
@@ -769,7 +831,7 @@ print(result)</code></pre>
 {{ block.super }}
 <script>
   (function () {
-    const validTabs = ['general','integrations','messaging','email','branding','agents','prompts','protocols','registrations','selfreg','api','maintenance'];
+    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','api','maintenance'];
     const buttons = document.querySelectorAll('.stg-navitem');
     const panels  = document.querySelectorAll('.settings-panel');
 

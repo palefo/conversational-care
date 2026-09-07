@@ -105,11 +105,14 @@ def job_process_whatsapp_audio(
     voice_id = resolve_tts_voice_id(getattr(patient, "agent", None))
     synthesize_speech_elevenlabs(reply_text, out_name, voice_id=voice_id)
 
-    # Persist message
+    # Persist message. This path writes the row itself rather than going
+    # through save_message, so it has to scrub a spoken/typed Sensei passcode
+    # on its own — see ConvAI.sensei.redact.
+    from .sensei import redact as _redact_credentials
     msg = Message.objects.create(
         user=phone,
         conversation_id=thread_id,
-        user_message=transcript or (body_text or ""),
+        user_message=_redact_credentials(transcript or (body_text or "")),
         response_message=reply_text,
         input_audio_file=in_name or "",
         response_audio_file=out_name,

@@ -797,6 +797,12 @@ class Agent(models.Model):
         # 'prompt' agents are user-created, run in-process, and use a stored
         # system prompt with no tools.
         PROMPT = "prompt", _("Prompt-based")
+        # 'sensei' agents forward the turn to the external Sensei service over
+        # its REST endpoint (see ConvAI.sensei and agents.md). Deliberately a
+        # kind of its own rather than a flavour of REMOTE: remote agents speak
+        # LangGraph over host:port, Sensei speaks a small JSON operation
+        # protocol over HTTPS, and the two share no connection settings.
+        SENSEI = "sensei", _("Sensei")
 
     name = models.CharField(max_length=100, unique=True)
 
@@ -813,7 +819,8 @@ class Agent(models.Model):
         max_length=16, choices=Kind.choices, default=Kind.REMOTE, db_index=True,
         help_text=_("Remote = runs on a LangGraph server (host:port). "
                     "Native = ships with the platform. "
-                    "Prompt-based = in-process agent driven by a stored prompt."),
+                    "Prompt-based = in-process agent driven by a stored prompt. "
+                    "Sensei = forwards the turn to the external Sensei service."),
     )
     native_key = models.CharField(
         max_length=64, blank=True, default="",
@@ -898,7 +905,12 @@ class Agent(models.Model):
     tts_voice_id = models.CharField(max_length=40, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.name} @ {self.host}:{self.port}"
+        # host:port only identifies a *remote* agent. Every other kind has none,
+        # so the old unconditional form rendered "Loopback @ :None" in admin
+        # dropdowns and anywhere else an agent is listed by name.
+        if self.kind == self.Kind.REMOTE and self.host:
+            return f"{self.name} @ {self.host}:{self.port}"
+        return self.name
 
 
 # ---------------------------------------------------------------------------
@@ -1300,6 +1312,20 @@ class SiteConfiguration(models.Model):
     # azure_embedding_deployment (falling back to the model name).
     rag_embedding_model = models.CharField(max_length=120, blank=True, default="")
     azure_embedding_deployment = models.CharField(max_length=100, blank=True, default="")
+
+    # --- Sensei (live) ---
+    # Off by default, and deliberately so: most installations have no Sensei
+    # service to talk to, and the flag is what keeps the whole feature — the
+    # agent kind, its settings, and its create button — out of their way. See
+    # agents.md -> "Sensei agents".
+    sensei_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+    sensei_api_url = models.CharField(max_length=500, blank=True, default="")
+    sensei_function_key = models.CharField(max_length=500, blank=True, default="")
+    # HMAC key behind the opaque per-patient id sent to Sensei. Sensei never
+    # learns who a patient is; it only ever sees a stable digest. Rotating this
+    # value orphans every Sensei-side account, so it is generated once and left
+    # alone (see ConvAI.sensei.external_user_id).
+    sensei_user_id_secret = models.CharField(max_length=200, blank=True, default="")
 
     # --- Editable content (live) ---
     # Markdown source for the Help page. Blank falls back to the shipped default

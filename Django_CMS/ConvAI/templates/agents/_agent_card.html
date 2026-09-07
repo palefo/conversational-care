@@ -8,6 +8,8 @@
       <span class="agent-avatar bg-indigo-50 text-indigo-600"><span class="material-icons-outlined">chat</span></span>
     {% elif a.kind == 'remote' %}
       <span class="agent-avatar bg-sky-50 text-sky-600"><span class="material-icons-outlined">cloud</span></span>
+    {% elif a.kind == 'sensei' %}
+      <span class="agent-avatar bg-teal-50 text-teal-600"><span class="material-icons-outlined">sensors</span></span>
     {% else %}
       <span class="agent-avatar bg-emerald-50 text-emerald-600"><span class="material-icons-outlined">bolt</span></span>
     {% endif %}
@@ -20,6 +22,8 @@
           <span class="agent-badge bg-indigo-100 text-indigo-700">{% trans "Prompt" %}</span>
         {% elif a.kind == 'remote' %}
           <span class="agent-badge bg-sky-100 text-sky-700">{% trans "Remote" %}</span>
+        {% elif a.kind == 'sensei' %}
+          <span class="agent-badge bg-teal-100 text-teal-700">{% trans "Sensei" %}</span>
         {% else %}
           <span class="agent-badge bg-emerald-100 text-emerald-700">{% trans "Native" %}</span>
         {% endif %}
@@ -39,6 +43,8 @@
           {{ a.system_prompt|truncatechars:70|default:_("No prompt set") }}
         {% elif a.kind == 'remote' %}
           {{ a.langgraph_name|default:_("Remote LangGraph agent") }}
+        {% elif a.kind == 'sensei' %}
+          {% trans "Answers from the client's own sensor data, via Sensei." %}
         {% else %}
           <code>{{ a.native_key }}</code>
         {% endif %}
@@ -65,6 +71,12 @@
       <span class="agent-chip" title="{% trans 'Host' %}">
         <span class="material-icons-outlined text-[13px]">dns</span>
         <span class="truncate">{{ a.host|default:"—" }}{% if a.port %}:{{ a.port }}{% endif %}</span>
+      </span>
+    {% elif a.kind == 'sensei' %}
+      {# No model chip: the answering model runs on Sensei's side, not ours. #}
+      <span class="agent-chip" title="{% trans 'Answered by the external Sensei service' %}">
+        <span class="material-icons-outlined text-[13px]">sensors</span>
+        {% trans "Sensei service" %}
       </span>
     {% else %}
       <span class="agent-chip" title="{% trans 'Model' %}">

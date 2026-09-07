@@ -56,6 +56,12 @@
     <span class="material-icons-outlined text-base">bolt</span>{% trans "Native" %}
     <span class="count">{{ native_agents|length }}</span>
   </button>
+  {% if show_sensei %}
+  <button type="button" data-agent-tab="sensei" class="agent-tab">
+    <span class="material-icons-outlined text-base">sensors</span>{% trans "Sensei" %}
+    <span class="count">{{ sensei_agents|length }}</span>
+  </button>
+  {% endif %}
 </div>
 
 {% comment %} ---------- Prompt-based ---------- {% endcomment %}
@@ -128,6 +134,45 @@
     </div>
   {% endif %}
 </section>
+{% comment %} ---------- Sensei ---------- {% endcomment %}
+{% if show_sensei %}
+<section class="agent-panel" data-agent-panel="sensei">
+  <p class="text-sm text-gray-500 max-w-xl mb-4">{% trans "Agents that hand the conversation to Sensei, an external service that answers from the wearable and phone health data a client has synced to it. Only the text of the turn is shared — the two systems keep separate databases." %}</p>
+
+  {% if not sensei_enabled %}
+    <div class="px-4 py-3 mb-4 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-sm flex items-start gap-2">
+      <span class="material-icons-outlined text-base">warning_amber</span>
+      <div>
+        {% trans "Sensei is switched off, so these agents will not answer." %}
+        <a class="underline font-medium" href="{% url 'config' %}?tab=sensei#sensei">{% trans "Turn it on in Settings" %}</a>.
+      </div>
+    </div>
+  {% endif %}
+
+  {% if sensei_agents %}
+    <div class="agent-grid">
+      {% for a in sensei_agents %}{% include "agents/_agent_card.html" with a=a %}{% endfor %}
+      {% if sensei_enabled %}
+        <a href="{% url 'agent_create' 'sensei' %}" class="agent-card agent-add">
+          <span class="material-icons-outlined text-3xl">add</span>
+          <span class="font-medium text-sm">{% trans "New Sensei agent" %}</span>
+        </a>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="agent-empty">
+      <span class="material-icons-outlined text-4xl text-teal-300">sensors</span>
+      <p class="mt-2 font-medium text-gray-700">{% trans "No Sensei agents yet." %}</p>
+      <p class="text-sm text-gray-500 mb-4">{% trans "Add one to let clients ask about their own sensor data." %}</p>
+      {% if sensei_enabled %}
+        <a href="{% url 'agent_create' 'sensei' %}" class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+          <span class="material-icons-outlined text-base">add</span>{% trans "New Sensei agent" %}
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -145,7 +190,7 @@
       t.addEventListener('click', function () { activate(t.dataset.agentTab); });
     });
     var initial = (location.hash || '').replace('#', '');
-    var valid = ['prompt', 'remote', 'native'];
+    var valid = ['prompt', 'remote', 'native', 'sensei'];
     activate(valid.indexOf(initial) >= 0 ? initial : 'prompt');
   })();
 </script>

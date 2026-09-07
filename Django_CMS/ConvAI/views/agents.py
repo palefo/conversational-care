@@ -1,5 +1,5 @@
 from ._base import *  # noqa: F401,F403
-from ..forms import AgentForm, PromptAgentForm, NativeAgentForm
+from ..forms import AgentForm, PromptAgentForm, NativeAgentForm, SenseiAgentForm
 import logging
 
 from ..realtime import (mint_realtime_session, realtime_configured,
@@ -17,14 +17,30 @@ _KIND_FORMS = {
     Agent.Kind.REMOTE: AgentForm,
     Agent.Kind.PROMPT: PromptAgentForm,
     Agent.Kind.NATIVE: NativeAgentForm,
+    Agent.Kind.SENSEI: SenseiAgentForm,
 }
 _KIND_LABELS = {
     Agent.Kind.REMOTE: _("remote agent"),
     Agent.Kind.PROMPT: _("prompt-based agent"),
     Agent.Kind.NATIVE: _("native agent"),
+    Agent.Kind.SENSEI: _("Sensei agent"),
 }
 # Kinds that admins may create from scratch (native agents are seeded, not created).
-_CREATABLE_KINDS = {Agent.Kind.REMOTE, Agent.Kind.PROMPT}
+_CREATABLE_KINDS = {Agent.Kind.REMOTE, Agent.Kind.PROMPT, Agent.Kind.SENSEI}
+
+
+def _kind_available(kind) -> bool:
+    """Whether ``kind`` may be created on this installation.
+
+    Sensei is behind a flag that is off by default (Settings -> Sensei). Only
+    *creation* is gated: an agent created while the flag was on stays editable
+    after it is turned off, so flipping the switch off and on again does not
+    cost an admin the configuration they wrote.
+    """
+    if kind == Agent.Kind.SENSEI:
+        from .. import sensei
+        return sensei.enabled()
+    return True
 
 
 @login_required
@@ -32,6 +48,7 @@ _CREATABLE_KINDS = {Agent.Kind.REMOTE, Agent.Kind.PROMPT}
 def agent_list(request):
     """Admin-only listing of agents, grouped by kind (and prompt subtype)."""
     from ..models import RagDocument
+    from .. import sensei
     # The document count is annotated rather than read per card, which would be
     # a query per RAG agent. Only ready *and* enabled documents count: that is
     # what the agent can actually search.
@@ -43,6 +60,7 @@ def agent_list(request):
         ),
     ).order_by('name')
     prompt_agents = [a for a in agents if a.kind == Agent.Kind.PROMPT]
+    sensei_agents = [a for a in agents if a.kind == Agent.Kind.SENSEI]
     return render(request, 'agents/agent_list.html', {
         'active_page': 'agents',
         'native_agents': [a for a in agents if a.kind == Agent.Kind.NATIVE],
@@ -50,6 +68,12 @@ def agent_list(request):
         'plain_prompt_agents': [a for a in prompt_agents if not a.rag_enabled],
         'rag_agents': [a for a in prompt_agents if a.rag_enabled],
         'remote_agents': [a for a in agents if a.kind == Agent.Kind.REMOTE],
+        'sensei_agents': sensei_agents,
+        # The tab is hidden entirely on installations that do not use Sensei —
+        # unless some already exist, in which case hiding it would strand them
+        # with no way to reach the rows.
+        'show_sensei': sensei.enabled() or bool(sensei_agents),
+        'sensei_enabled': sensei.enabled(),
     })
 
 
@@ -69,6 +93,10 @@ def agent_form(request, pk=None, kind=None):
         return redirect('agents')
     if agent is None and kind not in _CREATABLE_KINDS:
         messages.error(request, _("That agent kind cannot be created here."))
+        return redirect('agents')
+    if agent is None and not _kind_available(kind):
+        messages.error(request, _("Sensei agents are not enabled on this "
+                                  "installation. Turn Sensei on in Settings first."))
         return redirect('agents')
 
     FormClass = _KIND_FORMS[kind]

@@ -365,6 +365,16 @@ def generate_response_with_agent(agent,
         from .native_agents import run_prompt_agent
         return run_prompt_agent(agent, thread_id, user_message, configurable, model_name)
 
+    # Sensei agents: one JSON POST to the external Sensei service. No host/port
+    # of their own — the endpoint and key are installation-wide settings — so
+    # this returns before the LangGraph host allow-list below, which has nothing
+    # to check for them.
+    if kind == "sensei":
+        from . import sensei
+        if not sensei.enabled():
+            return "Sorry, Sensei agents are not enabled on this installation."
+        return sensei.send(user_or_patient, user_message, thread_id)
+
     # AS-06/F8 fix: deny SSRF to non-allow-listed agent hosts.
     if not agent_host_allowed(getattr(agent, "host", "")):
         return "Sorry, the configured agent host is not permitted."
@@ -416,6 +426,15 @@ def save_message(phone: str, user_message: str, response_message: str, thread_id
     """
     now = timezone.now()
     agent = getattr(patient, "agent", None) if patient is not None else None
+
+    # Scrub a Sensei passcode before it reaches the database. This is the one
+    # place every inbound turn is persisted from — WhatsApp, SMS, the external
+    # chat and the tester chat all land here — which is what makes it the right
+    # place: the agent has already been given the raw text by now, and nothing
+    # downstream of this row (the classifier, the transcript a navigator reads,
+    # the summariser) has any business seeing the passcode.
+    from .sensei import redact as _redact_credentials
+    user_message = _redact_credentials(user_message)
 
     with transaction.atomic():
         # Upsert Conversation by UUID primary key

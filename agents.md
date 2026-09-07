@@ -2,8 +2,9 @@
 
 Conversational Care talks to its users through **agents**. Every chat surface —
 the external chat, the navigator chatbot bubble, WhatsApp/SMS, protocol replies —
-resolves an `Agent` and asks it to generate a response. Agents come in three
-**kinds**, distinguished by the `Agent.kind` field.
+resolves an `Agent` and asks it to generate a response. Agents come in four
+**kinds**, distinguished by the `Agent.kind` field. Three ship on every
+installation; the fourth, **Sensei**, is behind a flag that is off by default.
 
 ## Concepts
 
@@ -29,10 +30,11 @@ resolves an `Agent` and asks it to generate a response. Agents come in three
 In the app UI (**Agents** page, admin only) agents are grouped by kind in tabs:
 **Prompt-based** and **Remote** are fully user-manageable (create / edit /
 delete); **Native** ship with the platform, so they can't be created or deleted,
-but admins **can edit** their description, model and TTS voice. Every agent has a
-**Test** button that opens the chat UI wired to just that agent (nothing is saved).
+but admins **can edit** their description, model and TTS voice. **Sensei** only
+appears once the feature is switched on. Every agent has a **Test** button that
+opens the chat UI wired to just that agent (nothing is saved).
 
-## The three kinds
+## The kinds
 
 ### Remote agents (`kind = "remote"`)
 
@@ -262,11 +264,121 @@ The bundled native agents are seeded by a data migration
 > credentials for its selected model. See the note at the top of
 > `ConvAI/native_agents/link_worker.py`.
 
+### Sensei agents (`kind = "sensei"`)
+
+**Off by default.** Sensei is one deployment's integration, not a platform
+feature, so a fresh installation never sees it: the switch lives in
+**Settings → Sensei** (`SiteConfiguration.sensei_enabled`, or `SENSEI_ENABLED`
+in `.env`) and starts blank/off. While it is off the tab is hidden, the kind
+cannot be created, and any Sensei agent that already exists stops answering and
+says so. Turning it off does **not** delete anything — agents created earlier
+stay editable, so flipping the switch back on costs an admin nothing.
+
+[Sensei](https://github.com/hansoolee18/sensoryLLM) is an external service, run
+by KIST, that answers a person's questions about their own wearable and phone
+health data (steps, heart rate, sleep, and so on). The two systems **share no
+database**. The only thing that crosses is the text of the turn, over one HTTPS
+POST, implemented in **`ConvAI/sensei.py`**.
+
+#### The wire contract
+
+```
+POST <SENSEI_API_URL>
+Content-Type: application/json
+x-functions-key: <SENSEI_FUNCTION_KEY>
+
+{"operation": "message",  "external_user_id": "cc_<hex>",
+ "conversation_id": "<uuid>", "message": "<text>"}
+{"operation": "login",    "external_user_id": "cc_<hex>",
+ "app_user_id": "<id>", "passcode": "<code>"}
+{"operation": "register", "external_user_id": "cc_<hex>",
+ "app_user_id": "<id>", "passcode": "<code>"}
+
+-> {"status": "ok" | "error", "response": "<text to show the user>"}
+```
+
+`conversation_id` is the patient's `current_thread_id`, so a Sensei conversation
+is scoped the same way every other kind's is.
+
+Two properties of that contract shape the adapter:
+
+- **Sensei holds the session.** A successful `login`/`register` binds the
+  Sensei-side account to our `external_user_id`; later `message` calls just
+  work. Conversational Care therefore stores **no Sensei credentials at all**.
+- **The error text is the user-facing text.** A 401 answers *"Please use /login
+  … first"*, which is exactly what the caregiver needs to read, so non-200
+  bodies are relayed verbatim rather than replaced with a generic failure.
+
+#### The opaque client id
+
+Sensei never learns who a client is. Each one is identified by
+`external_user_id` = `cc_` + `HMAC-SHA256(SENSEI_USER_ID_SECRET, "<model>:<pk>")`.
+
+- **HMAC, not a plain hash**, because the primary keys are small integers: an
+  unkeyed digest of one is trivially reversible by anyone holding the endpoint,
+  which would hand Sensei a working map back to our patient rows.
+- **The model label is part of the digest** because the agent test chat speaks
+  as the logged-in admin, and the `Patient` and user id spaces overlap — without
+  it, an admin testing the agent would land in whichever patient shares their pk.
+- **Stable for the life of the secret**, which is what lets a caregiver log in
+  once and stay logged in. Rotating `SENSEI_USER_ID_SECRET` orphans every
+  Sensei-side account, so it is generated once (the settings form does this
+  automatically if the field is left blank) and then left alone.
+
+#### Signing in, and the passcode
+
+Clients link their Sensei account from inside an ordinary conversation:
+
+```
+/login <AppUserId> <Passcode>
+/register_user <NewAppUserId> <NewPasscode>
+```
+
+The adapter turns these into structured `login` / `register` operations rather
+than forwarding them as chat. A newly registered account can chat straight away;
+sensor-backed questions also need the client to sign in to the Sensei mobile app
+with the same AppUserId and sync their data.
+
+**The passcode never reaches the database.** It arrives in an ordinary chat
+message, and every inbound turn is stored, read by navigators, and swept by the
+classifier — so `sensei.redact()` strips it in `save_message`, the one choke
+point every inbound turn is persisted through (plus the voice-note path in
+`tasks.py`, which writes its row directly). The account name is kept, because
+seeing *which* account a client signed in as is what makes a failed login
+diagnosable:
+
+    /login ada s3cret   →  stored as   /login ada ••••
+
+Redaction is **not** conditional on the agent being a Sensei one: a passcode
+typed at the wrong agent is still a passcode. A mistyped command that does not
+parse is answered with help and never forwarded — forwarding it would put the
+passcode into Sensei as free-text chat — but it is still redacted before storage.
+
+#### Configuration
+
+| Setting | Meaning |
+|---|---|
+| `SENSEI_ENABLED` | The switch. Off by default. |
+| `SENSEI_API_URL` | Full endpoint, e.g. `https://<function-app>.azurewebsites.net/api/send_message` |
+| `SENSEI_FUNCTION_KEY` | Sent as the `x-functions-key` header. |
+| `SENSEI_USER_ID_SECRET` | Keys the opaque client id above. |
+
+All four resolve DB-first (**Settings → Sensei**) then `.env`, like every other
+runtime setting. A Sensei `Agent` row itself carries **no connection details** —
+the endpoint is installation-wide — and no model, because the answering model
+runs on Sensei's side.
+
+Sensei turns can take tens of seconds (`REQUEST_TIMEOUT` is 120s), so an
+installation using Sensei over WhatsApp should run with `ASYNC_WHATSAPP_REPLY`
+on; see `async_replies.md`.
+
+Tests: `ConvAI/test_sensei.py`.
+
 ## Choosing the model
 
 In-process agents (native + prompt-based) pick their LLM through one shared
-factory, **`ConvAI/llm_factory.py`** (`make_llm`). Remote agents don't use it —
-their server owns the model.
+factory, **`ConvAI/llm_factory.py`** (`make_llm`). Remote and Sensei agents
+don't use it — the service on the other end owns the model.
 
 - **Per agent.** Each agent's **`Agent.model`** field selects the model. Admins
   set it in the Agents UI (a free-text field with common suggestions). Blank uses

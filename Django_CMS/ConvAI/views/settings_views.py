@@ -126,6 +126,19 @@ def _email_status_context(request):
     }
 
 
+def _sensei_status_context():
+    """Whether Sensei is on and fully configured, for the banner on its tab."""
+    from .. import sensei
+
+    ok, reason = sensei.configured()
+    return {
+        "enabled": sensei.enabled(),
+        "ok": ok,
+        "reason": reason,
+        "api_url": sensei.api_url(),
+    }
+
+
 def _build_config_context(request, forms_override=None, active_tab="general"):
     """Assemble the settings-page context, letting one bound (invalid) form be
     injected so validation errors render inline."""
@@ -158,6 +171,7 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
             ("email", _("Email"), "mail"),
             ("branding", _("Branding"), "palette"),
             ("agents", _("Agents"), "smart_toy"),
+            ("sensei", _("Sensei"), "sensors"),
             ("prompts", _("Prompts"), "auto_awesome"),
             ("protocols", _("Protocols"), "checklist"),
             ("registrations", _("Registrations"), "how_to_reg"),
@@ -183,6 +197,11 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
         "email_status": _email_status_context(request),
         "agents_form": _form("agents"),
         "prompts_form": _form("prompts"),
+        "sensei_form": _form("sensei"),
+        # Whether a Sensei turn could succeed right now, reported from the same
+        # check the adapter runs — so the tab cannot say "ready" while every
+        # turn is failing on a missing value.
+        "sensei_status": _sensei_status_context(),
         # Boot-only values shown read-only (require .env change + restart).
         "boot_info": {
             "language": settings.LANGUAGE_CODE,

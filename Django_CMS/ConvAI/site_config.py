@@ -77,6 +77,10 @@ _STR_KEYS = {
     "SMTP_SECURITY": "smtp_security",
     # Which channel meeting reminders go out on: 'whatsapp' or 'email'.
     "REMINDER_CHANNEL": "reminder_channel",
+    # Sensei agents (see ConvAI.sensei).
+    "SENSEI_API_URL": "sensei_api_url",
+    "SENSEI_FUNCTION_KEY": "sensei_function_key",
+    "SENSEI_USER_ID_SECRET": "sensei_user_id_secret",
 }
 
 _BOOL_KEYS = {
@@ -86,6 +90,7 @@ _BOOL_KEYS = {
     "SEND_CARE_PLAN": "send_care_plan",
     "WHATSAPP_AUDIO_ENABLED": "whatsapp_audio_enabled",
     "USE_AZURE": "use_azure",
+    "SENSEI_ENABLED": "sensei_enabled",
 }
 
 
