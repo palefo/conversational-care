@@ -384,8 +384,9 @@
         </div>
       </div>
 
-      {# Same check the adapter runs before every turn, so this cannot claim
-         Sensei is ready while calls are failing on a missing value. #}
+      {% comment %} Same check the adapter runs before every turn, so this
+      cannot claim Sensei is ready while calls are failing on a missing
+      value. {% endcomment %}
       {% if not sensei_status.enabled %}
         <div class="px-4 py-3 mb-5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm flex items-start gap-2">
           <span class="material-icons-outlined text-base">toggle_off</span>
