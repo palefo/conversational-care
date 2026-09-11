@@ -163,6 +163,20 @@ def dashboard(request):
         "low": alerts_qs.filter(priority=Alert.Priority.LOW).count(),
     }
 
+    # People waiting to be let in. A self-registration is not an Alert row and
+    # is not made into one: approving the person is what clears it, so it is
+    # read straight from SelfRegistration and leaves the queue the moment its
+    # state changes — nothing to resolve twice, nothing to fall out of step.
+    #
+    # Admins only, because only an admin can approve one (approve_self_registration
+    # is admin_required), and only while self-registration is switched on. With
+    # it off nobody new can sign up by message, so the box stays about alerts.
+    show_registrations = is_admin(user) and get_bool("SELF_REGISTRATION_ENABLED")
+    pending_regs = (SelfRegistration.objects.filter(state=SelfRegistration.State.REGISTERED)
+                    if show_registrations else SelfRegistration.objects.none())
+    alert_counts["registrations"] = pending_regs.count()
+    alert_counts["all"] += alert_counts["registrations"]
+
     # Find a client by name. One box beats four filter chips: priority is on
     # every row already, so narrowing by it answered a question you can see.
     query = (request.GET.get("q") or "").strip()
@@ -362,6 +376,48 @@ def dashboard(request):
               shown_alerts_qs.select_related("patient")[:ALERTS_MAX]]
     alerts_capped = len(alerts) == ALERTS_MAX
 
+    def _registration_row(r):
+        age, exact = _humanise_age(r.created_at, now)
+        details = r.details if isinstance(r.details, dict) else {}
+        return {
+            "kind": "registration",
+            "name": f"{r.name} {r.lastname}".strip(),
+            "description": (
+                _("Signed up by message and is waiting to be approved.")
+                if details.get("source") == "self-registration-agent"
+                else _("Registered through the API and is waiting to be approved.")
+            ),
+            "age": age,
+            "age_exact": exact,
+            "created_ts": r.created_at,
+            # Approving needs an agent picked, and that form lives in Settings,
+            # so the row goes there rather than opening a panel.
+            "url": f"{reverse('config')}?tab=registrations#registrations",
+            # No panel and no SeenMark: it is "new" until someone approves it,
+            # which the row already says.
+            "panel_token": "",
+            "unread": False,
+        }
+
+    registrations = pending_regs
+    if query:
+        registrations = registrations.filter(
+            Q(name__icontains=query) | Q(lastname__icontains=query))
+    registrations = [_registration_row(r)
+                     for r in registrations.order_by("-created_at")[:ALERTS_MAX]]
+
+    # Where they sit in the queue. By age, when the queue is sorted by age. By
+    # priority, after the High alerts and ahead of the rest: someone waiting to
+    # be let in is waiting on an admin and nobody else, but they are not in
+    # danger, and a sign-up must never push a crisis off the first page.
+    if sort == "priority":
+        queue = ([a for a in alerts if a["priority_level"] == Alert.Priority.HIGH]
+                 + registrations
+                 + [a for a in alerts if a["priority_level"] != Alert.Priority.HIGH])
+    else:
+        queue = sorted(alerts + registrations, key=lambda row: row["created_ts"],
+                       reverse=(sort == "newest"))
+
 
 
     ### Message trends ###
@@ -444,7 +500,9 @@ def dashboard(request):
         'meetings_per_page': MEETINGS_PER_PAGE,
         'mq': mq,
         'msort': msort,
-        'alerts': alerts,
+        # The alert rows with any registrations merged in. _mark_unread above
+        # still reads `alerts` alone: only an alert has a panel to have opened.
+        'alerts': queue,
         'digest': digest,
         'alerts_capped': alerts_capped,
         'alerts_per_page': ALERTS_PER_PAGE,

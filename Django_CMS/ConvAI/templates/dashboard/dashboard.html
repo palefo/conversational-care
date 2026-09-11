@@ -161,6 +161,7 @@
     .dash-ic-visit { background: #fff7ed; color: #c2410c; }
     .dash-ic-chat  { background: #f0fdf4; color: #15803d; }
     .dash-ic-alert { background: #fef2f2; color: #b91c1c; }
+    .dash-ic-reg   { background: #f0f9ff; color: #0369a1; }
 
     /* Rows inside a section container (dividers, not separate cards) */
     .dash-row {
@@ -508,6 +509,34 @@
 
       {% if alerts %}
         {% for it in alerts %}
+          {% if it.kind == 'registration' %}
+          {% comment %}
+            Someone who signed up and is waiting to be approved — admins only,
+            and only while self-registration is on; see views/dashboard.py.
+            Same row as an alert so the queue reads as one list, but it goes to
+            Settings rather than opening a panel: approving means picking an
+            agent, and that form is there. No priority, because a sign-up has
+            none; the slot says what is being asked instead.
+          {% endcomment %}
+          <a href="{{ it.url }}" class="block">
+            <div class="dash-row">
+              <span class="dash-ic dash-ic-reg">
+                <span class="material-icons-outlined">how_to_reg</span>
+              </span>
+              <div class="dash-row-main">
+                <div class="dash-row-l1">
+                  <span class="dash-row-name">{{ it.name }}</span>
+                  <span class="dash-utag dash-utag-prog">{% trans "Self-registration" %}</span>
+                </div>
+                <div class="dash-row-l2">{{ it.description }}</div>
+              </div>
+              <div class="dash-row-right">
+                <span class="dash-prio">{% trans "To approve" %}</span>
+                <span class="dash-age" title="{{ it.age_exact }}">{{ it.age }}</span>
+              </div>
+            </div>
+          </a>
+          {% else %}
           {% comment %}
             `it.url` is built in views/dashboard.py as the current querystring
             plus `item`, so it satisfies the same contract as the literal ones
@@ -548,6 +577,7 @@
               </div>
             </div>
           </a>
+          {% endif %}
         {% endfor %}
       {% else %}
         <p class="dash-empty">{% trans "Nothing to review." %}</p>
