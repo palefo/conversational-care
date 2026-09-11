@@ -933,6 +933,24 @@ class SenseiConfigForm(SecretPreserveMixin, forms.ModelForm):
         return cleaned
 
 
+class ExportConfigForm(forms.ModelForm):
+    """Settings -> Export: the switch that makes message export available."""
+
+    class Meta:
+        model = SiteConfiguration
+        fields = ["message_export_enabled"]
+        labels = {
+            "message_export_enabled": _("Enable message export"),
+        }
+        help_texts = {
+            "message_export_enabled": _("Off by default. When on, admins can download "
+                                        "every stored message as a CSV file from this tab."),
+        }
+        widgets = {
+            "message_export_enabled": forms.Select(attrs=_SELECT),
+        }
+
+
 class NavigatorForm(forms.Form):
     """Admin-only creation of a Navigator account (username, e-mail, password)."""
     username = forms.CharField(max_length=150, label=_("Username"), widget=forms.TextInput(attrs=_INPUT))

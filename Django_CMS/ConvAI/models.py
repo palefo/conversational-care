@@ -1327,6 +1327,12 @@ class SiteConfiguration(models.Model):
     # alone (see ConvAI.sensei.external_user_id).
     sensei_user_id_secret = models.CharField(max_length=200, blank=True, default="")
 
+    # --- Message export (live) ---
+    # Off by default, like Sensei: downloading every client's messages is
+    # something a study needs, not something every installation should offer.
+    # See message_export.md.
+    message_export_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
     # --- Editable content (live) ---
     # Markdown source for the Help page. Blank falls back to the shipped default
     # (see ConvAI.default_help.DEFAULT_HELP_MARKDOWN) until an admin edits it.

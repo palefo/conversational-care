@@ -91,6 +91,7 @@ _BOOL_KEYS = {
     "WHATSAPP_AUDIO_ENABLED": "whatsapp_audio_enabled",
     "USE_AZURE": "use_azure",
     "SENSEI_ENABLED": "sensei_enabled",
+    "MESSAGE_EXPORT_ENABLED": "message_export_enabled",
 }
 
 

@@ -781,6 +781,66 @@ print(result)</code></pre>
     </div>
   </section>
 
+  {# ═════════ Export ═════════ #}
+  <section class="settings-panel hidden" data-tab="export">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">download</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Message export" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Download every stored message as a CSV file, one row per message, for analysis outside the platform. Clients and users appear by internal id only — no names, phone numbers or email addresses — but message text is exported exactly as it was written." %}</p>
+        </div>
+      </div>
+
+      {% if not export_enabled %}
+        <div class="px-4 py-3 mb-5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">toggle_off</span>
+          <div>{% trans "Message export is off. While it is off, nobody can download messages." %}</div>
+        </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="export">
+        {% include "settings/_field.html" with field=export_form.message_export_enabled %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+    </div>
+
+    {% if export_enabled %}
+    <div class="card p-6 mt-6">
+      <h3 class="font-semibold text-gray-800 mb-2">{% trans "Download messages" %}</h3>
+      <p class="text-sm text-gray-500 mb-4">{% blocktrans with tz=boot_info.timezone %}Leave both dates empty to export everything. Both days are included, and days follow the platform timezone ({{ tz }}).{% endblocktrans %}</p>
+      <form method="get" action="{% url 'export_messages' %}" class="flex flex-wrap items-end gap-4">
+        <label class="text-sm">
+          <span class="block text-gray-600 mb-1">{% trans "From" %}</span>
+          <input type="date" name="from" class="form-control">
+        </label>
+        <label class="text-sm">
+          <span class="block text-gray-600 mb-1">{% trans "To" %}</span>
+          <input type="date" name="to" class="form-control">
+        </label>
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm inline-flex items-center gap-1">
+          <span class="material-icons-outlined text-base">download</span>{% trans "Download CSV" %}
+        </button>
+      </form>
+
+      <details class="mt-6 text-sm">
+        <summary class="cursor-pointer font-medium text-gray-700">{% trans "What is in the file" %}</summary>
+        <p class="text-gray-500 mt-2 mb-3">{% trans "Each stored exchange — a client's message and the agent's reply — becomes two rows that share a message_id. Messages the platform sent on its own (reminders, alert messages, care plans) have only the platform's row." %}</p>
+        <dl class="divide-y divide-gray-100">
+          {% for name, note in export_columns %}
+            <div class="py-2 grid grid-cols-1 md:grid-cols-4 gap-1">
+              <dt><code class="text-xs">{{ name }}</code></dt>
+              <dd class="md:col-span-3 text-gray-600">{{ note }}</dd>
+            </div>
+          {% endfor %}
+        </dl>
+      </details>
+    </div>
+    {% endif %}
+  </section>
+
   {# ═════════ Maintenance ═════════ #}
   <section class="settings-panel hidden" data-tab="maintenance">
     <div class="card p-6 mb-6">
@@ -832,7 +892,7 @@ print(result)</code></pre>
 {{ block.super }}
 <script>
   (function () {
-    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','api','maintenance'];
+    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','api','export','maintenance'];
     const buttons = document.querySelectorAll('.stg-navitem');
     const panels  = document.querySelectorAll('.settings-panel');
 

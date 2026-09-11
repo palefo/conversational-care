@@ -34,7 +34,7 @@ from .views import (
     twilio_audio_download, send_care_plan_whatsapp, twilio_careplan_download,
     start_protocol_automation, dismiss_sms_offer, communications, panel_fragment,
     summarize_meeting_view, transcribe_recording_view, edit_overview,
-    download_client_sdk,
+    download_client_sdk, export_messages,
 )
 from .utils import navigator_required, patient_tester_required
 
@@ -137,6 +137,9 @@ urlpatterns = [
     path("conversations/<str:conversation_id>/feedback/", navigator_required(conversation_feedback), name="conversation_feedback"),
     path("config/run-classification/", run_conversation_classification, name="run_conversation_classification"),
     path("config/send-test-email/", send_test_email_view, name="send_test_email"),
+    # Admin-only and 404 unless MESSAGE_EXPORT_ENABLED is on; both checked in
+    # the view. See message_export.md.
+    path("app/export/messages.csv", export_messages, name="export_messages"),
     path("profile/token/issue/", issue_api_token, name="issue_api_token"),
     path('self-registrations/<int:pk>/approve/', approve_self_registration, name='approve_self_registration'),
     # Polled by the notification component in base.html.

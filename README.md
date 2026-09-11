@@ -49,6 +49,8 @@ Topic deep dives:
   access is controlled via ownership-checked views and single-use signed tokens.
 - [Database setup & backups](database.md) — how to set up the database and how
   to perform backups and restore them.
+- [Message export](message_export.md) — the optional CSV export of every stored
+  message (one row per message) for behavioural analysis, and how to turn it on.
 - [Styling & layout](STYLING.md) — where the look of the app actually lives:
   the design system, the Tailwind build, the per-page `<style>` blocks, and the
   two colour systems that currently disagree. Read this before porting the

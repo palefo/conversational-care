@@ -1,4 +1,5 @@
 from ._base import *  # noqa: F401,F403
+from .. import message_export
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 
@@ -177,6 +178,7 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
             ("registrations", _("Registrations"), "how_to_reg"),
             ("selfreg", _("Self registration"), "qr_code_2"),
             ("api", _("API client"), "terminal"),
+            ("export", _("Export"), "download"),
             ("maintenance", _("Maintenance"), "build"),
         ],
         # Absolute URLs for the API-client instructions (wget / base_url).
@@ -202,6 +204,9 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
         # check the adapter runs — so the tab cannot say "ready" while every
         # turn is failing on a missing value.
         "sensei_status": _sensei_status_context(),
+        "export_form": _form("export"),
+        "export_enabled": message_export.enabled(),
+        "export_columns": message_export.COLUMN_NOTES,
         # Boot-only values shown read-only (require .env change + restart).
         "boot_info": {
             "language": settings.LANGUAGE_CODE,
