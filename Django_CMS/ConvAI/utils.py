@@ -1627,5 +1627,9 @@ def send_sms_text(to_e164: str | None, body: str) -> bool:
             body=body.strip()
         )
         return True
-    except Exception:
+    except Exception as exc:
+        # This is the reply to a caregiver who texted in. Failing silently left
+        # nothing to find when one went unanswered — the WhatsApp sender above
+        # logs its refusals the same way.
+        logger.warning("SMS create failed for %s: %s", to_e164, exc)
         return False
