@@ -206,6 +206,7 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
         "sensei_status": _sensei_status_context(),
         "export_form": _form("export"),
         "export_enabled": message_export.enabled(),
+        "conversation_download_enabled": message_export.conversation_download_enabled(),
         "export_columns": message_export.COLUMN_NOTES,
         # Boot-only values shown read-only (require .env change + restart).
         "boot_info": {

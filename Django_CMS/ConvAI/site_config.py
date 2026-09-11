@@ -92,6 +92,7 @@ _BOOL_KEYS = {
     "USE_AZURE": "use_azure",
     "SENSEI_ENABLED": "sensei_enabled",
     "MESSAGE_EXPORT_ENABLED": "message_export_enabled",
+    "CONVERSATION_DOWNLOAD_ENABLED": "conversation_download_enabled",
 }
 
 

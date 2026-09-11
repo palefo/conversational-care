@@ -344,6 +344,7 @@ precedence over `.env`.
 | `ENABLE_AUTOMATIONS` | Enable automation features (*runtime*). |
 | `SELF_REGISTRATION_ENABLED` / `SELF_REG_AGENT_NAME` | WhatsApp self-registration (see [§9](#9-agents)) (*runtime*). |
 | `MESSAGE_EXPORT_ENABLED` | Let admins download every stored message as CSV from **Settings → Export**; off by default (see [message_export.md](../message_export.md)) (*runtime*). |
+| `CONVERSATION_DOWNLOAD_ENABLED` | Let navigators download a single conversation of their own clients as CSV from the panel's Conversation tab; off by default (see [message_export.md](../message_export.md)) (*runtime*). |
 | `VOICE_RECORDINGS_DIR` / `CALL_RECORDINGS_DIR` | Override media dirs (default: under `MEDIA_ROOT`). |
 | `DOWNLOAD_TOKEN_KEY` | Dedicated key signing single-use media tokens; random per-process if unset. |
 | `SECURE_HSTS_SECONDS` | HSTS max-age (default 1 year). |

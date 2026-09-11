@@ -74,6 +74,16 @@ def enabled() -> bool:
     return get_bool("MESSAGE_EXPORT_ENABLED", False)
 
 
+def conversation_download_enabled() -> bool:
+    """Whether a navigator may download one conversation from the panel.
+
+    Off by default, and independent of ``enabled()``: the file is the same
+    shape, but who takes it and how much of it differ, so each installation
+    decides the two separately.
+    """
+    return get_bool("CONVERSATION_DOWNLOAD_ENABLED", False)
+
+
 def _kind_of(conversation_id):
     """``(kind, ref)``: what a conversation key is, and the id inside it.
 
@@ -171,14 +181,16 @@ class _Lookup:
         return None
 
 
-def rows(start=None, end=None):
+def rows(start=None, end=None, messages=None):
     """Yield one list per message, in COLUMNS order.
 
     ``start`` and ``end`` are aware datetimes bounding ``Message.timestamp``
-    (start inclusive, end exclusive); either can be None. Rows come grouped by
+    (start inclusive, end exclusive); either can be None. ``messages`` narrows
+    the export to a queryset of Message — one conversation, for the panel's
+    download — and defaults to every message. Rows come grouped by
     conversation and in order within it.
     """
-    qs = Message.objects.all()
+    qs = Message.objects.all() if messages is None else messages
     if start is not None:
         qs = qs.filter(timestamp__gte=start)
     if end is not None:
@@ -192,7 +204,8 @@ def rows(start=None, end=None):
     before = {}
     if start is not None:
         before = dict(
-            Message.objects.filter(timestamp__lt=start)
+            (Message.objects.all() if messages is None else messages)
+            .filter(timestamp__lt=start)
             .order_by().values("conversation_id")
             .annotate(n=Count("id")).values_list("conversation_id", "n")
         )
@@ -252,8 +265,8 @@ class _Echo:
         return value
 
 
-def csv_chunks(start=None, end=None):
-    """The CSV file as a stream of text chunks, header first.
+def csv_chunks(start=None, end=None, messages=None):
+    """The CSV file as a stream of text chunks, header first. See ``rows``.
 
     UTF-8 with a byte-order mark: without it Excel reads the file as the local
     code page and every accent — and every Korean or Chinese message — comes
@@ -262,7 +275,7 @@ def csv_chunks(start=None, end=None):
     writer = csv.writer(_Echo())
     yield "\ufeff" + writer.writerow(COLUMNS)
     batch = []
-    for row in rows(start, end):
+    for row in rows(start, end, messages):
         batch.append(writer.writerow(row))
         if len(batch) >= _CHUNK_ROWS:
             yield "".join(batch)

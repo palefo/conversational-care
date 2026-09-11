@@ -17,6 +17,9 @@ dropped — same component, one less row.
 """
 from ._base import *  # noqa: F401,F403
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Max, Min
+from django.utils.translation import gettext_lazy
+from .. import message_export
 
 __all__ = ['resolve_panel_item', 'panel_context', 'panel_fragment']
 
@@ -218,6 +221,110 @@ def _context_strip(patient):
     }
 
 
+# What a divider calls a run of messages the platform sent on its own. Those
+# are logged under a key like reminder-12 rather than a conversation id — see
+# message_export._LOGGED_KINDS — and each is a thing of its own, not a
+# conversation anyone had. Lazy, because this is read at import and the
+# language is only known per request.
+_RUN_LABEL = {
+    'reminder': gettext_lazy("Reminder"),
+    'alert': gettext_lazy("Alert message"),
+    'care_plan': gettext_lazy("Care plan"),
+}
+
+
+def _span_label(start, end):
+    """"11:11 – 11:40", with the day on both ends when the two are not the same
+    day — an alert's linked thread can run past midnight, and the bubbles only
+    carry a time."""
+    a, b = timezone.localtime(start), timezone.localtime(end)
+    if a.date() != b.date():
+        return "%s – %s" % (formats.date_format(a, "j M H:i"), formats.date_format(b, "j M H:i"))
+    if a.strftime("%H:%M") == b.strftime("%H:%M"):
+        return a.strftime("%H:%M")
+    return "%s – %s" % (a.strftime("%H:%M"), b.strftime("%H:%M"))
+
+
+def _conversation_runs(shown, patient=None, can_download=False):
+    """The pane's messages cut where one conversation ends and the next begins.
+
+    A chat pane is one *day* of a client, and a day is often several
+    conversations — a check-in in the morning, a reply to a reminder at
+    night — which used to run together as one unbroken thread with nothing to
+    say where one stopped. Each conversation is a run of consecutive messages
+    sharing a conversation_id, headed by a divider with its own start and end.
+
+    Runs, not groups: messages stay in the order they happened. Pulling one
+    conversation's messages together would put a reply above the reminder it
+    was answering. So a conversation interrupted by something else is two runs,
+    and the second one says it is the same conversation carrying on.
+
+    Each divider also says when the conversation began before the pane or
+    carries on after it, because the download on it is the whole conversation
+    and not only the part on screen. Both are measured over this client's
+    messages only — the predicate the pane and the download both read by.
+
+    ``can_download`` puts the download on the divider; it is the caller's to
+    work out, since it depends on who is looking as well as on the switch.
+    """
+    runs = []
+    for m in shown:
+        if runs and runs[-1]['id'] == m.conversation_id:
+            runs[-1]['messages'].append(m)
+        else:
+            runs.append({'id': m.conversation_id, 'messages': [m]})
+    if not runs:
+        return []
+
+    scope = patient_message_q(patient) if patient else Q()
+    span = {
+        row['conversation_id']: row
+        for row in (Message.objects
+                    .filter(scope, conversation_id__in={r['id'] for r in runs})
+                    .order_by().values('conversation_id')
+                    .annotate(first=Min('timestamp'), last=Max('timestamp')))
+    }
+
+    # Numbered only when there is more than one to tell apart.
+    chats = []
+    for r in runs:
+        if message_export._kind_of(r['id'])[0] not in _RUN_LABEL and r['id'] not in chats:
+            chats.append(r['id'])
+    last_run = {r['id']: i for i, r in enumerate(runs)}
+
+    seen = set()
+    for i, r in enumerate(runs):
+        cid, msgs = r['id'], r['messages']
+        kind = message_export._kind_of(cid)[0]
+        resumed = cid in seen
+        seen.add(cid)
+        whole = span.get(cid)
+
+        if kind in _RUN_LABEL:
+            label = _RUN_LABEL[kind]
+        elif len(chats) > 1:
+            label = _("Conversation %(n)s") % {'n': chats.index(cid) + 1}
+        else:
+            label = _("Conversation")
+        if resumed:
+            label = _("%(label)s, continued") % {'label': label}
+
+        r.update({
+            'label': label,
+            'span': _span_label(msgs[0].timestamp, msgs[-1].timestamp),
+            'began': (whole['first'] if whole and not resumed
+                      and whole['first'] < msgs[0].timestamp else None),
+            'continues': (whole['last'] if whole and last_run[cid] == i
+                          and whole['last'] > msgs[-1].timestamp else None),
+            # Only for a conversation the download will find: one with this
+            # client's messages in it, and an id that fits in a URL segment.
+            'download_url': (reverse('download_conversation', args=[patient.pk, cid])
+                             if can_download and patient and whole and cid and '/' not in cid
+                             else ''),
+        })
+    return runs
+
+
 def _alert_panel(request, pk):
     alert = (Alert.objects
              .select_related('patient', 'patient__caregiver', 'user')
@@ -319,6 +426,7 @@ def _alert_panel(request, pk):
                       .order_by('timestamp'))
 
     linked_total = linked.count()
+    linked_shown = list(linked[:PANEL_MSG_LIMIT])
 
     # An alert the classifier raised carries two different pieces of writing,
     # and the panel must not run them together. The trigger is why somebody is
@@ -347,7 +455,13 @@ def _alert_panel(request, pk):
         **bot,
         **overview_meta,
         'kind': 'alert',
-        'messages': list(linked[:PANEL_MSG_LIMIT]),
+        'messages': linked_shown,
+        # The download needs the client's panel, not just this alert: an alert
+        # can be yours to read because you raised it, on someone else's client.
+        'conversations': _conversation_runs(
+            linked_shown, alert.patient,
+            can_download=(message_export.conversation_download_enabled()
+                          and _can_see(request.user, alert.patient))),
         'message_count': linked_total,
         'messages_clipped': linked_total > PANEL_MSG_LIMIT,
         'link_is_exact': link_is_exact,
@@ -1085,6 +1199,11 @@ def _chat_panel(request, ident):
     first_msg = msgs.first()
     last_msg = msgs.last()
     total = msgs.count()
+    shown = list(msgs[:PANEL_MSG_LIMIT])
+    # _can_see above already settled who is looking, so the switch is all
+    # that is left to ask.
+    runs = _conversation_runs(shown, patient,
+                              can_download=message_export.conversation_download_enabled())
     started = (first_msg.timestamp if first_msg
                else conv.started_at if conv
                else timezone.make_aware(dt.datetime.combine(day, dt.time.min)))
@@ -1143,12 +1262,17 @@ def _chat_panel(request, ident):
                          conv.analyzed_at if conv else None),
         'points': [],
         'message_count': total,
-        'messages': msgs[:PANEL_MSG_LIMIT],
+        'messages': shown,
+        'conversations': runs,
         'messages_clipped': total > PANEL_MSG_LIMIT,
         # The Summary tab is otherwise one paragraph. This is the same detail
         # the old conversation page carried in its header, as a list.
         'facts': [
             (_("Messages"), total),
+            # Conversations, not runs: one interrupted by a reminder is still
+            # one. Counted over what the pane shows, which is the whole day
+            # unless the clip notice says otherwise.
+            (_("Conversations"), len({r['id'] for r in runs}) or _("—")),
             (_("Between"), "%s – %s" % (
                 timezone.localtime(first_msg.timestamp).strftime("%H:%M"),
                 timezone.localtime(last_msg.timestamp).strftime("%H:%M"),

@@ -844,12 +844,35 @@ whatever you opened, and neither moves when the body scrolls.
       </p>
     {% endif %}
     {% if panel_item.messages %}
-      <div class="dp-msgs">
-        {% for m in panel_item.messages %}
-          {% if m.user_message %}<div class="dp-msg dp-msg-in"><span class="dp-msg-b">{{ m.user_message|linebreaksbr }}</span><time>{{ m.timestamp|localtime|date:"H:i" }}</time></div>{% endif %}
-          {% if m.response_message %}<div class="dp-msg dp-msg-out"><span class="dp-msg-b">{{ m.response_message|linebreaksbr }}</span><time>{{ m.timestamp|localtime|date:"H:i" }}</time></div>{% endif %}
-        {% endfor %}
-      </div>
+      {% comment %}
+        One block per conversation, because a day of chat is often several. The
+        divider is the same small caps as a section heading, so it reads as
+        structure rather than content, and carries the conversation's own start
+        and end. The download sits on it when the switch is on — see
+        _conversation_runs in views/_panel.py.
+      {% endcomment %}
+      {% for run in panel_item.conversations %}
+        <section class="dp-conv">
+          <div class="dp-conv-h">
+            <span>{{ run.label }}</span>
+            <span class="dp-conv-rule" aria-hidden="true"></span>
+            <span class="dp-conv-span">{{ run.span }}</span>
+            {% if run.download_url %}
+              <a class="dp-conv-dl" href="{{ run.download_url }}" download
+                 title="{% trans 'Download this conversation (CSV)' %}"
+                 aria-label="{% blocktrans with label=run.label span=run.span %}Download {{ label }}, {{ span }}, as CSV{% endblocktrans %}"><span class="material-icons-outlined" aria-hidden="true">download</span></a>
+            {% endif %}
+          </div>
+          {% if run.began %}<p class="dp-conv-note">{% blocktrans with when=run.began|localtime|date:"j M, H:i" %}Began earlier, on {{ when }}.{% endblocktrans %}</p>{% endif %}
+          <div class="dp-msgs">
+            {% for m in run.messages %}
+              {% if m.user_message %}<div class="dp-msg dp-msg-in"><span class="dp-msg-b">{{ m.user_message|linebreaksbr }}</span><time>{{ m.timestamp|localtime|date:"H:i" }}</time></div>{% endif %}
+              {% if m.response_message %}<div class="dp-msg dp-msg-out"><span class="dp-msg-b">{{ m.response_message|linebreaksbr }}</span><time>{{ m.timestamp|localtime|date:"H:i" }}</time></div>{% endif %}
+            {% endfor %}
+          </div>
+          {% if run.continues %}<p class="dp-conv-note">{% blocktrans with when=run.continues|localtime|date:"j M, H:i" %}Carries on until {{ when }}.{% endblocktrans %}</p>{% endif %}
+        </section>
+      {% endfor %}
       {% if panel_item.messages_clipped %}
         <p class="dp-hint">{% blocktrans with shown=panel_item.messages|length total=panel_item.message_count %}Showing the first {{ shown }} of {{ total }} messages.{% endblocktrans %}</p>
       {% endif %}

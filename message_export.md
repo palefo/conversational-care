@@ -23,8 +23,10 @@ While export is off, the Export tab shows only the switch, and the download URL
 ## Who can download
 
 Admins only: users with the `access_configuration` permission (see
-[permissions.md](permissions.md)). Navigators cannot, even for their own
-clients. Every download is logged (`ConvAI.views.exports`) with the user's id
+[permissions.md](permissions.md)). Navigators cannot use this export, even for
+their own clients. What they can get, if it is switched on, is one conversation
+at a time (see [Conversation downloads](#conversation-downloads-navigators)).
+Every download is logged (`ConvAI.views.exports`) with the user's id
 and the date range.
 
 ## Downloading
@@ -37,6 +39,44 @@ The same file is available directly at:
 
 ```
 /app/export/messages.csv?from=2026-09-01&to=2026-09-30
+```
+
+## Conversation downloads (navigators)
+
+A second, separate switch lets navigators and link workers download **one
+conversation at a time** from the panel, without giving them the full export.
+It is also **off by default**. Turning one switch on does not turn on the other.
+
+Turn it on with **Settings → Export → Enable conversation downloads → On**, or
+`CONVERSATION_DOWNLOAD_ENABLED=1` in `.env`. The in-app setting wins, as above.
+
+**Where it appears.** A chat's **Conversation** tab shows one day of a client's
+messages. A day often holds several conversations, so the tab is divided into
+them. Each has a small divider with its label (*Conversation 1*, *Conversation
+2*… or just *Conversation* when there is only one) and its start and end time.
+While the switch is on, the divider also carries a download button. The same
+dividers appear on an alert's Conversation tab.
+
+- Messages stay in the order they happened. If a conversation is interrupted
+  (by a reminder the platform sent, say), it shows as two blocks, and the
+  second is labelled *…, continued*.
+- A conversation that started the day before, or carries on past midnight,
+  says so on its divider (*Began earlier, on…* / *Carries on until…*).
+
+**Who can download.** Anyone who can open that client's panel: the client's own
+navigator, or an admin. For anyone else the URL returns 404, and so does a
+conversation that contains none of this client's messages. The download is also
+404 while the switch is off. Every download is logged with the user's id, the
+client's id and the conversation id.
+
+**What is in it.** The same CSV as the full export (same columns, same privacy
+rules; see below), limited to that one conversation. It includes the
+**whole** conversation, not only the day on screen, and only this client's
+messages in it. The file is named after when the conversation started, e.g.
+`conversation_20260719_1124_28ace49c.csv`, never after the client.
+
+```
+/app/export/clients/<client id>/conversations/<conversation id>.csv
 ```
 
 ## The file

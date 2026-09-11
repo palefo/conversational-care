@@ -1453,6 +1453,26 @@ button.dp-stamp:hover { color: #075985; text-decoration: underline; }
 .dp-msg-out .dp-msg-b { background: #f1f5f9; color: #0f172a; border-bottom-left-radius: 2px; }
 .dp-msg time { font-size: .625rem; color: #94a3b8; font-variant-numeric: tabular-nums; }
 
+/* One conversation among the day's several. The divider borrows .dpc-sect's
+   small caps so it reads as structure, not as another message, and the gap
+   above each one after the first is what says the previous one ended. */
+.dp-conv + .dp-conv { margin-top: 18px; }
+.dp-conv-h {
+  display: flex; align-items: center; gap: 8px; min-height: 24px;
+  font-size: .59375rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: #94a3b8;
+}
+.dp-conv-rule { flex: 1 1 auto; height: 1px; background: #e6edf5; }
+.dp-conv-span { font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
+.dp-conv-dl {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 6px; color: #64748b; text-decoration: none;
+}
+.dp-conv-dl:hover { background: #f1f5f9; color: #0369a1; }
+.dp-conv-dl:focus-visible { outline: 2px solid #0369a1; outline-offset: 1px; }
+.dp-conv-dl .material-icons-outlined { font-size: 16px; }
+.dp-conv-note { font-size: .65625rem; line-height: 1.5; color: #94a3b8; margin: 4px 0 0; }
+
 .dp-transcript { font-size: .6875rem; color: #475569; white-space: pre-line; line-height: 1.5; }
 
 /* ── Transcript, as turns ────────────────────────────────────────────────

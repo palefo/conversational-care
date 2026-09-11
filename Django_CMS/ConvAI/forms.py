@@ -934,20 +934,31 @@ class SenseiConfigForm(SecretPreserveMixin, forms.ModelForm):
 
 
 class ExportConfigForm(forms.ModelForm):
-    """Settings -> Export: the switch that makes message export available."""
+    """Settings -> Export: the two switches for what may leave as a file.
+
+    One form rather than one per switch: config_save binds the whole form to
+    the POST, so a form holding only one of them would reset the other to
+    "Use .env default" every time it was saved.
+    """
 
     class Meta:
         model = SiteConfiguration
-        fields = ["message_export_enabled"]
+        fields = ["message_export_enabled", "conversation_download_enabled"]
         labels = {
             "message_export_enabled": _("Enable message export"),
+            "conversation_download_enabled": _("Enable conversation downloads"),
         }
         help_texts = {
             "message_export_enabled": _("Off by default. When on, admins can download "
                                         "every stored message as a CSV file from this tab."),
+            "conversation_download_enabled": _("Off by default. When on, navigators and link "
+                                               "workers can download a single conversation of "
+                                               "their own clients as a CSV file, from the "
+                                               "Conversation tab of a chat."),
         }
         widgets = {
             "message_export_enabled": forms.Select(attrs=_SELECT),
+            "conversation_download_enabled": forms.Select(attrs=_SELECT),
         }
 
 

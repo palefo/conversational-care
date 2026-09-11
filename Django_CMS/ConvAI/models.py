@@ -1332,6 +1332,11 @@ class SiteConfiguration(models.Model):
     # something a study needs, not something every installation should offer.
     # See message_export.md.
     message_export_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+    # A separate switch from the one above: that one lets admins take every
+    # message at once, this one lets a navigator take one conversation of
+    # their own client's from the panel. Different people, different amounts,
+    # so an installation can want one without the other.
+    conversation_download_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
 
     # --- Editable content (live) ---
     # Markdown source for the Help page. Blank falls back to the shipped default

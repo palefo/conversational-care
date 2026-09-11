@@ -788,14 +788,14 @@ print(result)</code></pre>
         <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">download</span>
         <div>
           <h2 class="text-lg font-semibold text-gray-800">{% trans "Message export" %}</h2>
-          <p class="text-sm text-gray-500">{% trans "Download every stored message as a CSV file, one row per message, for analysis outside the platform. Clients and users appear by internal id only — no names, phone numbers or email addresses — but message text is exported exactly as it was written." %}</p>
+          <p class="text-sm text-gray-500">{% trans "Download stored messages as a CSV file, one row per message, for analysis outside the platform. Clients and users appear by internal id only — no names, phone numbers or email addresses — but message text is exported exactly as it was written." %}</p>
         </div>
       </div>
 
-      {% if not export_enabled %}
+      {% if not export_enabled and not conversation_download_enabled %}
         <div class="px-4 py-3 mb-5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm flex items-start gap-2">
           <span class="material-icons-outlined text-base">toggle_off</span>
-          <div>{% trans "Message export is off. While it is off, nobody can download messages." %}</div>
+          <div>{% trans "Both are off. While they are off, nobody can download messages." %}</div>
         </div>
       {% endif %}
 
@@ -803,8 +803,13 @@ print(result)</code></pre>
         {% csrf_token %}
         <input type="hidden" name="section" value="export">
         {% include "settings/_field.html" with field=export_form.message_export_enabled %}
+        {% include "settings/_field.html" with field=export_form.conversation_download_enabled %}
         <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
       </form>
+
+      {% if conversation_download_enabled %}
+        <p class="text-sm text-gray-500 mt-5">{% trans "Conversation downloads are on. Each conversation in a chat's Conversation tab has a download button beside its start and end time. Navigators see it on their own clients only; admins on every client. The file has the same columns as the full message export." %}</p>
+      {% endif %}
     </div>
 
     {% if export_enabled %}
