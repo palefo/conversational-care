@@ -781,6 +781,54 @@ print(result)</code></pre>
     </div>
   </section>
 
+  {# ═════════ Privacy ═════════ #}
+  <section class="settings-panel hidden" data-tab="privacy">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">lock</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Conversation privacy" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Whether a client can ask that one conversation not be readable by their link worker. Their link worker still sees that the conversation happened, when it was and how many messages it held — what is withheld is the content, the automatic summary and the topic." %}</p>
+        </div>
+      </div>
+
+      <div class="px-4 py-3 mb-5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm">
+        <p class="font-medium mb-1">{% trans "What this does not cover" %}</p>
+        <ul class="list-disc pl-5 space-y-1 text-gray-600">
+          <li>{% trans "Administrators read every conversation, hidden or not." %}</li>
+          <li>{% trans "A conversation that raised a self-harm alert stays readable by the link worker. The alert has to be actionable, so this one is not something a client can switch off." %}</li>
+          <li>{% trans "Conversations are still classified and can still raise alerts. What a hidden one does not carry is the summary and the sentence that triggered it." %}</li>
+          <li>{% trans "It applies to one conversation at a time, not to the client. The next conversation starts readable." %}</li>
+        </ul>
+      </div>
+
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="privacy">
+        {% include "settings/_field.html" with field=privacy_form.conversation_privacy_enabled %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+
+      {% if hidden_conversation_count %}
+        {% comment %}
+          Shown whether the switch is on or off, and deliberately so: turning
+          the feature off does not un-hide anything that is already hidden, and
+          a page that went quiet about those conversations would be telling an
+          admin they had taken something back that they had not.
+        {% endcomment %}
+        <div class="px-4 py-3 mt-5 rounded-lg bg-sky-50 border border-sky-100 text-sky-900 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">info</span>
+          <div>
+            {% blocktrans count n=hidden_conversation_count %}{{ n }} conversation is currently hidden at a client's request.{% plural %}{{ n }} conversations are currently hidden at clients' requests.{% endblocktrans %}
+            {% if not conversation_privacy_enabled %}
+              {% trans "They stay hidden while the switch is off — turning the feature off stops new requests, it does not withdraw the ones already made." %}
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
   {# ═════════ Export ═════════ #}
   <section class="settings-panel hidden" data-tab="export">
     <div class="card p-6">
@@ -897,7 +945,9 @@ print(result)</code></pre>
 {{ block.super }}
 <script>
   (function () {
-    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','api','export','maintenance'];
+    // Keep in step with the `tabs` list in views/settings_views.py: a tab
+    // missing here is a sidebar entry that silently falls back to General.
+    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','api','privacy','export','maintenance'];
     const buttons = document.querySelectorAll('.stg-navitem');
     const panels  = document.querySelectorAll('.settings-panel');
 

@@ -39,7 +39,9 @@ from .serializers import (
     AnswerUpsertItemSerializer,
     MeetingAnswersUpsertInSerializer,
     PatientDetailsAppendInSerializer,
-    PatientDetailsAppendOutSerializer
+    PatientDetailsAppendOutSerializer,
+    ConversationVisibilityInSerializer,
+    ConversationVisibilityOutSerializer,
 )
 from ..models import (
     Conversation, 
@@ -913,3 +915,84 @@ class PatientDetailsAppendView(APIView):
             "details": updated,
         })
         return Response(out.data, status=status.HTTP_200_OK)
+
+class ConversationVisibilityView(APIView):
+    """
+    GET  /api/v1/conversations/<conversation_id>/visibility/
+    POST /api/v1/conversations/<conversation_id>/visibility/
+    Authorization: Bearer <token>  (or "Token <key>" under DRF TokenAuthentication)
+    Body (POST): { "hidden": true }
+
+    Whether this conversation's content is readable by the client's link
+    worker. This is the contract behind the agent tool that asks the client
+    the question — see ConvAI/native_agents/privacy_tool.py and
+    conversation_privacy.md.
+
+    404 rather than 403 in every refusal, the feature being switched off
+    included. A caller who may not touch this conversation should not learn
+    from the status code whether it exists, and an installation that never
+    turned the feature on has no endpoint to find.
+
+    Idempotent on purpose: an agent whose client says "hide it" twice should
+    not have to care, and the response always describes the state the
+    conversation is now in rather than what changed.
+    """
+    authentication_classes = AUTH_CLASSES
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, conversation_id):
+        conv = self._conversation(request, conversation_id)
+        return Response(self._out(conv), status=status.HTTP_200_OK)
+
+    def post(self, request, conversation_id):
+        from .. import conversation_privacy
+
+        conv = self._conversation(request, conversation_id)
+        ser = ConversationVisibilityInSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        conversation_privacy.set_hidden(conv, ser.validated_data["hidden"])
+        return Response(self._out(conv), status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _conversation(request, conversation_id):
+        from django.http import Http404
+        from .. import conversation_privacy
+        from ..roles import is_admin
+
+        if not conversation_privacy.enabled():
+            raise Http404
+        try:
+            conv_uuid = uuid.UUID(str(conversation_id))
+        except (TypeError, ValueError):
+            raise Http404
+        conv = (Conversation.objects
+                .select_related("patient__tester_account")
+                .filter(id=conv_uuid).first())
+        if conv is None:
+            raise Http404
+
+        # Whose conversation it is: the account that held it (the API and the
+        # SDK), or the tester account standing in for the client on the web
+        # chat. Admins may act on any of them, since they already read all of
+        # them. A navigator is deliberately not on this list — the switch is
+        # the client's own answer about their own privacy, and a link worker
+        # setting it on their behalf would make it worth nothing.
+        tester_id = getattr(getattr(conv.patient, "tester_account", None), "id", None)
+        if not (is_admin(request.user)
+                or conv.user_id == request.user.id
+                or (tester_id and tester_id == request.user.id)):
+            raise Http404
+        return conv
+
+    @staticmethod
+    def _out(conv):
+        # Counted over the conversation key, which is what a navigator sees on
+        # the divider — so the number the agent reads back to the client is the
+        # same number the link worker is left with.
+        count = Message.objects.filter(conversation_id=str(conv.id)).count()
+        return ConversationVisibilityOutSerializer({
+            "conversation_id": str(conv.id),
+            "hidden": conv.hidden,
+            "hidden_at": conv.hidden_at,
+            "message_count": count,
+        }).data

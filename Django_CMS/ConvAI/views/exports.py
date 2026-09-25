@@ -12,7 +12,7 @@ from django.http import Http404, HttpResponseBadRequest, StreamingHttpResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
-from .. import message_export
+from .. import conversation_privacy, message_export
 from ..models import Message, Patient
 from ..roles import admin_required, navigator_required
 from ..utils import patient_message_q
@@ -95,8 +95,14 @@ def download_conversation(request, patient_pk, conversation_id):
     Anyone who can open the client's panel can take it — the client's own
     navigator, or an admin — and only while CONVERSATION_DOWNLOAD_ENABLED is
     on. Everything else is a 404: the switch being off, a client who is not
-    yours, a conversation with nothing of this client's in it. None of those
-    should tell the asker which of them it was.
+    yours, a conversation with nothing of this client's in it, a conversation
+    the client asked their link worker not to read. None of those should tell
+    the asker which of them it was.
+
+    That last one is checked here and not only in the panel. The panel drops
+    the download button from a withheld conversation, but the URL is a plain
+    GET anyone can keep or guess, and a rule enforced only by the absence of a
+    button is not enforced.
 
     The whole conversation, not just the day the panel was showing: a
     conversation that ran past midnight is still one conversation, and the
@@ -108,6 +114,9 @@ def download_conversation(request, patient_pk, conversation_id):
         raise Http404
     patient = Patient.objects.select_related("caregiver").filter(pk=patient_pk).first()
     if not _can_see(request.user, patient):
+        raise Http404
+
+    if conversation_privacy.withheld_ids([conversation_id], request.user):
         raise Http404
 
     msgs = Message.objects.filter(patient_message_q(patient), conversation_id=conversation_id)

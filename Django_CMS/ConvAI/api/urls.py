@@ -7,7 +7,7 @@ from .views import (
     AlertListCreateView, AlertDetailView, AlertResolveView,
     PatientsListView, MeetingCreateView, PatientProtocolsFilledView,
     ProtocolQuestionsView, MeetingAnswersUpsertView, PatientMeetingsListView,
-    PatientDetailsAppendView,
+    PatientDetailsAppendView, ConversationVisibilityView,
 )
 
 urlpatterns = [
@@ -24,4 +24,8 @@ urlpatterns = [
     path("api/v1/meetings/<int:meeting_id>/answers/", MeetingAnswersUpsertView.as_view(), name="meeting_answers_upsert"),
     path("api/v1/patients/<int:patient_id>/meetings/", PatientMeetingsListView.as_view(), name="patient_meetings"),
     path("api/v1/patients/<int:patient_id>/details/append/", PatientDetailsAppendView.as_view(), name="api_patient_details_append"),
+    # Whether the client's link worker may read this conversation. 404s while
+    # CONVERSATION_PRIVACY_ENABLED is off — see conversation_privacy.md.
+    path("api/v1/conversations/<str:conversation_id>/visibility/",
+         ConversationVisibilityView.as_view(), name="api_conversation_visibility"),
 ]

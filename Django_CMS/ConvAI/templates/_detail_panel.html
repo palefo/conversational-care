@@ -750,7 +750,14 @@ whatever you opened, and neither moves when the body scrolls.
         rather than present-and-empty — the same rule the in-person meeting
         follows for Transcript.
       {% endcomment %}
-      {% if panel_item.messages %}
+      {% comment %}
+        `conversations` rather than `messages`: a conversation the client asked
+        their link worker not to read has runs but no message bodies, and the
+        tab is exactly where the panel says so. Hiding the tab instead would
+        hide the fact that there was a conversation at all, which is the one
+        thing the client was not asking for.
+      {% endcomment %}
+      {% if panel_item.conversations %}
         <button type="button" class="dp-tab" data-dptab="conversation">{% trans "Conversation" %}
           {% if panel_item.message_count %}<span class="dp-tab-n">{{ panel_item.message_count }}</span>{% endif %}
         </button>
@@ -830,9 +837,9 @@ whatever you opened, and neither moves when the body scrolls.
 
   </div>
 
-  {% if panel_item.kind == 'chat' or panel_item.kind == 'alert' and panel_item.messages %}
+  {% if panel_item.kind == 'chat' or panel_item.kind == 'alert' and panel_item.conversations %}
   <div data-dppane="conversation" hidden>
-    {% if panel_item.kind == 'alert' and panel_item.messages %}
+    {% if panel_item.kind == 'alert' and panel_item.conversations %}
       {% comment %}
         Two different claims, and the panel should not make the stronger one on
         the weaker evidence: either the alert names this exchange, or this is
@@ -843,7 +850,7 @@ whatever you opened, and neither moves when the body scrolls.
         {% else %}{% trans "What this client said on the day the alert appeared. The alert does not name a conversation, so this is context rather than the cause." %}{% endif %}
       </p>
     {% endif %}
-    {% if panel_item.messages %}
+    {% if panel_item.conversations %}
       {% comment %}
         One block per conversation, because a day of chat is often several. The
         divider is the same small caps as a section heading, so it reads as
@@ -864,17 +871,31 @@ whatever you opened, and neither moves when the body scrolls.
             {% endif %}
           </div>
           {% if run.began %}<p class="dp-conv-note">{% blocktrans with when=run.began|localtime|date:"j M, H:i" %}Began earlier, on {{ when }}.{% endblocktrans %}</p>{% endif %}
+          {% if run.withheld %}
+            {% comment %}
+              The client asked that this one not be readable. The divider above
+              still carries its label and its time span, and the line below says
+              how much of it there was — so what is lost is the words and
+              nothing else. There are no message bodies in the context here to
+              print; see _conversation_runs in views/_panel.py.
+            {% endcomment %}
+            <p class="dp-conv-hidden">
+              <span class="material-icons-outlined" aria-hidden="true">lock</span>
+              {% blocktrans count n=run.withheld_count %}Hidden at the client's request — {{ n }} message.{% plural %}Hidden at the client's request — {{ n }} messages.{% endblocktrans %}
+            </p>
+          {% else %}
           <div class="dp-msgs">
             {% for m in run.messages %}
               {% if m.user_message %}<div class="dp-msg dp-msg-in"><span class="dp-msg-b">{{ m.user_message|linebreaksbr }}</span><time>{{ m.timestamp|localtime|date:"H:i" }}</time></div>{% endif %}
               {% if m.response_message %}<div class="dp-msg dp-msg-out"><span class="dp-msg-b">{{ m.response_message|linebreaksbr }}</span><time>{{ m.timestamp|localtime|date:"H:i" }}</time></div>{% endif %}
             {% endfor %}
           </div>
+          {% endif %}
           {% if run.continues %}<p class="dp-conv-note">{% blocktrans with when=run.continues|localtime|date:"j M, H:i" %}Carries on until {{ when }}.{% endblocktrans %}</p>{% endif %}
         </section>
       {% endfor %}
       {% if panel_item.messages_clipped %}
-        <p class="dp-hint">{% blocktrans with shown=panel_item.messages|length total=panel_item.message_count %}Showing the first {{ shown }} of {{ total }} messages.{% endblocktrans %}</p>
+        <p class="dp-hint">{% blocktrans with shown=panel_item.shown_count total=panel_item.message_count %}Showing the first {{ shown }} of {{ total }} messages.{% endblocktrans %}</p>
       {% endif %}
     {% else %}
       <p class="dp-empty">{% if panel_item.kind == 'alert' %}{% trans "This alert was not raised from a conversation." %}{% else %}{% trans "No messages recorded that day." %}{% endif %}</p>

@@ -160,3 +160,22 @@ class PatientDetailsAppendOutSerializer(serializers.Serializer):
     target = serializers.CharField()
     appended_at = serializers.DateTimeField()
     details = serializers.CharField()  # the updated markdown blob
+
+class ConversationVisibilityInSerializer(serializers.Serializer):
+    """The client's answer, and nothing else.
+
+    ``hidden`` is required rather than defaulted: this endpoint is the record
+    of somebody being asked a yes/no question, and a body that forgot to say
+    which should be refused rather than guessed at.
+    """
+    hidden = serializers.BooleanField()
+
+
+class ConversationVisibilityOutSerializer(serializers.Serializer):
+    conversation_id = serializers.CharField()
+    hidden = serializers.BooleanField()
+    hidden_at = serializers.DateTimeField(allow_null=True)
+    # What the link worker will still see. Returned so the agent can tell the
+    # client exactly what was and was not kept from them, in the same breath
+    # as confirming the change.
+    message_count = serializers.IntegerField()

@@ -1079,6 +1079,32 @@ class Conversation(models.Model):
         help_text="Human validation of detector booleans, keyed by the same labels."
     )
 
+    # --- Client-requested privacy (see conversation_privacy.md) ---
+    # Set by the client themselves, through a tool the agent offers them: this
+    # exchange is not for their link worker to read. The navigator still sees
+    # that it happened and how long it was — the row, the time span, the
+    # message count — but not a word of what was said, nor the summary, topic
+    # or detector answers the classifier wrote from it.
+    #
+    # Per conversation and nothing wider. The client is answering "this one",
+    # not signing a standing policy, and a thread rolls over after a couple of
+    # hours idle — so the next conversation starts visible and they are asked
+    # again if the agent offers it again.
+    #
+    # Deliberately *not* gated on CONVERSATION_PRIVACY_ENABLED at read time.
+    # The switch decides whether the platform may take the promise; it does
+    # not decide whether a promise already made still holds. An admin turning
+    # the feature off stops new conversations being hidden and leaves the ones
+    # already hidden alone. See ConvAI.conversation_privacy.
+    hidden = models.BooleanField(
+        default=False, db_index=True,
+        help_text="Client asked that this conversation not be readable by their link worker.",
+    )
+    hidden_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the client last asked for this conversation to be hidden.",
+    )
+
     class Meta:
         ordering = ["-last_message_at"]
         indexes = [
@@ -1337,6 +1363,16 @@ class SiteConfiguration(models.Model):
     # their own client's from the panel. Different people, different amounts,
     # so an installation can want one without the other.
     conversation_download_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # --- Conversation privacy (live) ---
+    # Off by default, like Sensei and the exports above: letting a client keep
+    # an exchange from their own link worker is a decision about how a service
+    # is run, and an installation that never made it should not find the
+    # feature switched on. While it is off the agent tool is not offered and
+    # the API does not exist.
+    #
+    # Turning it off again does not un-hide anything — see Conversation.hidden.
+    conversation_privacy_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
 
     # --- Editable content (live) ---
     # Markdown source for the Help page. Blank falls back to the shipped default

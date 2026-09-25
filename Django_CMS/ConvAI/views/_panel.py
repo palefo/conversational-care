@@ -19,7 +19,7 @@ from ._base import *  # noqa: F401,F403
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max, Min
 from django.utils.translation import gettext_lazy
-from .. import message_export
+from .. import conversation_privacy, message_export
 
 __all__ = ['resolve_panel_item', 'panel_context', 'panel_fragment']
 
@@ -245,7 +245,7 @@ def _span_label(start, end):
     return "%s – %s" % (a.strftime("%H:%M"), b.strftime("%H:%M"))
 
 
-def _conversation_runs(shown, patient=None, can_download=False):
+def _conversation_runs(shown, patient=None, can_download=False, withheld=()):
     """The pane's messages cut where one conversation ends and the next begins.
 
     A chat pane is one *day* of a client, and a day is often several
@@ -266,6 +266,13 @@ def _conversation_runs(shown, patient=None, can_download=False):
 
     ``can_download`` puts the download on the divider; it is the caller's to
     work out, since it depends on who is looking as well as on the switch.
+
+    ``withheld`` is the set of conversation ids whose content this reader may
+    not see — a client asked that their link worker not read them. Those runs
+    keep their divider, their time span and their message count and lose their
+    messages and their download: the point is that the navigator knows the
+    conversation happened and how long it was, and cannot read a word of it.
+    See ConvAI.conversation_privacy.
     """
     runs = []
     for m in shown:
@@ -309,6 +316,7 @@ def _conversation_runs(shown, patient=None, can_download=False):
         if resumed:
             label = _("%(label)s, continued") % {'label': label}
 
+        hide = cid in withheld
         r.update({
             'label': label,
             'span': _span_label(msgs[0].timestamp, msgs[-1].timestamp),
@@ -318,10 +326,19 @@ def _conversation_runs(shown, patient=None, can_download=False):
                           and whole['last'] > msgs[-1].timestamp else None),
             # Only for a conversation the download will find: one with this
             # client's messages in it, and an id that fits in a URL segment.
+            # Never on a withheld one — the CSV is the content by another
+            # route, and download_conversation refuses it anyway.
             'download_url': (reverse('download_conversation', args=[patient.pk, cid])
-                             if can_download and patient and whole and cid and '/' not in cid
+                             if can_download and not hide and patient and whole
+                             and cid and '/' not in cid
                              else ''),
+            'withheld': hide,
+            'withheld_count': len(msgs) if hide else 0,
         })
+        # Dropped here rather than guarded in the template: a message body that
+        # never reaches the context cannot be printed by a future edit to it.
+        if hide:
+            r['messages'] = []
     return runs
 
 
@@ -428,6 +445,22 @@ def _alert_panel(request, pk):
     linked_total = linked.count()
     linked_shown = list(linked[:PANEL_MSG_LIMIT])
 
+    # An alert can perfectly well be raised from a conversation the client
+    # asked their link worker not to read — the classifier keeps running on
+    # hidden conversations, precisely so that the things worth raising still
+    # get raised. The alert stands, and says which detector fired; the exchange
+    # behind it, and the sentences the classifier wrote out of it, do not
+    # travel with it.
+    #
+    # The one exception is the exception everywhere else: a conversation that
+    # tripped the self-harm floor is not withheld from anybody, because
+    # somebody has to be able to act on it. withheld_ids applies that rule, so
+    # there is nothing to special-case here.
+    alert_withheld = conversation_privacy.withheld_ids(
+        {m.conversation_id for m in linked_shown}, request.user)
+    linked_all_withheld = bool(linked_shown) and all(
+        m.conversation_id in alert_withheld for m in linked_shown)
+
     # An alert the classifier raised carries two different pieces of writing,
     # and the panel must not run them together. The trigger is why somebody is
     # being interrupted right now — it goes above the fold, in the alert's own
@@ -448,22 +481,28 @@ def _alert_panel(request, pk):
                 trigger_at = dt.datetime.fromisoformat(raw_at)
             except (TypeError, ValueError):
                 trigger_at = None
-    overview_meta = (_overview_meta('alert', alert, alert.pk, alert.created_at)
+    overview_meta = ({} if linked_all_withheld else
+                     _overview_meta('alert', alert, alert.pk, alert.created_at)
                      if from_classifier and alert.description else {})
 
     return {
         **bot,
         **overview_meta,
         'kind': 'alert',
-        'messages': linked_shown,
+        # Only what may be printed. The count above stays whole.
+        'messages': [m for m in linked_shown
+                     if m.conversation_id not in alert_withheld],
         # The download needs the client's panel, not just this alert: an alert
         # can be yours to read because you raised it, on someone else's client.
         'conversations': _conversation_runs(
             linked_shown, alert.patient,
             can_download=(message_export.conversation_download_enabled()
-                          and _can_see(request.user, alert.patient))),
+                          and _can_see(request.user, alert.patient)),
+            withheld=alert_withheld),
         'message_count': linked_total,
         'messages_clipped': linked_total > PANEL_MSG_LIMIT,
+        'shown_count': len(linked_shown),
+        'withheld': linked_all_withheld,
         'link_is_exact': link_is_exact,
         'notes_list': _notes_for(alert=alert),
         'note_parent': 'alert',
@@ -480,8 +519,10 @@ def _alert_panel(request, pk):
             if k not in ('archive_bucket', 'trigger', 'trigger_at')
             and not isinstance(v, (dict, list))
         ),
-        'trigger': data.get('trigger') or '',
-        'trigger_at': trigger_at,
+        # The trigger is a sentence quoted out of the conversation, so it is
+        # content and goes with the content.
+        'trigger': '' if linked_all_withheld else (data.get('trigger') or ''),
+        'trigger_at': None if linked_all_withheld else trigger_at,
         'detector': data.get('detector') or '',
         # Not "Alert \u00b7 high": the tag beside the title says high, in colour.
         'kicker': _("Alert"),
@@ -493,7 +534,16 @@ def _alert_panel(request, pk):
         'when': alert.created_at,
         'patient': alert.patient,
         'overview_heading': _("Summary") if from_classifier else _("Description"),
-        'overview': alert.description,
+        # A classifier's description *is* the conversation, written out. A
+        # person's description is their own words about why they raised the
+        # alert, and hiding those would leave the navigator with an alert and
+        # no reason for it — so only the generated one is withheld.
+        'overview': ('' if linked_all_withheld and from_classifier
+                     else alert.description),
+        'overview_empty': (
+            _("Hidden at the client's request. The alert stands; the "
+              "conversation behind it is not readable.")
+            if linked_all_withheld and from_classifier else ''),
         'points': points,
         'alert': alert,
         'detail_url': reverse('alert_detail', args=[alert.pk]),
@@ -1200,10 +1250,29 @@ def _chat_panel(request, ident):
     last_msg = msgs.last()
     total = msgs.count()
     shown = list(msgs[:PANEL_MSG_LIMIT])
+
+    # Conversations this client asked their link worker not to read. Worked out
+    # over what is on screen, so a day with none of them costs one cheap query
+    # and changes nothing. See ConvAI.conversation_privacy.
+    withheld = conversation_privacy.withheld_ids(
+        {m.conversation_id for m in shown}, request.user)
     # _can_see above already settled who is looking, so the switch is all
     # that is left to ask.
     runs = _conversation_runs(shown, patient,
-                              can_download=message_export.conversation_download_enabled())
+                              can_download=message_export.conversation_download_enabled(),
+                              withheld=withheld)
+    shown_count = len(shown)
+    # The pane is handed only what it may print. The counts above are
+    # deliberately left whole: "14 messages" is the part the navigator is
+    # meant to keep.
+    shown = [m for m in shown if m.conversation_id not in withheld]
+
+    # The day's own conversation may itself be withheld, and then everything
+    # written *from* its content goes with the messages — the classifier's
+    # summary, the topic it was filed under, the detector answers, and the
+    # navigator's review of an exchange they cannot read. What stays is that it
+    # happened, when, how long it was, and which agent held it.
+    conv_withheld = conversation_privacy.is_withheld(conv, request.user)
     started = (first_msg.timestamp if first_msg
                else conv.started_at if conv
                else timezone.make_aware(dt.datetime.combine(day, dt.time.min)))
@@ -1244,9 +1313,13 @@ def _chat_panel(request, ident):
         'note_parent': 'conversation',
         'note_parent_id': str(conv.id) if conv else '',
         'kicker': _("Chatbot"),
-        'title': conv.topic if conv and conv.topic else _("Conversation"),
+        'title': (conv.topic if conv and conv.topic and not conv_withheld
+                  else _("Conversation")),
         'when': started,
         'patient': patient,
+        # Said once, at the top of the pane, so the empty Conversation tab is
+        # explained before it is opened rather than after.
+        'withheld': conv_withheld,
         # The summary the conversation itself carries. It is written by the
         # classifier onto Conversation.summary and was already being drawn here
         # — but only when it existed, so a thread nobody has analysed yet drew
@@ -1255,16 +1328,25 @@ def _chat_panel(request, ident):
         # the Edit inside the block is what lets a navigator write one by hand,
         # which was unreachable while the block itself was conditional.
         'overview_heading': _("Summary") if conv else '',
-        'overview': conv.summary if conv else '',
-        'overview_empty': (_("Not summarised yet.")
-                           if conv and not conv.summary else ''),
-        **_overview_meta('conversation', conv, str(conv.id) if conv else '',
-                         conv.analyzed_at if conv else None),
+        'overview': conv.summary if conv and not conv_withheld else '',
+        'overview_empty': (
+            _("Hidden at the client's request. You can see that this "
+              "conversation happened and how long it was, but not what was "
+              "said or what it was about.") if conv_withheld
+            else _("Not summarised yet.") if conv and not conv.summary
+            else ''),
+        # No Edit either: the block is not an empty summary waiting to be
+        # written, it is a summary being withheld, and offering to overwrite it
+        # would be offering to publish it.
+        **({} if conv_withheld else
+           _overview_meta('conversation', conv, str(conv.id) if conv else '',
+                          conv.analyzed_at if conv else None)),
         'points': [],
         'message_count': total,
         'messages': shown,
         'conversations': runs,
-        'messages_clipped': total > PANEL_MSG_LIMIT,
+        'messages_clipped': shown_count > len(shown) or total > PANEL_MSG_LIMIT,
+        'shown_count': shown_count,
         # The Summary tab is otherwise one paragraph. This is the same detail
         # the old conversation page carried in its header, as a list.
         'facts': [
@@ -1278,19 +1360,24 @@ def _chat_panel(request, ident):
                 timezone.localtime(last_msg.timestamp).strftime("%H:%M"),
             ) if first_msg else _("—")),
             (_("Agent"), (conv.agent.name if conv and conv.agent else _("Not recorded"))),
-            (_("Topic"), (conv.topic if conv and conv.topic else _("Not classified"))),
-            (_("Flagged"), (_("Needs attention") if conv and conv.is_important
+            (_("Topic"), (_("Hidden by the client") if conv_withheld
+                          else conv.topic if conv and conv.topic
+                          else _("Not classified"))),
+            (_("Flagged"), (_("Hidden by the client") if conv_withheld
+                            else _("Needs attention") if conv and conv.is_important
                             else _("Nothing raised automatically"))),
         ],
 
         # The judgement is on the exchange as a whole. Per-message feedback was
         # dropped deliberately — see the review block in _detail_panel.html.
         'conv': conv,
+        # The review is a judgement on the exchange. Withheld from whoever
+        # cannot read the exchange — both the form and what was written in it.
         'feedback_url': (reverse('conversation_feedback', args=[str(conv.id)])
-                         if conv else ''),
-        'rating': conv.rating if conv else None,
-        'feedback': conv.feedback if conv else '',
-        'flags': flags,
+                         if conv and not conv_withheld else ''),
+        'rating': conv.rating if conv and not conv_withheld else None,
+        'feedback': conv.feedback if conv and not conv_withheld else '',
+        'flags': [] if conv_withheld else flags,
 
         # Turning the agent off is stored per client, not per conversation, so
         # the same switch reads the same wherever it is shown.

@@ -1,9 +1,36 @@
 from ._base import *  # noqa: F401,F403
 from ._panel import panel_context, fold_recordings
 from django.db.models import Max
+from .. import conversation_privacy
 from ..forms import ClientForm, PatientForm
 
 __all__ = ['build_patient_events', 'save_client_note', 'update_client_terms', 'toggle_patient_chatbot', 'raise_alert', 'create_client', 'download_care_plan', 'edit_care_plan', 'edit_patient', 'edit_patient_details', 'extract_study_id', 'patient_list', 'patient_conversation_detail', 'patient_detail', 'view_care_plan']
+
+
+class _WithheldThread:
+    """A conversation the reader may not read, standing in for its messages.
+
+    The history page regroups the day's messages by ``conversation_id``, so a
+    thread whose rows were simply dropped would vanish from the page — and the
+    client asking that an exchange not be read is not asking for it to look as
+    though it never happened. One of these per withheld thread keeps the card
+    in its place in the day, carrying nothing but the id and when it started.
+
+    Nothing readable on purpose: the template guards on ``conv.withheld``, but
+    a body that is not in the context cannot be printed by a guard that is
+    later edited away.
+    """
+
+    withheld = True
+    user_message = ""
+    response_message = ""
+    input_audio_file = None
+    response_audio_file = None
+    liked = disliked = warning = dangerous = False
+
+    def __init__(self, conversation_id, timestamp):
+        self.conversation_id = conversation_id
+        self.timestamp = timestamp
 
 
 def _format_duration(seconds):
@@ -622,6 +649,44 @@ def patient_conversation_detail(request, pk, day):
     conversations = Conversation.objects.filter(id__in=conv_uuids)
     conv_map = {str(c.id): c for c in conversations}
 
+    # Conversations the client asked their link worker not to read. The page
+    # keeps the card, the time span and the message count and loses everything
+    # written out of the words: the bubbles, the summary, the topic, and the
+    # review of an exchange this reader cannot read. An admin sees all of it,
+    # and so does anybody looking at a conversation that tripped the self-harm
+    # floor. See ConvAI.conversation_privacy.
+    withheld = conversation_privacy.withheld_ids(conv_map.keys(), request.user)
+    if withheld:
+        by_thread = {}
+        for m in messages:
+            if m.conversation_id in withheld:
+                by_thread.setdefault(m.conversation_id, []).append(m)
+
+        for cid, rows in by_thread.items():
+            conv = conv_map.get(cid)
+            if conv is None:
+                continue
+            conv.withheld = True
+            conv.withheld_count = len(rows)
+            first_at = timezone.localtime(rows[0].timestamp)
+            last_at = timezone.localtime(rows[-1].timestamp)
+            conv.withheld_span = "%s – %s" % (first_at.strftime("%H:%M"),
+                                              last_at.strftime("%H:%M"))
+
+        # The rows themselves never reach the template. A placeholder holds the
+        # thread's place in the day so the card still appears, in order, with
+        # its header — the template regroups by conversation_id, and a thread
+        # with nothing in it would simply not be there.
+        kept, seen = [], set()
+        for m in messages:
+            cid = m.conversation_id
+            if cid not in withheld:
+                kept.append(m)
+            elif cid not in seen:
+                seen.add(cid)
+                kept.append(_WithheldThread(cid, m.timestamp))
+        messages = kept
+
     # Dynamic detector labels from Agent
     detector_labels = []
     if patient.agent and isinstance(patient.agent.detectors, dict):
@@ -634,7 +699,10 @@ def patient_conversation_detail(request, pk, day):
         "prev_day": (day_date - dt.timedelta(days=1)).isoformat(),
         "next_day": (day_date + dt.timedelta(days=1)).isoformat(),
         "is_today": day_date >= today_local,
-        "messages": messages,
+        # Not "messages": base.html reads Django's messages framework out of a
+        # context variable by that name, and this page was overwriting it with
+        # the day's chat rows — which then arrived as notification toasts.
+        "conversation_messages": messages,
         "conv_map": conv_map,
         "detector_labels": detector_labels,
         "active_page": "patients",

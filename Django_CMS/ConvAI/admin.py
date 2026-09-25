@@ -299,6 +299,7 @@ class ConversationAdmin(admin.ModelAdmin):
         "visited",
         "rating",
         "analyzed",
+        "hidden",
         "last_message_at",
         "analyzed_at",
         "message_count"
@@ -308,6 +309,7 @@ class ConversationAdmin(admin.ModelAdmin):
         "is_important",
         "visited",
         "analyzed",
+        "hidden",
         "rating",
         ("last_message_at", admin.DateFieldListFilter),
         ("analyzed_at", admin.DateFieldListFilter),
@@ -322,7 +324,7 @@ class ConversationAdmin(admin.ModelAdmin):
     date_hierarchy = "last_message_at"
     list_per_page = 50
 
-    readonly_fields = ("id", "started_at", "last_message_at", "analyzed_at")
+    readonly_fields = ("id", "started_at", "last_message_at", "analyzed_at", "hidden_at")
     fieldsets = (
         ("Identity & Timestamps", {
             "fields": ("id", "started_at", "last_message_at"),
@@ -340,6 +342,19 @@ class ConversationAdmin(admin.ModelAdmin):
                 "analyzed_at",
                 "auto_flags"
             )
+        }),
+        # Editable here on purpose. The client sets this through their agent,
+        # but somebody has to be able to answer "they rang and asked me to
+        # undo it", and the admin is the surface that already assumes an
+        # administrator reading everything. See conversation_privacy.md.
+        ("Privacy", {
+            "fields": ("hidden", "hidden_at"),
+            "description": (
+                "When hidden, the client's link worker sees that this conversation "
+                "happened and how many messages it holds, but not its content, "
+                "summary or topic. Administrators are unaffected, and a conversation "
+                "that raised a self-harm alert is readable regardless."
+            ),
         }),
     )
 

@@ -1473,6 +1473,18 @@ button.dp-stamp:hover { color: #075985; text-decoration: underline; }
 .dp-conv-dl .material-icons-outlined { font-size: 16px; }
 .dp-conv-note { font-size: .65625rem; line-height: 1.5; color: #94a3b8; margin: 4px 0 0; }
 
+/* A conversation the client asked their link worker not to read. Deliberately
+   quiet: it is a statement about a conversation, not a warning about one, and
+   it sits where the bubbles would have been so the shape of the day still
+   reads. See conversation_privacy.md. */
+.dp-conv-hidden {
+  display: flex; align-items: center; gap: 6px; margin: 6px 0 2px;
+  padding: 10px 12px; border-radius: 8px;
+  background: #f8fafc; border: 1px dashed #dbe3ec;
+  font-size: .6875rem; line-height: 1.5; color: #64748b;
+}
+.dp-conv-hidden .material-icons-outlined { font-size: 14px; color: #94a3b8; }
+
 .dp-transcript { font-size: .6875rem; color: #475569; white-space: pre-line; line-height: 1.5; }
 
 /* ── Transcript, as turns ────────────────────────────────────────────────

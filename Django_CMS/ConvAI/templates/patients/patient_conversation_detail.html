@@ -35,6 +35,18 @@
   .pcv-summary { background:#f8fafc; border-left:3px solid #7dd3fc; border-radius:.5rem;
     padding:.7rem .9rem; font-size:.875rem; color:#475569; line-height:1.55; }
 
+  /* A conversation the client asked their link worker not to read. It takes
+     the place of the summary and the bubbles, and is kept quiet on purpose:
+     the card is stating a fact about the exchange, not warning about it. */
+  .pcv-hidden { background:#f1f5f9; color:#475569; }
+  .pcv-hidden .material-icons-outlined { font-size:.9rem; }
+  .pcv-withheld { display:flex; gap:.75rem; align-items:flex-start;
+    background:#f8fafc; border:1px dashed #e2e8f0; border-radius:.75rem;
+    padding:1rem 1.1rem; }
+  .pcv-withheld .material-icons-outlined { font-size:1.1rem; color:#94a3b8; margin-top:.1rem; }
+  .pcv-withheld-t { font-size:.875rem; font-weight:600; color:#334155; margin:0; }
+  .pcv-withheld-b { font-size:.8125rem; color:#64748b; line-height:1.55; margin:.25rem 0 0; }
+
   /* ───────── Chat panel ───────── */
   .pcv-chat { background:#f8fafc; border:1px solid #f1f5f9; border-radius:.75rem; padding:1.25rem;
     display:flex; flex-direction:column; gap:1rem; }
@@ -111,7 +123,13 @@
   </div>
 </header>
 
-{% regroup messages by conversation_id as threads %}
+{% comment %}
+  `conversation_messages`, not `messages`: base.html renders Django's messages
+  framework from a context variable of that name, so a page handing it the
+  day's chat rows had every one of them pop up as a notification toast —
+  message text, in a corner, on a page about privacy.
+{% endcomment %}
+{% regroup conversation_messages by conversation_id as threads %}
 
 {% if threads %}
   {% for thread in threads %}
@@ -119,7 +137,14 @@
     <div class="card p-6 mb-6">
       {# ---------- Thread header: status + topic + meta ---------- #}
       <div class="flex flex-wrap items-center gap-2 mb-4">
-        {% if conv and conv.analyzed %}
+        {% if conv.withheld %}
+          {% comment %}
+            The client asked that their link worker not read this one. The card
+            stays, and says so; the chips that summarise the content — urgency,
+            topic — go with the content. See conversation_privacy.md.
+          {% endcomment %}
+          <span class="pcv-chip pcv-hidden"><span class="material-icons-outlined">lock</span>{% trans "Hidden by the client" %}</span>
+        {% elif conv and conv.analyzed %}
           {% if conv.is_important %}
             <span class="pcv-chip pcv-urgent"><span class="d"></span>{% trans "Urgent" %}</span>
           {% else %}
@@ -134,15 +159,34 @@
           </span>
         {% endif %}
         <span class="pcv-meta ml-auto">
-          {% blocktrans count counter=thread.list|length %}{{ counter }} message{% plural %}{{ counter }} messages{% endblocktrans %}
-          · {% localtime on %}{{ thread.list.0.timestamp|date:"H:i" }}{% with last_msg=thread.list|last %} – {{ last_msg.timestamp|date:"H:i" }}{% endwith %}{% endlocaltime %}
+          {% comment %}
+            A withheld thread is one placeholder row, not its messages, so its
+            count and span are carried on the conversation instead — the view
+            measured them before dropping the rows.
+          {% endcomment %}
+          {% if conv.withheld %}
+            {% blocktrans count counter=conv.withheld_count %}{{ counter }} message{% plural %}{{ counter }} messages{% endblocktrans %}
+            · {{ conv.withheld_span }}
+          {% else %}
+            {% blocktrans count counter=thread.list|length %}{{ counter }} message{% plural %}{{ counter }} messages{% endblocktrans %}
+            · {% localtime on %}{{ thread.list.0.timestamp|date:"H:i" }}{% with last_msg=thread.list|last %} – {{ last_msg.timestamp|date:"H:i" }}{% endwith %}{% endlocaltime %}
+          {% endif %}
         </span>
       </div>
 
-      {% if conv and conv.analyzed and conv.summary %}
+      {% if conv.withheld %}
+        <div class="pcv-withheld">
+          <span class="material-icons-outlined" aria-hidden="true">lock</span>
+          <div>
+            <p class="pcv-withheld-t">{% trans "This conversation is hidden at the client's request." %}</p>
+            <p class="pcv-withheld-b">{% trans "You can see that it happened, when, and how long it was. What was said, the summary and the topic are not available to you." %}</p>
+          </div>
+        </div>
+      {% elif conv and conv.analyzed and conv.summary %}
         <div class="pcv-summary mb-5">{{ conv.summary }}</div>
       {% endif %}
 
+      {% if not conv.withheld %}
       {# ---------- Chat ---------- #}
       <div class="pcv-chat">
         {% for msg in thread.list %}
@@ -201,6 +245,7 @@
       </div>
 
       {# ---- Conversation-level feedback ---- #}
+      {# A verdict on an exchange nobody here can read is not a verdict. #}
       {% if conv_id %}
       <div class="mt-6 pt-5 border-t border-gray-100" data-conv-feedback data-conv-id="{{ conv_id }}">
         <div class="pcv-feedback-title">
@@ -245,6 +290,7 @@
           </div>
         {% endif %}
       </div>
+      {% endif %}
       {% endif %}
     </div>
     {% endwith %}

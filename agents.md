@@ -446,6 +446,10 @@ reword its instruction by using the same label; they cannot stop it raising or
 lower it below High. The reasoning is in the code comment — a forgotten config
 field must not be the only thing between a disclosure and a navigator.
 
+The same floor is what a client's conversation-privacy request cannot reach: a
+conversation that tripped it stays readable by the navigator. See
+[conversation_privacy.md](conversation_privacy.md).
+
 ### When classification runs
 
 `process_message_for_patient` hands each inbound turn to
@@ -469,6 +473,20 @@ that has `raises` set, with:
 from detectors somebody chose in advance, plus the floor. One open alert per
 conversation per detector, so a long crisis chat is one row rather than
 fourteen.
+
+## Conversation privacy
+
+A client can ask that one conversation not be readable by their link worker —
+the navigator keeps the fact of it, its time span and its message count, and
+loses the content, the summary, the topic and the review. Off by default
+(**Settings → Privacy**), overridden by the self-harm floor, and never hidden
+from admins.
+
+It reaches agents as two tools built by
+`ConvAI/native_agents/privacy_tool.py`, over the same rule as the REST endpoint
+`POST /api/v1/conversations/<id>/visibility/`. The tools are **not yet attached
+to any agent**: the turn that asks the client the question is the next piece of
+work. See [conversation_privacy.md](conversation_privacy.md).
 
 ## Which surface uses which agent
 
@@ -498,5 +516,7 @@ the project's LangGraph version.
 
 Per-agent model selection, multi-provider (incl. Azure) routing, and the
 RAG subtype's document tool are in place. Natural extensions: per-agent
-temperature, more tools for prompt-based agents, and OCR so scanned PDFs can be
-ingested instead of rejected.
+temperature, more tools for prompt-based agents, OCR so scanned PDFs can be
+ingested instead of rejected, and wiring the conversation-privacy tools to an
+agent — which needs a per-agent opt-in, since handing a plain prompt agent a
+tool turns it into a react agent.

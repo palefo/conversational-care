@@ -962,6 +962,35 @@ class ExportConfigForm(forms.ModelForm):
         }
 
 
+class ConversationPrivacyConfigForm(forms.ModelForm):
+    """Settings -> Privacy: whether clients may hide a conversation at all.
+
+    The switch decides whether the platform may *take* the promise — it turns
+    the agent tool and the visibility API on. It does not decide whether a
+    promise already made still holds: turning it off leaves conversations that
+    are already hidden hidden. See conversation_privacy.md.
+    """
+
+    class Meta:
+        model = SiteConfiguration
+        fields = ["conversation_privacy_enabled"]
+        labels = {
+            "conversation_privacy_enabled": _("Let clients hide a conversation"),
+        }
+        help_texts = {
+            "conversation_privacy_enabled": _(
+                "Off by default. When on, a client can ask that one conversation "
+                "not be readable by their link worker. The link worker still sees "
+                "that it happened, when, and how many messages it had \u2014 but not "
+                "the content, the summary or the topic. Administrators can still "
+                "read it, and so can the link worker if the conversation raised a "
+                "self-harm alert."),
+        }
+        widgets = {
+            "conversation_privacy_enabled": forms.Select(attrs=_SELECT),
+        }
+
+
 class NavigatorForm(forms.Form):
     """Admin-only creation of a Navigator account (username, e-mail, password)."""
     username = forms.CharField(max_length=150, label=_("Username"), widget=forms.TextInput(attrs=_INPUT))
