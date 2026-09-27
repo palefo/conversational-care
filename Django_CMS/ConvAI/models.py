@@ -56,9 +56,55 @@ class ConvAIUser(AbstractUser):
 
 
 class Message(models.Model):
+    """One exchange: what came in (``user_message``) and what went out.
+
+    **Who a message belongs to is decided once, when it is written, and never
+    re-derived.** ``patient`` and ``account`` are that decision; see
+    ConvAI.message_attribution and message_attribution.md.
+
+    ``user`` is the raw address the message arrived from or was sent to — a
+    phone number, an email, a username. It is kept as history and must not be
+    used to work out whose message this is: numbers change hands, and a client
+    who gets a new number keeps their past messages only because ``patient``
+    was fixed when those messages arrived. Rows written before migration 0089
+    may still have no owner, and those alone fall back to matching ``user``.
+    """
+
+    class SenderRole(models.TextChoices):
+        # Who wrote the inbound side. Outbound-only rows (reminders, alert SMS,
+        # care plans) have nobody writing in and are PLATFORM.
+        CLIENT = "client", _("Client")
+        CAREGIVER = "caregiver", _("Caregiver")
+        STAFF = "staff", _("Staff")          # a navigator or admin, through a login
+        TESTER = "tester", _("Tester")       # a tester login standing in for a client
+        API = "api", _("API account")        # an SDK / integration account
+        PROSPECT = "prospect", _("Prospective client")  # self-registration, not a client yet
+        PLATFORM = "platform", _("Platform") # outbound only; nobody wrote in
+        UNKNOWN = "", _("Unknown")           # legacy rows the backfill could not place
+
     conversation_id = models.CharField(max_length=300)
     user = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+
+    # The client file this message belongs to, fixed at receipt. SET_NULL so a
+    # deleted client does not take the audit trail of what was said with them.
+    patient = models.ForeignKey(
+        "Patient", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="messages", db_index=True,
+        help_text="Client this message belongs to, fixed when it was written.",
+    )
+    # The login it came through, when it came through one: the Link Worker
+    # bubble (a navigator), /api/v1/messages/ (an SDK account), the tester chat
+    # (a tester account, alongside the client it stands in for).
+    account = models.ForeignKey(
+        "ConvAIUser", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="messages", db_index=True,
+        help_text="Login this message came through, if any.",
+    )
+    sender_role = models.CharField(
+        max_length=16, choices=SenderRole.choices, blank=True, default="",
+        help_text="Who wrote the inbound side, decided when the message arrived.",
+    )
     user_message = models.TextField()
 
     response_message = models.TextField()
@@ -83,6 +129,9 @@ class Message(models.Model):
         ordering = ["timestamp"]
         indexes = [
             models.Index(fields=["conversation_id", "user", "timestamp"]),
+            # The client timeline and the day panel both ask "this client's
+            # messages on this day", which is this index exactly.
+            models.Index(fields=["patient", "timestamp"], name="message_patient_ts_idx"),
         ]
 
     def __str__(self):
@@ -898,6 +947,17 @@ class Agent(models.Model):
     host = models.CharField(max_length=100, blank=True, default="")
     port = models.PositiveIntegerField(null=True, blank=True)
 
+    # Remote agents only: hand this agent a per-run token so it can report a
+    # summary and set the conversation's visibility over /api/v1/run/. Off by
+    # default — an agent that never calls back should never hold a credential.
+    # See ConvAI.run_tokens and agent_tools.md.
+    allow_callbacks = models.BooleanField(
+        default=False,
+        help_text=_("Remote agents only: give each run a short-lived token that lets "
+                    "the agent report a summary and set the conversation's "
+                    "visibility, for that one conversation only."),
+    )
+
     # Who the LLM should imitate (role/persona)
     classification_role = models.TextField(
         blank=True,
@@ -926,6 +986,12 @@ class Agent(models.Model):
     )
 
     tts_voice_id = models.CharField(max_length=40, blank=True, null=True)
+
+    @property
+    def tool_labels(self) -> list:
+        """Short names of the platform tools switched on, in registry order."""
+        from .native_agents import tool_registry
+        return [str(tool_registry.spec(s)["tab"]) for s in tool_registry.enabled_slugs(self)]
 
     def __str__(self):
         # host:port only identifies a *remote* agent. Every other kind has none,

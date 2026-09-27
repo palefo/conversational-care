@@ -229,3 +229,10 @@ class Client:
         if resp.status_code == 404:
             return None
         return self._json_or_raise(resp)
+
+
+
+# The run-token client lives in its own module so a remote agent can vendor just
+# run_client.py + langgraph_tools.py without this file. Re-exported here so
+# ``from conversationalcare_api import RunClient`` keeps working.
+from .run_client import RunClient  # noqa: E402,F401

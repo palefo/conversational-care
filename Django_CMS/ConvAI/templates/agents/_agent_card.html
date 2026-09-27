@@ -96,6 +96,22 @@
         {% trans "Real-time voice" %}
       </span>
     {% endif %}
+    {% comment %}
+      Tools change what an agent can *do* to a conversation — hide it, write
+      the summary a link worker reads — and make it a tool-calling agent, which
+      is slower per turn. Both are worth knowing from the roster without opening
+      the form.
+    {% endcomment %}
+    {% for label in a.tool_labels %}
+      <span class="agent-chip agent-chip-tool" title="{% trans 'Platform tool this agent may call' %}">
+        <span class="material-icons-outlined text-[13px]">build</span>{{ label }}
+      </span>
+    {% endfor %}
+    {% if a.kind == 'remote' and a.allow_callbacks %}
+      <span class="agent-chip agent-chip-tool" title="{% trans 'Each run gets a token for /api/v1/run/, scoped to its conversation' %}">
+        <span class="material-icons-outlined text-[13px]">sync_alt</span>{% trans "Callbacks" %}
+      </span>
+    {% endif %}
     {% if a.tts_voice_id %}
       <span class="agent-chip" title="{% trans 'Voice ID' %}">
         <span class="material-icons-outlined text-[13px]">graphic_eq</span>

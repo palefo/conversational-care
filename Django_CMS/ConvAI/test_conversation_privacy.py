@@ -208,9 +208,10 @@ class PaneLevelWithholding(PrivacyTestCase):
         self.assertNotIn("Your review of this conversation", pane)
 
     def test_the_review_is_there_when_nothing_is_hidden(self):
+        """Labelled with the conversation it rates, since the day has two."""
         self.evening.hidden = False
         self.evening.save(update_fields=["hidden"])
-        self.assertIn("Your review of this conversation", self.pane())
+        self.assertIn("Your review of Conversation 2", self.pane())
 
     def test_nothing_is_withheld_when_nothing_is_hidden(self):
         self.morning.hidden = False

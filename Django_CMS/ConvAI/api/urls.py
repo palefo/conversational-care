@@ -8,7 +8,7 @@ from .views import (
     PatientsListView, MeetingCreateView, PatientProtocolsFilledView,
     ProtocolQuestionsView, MeetingAnswersUpsertView, PatientMeetingsListView,
     PatientDetailsAppendView, ConversationVisibilityView,
-    ConversationSummaryView,
+    ConversationSummaryView, RunView, RunSummaryView, RunVisibilityView,
 )
 
 urlpatterns = [
@@ -33,4 +33,10 @@ urlpatterns = [
     # the view's docstring and agent_tools.md.
     path("api/v1/conversations/<str:conversation_id>/summary/",
          ConversationSummaryView.as_view(), name="api_conversation_summary"),
+    # For remote agents, authenticated by the per-run token in their run config
+    # and nothing else. No conversation id: the token says which. See
+    # ConvAI.run_tokens and agent_tools.md.
+    path("api/v1/run/", RunView.as_view(), name="api_run"),
+    path("api/v1/run/summary/", RunSummaryView.as_view(), name="api_run_summary"),
+    path("api/v1/run/visibility/", RunVisibilityView.as_view(), name="api_run_visibility"),
 ]

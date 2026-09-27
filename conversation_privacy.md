@@ -46,6 +46,14 @@ themselves*. Three things make that honest rather than a quiet erosion:
 * **The agent writes the summary knowing this.** `report_summary`'s prompt says
   that on a hidden conversation the summary is the only thing the link worker
   gets, so it must be something the person would expect them to read.
+* **The link worker cannot add their own.** The *Your summary* block is not
+  offered on a hidden conversation — nobody can summarise what they cannot read
+  — and one written before the client hid it is withheld with the words it
+  was written from. Follow-up goes in Notes.
+* **It reaches every hidden conversation, not just the day's last.** Summaries
+  are per conversation: each hidden conversation's summary sits on its own
+  divider, in place of its messages. With one summary per day, a hidden
+  conversation earlier in the day showed none.
 * **Nothing else moved.** The rating and the detector checkboxes are still
   withheld — a verdict on an exchange nobody here can read is not a verdict —
   and so are the topic, the messages and the download.

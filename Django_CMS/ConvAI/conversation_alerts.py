@@ -52,37 +52,37 @@ def _resolve_agent(conv):
     if getattr(conv, "patient", None) and conv.patient.agent_id:
         return conv.patient.agent
 
+    patient = _first_message_owner(conv)
+    return getattr(patient, "agent", None) if patient else None
+
+
+def _first_message_owner(conv):
+    """The client the conversation's first message was stamped with on arrival.
+
+    Only a legacy first message — written before attribution, not placed by the
+    backfill — is still matched by number, through the same resolver an
+    inbound message uses. See ConvAI.message_attribution.
+    """
     first_msg = (Message.objects
                  .filter(conversation_id=str(conv.id))
+                 .select_related("patient__agent", "patient__navigator")
                  .order_by("timestamp")
                  .first())
     if not first_msg:
         return None
-    sender = (first_msg.user or "").strip()
-    if not sender:
+    if first_msg.patient is not None:
+        return first_msg.patient
+    if first_msg.account_id or first_msg.sender_role:
         return None
-    patient = (Patient.objects
-               .filter(Q(phone_number=sender) | Q(caregiver__phone_number=sender))
-               .select_related("agent")
-               .first())
-    return getattr(patient, "agent", None) if patient else None
+    from .message_attribution import resolve_inbound
+    return resolve_inbound(first_msg.user).patient
 
 
 def _patient_for(conv):
     """The client an alert about this conversation would be about."""
     if getattr(conv, "patient", None):
         return conv.patient
-    first_msg = (Message.objects
-                 .filter(conversation_id=str(conv.id))
-                 .order_by("timestamp")
-                 .first())
-    sender = (first_msg.user or "").strip() if first_msg else ""
-    if not sender:
-        return None
-    return (Patient.objects
-            .filter(Q(phone_number=sender) | Q(caregiver__phone_number=sender))
-            .select_related("navigator")
-            .first())
+    return _first_message_owner(conv)
 
 
 def _already_open(conv_id: str, label: str) -> bool:

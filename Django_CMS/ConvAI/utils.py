@@ -325,27 +325,49 @@ def generate_response_langgraph(user_or_patient,
     )
 
 
-def _run_identity(user_or_patient, thread_id: str) -> dict:
-    """The ids and credential an agent needs to call back about this run.
+def _ensure_conversation(thread_id: str, patient=None, agent=None):
+    """The Conversation row for ``thread_id``, created now if this is its first turn.
 
-    Sent on every run rather than only when a tool is enabled. For a *remote*
-    agent the enabled-tool list lives on the remote side, so conversational-care
-    cannot know whether the graph will call back — a gate here would be
-    guessing, and an id a graph ignores costs nothing.
-
-    ``client_id`` is an explicit alias for ``patient_id``. The data model says
-    Patient and every screen in the product says client; a remote graph author
-    reading either word should find the key they reached for rather than
-    discovering the other one exists.
-
-    The tools take the conversation from *these* values and never from a
-    model-supplied argument, which is the whole point of sending them: an id the
-    model could pass is an id the model could get wrong.
+    ``save_message`` creates the row, but only *after* the agent has replied —
+    so a tool that calls back during the very first turn ("don't let my link
+    worker see this", as an opening message) found nothing to act on and had to
+    say "ask me again later". Created here with the same defaults
+    ``save_message`` uses, so that ``get_or_create`` there simply finds it.
     """
-    from . import conversation_actors
+    try:
+        conv_uuid = UUID(str(thread_id))
+    except (TypeError, ValueError):
+        return None
+    now = timezone.now()
+    defaults = {"started_at": now, "last_message_at": now}
+    if patient is not None:
+        defaults["patient"] = patient
+    if agent is not None:
+        defaults["agent"] = agent
+    conv, _created = Conversation.objects.get_or_create(id=conv_uuid, defaults=defaults)
+    return conv
 
-    out = {"conversation_id": str(thread_id or "")}
 
+def _run_identity(agent, user_or_patient, thread_id: str) -> dict:
+    """The ids — and, for a remote agent that calls back, the credential — for a run.
+
+    ``conversation_id`` / ``patient_id`` / ``client_id`` are sent on every run:
+    an id a graph ignores costs nothing, and a remote graph author reading either
+    word should find the key they reached for (the model says Patient, every
+    screen says client). They are **informational**. Nothing on the platform
+    side trusts them; what a remote agent may act on is decided by the token.
+
+    ``cc_run_token`` is sent only to a *remote* agent with ``allow_callbacks``
+    on. It is scoped to this one conversation, expires with its idle window, and
+    works only on ``/api/v1/run/`` — see ConvAI.run_tokens. Personal API tokens
+    are never sent to an agent: a remote agent's run config is stored on a server
+    we do not administer as closely as this one, and a person's token there is
+    that person's whole access. In-process agents get nothing, because their
+    tools reach the database directly.
+    """
+    from . import run_tokens
+
+    patient = user_or_patient if isinstance(user_or_patient, Patient) else None
     conv = None
     try:
         conv = Conversation.objects.filter(id=UUID(str(thread_id))).first()
@@ -353,19 +375,29 @@ def _run_identity(user_or_patient, thread_id: str) -> dict:
         # A thread_id that is not a UUID names no conversation. The run still
         # goes ahead; it just carries no conversation-bound identity.
         pass
+    if patient is None and conv is not None:
+        patient = conv.patient
 
-    patient_id = None
-    if isinstance(user_or_patient, Patient):
-        patient_id = user_or_patient.pk
-    elif conv is not None:
-        patient_id = conv.patient_id
-    if patient_id:
-        out["patient_id"] = patient_id
-        out["client_id"] = patient_id
+    out = {"conversation_id": str(thread_id or "")}
+    if patient is not None:
+        out["patient_id"] = patient.pk
+        out["client_id"] = patient.pk
 
-    token = conversation_actors.token_for_conversation(conv, user_or_patient)
-    if token:
-        out["user_token"] = token
+    wants_callbacks = (getattr(agent, "kind", "") == "remote"
+                       and bool(getattr(agent, "allow_callbacks", False)))
+    if wants_callbacks:
+        conv = conv or _ensure_conversation(thread_id, patient=patient, agent=agent)
+        if conv is not None:
+            out["cc_run_token"] = run_tokens.mint(
+                conv.id, agent_id=agent.pk,
+                patient_id=conv.patient_id or (patient.pk if patient else None))
+            api_url = (get_setting("AGENT_CALLBACK_URL") or "").strip().rstrip("/")
+            if api_url:
+                out["cc_api_url"] = api_url
+    elif getattr(agent, "kind", "") == "prompt" and getattr(agent, "tools", None):
+        # An in-process agent with tools reaches the database itself, but its
+        # tools still need a row to write to on the first turn.
+        _ensure_conversation(thread_id, patient=patient, agent=agent)
     return out
 
 
@@ -400,7 +432,7 @@ def generate_response_with_agent(agent,
             # In-process tools read thread_id (injected by _arun_graph) and fall
             # back to conversation_id. Both are set so one tool module serves
             # both kinds of agent without caring which it is running under.
-            **_run_identity(user_or_patient, thread_id),
+            **_run_identity(agent, user_or_patient, thread_id),
         }
         if isinstance(extra_configurable, dict) and extra_configurable:
             configurable.update(extra_configurable)
@@ -441,11 +473,11 @@ def generate_response_with_agent(agent,
             "thread_id": thread_id,
             "user_id":   user_or_patient.id,
             "user_name": user_name,
-            # conversation_id / patient_id / client_id / user_token. A remote
-            # graph calls the REST API to act on the conversation, so unlike an
-            # in-process tool it needs a credential as well as the ids. See
-            # ConvAI.conversation_actors and agent_tools.md.
-            **_run_identity(user_or_patient, thread_id),
+            # conversation_id / patient_id / client_id, and — only when this
+            # agent has allow_callbacks on — a cc_run_token scoped to this one
+            # conversation. Never a personal token. See ConvAI.run_tokens and
+            # agent_tools.md.
+            **_run_identity(agent, user_or_patient, thread_id),
         }
         if isinstance(extra_configurable, dict) and extra_configurable:
             configurable.update(extra_configurable)  # merge/override
@@ -468,15 +500,31 @@ def generate_response_with_agent(agent,
 
 def save_message(phone: str, user_message: str, response_message: str, thread_id: str,
                  patient: Patient | None = None,
-                 input_audio_file: str = "", response_audio_file: str = ""):
+                 input_audio_file: str = "", response_audio_file: str = "",
+                 *, account=None, sender_role: str | None = None):
     """
     Persist a message pair and ensure there's a Conversation row.
     - Creates Conversation(id=thread_id) if missing.
     - Updates last_message_at.
     - If available, attaches patient and agent to Conversation.
     - Optional audio filenames are stored on the Message (voice turns).
+    - Stamps the Message with its owner (``patient`` / ``account``) and
+      ``sender_role``, so nothing downstream has to work out whose it is from
+      ``phone`` again. See ConvAI.message_attribution.
     Returns the created Message.
+
+    ``sender_role`` should be passed by every caller that knows it. When it is
+    not, it is worked out here from what is known *now*, at write time: no
+    inbound text means the platform wrote it; otherwise the number is matched
+    against this client's own and caregiver numbers.
     """
+    from .message_attribution import create_message, role_for_number
+
+    if sender_role is None:
+        if not (user_message or "").strip():
+            sender_role = Message.SenderRole.PLATFORM
+        else:
+            sender_role = role_for_number(phone, patient)
     now = timezone.now()
     agent = getattr(patient, "agent", None) if patient is not None else None
 
@@ -522,42 +570,32 @@ def save_message(phone: str, user_message: str, response_message: str, thread_id
                 conv.save(update_fields=list(updates.keys()))
 
         # Finally, create the Message
-        return Message.objects.create(
+        return create_message(
             user=phone,
             conversation_id=str(conv.id),  # ensure we use the canonical UUID string
             user_message=user_message,
             response_message=response_message,
             input_audio_file=input_audio_file,
             response_audio_file=response_audio_file,
+            patient=patient,
+            account=account,
+            sender_role=sender_role,
         )
 
 
 def patient_message_q(patient: Patient) -> Q:
-    """Q filter selecting all Message rows that belong to ``patient``.
+    """Q filter selecting all Message rows on ``patient``'s file.
 
-    Matches by EITHER of the two ways a message can be tied to a patient:
-      1. ``Message.user`` is the patient's or caregiver's phone number
-         (WhatsApp/webhook traffic stores the sender phone there), OR
-      2. the message's conversation is linked to the patient via
-         ``Conversation.patient`` (web tester chat and voice chat store a
-         username in ``Message.user``, so phone matching alone misses them).
+    By ``Message.patient``, fixed when each message was written — so a client
+    who changes number keeps their history, and a stranger given their old
+    number does not inherit it. Rows written before that existed, and not
+    placed by the backfill, still fall back to the old matching (current phone
+    numbers, or a conversation tied to this client). The rule lives in
+    ConvAI.message_attribution; this name is kept because a dozen call sites
+    already use it.
     """
-    q = Q(pk__in=[])  # always-false base; OR'ed conditions below widen it
-    nums = []
-    if patient.phone_number:
-        nums.append(str(patient.phone_number))
-    caregiver = getattr(patient, "caregiver", None)
-    if caregiver and caregiver.phone_number:
-        nums.append(str(caregiver.phone_number))
-    if nums:
-        q |= Q(user__in=nums)
-    conv_ids = [
-        str(cid) for cid in
-        Conversation.objects.filter(patient=patient).values_list("id", flat=True)
-    ]
-    if conv_ids:
-        q |= Q(conversation_id__in=conv_ids)
-    return q
+    from .message_attribution import patient_messages_q
+    return patient_messages_q(patient)
 
 
 # ---------------------------
@@ -679,7 +717,8 @@ def _review_after_message(message, inbound_text: str) -> None:
                          message.conversation_id)
 
 
-def process_message_for_patient(patient: Patient, raw_message: str, *, user_label: str | None = None) -> str:
+def process_message_for_patient(patient: Patient, raw_message: str, *, user_label: str | None = None,
+                                sender_role: str | None = None, account=None) -> str:
     """
     Process a chat message for an already-resolved patient.
 
@@ -687,15 +726,21 @@ def process_message_for_patient(patient: Patient, raw_message: str, *, user_labe
     logged-in test user, not from a phone number). ``user_label`` is only a
     display/identifier string stored on the Message; it defaults to a stable,
     non-phone value.
+
+    ``sender_role`` and ``account`` are what the caller already knows about who
+    wrote in — the inbound resolver for WhatsApp and SMS, the tester login for
+    the web chat — and are stamped onto the message as they are.
     """
     text = raw_message.strip()
     label = user_label or f"patient:{patient.pk}"
+    stamp = {"account": account, "sender_role": sender_role}
 
     # 0) the navigator's switch. Both inbound paths land here, so this is the
     # one place that has to honour it. The message is still recorded — what is
     # suspended is the agent answering, not the caregiver being heard.
     if not patient.chatbot_enabled:
-        msg = save_message(label, text, "", _get_or_create_thread(patient), patient=patient)
+        msg = save_message(label, text, "", _get_or_create_thread(patient), patient=patient,
+                           **stamp)
         # Reviewed even though nothing answered — arguably especially then. The
         # switch suspends the agent replying, not the caregiver being heard,
         # and a crisis disclosed while the agent is off is the one nobody is
@@ -722,7 +767,7 @@ def process_message_for_patient(patient: Patient, raw_message: str, *, user_labe
                                         extra_configurable=extra_configurable)
 
     # 5) persist both sides and upsert Conversation metadata
-    msg = save_message(label, text, reply, thread_id, patient=patient)
+    msg = save_message(label, text, reply, thread_id, patient=patient, **stamp)
 
     # 6) hand the exchange to the classifier. Off the reply path deliberately:
     #    this is a second model call, and the caregiver should not wait behind
@@ -737,23 +782,25 @@ def process_received_message(phone_number: str, raw_message: str) -> str:
     Resolves the patient by phone, then delegates to
     :func:`process_message_for_patient`.
     """
-    phone = phone_number.replace("whatsapp:", "").strip()
+    from .message_attribution import normalise, resolve_inbound
+
+    phone = normalise(phone_number)
     text = raw_message.strip()
 
-    # 1) resolve patient by phone (patient or caregiver)
-    patient = (
-        Patient.objects
-        .filter(Q(phone_number=phone) | Q(caregiver__phone_number=phone))
-        .select_related("agent")
-        .first()
-    )
+    # 1) resolve the client this number writes about. The one place, with the
+    # audio paths, that a number is used to decide whose a message is — the
+    # answer is stamped onto the message and never re-derived. See
+    # ConvAI.message_attribution.
+    inbound = resolve_inbound(phone)
+    patient = inbound.patient
     if not patient:
         sr_reply = _handle_self_registration_flow(phone, text)
         if sr_reply is not None:
             return sr_reply
         return "Sorry, we could not find a patient matching this number."
 
-    return process_message_for_patient(patient, raw_message, user_label=phone)
+    return process_message_for_patient(patient, raw_message, user_label=phone,
+                                       sender_role=inbound.role)
 
 
 def download_recording_mp3(recording_sid):
@@ -954,11 +1001,14 @@ def send_whatsapp_reminder(meeting):
     )
 
     # Registrar en la base de datos únicamente la parte del sistema
-    Message.objects.create(
+    from .message_attribution import create_message
+    create_message(
         conversation_id  = f"reminder-{meeting.id}",
         user             = str(caregiver.phone_number),
         user_message     = "",
-        response_message = body
+        response_message = body,
+        patient          = meeting.patient,
+        sender_role      = Message.SenderRole.PLATFORM,
     )
     
     return msg.sid  # devuelve el SID del mensaje si es exitoso
@@ -1459,11 +1509,16 @@ def _handle_self_registration_flow(phone: str, text: str) -> str | None:
     conv.last_message_at = timezone.now()
     conv.save()
 
-    Message.objects.create(
+    from .message_attribution import create_message
+    # No owner: this is somebody asking to become a client, not one yet. The
+    # role marks the row as stamped, so it is never picked up later by number
+    # matching if the same number is saved on a client after approval.
+    create_message(
         user=phone,
         conversation_id=thread_id,
         user_message=text,
         response_message=reply,
+        sender_role=Message.SenderRole.PROSPECT,
     )
     return reply
 

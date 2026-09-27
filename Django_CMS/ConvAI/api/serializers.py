@@ -215,3 +215,19 @@ class ConversationSummaryOutSerializer(serializers.Serializer):
     # Worth knowing when writing the summary: on a hidden conversation the
     # summary is the *only* thing the link worker gets.
     hidden = serializers.BooleanField()
+
+
+class RunOutSerializer(serializers.Serializer):
+    """What a remote agent's run token lets it see about its own conversation."""
+    conversation_id = serializers.CharField()
+    patient_id = serializers.IntegerField(allow_null=True)
+    # The summary the link worker reads now, and who wrote it — 'agent',
+    # 'classifier', or '' when nothing has summarised it yet.
+    summary = serializers.CharField(allow_blank=True)
+    source = serializers.CharField(allow_blank=True)
+    hidden = serializers.BooleanField()
+    # Whether the platform currently takes visibility requests at all, so an
+    # agent can tell a client "that isn't available here" instead of trying.
+    privacy_available = serializers.BooleanField()
+    scopes = serializers.ListField(child=serializers.CharField())
+    expires_at = serializers.DateTimeField()

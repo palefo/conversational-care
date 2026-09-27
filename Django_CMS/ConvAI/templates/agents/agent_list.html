@@ -29,6 +29,8 @@
   .agent-chip { display: inline-flex; align-items: center; gap: .3rem; padding: .18rem .5rem; border-radius: 9999px;
     background: #f1f5f9; color: #475569; font-size: .72rem; font-weight: 500; max-width: 100%; }
   .agent-chip code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  /* Tools: what the agent can do to a conversation, set apart from what it is. */
+  .agent-chip-tool { background: #eef2ff; color: #4338ca; }
   .agent-badge { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: .12rem .45rem; border-radius: 9999px; flex-shrink: 0; }
   .agent-empty { border: 1.5px dashed #e2e8f0; border-radius: .75rem; padding: 2.75rem 1rem; text-align: center; background: #fafbfc; }
 
@@ -72,7 +74,8 @@
   <h2 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
     <span class="material-icons-outlined text-base text-indigo-500">chat</span>{% trans "Plain" %}
   </h2>
-  <p class="text-xs text-gray-500 mb-3">{% trans "Prompt only, no tools." %}</p>
+  {# Not "no tools" any more: platform tools can be ticked on any prompt agent. #}
+  <p class="text-xs text-gray-500 mb-3">{% trans "Driven by the prompt, plus any platform tools ticked on the agent." %}</p>
   <div class="agent-grid mb-8">
     {% for a in plain_prompt_agents %}{% include "agents/_agent_card.html" with a=a %}{% endfor %}
     <a href="{% url 'agent_create' 'prompt' %}" class="agent-card agent-add">

@@ -45,6 +45,7 @@
   /* An author `display` beats the UA stylesheet's `[hidden] { display: none }`,
      so the dot has to opt back out by name or every tab looks edited. */
   .pt-tab-dot[hidden] { display: none; }
+  .pt-off { font-weight: 400; color: #b45309; font-size: .75rem; }
   .pt-panel { padding: .9rem 1rem; }
   .pt-panel-h { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .45rem; }
   .pt-panel-d { font-size: .75rem; color: #6b7280; line-height: 1.5; margin: 0 0 .6rem; }
@@ -70,6 +71,7 @@
         <label class="pt-tool{% if not t.available %} pt-tool-off{% endif %}">
           <input type="checkbox" name="tool_slugs" value="{{ t.slug }}"
                  data-tool-check="{{ t.slug }}"
+                 data-available="{{ t.available|yesno:'1,0' }}"
                  {% if t.enabled %}checked{% endif %}>
           <span>
             <span class="pt-tool-l">{{ t.label }}</span>
@@ -89,7 +91,7 @@
             data-pt-tab="main">{% trans "System prompt" %}</button>
     {% for t in tool_specs %}
       <button type="button" class="pt-tab" role="tab" aria-selected="false" hidden
-              data-pt-tab="{{ t.slug }}">{{ t.tab }}<span class="pt-tab-dot" hidden data-pt-dot></span></button>
+              data-pt-tab="{{ t.slug }}">{{ t.tab }}{% if not t.available %} <span class="pt-off">({% trans "off" %})</span>{% endif %}<span class="pt-tab-dot" hidden data-pt-dot></span></button>
     {% endfor %}
     <button type="button" class="pt-tab" role="tab" aria-selected="false"
             data-pt-tab="__preview">{% trans "Preview" %}</button>
@@ -137,6 +139,7 @@
       <span class="block text-sm font-medium text-gray-700">{% trans "What the agent will be sent" %}</span>
     </div>
     <pre class="pt-preview" data-pt-preview></pre>
+    <p class="pt-tool-warn" data-pt-skipped hidden></p>
     <p class="pt-preview-n">
       {% trans "The system message on every turn: your prompt, then each enabled tool's wording. A knowledge base adds its own paragraph too, which is not shown here." %}
     </p>
@@ -156,6 +159,7 @@
     var panels = wrap.querySelectorAll('[data-pt-panel]');
     var mainInput = document.getElementById('{{ form.system_prompt.id_for_label }}');
     var preview = wrap.querySelector('[data-pt-preview]');
+    var skippedNote = wrap.querySelector('[data-pt-skipped]');
 
     // slug -> {check, panel, tab, input, default}
     var tools = [];
@@ -188,15 +192,29 @@
     function renderPreview() {
       if (!preview) return;
       var out = (mainInput ? mainInput.value : '').trim();
+      var skipped = [];
       // Registry order, which is the order `tools` was rendered in and the order
       // tool_registry.prompt_suffix concatenates — so the preview is the prompt,
-      // not an approximation of it.
+      // not an approximation of it. A ticked tool the installation has switched
+      // off is left out here exactly as the server leaves it out, and named
+      // underneath instead: the Preview claims to be what will be sent.
       tools.forEach(function (t) {
         if (!t.check || !t.check.checked) return;
+        if (t.check.dataset.available === '0') {
+          var name = t.check.closest('label') && t.check.closest('label').querySelector('.pt-tool-l');
+          skipped.push(name ? name.textContent.trim() : t.slug);
+          return;
+        }
         var text = (t.input ? t.input.value : '').trim();
         if (text) out += '\n\n' + text;
       });
       preview.textContent = out;
+      if (skippedNote) {
+        skippedNote.hidden = !skipped.length;
+        skippedNote.textContent = skipped.length
+          ? '{% trans "Not sent while switched off for this installation:" %} ' + skipped.join(', ')
+          : '';
+      }
     }
 
     // A ticked tool has a tab; an unticked one does not, and switching away from

@@ -420,11 +420,14 @@ def send_meeting_reminder_email(meeting):
 
     # Same record the WhatsApp reminder leaves, so a reminder shows up in the
     # message history whichever channel carried it.
+    from .message_attribution import create_message
     from .models import Message
-    Message.objects.create(
+    create_message(
         conversation_id=f"reminder-{meeting.id}",
         user=address,
         user_message="",
         response_message=text,
+        patient=meeting.patient,
+        sender_role=Message.SenderRole.PLATFORM,
     )
     return address

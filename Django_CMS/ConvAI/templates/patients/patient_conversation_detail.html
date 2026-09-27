@@ -40,6 +40,9 @@
      the card is stating a fact about the exchange, not warning about it. */
   .pcv-hidden { background:#f1f5f9; color:#475569; }
   .pcv-hidden .material-icons-outlined { font-size:.9rem; }
+  .pcv-summary-mine { border-left-color:#94a3b8 !important; background:#f8fafc !important; }
+  .pcv-summary-by { font-size:.6875rem; font-weight:600; letter-spacing:.05em; text-transform:uppercase;
+                    color:#64748b; margin:0 0 .25rem; }
   .pcv-withheld { display:flex; gap:.75rem; align-items:flex-start;
     background:#f8fafc; border:1px dashed #e2e8f0; border-radius:.75rem;
     padding:1rem 1.1rem; }
@@ -191,13 +194,21 @@
         {% if conv.display_summary %}
           <div class="pcv-summary mb-5">{{ conv.display_summary }}</div>
         {% endif %}
-      {% elif conv.display_summary %}
+      {% elif conv.display_summary or conv.human_text %}
         {% comment %}
           No longer gated on conv.analyzed: an agent can report its own summary
           before the classifier has run, and a summary that exists should be
-          printed by whichever of the two wrote it.
+          printed by whichever of the two wrote it. The link worker's own sits
+          underneath, as it does in the panel — never on a hidden conversation,
+          which is why this branch is the visible one only.
         {% endcomment %}
-        <div class="pcv-summary mb-5">{{ conv.display_summary }}</div>
+        {% if conv.display_summary %}<div class="pcv-summary mb-3">{{ conv.display_summary }}</div>{% endif %}
+        {% if conv.human_text %}
+          <div class="pcv-summary pcv-summary-mine mb-5">
+            <p class="pcv-summary-by">{% blocktrans with who=conv.human_by %}Summary by {{ who }}{% endblocktrans %}</p>
+            {{ conv.human_text }}
+          </div>
+        {% endif %}
       {% endif %}
 
       {% if not conv.withheld %}

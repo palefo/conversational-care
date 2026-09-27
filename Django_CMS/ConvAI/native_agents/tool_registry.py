@@ -13,6 +13,11 @@ Two things are deliberately *not* stored on the agent:
   the default been copied into the row on save, improving the shipped wording
   would reach no existing agent, and "Reset to default" would write a copy that
   is right only until the next release. Reset is a key deletion.
+
+A tool's entry is ``{}`` (on, shipped wording), ``{"prompt": …}`` (on, edited)
+or ``{"enabled": false, "prompt": …}`` (off, but its edited wording kept, so
+unticking a box by accident and saving does not throw away somebody's work).
+A tool that is off with nothing edited has no entry at all.
 * **Whether the tool works.** ``available()`` is asked at render and at build
   time, because a tool can be switched off by an installation-wide setting
   after an agent was configured with it. Conversation privacy is the live
@@ -131,7 +136,14 @@ def enabled_slugs(agent) -> list[str]:
     stored = getattr(agent, "tools", None) or {}
     if not isinstance(stored, dict):
         return []
-    return [s for s in TOOLS if s in stored]
+    return [s for s in TOOLS if s in stored and is_enabled_entry(stored[s])]
+
+
+def is_enabled_entry(entry) -> bool:
+    """Whether a stored tool entry means "on". Absent ``enabled`` means on."""
+    if not isinstance(entry, dict):
+        return bool(entry)
+    return entry.get("enabled", True) is not False
 
 
 def prompt_for(agent, slug: str) -> str:

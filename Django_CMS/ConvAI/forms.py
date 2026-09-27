@@ -767,10 +767,20 @@ class AgentForm(forms.ModelForm):
     class Meta:
         model = Agent
         fields = [
-            "name", "description", "langgraph_name", "host", "port",
+            "name", "description", "langgraph_name", "host", "port", "allow_callbacks",
             "classification_role", "abstract_instruction", "detectors", "tts_voice_id",
         ]
-        labels = {"description": _("Description")}
+        labels = {"description": _("Description"),
+                  "allow_callbacks": _("Allow callbacks")}
+        help_texts = {
+            "allow_callbacks": _(
+                "Give each run a token that lets this agent report the conversation's "
+                "summary and, if the client asks, hide it from their link worker — for "
+                "that one conversation only, for two hours. The agent finds it as "
+                "cc_run_token in its run config and sends it to /api/v1/run/. Leave off "
+                "for agents that never call back: they should not hold a credential."
+            ),
+        }
         field_classes = {"detectors": DetectorsFormField}
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
@@ -778,6 +788,7 @@ class AgentForm(forms.ModelForm):
             "langgraph_name": forms.TextInput(attrs=_INPUT),
             "host": forms.TextInput(attrs=_INPUT),
             "port": forms.NumberInput(attrs=_INPUT),
+            "allow_callbacks": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "classification_role": forms.Textarea(attrs={**_INPUT, "rows": 4}),
             "abstract_instruction": forms.TextInput(attrs=_INPUT),
             "detectors": DetectorTableWidget(),
@@ -904,13 +915,13 @@ class PromptAgentForm(forms.ModelForm):
                 # is not offering it needs to be told where the switch is.
                 "available": available,
                 "unavailable": spec["unavailable"],
-                "enabled": slug in stored,
+                "enabled": slug in stored and tool_registry.is_enabled_entry(stored[slug]),
                 "default": default,
                 "field": self[name],
             })
         self.fields["tool_slugs"].choices = choices
         if self.instance and self.instance.pk:
-            self.fields["tool_slugs"].initial = list(stored.keys())
+            self.fields["tool_slugs"].initial = tool_registry.enabled_slugs(self.instance)
 
     def clean(self):
         cleaned = super().clean()
@@ -966,11 +977,16 @@ class PromptAgentForm(forms.ModelForm):
         chosen = set(self.cleaned_data.get("tool_slugs") or [])
         out = {}
         for slug in tool_registry.slugs():   # registry order, not tick order
-            if slug not in chosen:
-                continue
             text = self._normalise(self.cleaned_data.get(f"{self.TOOL_PROMPT_PREFIX}{slug}"))
             default = self._normalise(tool_registry.default_prompt(slug))
-            out[slug] = {} if (not text or text == default) else {"prompt": text}
+            edited = bool(text) and text != default
+            if slug in chosen:
+                out[slug] = {"prompt": text} if edited else {}
+            elif edited:
+                # Unticked, but somebody rewrote its wording: keep the words and
+                # switch the tool off, rather than discarding them because a box
+                # was unticked. Ticking it again brings them back.
+                out[slug] = {"enabled": False, "prompt": text}
         return out
 
     def save(self, commit=True):
@@ -1120,8 +1136,8 @@ class ConversationPrivacyConfigForm(forms.ModelForm):
             "conversation_privacy_enabled": _(
                 "Off by default. When on, a client can ask that one conversation "
                 "not be readable by their link worker. The link worker still sees "
-                "that it happened, when, and how many messages it had \u2014 but not "
-                "the content, the summary or the topic. Administrators can still "
+                "that it happened, when, how many messages it had and its summary "
+                "\u2014 but not the messages, the topic or the review. Administrators can still "
                 "read it, and so can the link worker if the conversation raised a "
                 "self-harm alert."),
         }

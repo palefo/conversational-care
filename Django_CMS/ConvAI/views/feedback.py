@@ -12,11 +12,15 @@ def message_feedback(request, message_id):
     """
     msg = get_object_or_404(Message, pk=message_id)
 
-    # find the patient whose phone or caregiver phone matches msg.user
-    patient = Patient.objects.filter(
-        Q(phone_number=str(msg.user)) |
-        Q(caregiver__phone_number=str(msg.user))
-    ).select_related('navigator').first()
+    # Whose message this is, as fixed when it arrived. Only a legacy row the
+    # backfill could not place is still matched by number. Matching every row by
+    # number made this an authorisation check that followed a phone number — a
+    # recycled number handed the old client's messages to the new one's
+    # navigator. See ConvAI.message_attribution.
+    patient = msg.patient
+    if patient is None and not msg.account_id and not msg.sender_role:
+        from ..message_attribution import resolve_inbound
+        patient = resolve_inbound(msg.user).patient
 
     # permission check
     if not (is_admin(request.user) or (patient and patient.navigator == request.user)):

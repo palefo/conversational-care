@@ -52,6 +52,9 @@ Topic deep dives:
 - [Message export](message_export.md) — the optional CSV export of every stored
   message (one row per message) for behavioural analysis, the optional
   per-conversation download for navigators, and how to turn each on.
+- [Whose a message is](message_attribution.md) — how every message is tied to
+  a client (or a login) when it arrives, so a phone number that changes hands
+  takes neither the history nor the access with it.
 - [Agent tools & summaries](agent_tools.md) — the platform tools a prompt-based
   agent can be given from the agent form, the summary an agent writes for the
   client's link worker, and how a remote agent authenticates to write one.

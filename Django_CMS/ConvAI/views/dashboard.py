@@ -429,25 +429,11 @@ def dashboard(request):
 
     msg_qs = Message.objects.filter(timestamp__gte=start_of_day, timestamp__lt=end_of_day)
 
-    # Restrict to this CTN's patients if not staff. Match by phone (WhatsApp)
-    # OR by patient-linked Conversation (tester/voice chat store a username).
+    # Restrict to this navigator's clients if not an admin — by each message's
+    # owner, fixed when it arrived. See ConvAI.message_attribution.
     if not is_admin(request.user):
-        phones = set()
-        for p in Patient.objects.filter(navigator=user).select_related("caregiver"):
-            if p.phone_number:
-                phones.add(str(p.phone_number))
-            if p.caregiver and p.caregiver.phone_number:
-                phones.add(str(p.caregiver.phone_number))
-        conv_ids = [
-            str(cid) for cid in
-            Conversation.objects.filter(patient__navigator=user).values_list("id", flat=True)
-        ]
-        scope_q = Q(pk__in=[])
-        if phones:
-            scope_q |= Q(user__in=list(phones))
-        if conv_ids:
-            scope_q |= Q(conversation_id__in=conv_ids)
-        msg_qs = msg_qs.filter(scope_q)
+        from ..message_attribution import navigator_messages_q
+        msg_qs = msg_qs.filter(navigator_messages_q(user))
 
     total_msgs_today = msg_qs.count()
 

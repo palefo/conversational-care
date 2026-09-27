@@ -194,6 +194,10 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
         "general_form": _form("general"),
         "integrations_form": _form("integrations"),
         "messaging_form": _form("messaging"),
+        # Numbers more than one client can be reached on, and the older messages
+        # still matched by number because the backfill could not place them.
+        # See ConvAI.message_attribution.
+        **_attribution_context(),
         "email_form": _form("email"),
         "branding_form": _form("branding"),
         # Whether mail could go out right now, and if not, what is missing.
@@ -225,6 +229,20 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
                 "/" + getattr(settings, "TWILIO_WEBHOOK_PATH", "webhooks/whatsapp")
             ),
         },
+    }
+
+
+def _attribution_context():
+    from .. import message_attribution
+
+    shared = [
+        {"number": number,
+         "holders": [{"role": role, "patient": p} for role, p in holders]}
+        for number, holders in sorted(message_attribution.shared_numbers().items())
+    ]
+    return {
+        "shared_numbers": shared,
+        "legacy_message_count": Message.objects.filter(message_attribution.legacy_q()).count(),
     }
 
 

@@ -1493,6 +1493,27 @@ button.dp-stamp:hover { color: #075985; text-decoration: underline; }
 .dp-ov-hidnote { align-items: flex-start; margin: 0 0 10px; }
 .dp-ov-hidnote .material-icons-outlined { margin-top: 1px; }
 
+/* One entry per conversation on the Summary tab. Separated by a hairline and
+   headed with the same label and span as that conversation's divider on the
+   Conversation tab, so the two tabs can be read against each other. */
+.dp-sumentry-next { margin-top: 18px; padding-top: 14px; border-top: 1px solid #e5eaf0; }
+.dp-sumentry-h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
+                 margin: 0 0 8px; font-size: .6875rem; font-weight: 600; letter-spacing: .06em;
+                 text-transform: uppercase; color: #64748b; }
+.dp-sumentry-m { font-weight: 500; letter-spacing: 0; text-transform: none; color: #94a3b8;
+                 text-align: right; }
+
+/* A conversation's summary on its divider. Quiet and violet-tinted like the
+   overview it repeats, clamped so a long one cannot push the messages away. */
+.dp-conv-sum { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0 4px;
+               padding: 8px 10px; border-radius: 8px; background: #f7f5ff;
+               border: 1px solid #ebe7ff; }
+.dp-conv-sum .material-icons-outlined { font-size: 14px; color: #7c6cf0; margin-top: 2px; }
+.dp-conv-sum-t { margin: 0; font-size: .75rem; line-height: 1.5; color: #334155;
+                 display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+                 overflow: hidden; }
+.dp-conv-sum-s { margin: 2px 0 0; font-size: .625rem; color: #94a3b8; }
+
 .dp-transcript { font-size: .6875rem; color: #475569; white-space: pre-line; line-height: 1.5; }
 
 /* ── Transcript, as turns ────────────────────────────────────────────────

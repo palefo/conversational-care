@@ -391,13 +391,14 @@ def send_alert_sms(request, alert_id: int):
         messages.error(request, _("The alert's user has no phone number."))
         return redirect("alert_detail", pk=alert.id)
 
-    # Try to map phone -> patient (for thread + agent)
-    patient = (
-        Patient.objects
-        .filter(Q(phone_number=to_number) | Q(caregiver__phone_number=to_number))
-        .select_related("agent")
-        .first()
-    )
+    # The client this alert is about, when the alert already says so; only an
+    # alert with no client falls back to working it out from the number, and
+    # then through the same resolver an inbound message uses.
+    # See ConvAI.message_attribution.
+    patient = alert.patient
+    if patient is None:
+        from ..message_attribution import resolve_inbound
+        patient = resolve_inbound(to_number).patient
     thread_id = None
     if patient and patient.agent:
         thread_id = _get_or_create_thread(patient)
@@ -434,11 +435,14 @@ def send_alert_sms(request, alert_id: int):
         append_system_note_to_langgraph(patient, system_note, thread_id=thread_id)
     else:
         # Fallback logging if we couldn't resolve a patient/thread
-        Message.objects.create(
+        from ..message_attribution import create_message
+        create_message(
             conversation_id=f"alert-{alert.id}",
             user=str(to_number),
             user_message="",
             response_message=body_to_log,
+            patient=alert.patient or patient,
+            sender_role=Message.SenderRole.PLATFORM,
         )
 
     # Progress the alert if still CREATED

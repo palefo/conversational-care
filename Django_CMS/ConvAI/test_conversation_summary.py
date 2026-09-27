@@ -255,6 +255,66 @@ class ThePersonsSummary(SummaryTestCase):
         self.assertEqual(response.status_code, 403)
 
 
+class TheHeading(SummaryTestCase):
+    def test_says_your_summary_when_it_is(self):
+        conversation_summary.set_human_summary(self.conv, "Mine.", self.nav)
+        self.assertIn("Your summary", self.pane())
+
+    def test_names_the_author_when_it_is_someone_elses(self):
+        """A reassigned link worker should be told whose words they are reading."""
+        colleague = ConvAIUser.objects.create_user(username="col", password="x",
+                                                   first_name="Cara", last_name="Lee")
+        conversation_summary.set_human_summary(self.conv, "Theirs.", colleague)
+        pane = self.pane()
+        self.assertIn("Summary by Cara Lee", pane)
+        self.assertNotIn("Your summary", pane)
+
+
+class ADayWithSeveralConversations(SummaryTestCase):
+    """The pane is a day. The summaries are per conversation."""
+
+    def setUp(self):
+        super().setUp()
+        self.turn_privacy_on("1")
+        # Earlier the same day, and hidden: not the pane's "own" conversation.
+        self.morning = Conversation.objects.create(
+            patient=self.patient, agent=self.agent, hidden=True,
+            summary="Morning: she asked about night-time wandering.")
+        _message(self.morning.id, CLIENT_PHONE, "he was up at 3", "that sounds hard",
+                 _local(2026, 9, 11, 8, 0))
+        Conversation.objects.filter(pk=self.morning.pk).update(
+            last_message_at=_local(2026, 9, 11, 8, 0))
+        # As save_message would have left it: last active at its last message.
+        Conversation.objects.filter(pk=self.conv.pk).update(
+            last_message_at=_local(2026, 9, 11, 10, 0))
+
+    def test_every_conversation_has_its_summary(self):
+        pane = self.pane()
+        self.assertIn(CLASSIFIER_TEXT, pane)
+        self.assertIn("Morning: she asked about night-time wandering.", pane)
+
+    def test_a_hidden_earlier_conversation_still_shows_its_summary(self):
+        """The rollback promised this; the per-day pane used to lose it."""
+        self.assertIn("Morning: she asked about night-time wandering.", self.pane())
+        self.assertNotIn("he was up at 3", self.pane())
+
+    def test_only_the_visible_one_offers_a_link_worker_summary(self):
+        pane = self.pane()
+        self.assertIn(reverse("edit_overview", args=["conversation", str(self.conv.id)]), pane)
+        self.assertNotIn(reverse("edit_overview", args=["conversation", str(self.morning.id)]),
+                         pane)
+
+    def test_each_summary_is_on_its_divider(self):
+        self.assertEqual(self.pane().count('class="dp-conv-sum"'), 2)
+
+    def test_the_header_does_not_borrow_one_conversations_topic(self):
+        pane = self.pane()
+        self.assertIn("2 conversations", pane)
+
+    def test_the_review_says_which_conversation_it_rates(self):
+        self.assertIn("Your review of Conversation 2", self.pane())
+
+
 # ─────────────────────── the privacy rollback ──────────────────────────────
 
 class AHiddenConversation(SummaryTestCase):
@@ -282,10 +342,26 @@ class AHiddenConversation(SummaryTestCase):
         self.assertIn("Hidden at the client", pane)
         self.assertIn("You can read the summary below", pane)
 
-    def test_a_navigator_still_cannot_write_over_the_generated_one(self):
-        """The machine block has no edit URL whether or not it is hidden."""
+    def test_offers_no_link_worker_summary(self):
+        """You cannot summarise what you cannot read. Follow-up goes in Notes."""
         pane = self.pane()
-        self.assertIn("Your summary", pane)
+        self.assertNotIn("Your summary", pane)
+        self.assertNotIn(reverse("edit_overview", args=["conversation", str(self.conv.id)]),
+                         pane)
+
+    def test_withholds_a_link_worker_summary_written_before_it_was_hidden(self):
+        """Written from the words, so it goes with the words."""
+        conversation_summary.set_human_summary(self.conv, "She wants respite care.",
+                                               self.other_nav)
+        self.assertNotIn("She wants respite care.", self.pane())
+        self.assertNotIn("She wants respite care.", self.history())
+
+    def test_says_when_no_summary_was_shared(self):
+        self.conv.summary = ""
+        self.conv.save(update_fields=["summary"])
+        pane = self.pane()
+        self.assertIn("no summary was shared", pane)
+        self.assertNotIn("You can read the summary below", pane)
 
     def test_the_agent_can_still_report_one(self):
         """Which is the point: on a hidden conversation it is all they get."""
@@ -316,11 +392,11 @@ class TheSummaryEndpoint(SummaryTestCase):
         self.patient.save(update_fields=["tester_account"])
         self.assertEqual(self.api(tester, "post", {"summary": AGENT_TEXT}).status_code, 200)
 
-    def test_the_service_account_may_write(self):
-        """The account-less channels' credential — see conversation_actors."""
-        self.assertEqual(
-            self.api(conversation_actors.service_account(), "post",
-                     {"summary": AGENT_TEXT}).status_code, 200)
+    def test_an_agent_service_account_no_longer_exists(self):
+        """Agents use /api/v1/run/ with a per-run token; see test_run_tokens."""
+        from ConvAI import conversation_actors
+        self.assertFalse(hasattr(conversation_actors, "service_account"))
+        self.assertFalse(hasattr(conversation_actors, "token_for_conversation"))
 
     def test_a_navigator_may_not(self):
         """Their words go in their own block, which the panel offers them."""
@@ -369,71 +445,6 @@ class TheSummaryEndpoint(SummaryTestCase):
         self.assertEqual(body["source"], "classifier")
         self.assertEqual(body["agent_summary"], "")
         self.assertFalse(body["hidden"])
-
-
-class TheVisibilityEndpointsOwnership(SummaryTestCase):
-    """The hole the shared rule closes: a WhatsApp conversation has no user."""
-
-    def setUp(self):
-        super().setUp()
-        self.turn_privacy_on("1")
-
-    def test_a_conversation_with_no_account_is_still_reachable(self):
-        self.assertIsNone(self.conv.user_id)
-        response = self.api(conversation_actors.service_account(), "post",
-                            {"hidden": True}, path="visibility")
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json()["hidden"])
-
-    def test_a_navigator_still_may_not_set_visibility(self):
-        response = self.api(self.nav, "post", {"hidden": True}, path="visibility")
-        self.assertEqual(response.status_code, 404)
-
-
-class TheServiceAccount(SummaryTestCase):
-    def test_it_is_created_once_and_reused(self):
-        first = conversation_actors.service_account()
-        self.assertEqual(conversation_actors.service_account().pk, first.pk)
-
-    def test_it_cannot_be_signed_into(self):
-        conversation_actors.service_account()
-        self.assertFalse(self.client.login(username=conversation_actors.SERVICE_USERNAME,
-                                           password=""))
-
-    def test_its_token_is_stable(self):
-        self.assertEqual(conversation_actors.service_token(),
-                         conversation_actors.service_token())
-
-    def test_may_act_on_refuses_an_inactive_account(self):
-        user = conversation_actors.service_account()
-        user.is_active = False
-        user.save(update_fields=["is_active"])
-        self.assertFalse(conversation_actors.may_act_on(self.conv, user))
-
-
-class TheCallbackToken(SummaryTestCase):
-    """Narrowest identity first: the conversation's own account, then the
-    client's tester account, then the service account."""
-
-    def test_the_conversations_own_account_when_it_has_one(self):
-        owner = ConvAIUser.objects.create_user(username="ada", password="x")
-        Conversation.objects.filter(pk=self.conv.pk).update(user=owner)
-        self.conv.refresh_from_db()
-        key = conversation_actors.token_for_conversation(self.conv, self.patient)
-        self.assertEqual(Token.objects.get(key=key).user_id, owner.pk)
-
-    def test_the_tester_account_next(self):
-        tester = ConvAIUser.objects.create_user(username="tester", password="x")
-        self.patient.tester_account = tester
-        self.patient.save(update_fields=["tester_account"])
-        self.patient.refresh_from_db()
-        key = conversation_actors.token_for_conversation(self.conv, self.patient)
-        self.assertEqual(Token.objects.get(key=key).user_id, tester.pk)
-
-    def test_the_service_account_last(self):
-        key = conversation_actors.token_for_conversation(self.conv, self.patient)
-        self.assertEqual(Token.objects.get(key=key).user.username,
-                         conversation_actors.SERVICE_USERNAME)
 
 
 # ─────────────────────────────── the tool ──────────────────────────────────
@@ -579,13 +590,34 @@ class TheAgentForm(SummaryTestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.save().tools, {"report_summary": {"prompt": "Say less."}})
 
-    def test_unticking_removes_the_tool_and_its_override(self):
+    def test_unticking_keeps_edited_wording_switched_off(self):
+        """An accidental untick and save must not throw somebody's work away."""
         self.agent.tools = {"report_summary": {"prompt": "Say less."}}
         self.agent.save(update_fields=["tools"])
         form = self.form(**{"tool_slugs": [],
                             "tool_prompt_report_summary": "Say less."})
         self.assertTrue(form.is_valid(), form.errors)
+        agent = form.save()
+        self.assertEqual(agent.tools,
+                         {"report_summary": {"enabled": False, "prompt": "Say less."}})
+        self.assertEqual(tool_registry.enabled_slugs(agent), [])
+        self.assertEqual(tool_registry.build_tools(agent), [])
+
+    def test_unticking_an_unedited_tool_removes_it(self):
+        self.agent.tools = {"report_summary": {}}
+        self.agent.save(update_fields=["tools"])
+        form = self.form(**{"tool_slugs": [],
+                            "tool_prompt_report_summary":
+                                tool_registry.default_prompt("report_summary")})
+        self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.save().tools, {})
+
+    def test_ticking_it_again_brings_the_wording_back(self):
+        self.agent.tools = {"report_summary": {"enabled": False, "prompt": "Say less."}}
+        self.agent.save(update_fields=["tools"])
+        form = self.form()
+        self.assertNotIn("report_summary", form.fields["tool_slugs"].initial)
+        self.assertEqual(form.fields["tool_prompt_report_summary"].initial, "Say less.")
 
     def test_tools_and_realtime_voice_are_refused_together(self):
         form = self.form(**{"tool_slugs": ["report_summary"], "realtime_enabled": "on"})
@@ -629,11 +661,17 @@ class TheGraphBuilder(SummaryTestCase):
 
 
 class TheRunIdentity(SummaryTestCase):
-    """What a remote graph is handed so it can call back."""
+    """What an agent is handed about the run it is in."""
 
-    def identity(self):
+    def identity(self, agent=None, who=None, thread=None):
         from ConvAI.utils import _run_identity
-        return _run_identity(self.patient, str(self.conv.id))
+        return _run_identity(agent or self.agent, who or self.patient,
+                             thread or str(self.conv.id))
+
+    def remote(self, callbacks):
+        return Agent.objects.create(name=f"Remote {callbacks}", kind="remote",
+                                    langgraph_name="reco_b", host="localhost", port=8123,
+                                    allow_callbacks=callbacks)
 
     def test_it_carries_the_conversation_and_the_client(self):
         ident = self.identity()
@@ -644,15 +682,44 @@ class TheRunIdentity(SummaryTestCase):
         ident = self.identity()
         self.assertEqual(ident["client_id"], ident["patient_id"])
 
-    def test_it_carries_a_token(self):
-        self.assertTrue(self.identity()["user_token"])
+    def test_it_never_carries_a_personal_token(self):
+        """Not the client's, not a tester's, and not an admin testing the agent."""
+        for agent in (self.agent, self.remote(True), self.remote(False)):
+            for who in (self.patient, self.admin, self.nav):
+                ident = self.identity(agent=agent, who=who)
+                self.assertNotIn("user_token", ident)
+                keys = set(Token.objects.values_list("key", flat=True))
+                self.assertFalse(keys & set(map(str, ident.values())))
+
+    def test_a_remote_agent_without_callbacks_gets_no_credential(self):
+        self.assertNotIn("cc_run_token", self.identity(agent=self.remote(False)))
+
+    def test_an_in_process_agent_gets_no_credential(self):
+        """Its tools reach the database directly."""
+        self.agent.tools = {"report_summary": {}}
+        self.agent.save(update_fields=["tools"])
+        self.assertNotIn("cc_run_token", self.identity())
+
+    def test_a_remote_agent_with_callbacks_gets_a_token_for_this_conversation(self):
+        from ConvAI import run_tokens
+        agent = self.remote(True)
+        claims = run_tokens.verify(self.identity(agent=agent)["cc_run_token"])
+        self.assertEqual(claims.conversation_id, str(self.conv.id))
+        self.assertEqual(claims.patient_id, self.patient.pk)
+        self.assertEqual(claims.agent_id, agent.pk)
+
+    def test_the_first_turn_has_a_conversation_to_call_back_about(self):
+        """Created before the run, so "hide this" as an opening message works."""
+        thread = str(uuid.uuid4())
+        self.identity(agent=self.remote(True), thread=thread)
+        conv = Conversation.objects.get(id=thread)
+        self.assertEqual(conv.patient, self.patient)
 
     def test_a_non_uuid_thread_still_yields_an_identity(self):
-        from ConvAI.utils import _run_identity
-
-        ident = _run_identity(self.patient, "not-a-uuid")
+        ident = self.identity(thread="not-a-uuid")
         self.assertEqual(ident["conversation_id"], "not-a-uuid")
         self.assertEqual(ident["patient_id"], self.patient.pk)
+        self.assertNotIn("cc_run_token", ident)
 
 
 class TheSafetyFloorStillWins(SummaryTestCase):

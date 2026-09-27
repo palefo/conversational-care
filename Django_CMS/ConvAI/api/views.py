@@ -45,7 +45,9 @@ from .serializers import (
     ConversationVisibilityOutSerializer,
     ConversationSummaryInSerializer,
     ConversationSummaryOutSerializer,
+    RunOutSerializer,
 )
+from ..run_tokens import RunTokenAuthentication
 from ..models import (
     Conversation, 
     Message, 
@@ -229,11 +231,17 @@ def _persist_exchange(user: User, conv: Conversation, user_text: str, bot_text: 
         or "api-user"
     )
 
-    Message.objects.create(
+    from ..message_attribution import create_message
+    # Owned by the API account that sent it. The identity string above is only
+    # the address it is recorded under; the account is what it belongs to.
+    create_message(
         user=identity,
         conversation_id=str(conv.id),
         user_message=user_text,
         response_message=bot_text,
+        patient=getattr(conv, "patient", None),
+        account=user,
+        sender_role=Message.SenderRole.API,
     )
 
     # Keep Conversation fresh & ensure agent is set from user if field exists
@@ -1086,3 +1094,121 @@ class ConversationSummaryView(APIView):
             "agent_summary_at": conv.agent_summary_at,
             "hidden": conv.hidden,
         }).data
+
+
+class _RunView(APIView):
+    """Base for the endpoints a remote agent calls about the run it is in.
+
+    Authenticated **only** by a run token (ConvAI.run_tokens), and the token
+    decides the conversation: none of these take an id. That is the difference
+    from ``/conversations/<id>/…``, which exist for people with personal tokens:
+    here there is no id for the agent, or a model inside it, to forge or get
+    wrong, and a token issued for one conversation cannot reach another.
+
+    Every refusal of a valid token is a 404, as elsewhere in this API: the
+    conversation missing, or a scope the token was not given.
+    """
+    authentication_classes = [RunTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    scope = None
+
+    def _conversation(self, request):
+        from django.http import Http404
+
+        claims = request.auth
+        if self.scope and not claims.allows(self.scope):
+            raise Http404
+        try:
+            conv_uuid = uuid.UUID(claims.conversation_id)
+        except (TypeError, ValueError):
+            raise Http404
+        conv = Conversation.objects.filter(id=conv_uuid).first()
+        if conv is None:
+            raise Http404
+        # The token names the client it was issued for. A conversation now on a
+        # different client's file is not the one this token is about.
+        if claims.patient_id and conv.patient_id and conv.patient_id != claims.patient_id:
+            raise Http404
+        return conv
+
+    @staticmethod
+    def _out(conv, claims):
+        from .. import conversation_privacy, conversation_summary
+
+        text, source, _when = conversation_summary.machine_summary(conv)
+        return RunOutSerializer({
+            "conversation_id": str(conv.id),
+            "patient_id": conv.patient_id,
+            "summary": text,
+            "source": source,
+            "hidden": conv.hidden,
+            "privacy_available": conversation_privacy.enabled(),
+            "scopes": list(claims.scopes),
+            "expires_at": claims.expires,
+        }).data
+
+
+class RunView(_RunView):
+    """
+    GET /api/v1/run/
+    Authorization: RunToken <cc_run_token from the run config>
+
+    The conversation this run is about, as the agent is allowed to see it.
+    """
+
+    def get(self, request):
+        conv = self._conversation(request)
+        return Response(self._out(conv, request.auth), status=status.HTTP_200_OK)
+
+
+class RunSummaryView(_RunView):
+    """
+    POST /api/v1/run/summary/   {"summary": "..."}
+
+    The agent's summary of this run's conversation. Same rules as the
+    per-conversation endpoint: replaces the last, blank and over-long refused.
+    """
+    scope = "summary"
+
+    def post(self, request):
+        from .. import conversation_summary
+
+        conv = self._conversation(request)
+        ser = ConversationSummaryInSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        text = ser.validated_data["summary"]
+        conversation_summary.set_agent_summary(conv, text)
+        logger.info("Agent summary recorded for conversation %s (%d chars) by %s",
+                    conv.id, len(text), request.user.get_username())
+        return Response(self._out(conv, request.auth), status=status.HTTP_200_OK)
+
+
+class RunVisibilityView(_RunView):
+    """
+    POST /api/v1/run/visibility/   {"hidden": true}
+
+    The client's answer about whether their link worker may read this
+    conversation. 404 while CONVERSATION_PRIVACY_ENABLED is off, as the
+    per-conversation endpoint is.
+    """
+    scope = "visibility"
+
+    def _conversation(self, request):
+        from django.http import Http404
+        from .. import conversation_privacy
+
+        if not conversation_privacy.enabled():
+            raise Http404
+        return super()._conversation(request)
+
+    def post(self, request):
+        from .. import conversation_privacy
+
+        conv = self._conversation(request)
+        ser = ConversationVisibilityInSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        hidden = ser.validated_data["hidden"]
+        conversation_privacy.set_hidden(conv, hidden)
+        logger.info("Conversation %s visibility set to hidden=%s by %s",
+                    conv.id, hidden, request.user.get_username())
+        return Response(self._out(conv, request.auth), status=status.HTTP_200_OK)

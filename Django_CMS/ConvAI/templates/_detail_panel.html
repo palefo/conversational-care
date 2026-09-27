@@ -815,31 +815,44 @@ whatever you opened, and neither moves when the body scrolls.
       write one by hand was inside the block that never appeared.
     {% endcomment %}
     {% comment %}
-      What a hidden conversation costs this reader, said once, before the tabs
-      that are empty because of it. The summary is deliberately *not* on this
-      list any more: withholding it left a link worker with no idea what their
-      client needed, and a client asking not to be transcribed is not usually
-      asking to be left without care. See ConvAI.conversation_summary.
-    {% endcomment %}
-    {% if panel_item.withheld %}
-      <p class="dp-conv-hidden dp-ov-hidnote">
-        <span class="material-icons-outlined" aria-hidden="true">lock</span>
-        {% trans "Hidden at the client's request. You can read the summary below, and see when this conversation happened and how long it was. The messages, the topic and the review are not available to you." %}
-      </p>
-    {% endif %}
+      A chat pane is a day, and a day is often several conversations. Each gets
+      its own entry: its machine summary (agent's first, then the classifier's;
+      read-only), the link worker's own summary beside it, and — for one the
+      client hid from this reader — a notice saying what is withheld. It used to
+      be one summary for the whole day, the last conversation's, so a hidden
+      conversation earlier in the day showed no summary anywhere.
 
-    {% if panel_item.overview or panel_item.overview_empty %}
+      No link-worker block on a hidden conversation: you cannot summarise what
+      you cannot read. Follow-up goes in Notes. See _summary_entries in
+      views/_panel.py and ConvAI.conversation_summary.
+
+      Other panel kinds (meeting, recording, alert) keep their single overview.
+    {% endcomment %}
+    {% if panel_item.kind == 'chat' %}
+      {% for entry in panel_item.summaries %}
+        <div class="dp-sumentry{% if not forloop.first %} dp-sumentry-next{% endif %}">
+          {% if panel_item.summaries|length > 1 %}
+            <div class="dp-sumentry-h">
+              <span>{{ entry.label }}</span>
+              <span class="dp-sumentry-m">{{ entry.span }}{% if entry.topic %} · {{ entry.topic }}{% endif %}</span>
+            </div>
+          {% endif %}
+          {% if entry.notice %}
+            <p class="dp-conv-hidden dp-ov-hidnote">
+              <span class="material-icons-outlined" aria-hidden="true">lock</span>
+              {{ entry.notice }}
+            </p>
+          {% endif %}
+          {% if entry.machine %}
+            {% include "_panel_overview.html" with panel_item=entry.machine only %}
+          {% endif %}
+          {% if entry.human %}
+            {% include "_panel_overview.html" with panel_item=entry.human only %}
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% elif panel_item.overview or panel_item.overview_empty %}
       {% include "_panel_overview.html" %}
-    {% endif %}
-
-    {% comment %}
-      The navigator's own summary, beside the model's rather than over the top of
-      it. Two blocks because they are two different claims about the exchange,
-      and the record is better for keeping both — and because an agent reporting
-      again would otherwise shadow a navigator's rewrite with no explanation.
-    {% endcomment %}
-    {% if panel_item.human_block %}
-      {% include "_panel_overview.html" with panel_item=panel_item.human_block only %}
     {% endif %}
 
     {% for p in panel_item.points %}
@@ -895,6 +908,21 @@ whatever you opened, and neither moves when the body scrolls.
             {% endif %}
           </div>
           {% if run.began %}<p class="dp-conv-note">{% blocktrans with when=run.began|localtime|date:"j M, H:i" %}Began earlier, on {{ when }}.{% endblocktrans %}</p>{% endif %}
+          {% comment %}
+            The conversation's summary on its own divider — set on the first run
+            of each conversation by _summary_entries. On a hidden conversation it
+            stands in the place of the messages, which is exactly where the link
+            worker looks; on a visible one it sits above them.
+          {% endcomment %}
+          {% if run.summary %}
+            <div class="dp-conv-sum">
+              <span class="material-icons-outlined" aria-hidden="true">auto_awesome</span>
+              <div>
+                <p class="dp-conv-sum-t">{{ run.summary }}</p>
+                {% if run.summary_src %}<p class="dp-conv-sum-s">{{ run.summary_src }}</p>{% endif %}
+              </div>
+            </div>
+          {% endif %}
           {% if run.withheld %}
             {% comment %}
               The client asked that this one not be readable. The divider above
@@ -943,7 +971,7 @@ whatever you opened, and neither moves when the body scrolls.
     {% if panel_item.conv and panel_item.kind == 'chat' and panel_item.feedback_url %}
       <div class="dp-rev" data-feedback-url="{{ panel_item.feedback_url }}">
         <div class="dp-rev-h">
-          {% trans "Your review of this conversation" %}
+          {% if panel_item.review_label %}{% blocktrans with c=panel_item.review_label %}Your review of {{ c }}{% endblocktrans %}{% else %}{% trans "Your review of this conversation" %}{% endif %}
           <span class="dpc-saved" id="dpRevSaved" hidden></span>
         </div>
 

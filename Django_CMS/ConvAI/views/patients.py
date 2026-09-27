@@ -655,6 +655,10 @@ def patient_conversation_detail(request, pk, day):
     # the classifier's. See ConvAI.conversation_summary.
     for _c in conv_map.values():
         _c.display_summary = conversation_summary.machine_summary(_c)[0]
+        # The link worker's own summary, as the panel shows it. Cleared below for
+        # a conversation this reader may not read: a summary written from the
+        # words goes with the words.
+        _c.human_text, _c.human_by, _c.human_when = conversation_summary.human_summary(_c)
 
     # Conversations the client asked their link worker not to read. The page
     # keeps the card, the time span, the message count — and the summary, which
@@ -676,6 +680,7 @@ def patient_conversation_detail(request, pk, day):
                 continue
             conv.withheld = True
             conv.withheld_count = len(rows)
+            conv.human_text = ""   # you cannot summarise what you cannot read
             first_at = timezone.localtime(rows[0].timestamp)
             last_at = timezone.localtime(rows[-1].timestamp)
             conv.withheld_span = "%s – %s" % (first_at.strftime("%H:%M"),

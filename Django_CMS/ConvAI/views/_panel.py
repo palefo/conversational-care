@@ -194,11 +194,11 @@ def _context_strip(patient):
     # counted none of their own.
     recs = CallRecording.for_patient(patient, nums)
     calls = recs.count()
-    chat_days = (
-        Message.objects.filter(user__in=nums)
-        .annotate(day=TruncDate('timestamp')).values('day').distinct().count()
-        if nums else 0
-    )
+    # Messages by their owner, fixed when they arrived — not by whatever this
+    # client's numbers are today. See ConvAI.message_attribution.
+    own_msgs = Message.objects.filter(patient_message_q(patient))
+    chat_days = (own_msgs.annotate(day=TruncDate('timestamp'))
+                 .values('day').distinct().count())
     open_alerts = patient.alerts.exclude(status=Alert.AlertStatus.RESOLVED).count()
 
     # Last contact = the most recent thing that actually happened, whichever
@@ -206,8 +206,7 @@ def _context_strip(patient):
     stamps = []
     # for_patient is already newest-first.
     last_rec = recs.values_list('start_time', flat=True).first()
-    last_msg = (Message.objects.filter(user__in=nums)
-                .order_by('-timestamp').values_list('timestamp', flat=True).first()) if nums else None
+    last_msg = own_msgs.order_by('-timestamp').values_list('timestamp', flat=True).first()
     last_meet = (patient.meetings.exclude(status=Meeting.Status.PENDING)
                  .order_by('-scheduled_time').values_list('scheduled_time', flat=True).first())
     stamps = [s for s in (last_rec, last_msg, last_meet) if s]
@@ -342,6 +341,122 @@ def _conversation_runs(shown, patient=None, can_download=False, withheld=()):
     return runs
 
 
+def _summary_entries(request, patient, runs, withheld):
+    """One Summary-tab entry per conversation on the pane, in the order they began.
+
+    Each entry carries the conversation's machine summary (agent's first, then
+    the classifier's; read-only), the link worker's own summary block, and —
+    for a conversation the client hid from this reader — a notice saying what
+    is withheld. It also writes each conversation's summary onto its first run,
+    so the Conversation tab shows it on the divider: in place of the messages on
+    a hidden conversation, above them on a visible one.
+
+    **The link worker's block is not offered on a hidden conversation**, and one
+    written before it was hidden is withheld: you cannot summarise what you
+    cannot read, and anything written from the words goes with the words. Their
+    own follow-up belongs in Notes, which is about what they did, not what was
+    said. The machine summary is still shown (see ConvAI.conversation_summary).
+    """
+    first_run, order = {}, []
+    for r in runs:
+        try:
+            key = str(UUID(str(r['id'])))
+        except (TypeError, ValueError):
+            continue            # a reminder / care-plan / alert run: no conversation
+        if key not in first_run:
+            first_run[key] = r
+            order.append(key)
+    if not order:
+        return []
+
+    convs = {str(c.id): c for c in (Conversation.objects
+                                    .filter(id__in=[UUID(k) for k in order])
+                                    .select_related('agent'))}
+    can_write = _can_see(request.user, patient)
+    several = len(order) > 1
+    entries = []
+    for key in order:
+        conv = convs.get(key)
+        if conv is None:
+            continue
+        run = first_run[key]
+        hidden = run['id'] in withheld or key in withheld
+        text, source, when = conversation_summary.machine_summary(conv)
+        if source == conversation_summary.AGENT:
+            src = (_("Reported by %(agent)s") % {'agent': conv.agent.name}
+                   if conv.agent else _("Reported by the agent"))
+        elif source == conversation_summary.CLASSIFIER:
+            src = _("Generated automatically")
+        else:
+            src = ''
+        machine = None
+        if text or not hidden:
+            machine = {
+                # Always "Summary": on a day with several conversations the entry
+                # is already headed with the conversation's label and span.
+                'overview_heading': _("Summary"),
+                'overview': text,
+                'overview_empty': '' if text else _("Not summarised yet."),
+                'overview_when': when,
+                'overview_source_label': src,
+                'overview_edited': False,
+            }
+
+        human = None
+        if can_write and not hidden:
+            h_text, h_by, h_when = conversation_summary.human_summary(conv)
+            author_id = _summary_author_id(conv) if h_text else None
+            mine = author_id is None or author_id == request.user.id
+            human = {
+                # "Your summary" only when it is: a reassigned link worker reading
+                # their predecessor's words should be told whose they are.
+                'overview_heading': (_("Your summary") if mine
+                                     else _("Summary by %(name)s") % {'name': h_by}),
+                'overview': h_text,
+                'overview_empty': _("Nothing from you yet. Add what the automatic "
+                                    "summary misses, or what you want the next "
+                                    "person reading this to know."),
+                'overview_edit_url': reverse('edit_overview', args=['conversation', key]),
+                'overview_edited': True,
+                'overview_by': h_by,
+                'overview_when': h_when,
+                'overview_verb': _("Written by"),
+            }
+
+        notice = ''
+        if hidden:
+            notice = (_("Hidden at the client's request. You can read the summary "
+                        "below and see when this conversation happened and how long "
+                        "it was. The messages, the topic and the review are not "
+                        "available to you.") if text else
+                      _("Hidden at the client's request, and no summary was shared. "
+                        "You can see when this conversation happened and how long it "
+                        "was; the messages, the topic and the review are not "
+                        "available to you."))
+
+        entries.append({
+            'id': key,
+            'label': run['label'],
+            'span': run['span'],
+            'hidden': hidden,
+            'notice': notice,
+            'topic': '' if hidden else (conv.topic or ''),
+            'machine': machine,
+            'human': human,
+        })
+        # The same summary on the Conversation tab's divider.
+        run['summary'] = text
+        run['summary_src'] = src
+    return entries
+
+
+def _summary_author_id(conv):
+    try:
+        return conv.summary_edit.author_id
+    except ObjectDoesNotExist:
+        return None
+
+
 def _alert_panel(request, pk):
     alert = (Alert.objects
              .select_related('patient', 'patient__caregiver', 'user')
@@ -425,22 +540,16 @@ def _alert_panel(request, pk):
         except (ValueError, Patient.DoesNotExist):
             src_patient, day = None, None
         if src_patient and day:
-            nums = [n for n in (str(src_patient.phone_number or ''),
-                                str(getattr(src_patient.caregiver, 'phone_number', '') or '')) if n]
-            if nums:
-                linked = (Message.objects
-                          .filter(user__in=nums, timestamp__date=day)
-                          .order_by('timestamp'))
-                link_is_exact = linked.exists()
+            linked = (Message.objects
+                      .filter(patient_message_q(src_patient), timestamp__date=day)
+                      .order_by('timestamp'))
+            link_is_exact = linked.exists()
 
     if not link_is_exact and alert.patient:
-        nums = [n for n in (str(alert.patient.phone_number or ''),
-                            str(getattr(alert.patient.caregiver, 'phone_number', '') or '')) if n]
-        if nums:
-            linked = (Message.objects
-                      .filter(user__in=nums,
-                              timestamp__date=timezone.localtime(alert.created_at).date())
-                      .order_by('timestamp'))
+        linked = (Message.objects
+                  .filter(patient_message_q(alert.patient),
+                          timestamp__date=timezone.localtime(alert.created_at).date())
+                  .order_by('timestamp'))
 
     linked_total = linked.count()
     linked_shown = list(linked[:PANEL_MSG_LIMIT])
@@ -1279,43 +1388,13 @@ def _chat_panel(request, ident):
     # asking to be left without care. See ConvAI.conversation_summary.
     conv_withheld = conversation_privacy.is_withheld(conv, request.user)
 
-    # Which summary the panel prints, and whose words it is. Two blocks: the
-    # model's, read-only, and the navigator's own beside it. Read-only because a
-    # correction and the model's original are different claims and the record is
-    # better for keeping both — and because the agent reporting again would
-    # otherwise shadow a navigator's rewrite with no explanation.
-    machine_text, machine_source, machine_when = conversation_summary.machine_summary(conv)
-    human_text, human_by, human_when = conversation_summary.human_summary(conv)
-    agent_name = conv.agent.name if conv and conv.agent else ''
-    if machine_source == conversation_summary.AGENT:
-        machine_src_label = (_("Reported by %(agent)s") % {'agent': agent_name}
-                             if agent_name else _("Reported by the agent"))
-    elif machine_source == conversation_summary.CLASSIFIER:
-        machine_src_label = _("Generated automatically")
-    else:
-        machine_src_label = ''
-
-    # The navigator's block. Offered to whoever may edit this client, and only
-    # once the conversation has a row to hang a SummaryEdit on. Drawn even when
-    # empty, so writing the first one is reachable — that was the bug the
-    # conditional overview block used to have.
-    human_block = None
-    if conv and _can_see(request.user, patient):
-        human_block = {
-            'overview_heading': _("Your summary"),
-            'overview': human_text,
-            'overview_empty': _("Nothing from you yet. Add what the automatic "
-                                "summary misses, or what you want the next "
-                                "person reading this to know."),
-            'overview_edit_url': reverse('edit_overview', args=['conversation', str(conv.id)]),
-            # Never the violet "a model wrote this" treatment: this block is a
-            # person's words by construction, so the claim is never made and
-            # never has to be dropped.
-            'overview_edited': True,
-            'overview_by': human_by,
-            'overview_when': human_when,
-            'overview_verb': _("Written by"),
-        }
+    # One Summary-tab entry per conversation that day, and each conversation's
+    # summary on its own divider in the Conversation tab. The pane used to show
+    # one summary for the whole day — the last conversation's — so a hidden
+    # conversation earlier in the day showed no summary anywhere, which was
+    # the one thing the summary rollback promised it. See _summary_entries.
+    summaries = _summary_entries(request, patient, runs, withheld)
+    several = len(summaries) > 1
     started = (first_msg.timestamp if first_msg
                else conv.started_at if conv
                else timezone.make_aware(dt.datetime.combine(day, dt.time.min)))
@@ -1329,11 +1408,22 @@ def _chat_panel(request, ident):
     # and the voice page (see patient_message_q). A sender that matches neither
     # leaves the line off rather than guessing, and a day both of them wrote on
     # says so instead of picking one.
-    senders = {s for s in msgs.values_list('user', flat=True).distinct() if s}
+    #
+    # Read from sender_role, stamped when each message arrived — so a caregiver
+    # who has since changed number is still the one who wrote. Only legacy rows
+    # (no role) are still matched against today's numbers. A tester standing in
+    # for the client counts as the client. See ConvAI.message_attribution.
+    Role = Message.SenderRole
+    roles = set(msgs.exclude(sender_role="").values_list('sender_role', flat=True).distinct())
+    senders = {s for s in msgs.filter(sender_role="").values_list('user', flat=True).distinct() if s}
     cg = patient.caregiver
     client_name = f"{patient.name} {patient.lastname}".strip()
-    wrote_client = bool(patient.phone_number and str(patient.phone_number) in senders)
-    wrote_cg = bool(cg and cg.phone_number and str(cg.phone_number) in senders)
+    wrote_client = bool(roles & {Role.CLIENT, Role.TESTER}) or bool(
+        patient.phone_number and str(patient.phone_number) in senders)
+    # Guarded on a caregiver still being on file: the line names them, and a
+    # client whose caregiver was removed would otherwise read "Written by None".
+    wrote_cg = cg is not None and (Role.CAREGIVER in roles or bool(
+        cg.phone_number and str(cg.phone_number) in senders))
     if wrote_client and wrote_cg:
         to = {'who': _("%(client)s and %(cg)s") % {'client': client_name, 'cg': cg},
               'role': _("the client and the caregiver")}
@@ -1356,33 +1446,17 @@ def _chat_panel(request, ident):
         'note_parent': 'conversation',
         'note_parent_id': str(conv.id) if conv else '',
         'kicker': _("Chatbot"),
-        'title': (conv.topic if conv and conv.topic and not conv_withheld
+        # A topic names one conversation. On a day with several, the header
+        # used to print the last one's topic over the first one's start time.
+        'title': (_("%(n)s conversations") % {'n': len(summaries)} if several
+                  else conv.topic if conv and conv.topic and not conv_withheld
                   else _("Conversation")),
         'when': started,
         'patient': patient,
-        # Said once, at the top of the pane, so the empty Conversation tab is
-        # explained before it is opened rather than after.
-        'withheld': conv_withheld,
-        # The summary the conversation itself carries. It is written by the
-        # classifier onto Conversation.summary and was already being drawn here
-        # — but only when it existed, so a thread nobody has analysed yet drew
-        # no block at all, and the Summary tab looked broken rather than empty.
-        # The heading stands either way now, and the absence is said out loud;
-        # the Edit inside the block is what lets a navigator write one by hand,
-        # which was unreachable while the block itself was conditional.
-        'overview_heading': _("Summary") if conv else '',
-        # Printed whether or not the conversation is withheld. On a hidden
-        # conversation this is the *only* thing derived from the words that the
-        # link worker gets, which is why report_summary's prompt tells the agent
-        # to write it knowing that.
-        'overview': machine_text,
-        'overview_empty': _("Not summarised yet.") if conv and not machine_text else '',
-        'overview_when': machine_when,
-        'overview_source_label': machine_src_label,
-        # No overview_edit_url: read-only. A navigator's words go in the block
-        # below instead of over the top of the model's.
-        'overview_edited': False,
-        'human_block': human_block,
+        # Per conversation: its machine summary (read-only), the link worker's
+        # own (not offered on a hidden one — nobody can summarise what they
+        # cannot read), and what a hidden one withholds. See _summary_entries.
+        'summaries': summaries,
         'points': [],
         'message_count': total,
         'messages': shown,
@@ -1402,13 +1476,16 @@ def _chat_panel(request, ident):
                 timezone.localtime(last_msg.timestamp).strftime("%H:%M"),
             ) if first_msg else _("—")),
             (_("Agent"), (conv.agent.name if conv and conv.agent else _("Not recorded"))),
+        ] + ([] if several else [
+            # One conversation's topic and flag. On a day with several, each
+            # summary entry carries its own topic instead.
             (_("Topic"), (_("Hidden by the client") if conv_withheld
                           else conv.topic if conv and conv.topic
                           else _("Not classified"))),
             (_("Flagged"), (_("Hidden by the client") if conv_withheld
                             else _("Needs attention") if conv and conv.is_important
                             else _("Nothing raised automatically"))),
-        ],
+        ]),
 
         # The judgement is on the exchange as a whole. Per-message feedback was
         # dropped deliberately — see the review block in _detail_panel.html.
@@ -1417,6 +1494,10 @@ def _chat_panel(request, ident):
         # cannot read the exchange — both the form and what was written in it.
         'feedback_url': (reverse('conversation_feedback', args=[str(conv.id)])
                          if conv and not conv_withheld else ''),
+        # The review rates one conversation — the day's last. Said so when
+        # there are several, instead of sitting ambiguously under all of them.
+        'review_label': next((e['label'] for e in summaries
+                              if conv and e['id'] == str(conv.id)), '') if several else '',
         'rating': conv.rating if conv and not conv_withheld else None,
         'feedback': conv.feedback if conv and not conv_withheld else '',
         'flags': [] if conv_withheld else flags,

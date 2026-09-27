@@ -114,13 +114,12 @@ def whatsapp_webhook(request):
         return HttpResponse("<Response></Response>", content_type="text/xml")
 
     # -------------------- SYNC BRANCH (existing behavior) --------------------
-    phone_e164 = from_num.replace("whatsapp:", "").strip()
-    patient = (
-        Patient.objects
-        .filter(Q(phone_number=phone_e164) | Q(caregiver__phone_number=phone_e164))
-        .select_related("agent")
-        .first()
-    )
+    from ..message_attribution import normalise, resolve_inbound
+
+    phone_e164 = normalise(from_num)
+    # The one lookup by number for this message; see ConvAI.message_attribution.
+    inbound = resolve_inbound(phone_e164)
+    patient = inbound.patient
 
     # WhatsApp AUDIO (sync only; keep your current path)
     if is_whatsapp and get_bool("WHATSAPP_AUDIO_ENABLED") and num_media == 1:
@@ -164,13 +163,16 @@ def whatsapp_webhook(request):
                 voice_id = resolve_tts_voice_id(getattr(patient, "agent", None))
                 synthesize_speech_elevenlabs(reply_text, out_name, voice_id=voice_id)
 
-                msg = Message.objects.create(
+                from ..message_attribution import create_message
+                msg = create_message(
                     user=phone_e164,
                     conversation_id=thread_id,
                     user_message=transcript,
                     response_message=reply_text,
                     input_audio_file=in_name,
                     response_audio_file=out_name,
+                    patient=patient,
+                    sender_role=inbound.role,
                 )
 
                 # Build single-use signed URL for Twilio to download
@@ -261,7 +263,10 @@ def send_chat_message(request):
         extra_configurable=extra_configurable,
     )
     # Persist both sides (thread_id == conversation_id).
-    save_message(request.user.get_username(), user_msg, bot_msg, thread_id)
+    # A navigator talking to the Link Worker: their own conversation, on no
+    # client's file. Owned by the login, not guessed from the username later.
+    save_message(request.user.get_username(), user_msg, bot_msg, thread_id,
+                 account=request.user, sender_role=Message.SenderRole.STAFF)
     return JsonResponse({'user_message': user_msg, 'bot_message': bot_msg})
 
 
@@ -330,8 +335,12 @@ def send_external_message(request):
     if not user_msg:
         return HttpResponseBadRequest("Empty message")
 
+    # The tester login stands in for the client: the client's file, typed
+    # through the tester account. Both are stamped, so the file keeps the
+    # message and the record still says which login sent it.
     bot_msg = process_message_for_patient(
-        patient, user_msg, user_label=_chat_user_label(request.user)
+        patient, user_msg, user_label=_chat_user_label(request.user),
+        sender_role=Message.SenderRole.TESTER, account=request.user,
     )
 
     return JsonResponse({
@@ -443,6 +452,8 @@ def process_audio(request):
         patient=patient,
         input_audio_file=in_name,
         response_audio_file=out_name,
+        account=request.user,
+        sender_role=Message.SenderRole.TESTER,
     )
 
     return JsonResponse({

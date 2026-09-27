@@ -47,13 +47,13 @@ def job_process_whatsapp_audio(
     """
     Download WA audio, transcribe, call agent, TTS, persist, and reply (text+audio).
     """
-    phone = from_number_raw.replace("whatsapp:", "").strip()
-    patient = (
-        Patient.objects
-        .filter(Q(phone_number=phone) | Q(caregiver__phone_number=phone))
-        .select_related("agent")
-        .first()
-    )
+    from .message_attribution import normalise, resolve_inbound
+
+    phone = normalise(from_number_raw)
+    # The one lookup by number for this message; its answer is stamped onto the
+    # Message below and never re-derived. See ConvAI.message_attribution.
+    inbound = resolve_inbound(phone)
+    patient = inbound.patient
 
     # Download audio if possible
     try:
@@ -109,13 +109,16 @@ def job_process_whatsapp_audio(
     # through save_message, so it has to scrub a spoken/typed Sensei passcode
     # on its own — see ConvAI.sensei.redact.
     from .sensei import redact as _redact_credentials
-    msg = Message.objects.create(
+    from .message_attribution import create_message
+    msg = create_message(
         user=phone,
         conversation_id=thread_id,
         user_message=_redact_credentials(transcript or (body_text or "")),
         response_message=reply_text,
         input_audio_file=in_name or "",
         response_audio_file=out_name,
+        patient=patient,
+        sender_role=inbound.role,
     )
 
     # Signed URL for Twilio to fetch the audio (via your download view)
