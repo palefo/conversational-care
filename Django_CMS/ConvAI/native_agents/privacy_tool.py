@@ -6,13 +6,11 @@ it. Built here rather than inside any one agent because more than one kind of
 agent will want them, and because the wording of what the client is being
 promised must not be re-invented per agent.
 
-**Not attached to any agent yet.** ``build_privacy_tools`` exists, is tested,
-and is registered by nothing: wiring it to a prompt-based agent turns that
-agent into a react agent (a plain prompt agent has no tool loop at all), and
-the conversation that *asks* the client the question — when to offer it, how
-to word it, what to do with a "maybe later" — is the next piece of work. Until
-then the switch is reachable through the API and the Django admin only. See
-conversation_privacy.md.
+Attached to a prompt-based agent by ticking **Conversation privacy** on the
+agent form, which also puts ``PRIVACY_PROMPT_SUFFIX`` below into that agent's
+system prompt and turns it into a react agent — a plain prompt agent has no tool
+loop at all. See ``tool_registry`` and agent_tools.md. Remote agents reach the
+same rule over ``POST /api/v1/conversations/<id>/visibility/``.
 
 The tools are deliberately **synchronous**, for the same reason the RAG and
 Link Worker tools are: LangGraph runs sync tools in a worker thread during
@@ -42,6 +40,11 @@ it, with `set_conversation_privacy`.
 - Only on their say-so, and only after telling them what it means: their link
   worker will still see that this conversation happened, when it was and how
   many messages it had — they just won't be able to read what was said.
+- Tell them their link worker will still read a **summary** of it, so that
+  somebody who has to help them still knows roughly what they needed. What
+  they lose is the conversation itself, not the fact of what it was about. If
+  there is something in here they would not want summarised either, say so
+  now rather than after.
 - Tell them two things it does not cover. A supervising administrator can
   still read it. And if anything in it suggests the person may be at risk of
   harming themselves, their link worker will be able to read it, because
@@ -81,8 +84,8 @@ def _describe(conv) -> str:
     count = Message.objects.filter(conversation_id=str(conv.id)).count()
     if conv.hidden:
         return (f"PRIVACY_HIDDEN messages={count} — this conversation's content is "
-                f"hidden from the link worker. They can see that it happened and "
-                f"that it has {count} messages, but not what was said.")
+                f"hidden from the link worker. They can see that it happened, that "
+                f"it has {count} messages, and its summary — but not what was said.")
     return (f"PRIVACY_VISIBLE messages={count} — this conversation can be read by "
             f"the link worker.")
 
@@ -122,8 +125,8 @@ def build_privacy_tools():
     def set_conversation_privacy(hidden: bool) -> str:
         """Hide this conversation from the person's link worker, or unhide it.
 
-        The link worker still sees that the conversation happened and how many
-        messages it holds; only the content, the summary and the topic are
+        The link worker still sees that the conversation happened, how many
+        messages it holds and its summary; the content and the topic are
         withheld. Applies to this conversation alone.
         """
         if not conversation_privacy.enabled():

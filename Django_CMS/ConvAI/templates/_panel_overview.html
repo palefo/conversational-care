@@ -12,9 +12,20 @@
   Expects panel_item.overview. The rest is optional: without
   .overview_edit_url the block is read-only, which is how the alert panel gets
   it — its "overview" is the alert description, written by whoever raised it,
-  and never generated in the first place.
+  and never generated in the first place. The conversation panel's machine
+  summary is read-only for a different reason: a navigator's words go in a
+  second copy of this block, included with .human_block, rather than over the
+  top of the model's. See ConvAI.conversation_summary.
+
+  .overview_source_label overrides the "Generated <when>" byline where the panel
+  knows something more useful — a conversation summary can come from the agent
+  that held it or from the classifier reading it afterwards, and which one wrote
+  it is the first thing a navigator wants to know about it.
+
+  Included more than once per panel, so nothing in here may use an id.
 {% endcomment %}
-<div class="dp-ovwrap" data-ov {% if panel_item.overview_edit_url %}data-ov-url="{{ panel_item.overview_edit_url }}"{% endif %}>
+<div class="dp-ovwrap" data-ov {% if panel_item.overview_edit_url %}data-ov-url="{{ panel_item.overview_edit_url }}"{% endif %}
+     {% if panel_item.overview_verb %}data-ov-verb="{{ panel_item.overview_verb }}"{% endif %}>
 
   <div class="dp-ov{% if panel_item.overview_edited %} dp-ov-mine{% endif %}" data-ov-view>
     {% if panel_item.overview_heading %}<div class="dp-ov-h" data-ov-head>{{ panel_item.overview_heading }}</div>{% endif %}
@@ -42,11 +53,17 @@
     </div>
   {% endif %}
 
-  {% if panel_item.overview_when or panel_item.overview_edit_url %}
+  {% if panel_item.overview_when or panel_item.overview_edit_url or panel_item.overview_source_label %}
     <div class="dp-ov-bar">
       <span class="dp-ov-src" data-ov-src>
-        {% if panel_item.overview_edited %}
-          {% blocktrans with who=panel_item.overview_by when=panel_item.overview_when|localtime|date:"j M · H:i" %}Edited by {{ who }} · {{ when }}{% endblocktrans %}
+        {% if panel_item.overview_edited and panel_item.overview_by %}
+          {% if panel_item.overview_verb %}
+            {{ panel_item.overview_verb }} {{ panel_item.overview_by }}{% if panel_item.overview_when %} · {{ panel_item.overview_when|localtime|date:"j M · H:i" }}{% endif %}
+          {% else %}
+            {% blocktrans with who=panel_item.overview_by when=panel_item.overview_when|localtime|date:"j M · H:i" %}Edited by {{ who }} · {{ when }}{% endblocktrans %}
+          {% endif %}
+        {% elif panel_item.overview_source_label %}
+          {{ panel_item.overview_source_label }}{% if panel_item.overview_when %} · {{ panel_item.overview_when|localtime|date:"j M · H:i" }}{% endif %}
         {% elif panel_item.overview_when %}
           {% blocktrans with when=panel_item.overview_when|localtime|date:"j M · H:i" %}Generated {{ when }}{% endblocktrans %}
         {% endif %}

@@ -48,6 +48,40 @@ result = client.schedule_meeting(
 print(result)  # {"ok": True, "meeting": {...}} or {"ok": False, "detail": "..."}
 ```
 
+### Conversations an agent is holding
+
+Two endpoints let the agent that held a conversation act on it afterwards — or,
+more usually, in the middle of it. A **remote** agent receives
+`conversation_id`, `patient_id`, `client_id` and `user_token` in its LangGraph
+run config, and uses them here.
+
+```python
+# What the conversation was about, for the client's link worker to read.
+# Preferred over the platform's automatic summary, and shown even when the
+# client has asked for the conversation to be hidden.
+client.report_conversation_summary(
+    conversation_id,
+    "Asked about respite care in their area. Gave the three local services and "
+    "how to refer. Wanted to talk to their link worker about the cost.",
+)
+
+# What the link worker can read. Only on the client's own say-so.
+client.set_conversation_visibility(conversation_id, hidden=True)
+# -> {"conversation_id": "...", "hidden": True, "hidden_at": "...",
+#     "message_count": 4}
+
+client.get_conversation_summary(conversation_id)
+# -> {"summary": "...", "source": "agent", "hidden": True, ...}
+```
+
+Both return `None` rather than raising when the conversation is not yours to
+touch, does not exist, or the feature is switched off — the API answers 404 to
+all three on purpose, so a caller cannot use the status code to find out which.
+
+`report_conversation_summary` replaces any summary reported before, so the text
+should stand on its own. Use the conversation id the platform gave you; the API
+checks that the account behind your token actually holds that conversation.
+
 ## Notes
 
 - The API must be enabled on the platform (`ENABLE_API`).

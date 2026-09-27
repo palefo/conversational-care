@@ -120,6 +120,16 @@ def agent_form(request, pk=None, kind=None):
     # into a collapsible section when the form has them.
     classification_fields = ['classification_role', 'abstract_instruction', 'detectors']
     show_classification = any(f in form.fields for f in classification_fields)
+
+    # The prompt and the per-tool prompts are drawn together as one tabbed
+    # editor, so they are lifted out of the template's generic field loop. The
+    # names are collected from the form rather than hard-coded: which tools
+    # exist is the registry's business (see native_agents/tool_registry.py).
+    tool_specs = getattr(form, 'tool_specs', [])
+    prompt_fields = ['system_prompt'] if 'system_prompt' in form.fields else []
+    if tool_specs:
+        prompt_fields.append('tool_slugs')
+        prompt_fields += [f'{form.TOOL_PROMPT_PREFIX}{t["slug"]}' for t in tool_specs]
     return render(request, 'agents/agent_form.html', {
         'active_page': 'agents',
         'form': form,
@@ -128,6 +138,10 @@ def agent_form(request, pk=None, kind=None):
         'kind_label': _KIND_LABELS[kind],
         'classification_fields': classification_fields,
         'show_classification': show_classification,
+        # The tabbed prompt editor: the agent's own prompt, plus a tab per tool
+        # whose wording it may override, plus a preview of the two concatenated.
+        'tool_specs': tool_specs,
+        'prompt_fields': prompt_fields,
         # Documents hang off a saved agent, so the link only makes sense once
         # there is one to hang them off.
         'show_knowledge_link': bool(agent and agent.kind == Agent.Kind.PROMPT),

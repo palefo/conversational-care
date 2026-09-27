@@ -814,8 +814,32 @@ whatever you opened, and neither moves when the body scrolls.
       summary looked broken rather than empty, and the Edit that would let you
       write one by hand was inside the block that never appeared.
     {% endcomment %}
+    {% comment %}
+      What a hidden conversation costs this reader, said once, before the tabs
+      that are empty because of it. The summary is deliberately *not* on this
+      list any more: withholding it left a link worker with no idea what their
+      client needed, and a client asking not to be transcribed is not usually
+      asking to be left without care. See ConvAI.conversation_summary.
+    {% endcomment %}
+    {% if panel_item.withheld %}
+      <p class="dp-conv-hidden dp-ov-hidnote">
+        <span class="material-icons-outlined" aria-hidden="true">lock</span>
+        {% trans "Hidden at the client's request. You can read the summary below, and see when this conversation happened and how long it was. The messages, the topic and the review are not available to you." %}
+      </p>
+    {% endif %}
+
     {% if panel_item.overview or panel_item.overview_empty %}
       {% include "_panel_overview.html" %}
+    {% endif %}
+
+    {% comment %}
+      The navigator's own summary, beside the model's rather than over the top of
+      it. Two blocks because they are two different claims about the exchange,
+      and the record is better for keeping both — and because an agent reporting
+      again would otherwise shadow a navigator's rewrite with no explanation.
+    {% endcomment %}
+    {% if panel_item.human_block %}
+      {% include "_panel_overview.html" with panel_item=panel_item.human_block only %}
     {% endif %}
 
     {% for p in panel_item.points %}
@@ -909,8 +933,14 @@ whatever you opened, and neither moves when the body scrolls.
 
       Saves itself against conversation_feedback — the same endpoint the old
       page used, unchanged.
+
+      Gated on feedback_url rather than on the conversation existing. The view
+      blanks that URL for a conversation the client asked their link worker not
+      to read — a verdict on an exchange nobody here can read is not a verdict —
+      but the block was drawn anyway, so a withheld conversation offered empty
+      stars and a note box that posted nowhere.
     {% endcomment %}
-    {% if panel_item.conv and panel_item.kind == 'chat' %}
+    {% if panel_item.conv and panel_item.kind == 'chat' and panel_item.feedback_url %}
       <div class="dp-rev" data-feedback-url="{{ panel_item.feedback_url }}">
         <div class="dp-rev-h">
           {% trans "Your review of this conversation" %}
@@ -1938,8 +1968,11 @@ whatever you opened, and neither moves when the body scrolls.
   // words stay where you read them, so you can see what you are changing.
   // Sits above the Notes block on purpose — that one returns early when a
   // panel has no notes list, and an overview can exist without one.
-  var ov = panel.querySelector('[data-ov]');
-  if (ov && ov.dataset.ovUrl) {
+  // Two of these on a conversation panel — the model's summary and the
+  // navigator's — so this walks them all rather than taking the first. The
+  // read-only ones have no data-ov-url and fall straight out.
+  Array.prototype.forEach.call(panel.querySelectorAll('[data-ov]'), function (ov) {
+    if (!ov.dataset.ovUrl) return;
     var ovView = ov.querySelector('[data-ov-view]');
     var ovEditor = ov.querySelector('[data-ov-editor]');
     var ovInput = ov.querySelector('[data-ov-input]');
@@ -1976,7 +2009,8 @@ whatever you opened, and neither moves when the body scrolls.
         // The violet block means the model wrote it. It did not, now.
         if (ovView) ovView.classList.add('dp-ov-mine');
         if (ovSrc) {
-          ovSrc.textContent = '{% trans "Edited by" %} ' + payload.author + ' · ' + payload.when;
+          var verb = ov.dataset.ovVerb || '{% trans "Edited by" %}';
+          ovSrc.textContent = verb + ' ' + payload.author + ' · ' + payload.when;
         }
         ovShow(false);
         if (ovState) { ovState.textContent = '{% trans "saved" %}'; }
@@ -1999,7 +2033,7 @@ whatever you opened, and neither moves when the body scrolls.
         }
       });
     }
-  }
+  });
 
   // ── Notes ─────────────────────────────────────────────────────────────
   var list = document.getElementById('dpNotes');

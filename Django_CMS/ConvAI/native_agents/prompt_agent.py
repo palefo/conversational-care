@@ -14,7 +14,16 @@ like the native agents (async LangGraph graph + Postgres checkpointer).
   an embedding call, and a follow-up question often should search again with
   different words. Retrieval never happens behind the model's back.
 
-Both subtypes share the prompt and the model; the only difference is the tool.
+Either subtype may additionally be given **platform tools** — conversation
+privacy, summary reporting — ticked on the agent form and listed in
+``tool_registry``. Any tool at all means a react agent: a plain prompt agent is
+a single model-call node with no tool loop, so a tool handed to it would simply
+never be called. The upgrade happens here rather than being a switch on the
+form, because "you must also tick this other box" is a question with one correct
+answer.
+
+Each tool contributes wording to the system prompt, appended after the agent's
+own and in registry order, the same way ``RAG_PROMPT_SUFFIX`` already is.
 """
 from __future__ import annotations
 
@@ -77,12 +86,10 @@ def _build_plain_graph(system_prompt: str, checkpointer, model_name: str | None)
     return graph.compile(checkpointer=checkpointer)
 
 
-def _build_rag_graph(system_prompt: str, checkpointer, model_name: str | None,
-                     agent_id: int, top_k: int):
-    """React agent whose one tool searches this agent's knowledge base."""
+def _rag_tool(agent_id: int, top_k: int):
+    """The ``search_documents`` tool over one agent's knowledge base."""
     from pydantic import BaseModel, Field
     from langchain_core.tools import tool
-    from langgraph.prebuilt import create_react_agent
 
     from ..rag.retrieve import format_hits, search
 
@@ -116,7 +123,15 @@ def _build_rag_graph(system_prompt: str, checkpointer, model_name: str | None,
             logger.exception("Knowledge-base search failed for agent %s", agent_id)
             return f"The knowledge base search failed: {exc}"
 
-    full_prompt = (system_prompt or "").strip() + RAG_PROMPT_SUFFIX
+    return search_documents
+
+
+def _build_react_graph(system_prompt: str, checkpointer, model_name: str | None,
+                       tools: list):
+    """React agent over ``tools``, with the assembled prompt as its system message."""
+    from langgraph.prebuilt import create_react_agent
+
+    full_prompt = (system_prompt or "").strip()
 
     def prompt(state, config):
         msgs = state["messages"] if state.get("messages") else []
@@ -127,7 +142,7 @@ def _build_rag_graph(system_prompt: str, checkpointer, model_name: str | None,
     # ``state_modifier``; the newer ``prompt`` kwarg does not exist yet.
     return create_react_agent(
         model=model,
-        tools=[search_documents],
+        tools=tools,
         state_modifier=prompt,
         checkpointer=checkpointer,
     )
@@ -135,13 +150,35 @@ def _build_rag_graph(system_prompt: str, checkpointer, model_name: str | None,
 
 def build_prompt_graph(system_prompt: str, checkpointer, model_name: str | None = None,
                        agent_id: int | None = None, rag_enabled: bool = False,
-                       top_k: int = 5):
+                       top_k: int = 5, agent=None):
     """Compile the graph for one prompt-based agent.
 
     ``model_name`` selects the model (blank → platform default); see
-    ``ConvAI.llm_factory``. ``rag_enabled`` picks the subtype: with it on, the
-    agent gets the ``search_documents`` tool over ``agent_id``'s documents.
+    ``ConvAI.llm_factory``. ``rag_enabled`` adds the ``search_documents`` tool
+    over ``agent_id``'s documents. ``agent`` is the row itself, needed for the
+    platform tools ticked on it — passing it is what lets the registry stay the
+    only place that knows which tools exist.
+
+    The prompt is assembled here, in one place, so what the model is told about
+    its tools cannot drift from which tools it was actually handed: a suffix is
+    appended only alongside the tool it describes.
     """
+    from .tool_registry import build_tools, prompt_suffix
+
+    tools, prompt = [], (system_prompt or "").strip()
+
     if rag_enabled and agent_id:
-        return _build_rag_graph(system_prompt, checkpointer, model_name, agent_id, top_k)
-    return _build_plain_graph(system_prompt, checkpointer, model_name)
+        tools.append(_rag_tool(agent_id, top_k))
+        prompt += RAG_PROMPT_SUFFIX
+
+    if agent is not None:
+        platform_tools = build_tools(agent)
+        if platform_tools:
+            tools.extend(platform_tools)
+            prompt += prompt_suffix(agent)
+
+    # No tools at all → the single-node graph. A react agent with an empty tool
+    # list still pays for the scaffolding and can still emit an empty tool call.
+    if not tools:
+        return _build_plain_graph(prompt, checkpointer, model_name)
+    return _build_react_graph(prompt, checkpointer, model_name, tools)

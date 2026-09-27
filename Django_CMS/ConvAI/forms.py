@@ -540,6 +540,26 @@ class ClientForm(forms.ModelForm):
             self.fields.pop("navigator")
 
 
+class DetectorsFormField(forms.JSONField):
+    """``Agent.detectors`` as a form field, keeping an empty table as ``{}``.
+
+    ``forms.JSONField.to_python`` maps every empty value — including the ``{}``
+    that DetectorTableWidget returns for a table with no rows — to ``None``, and
+    ``Agent.detectors`` is ``NOT NULL``. So an agent saved with no detectors of
+    its own raised an IntegrityError from the form, which is the ordinary case
+    for a new prompt agent: the self-harm row the table draws first is compiled
+    in and never submitted, so an admin who adds no rows of their own submits an
+    empty table.
+
+    Wired in through ``Meta.field_classes`` on every form that edits the field.
+    """
+
+    def to_python(self, value):
+        if value in self.empty_values:
+            return {}
+        return super().to_python(value)
+
+
 class DetectorTableWidget(forms.Widget):
     """The editor for what an agent watches for, and what it does about it.
 
@@ -751,6 +771,7 @@ class AgentForm(forms.ModelForm):
             "classification_role", "abstract_instruction", "detectors", "tts_voice_id",
         ]
         labels = {"description": _("Description")}
+        field_classes = {"detectors": DetectorsFormField}
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
             "description": _DESCRIPTION_WIDGET,
@@ -807,6 +828,7 @@ class PromptAgentForm(forms.ModelForm):
                            "5 suits most knowledge bases; raise it for long "
                            "documents, lower it for short ones."),
         }
+        field_classes = {"detectors": DetectorsFormField}
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
             "description": _DESCRIPTION_WIDGET,
@@ -822,9 +844,73 @@ class PromptAgentForm(forms.ModelForm):
             "tts_voice_id": forms.TextInput(attrs=_INPUT),
         }
 
+    # ── Platform tools ────────────────────────────────────────────────────
+    # `Agent.tools` is a JSON object, and a JSONField widget on a form an admin
+    # uses is a text box you can typo a config into. So it is not on the form at
+    # all: these two synthesised fields are, and `_tools_value` assembles the
+    # object from them. That also buys the per-tool prompt real form validation
+    # and real per-field error rendering, which a single JSON blob does not have.
+    tool_slugs = forms.MultipleChoiceField(
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label=_("Tools"),
+        help_text=_("Platform actions this agent may take. Each one adds its own "
+                    "instructions to the system prompt — edit them in the tabs below."),
+    )
+
+    # Prefix for the per-tool prompt fields, added in __init__ because which
+    # tools exist is the registry's business, not this form's.
+    TOOL_PROMPT_PREFIX = "tool_prompt_"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["system_prompt"].required = True
+
+        from .native_agents import tool_registry
+
+        self.tool_specs = []
+        choices = []
+        stored = (getattr(self.instance, "tools", None) or {}) if self.instance else {}
+        for slug in tool_registry.slugs():
+            spec = tool_registry.spec(slug)
+            available = tool_registry.is_available(slug)
+            label = spec["label"]
+            choices.append((slug, label))
+
+            name = f"{self.TOOL_PROMPT_PREFIX}{slug}"
+            default = tool_registry.default_prompt(slug)
+            initial = (tool_registry.prompt_for(self.instance, slug)
+                       if self.instance and self.instance.pk else default)
+            self.fields[name] = forms.CharField(
+                required=False, label=label, initial=initial,
+                widget=forms.Textarea(attrs={**_INPUT, "rows": 12,
+                                             "data-tool-prompt": slug}),
+            )
+            self.tool_specs.append({
+                "slug": slug,
+                "label": label,
+                # The id of the json_script block holding the shipped wording,
+                # which the tab's Reset link and its "edited" dot compare
+                # against. json_script rather than a plain text node: the
+                # default prompts are full of apostrophes, and an HTML-escaped
+                # &#x27; inside a script element stays escaped in textContent —
+                # so every tab looked edited the moment it was drawn.
+                "json_id": f"pt-default-{slug}",
+                "tab": spec["tab"],
+                "description": spec["description"],
+                # An unavailable tool is still listed, with the reason, rather
+                # than hidden: an agent configured while the feature was on
+                # keeps its configuration, and an admin wondering why the agent
+                # is not offering it needs to be told where the switch is.
+                "available": available,
+                "unavailable": spec["unavailable"],
+                "enabled": slug in stored,
+                "default": default,
+                "field": self[name],
+            })
+        self.fields["tool_slugs"].choices = choices
+        if self.instance and self.instance.pk:
+            self.fields["tool_slugs"].initial = list(stored.keys())
 
     def clean(self):
         cleaned = super().clean()
@@ -837,11 +923,63 @@ class PromptAgentForm(forms.ModelForm):
                   "real-time agents converse directly with the voice API and "
                   "cannot call the search tool. Pick one.")
             )
+        # The same reason, and the more dangerous case: a prompt that describes
+        # a tool the agent cannot call is how you get an agent telling a client
+        # their conversation is hidden when nothing hid it.
+        if cleaned.get("tool_slugs") and cleaned.get("realtime_enabled"):
+            raise forms.ValidationError(
+                _("Tools cannot be combined with real-time voice: real-time "
+                  "agents converse directly with the voice API and never call "
+                  "a tool. Untick the tools, or switch real-time voice off.")
+            )
         top_k = cleaned.get("rag_top_k")
         if top_k is not None and top_k > 20:
             self.add_error("rag_top_k", _("Use 20 or fewer — more extracts "
                                           "crowd out the conversation."))
         return cleaned
+
+    @staticmethod
+    def _normalise(text: str) -> str:
+        """A textarea's value with the line endings the browser added taken off.
+
+        HTML form submission normalises a textarea to **CRLF**, so text that came
+        out of a Python string as ``\n`` comes back as ``\r\n``. Left alone that
+        breaks the one comparison this form depends on — an untouched prompt
+        never equals its default, so "Reset to default" silently stored a
+        byte-for-byte copy of the default as an override, which is exactly the
+        frozen copy the design exists to avoid. It also put stray carriage
+        returns into every system prompt the platform sends.
+        """
+        return (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+
+    def _tools_value(self) -> dict:
+        """``Agent.tools`` as the ticked boxes and the tabs describe it.
+
+        A prompt equal to the shipped default is stored as **no** ``prompt`` key,
+        not as a copy of it. That is what makes "Reset to default" mean what it
+        says: the agent goes back to reading the registry, so improving the
+        shipped wording reaches it, instead of being frozen at whatever the text
+        said the day somebody pressed the button.
+        """
+        from .native_agents import tool_registry
+
+        chosen = set(self.cleaned_data.get("tool_slugs") or [])
+        out = {}
+        for slug in tool_registry.slugs():   # registry order, not tick order
+            if slug not in chosen:
+                continue
+            text = self._normalise(self.cleaned_data.get(f"{self.TOOL_PROMPT_PREFIX}{slug}"))
+            default = self._normalise(tool_registry.default_prompt(slug))
+            out[slug] = {} if (not text or text == default) else {"prompt": text}
+        return out
+
+    def save(self, commit=True):
+        agent = super().save(commit=False)
+        agent.tools = self._tools_value()
+        if commit:
+            agent.save()
+            self.save_m2m()
+        return agent
 
 
 class NativeAgentForm(forms.ModelForm):
@@ -878,6 +1016,7 @@ class SenseiAgentForm(forms.ModelForm):
             "classification_role", "abstract_instruction", "detectors", "tts_voice_id",
         ]
         labels = {"description": _("Description")}
+        field_classes = {"detectors": DetectorsFormField}
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
             "description": _DESCRIPTION_WIDGET,

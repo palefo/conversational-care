@@ -325,6 +325,50 @@ def generate_response_langgraph(user_or_patient,
     )
 
 
+def _run_identity(user_or_patient, thread_id: str) -> dict:
+    """The ids and credential an agent needs to call back about this run.
+
+    Sent on every run rather than only when a tool is enabled. For a *remote*
+    agent the enabled-tool list lives on the remote side, so conversational-care
+    cannot know whether the graph will call back — a gate here would be
+    guessing, and an id a graph ignores costs nothing.
+
+    ``client_id`` is an explicit alias for ``patient_id``. The data model says
+    Patient and every screen in the product says client; a remote graph author
+    reading either word should find the key they reached for rather than
+    discovering the other one exists.
+
+    The tools take the conversation from *these* values and never from a
+    model-supplied argument, which is the whole point of sending them: an id the
+    model could pass is an id the model could get wrong.
+    """
+    from . import conversation_actors
+
+    out = {"conversation_id": str(thread_id or "")}
+
+    conv = None
+    try:
+        conv = Conversation.objects.filter(id=UUID(str(thread_id))).first()
+    except (TypeError, ValueError):
+        # A thread_id that is not a UUID names no conversation. The run still
+        # goes ahead; it just carries no conversation-bound identity.
+        pass
+
+    patient_id = None
+    if isinstance(user_or_patient, Patient):
+        patient_id = user_or_patient.pk
+    elif conv is not None:
+        patient_id = conv.patient_id
+    if patient_id:
+        out["patient_id"] = patient_id
+        out["client_id"] = patient_id
+
+    token = conversation_actors.token_for_conversation(conv, user_or_patient)
+    if token:
+        out["user_token"] = token
+    return out
+
+
 def generate_response_with_agent(agent,
                                  user_or_patient,
                                  user_message: str,
@@ -353,6 +397,10 @@ def generate_response_with_agent(agent,
         configurable = {
             "user_id": getattr(user_or_patient, "id", None),
             "user_name": user_name,
+            # In-process tools read thread_id (injected by _arun_graph) and fall
+            # back to conversation_id. Both are set so one tool module serves
+            # both kinds of agent without caring which it is running under.
+            **_run_identity(user_or_patient, thread_id),
         }
         if isinstance(extra_configurable, dict) and extra_configurable:
             configurable.update(extra_configurable)
@@ -393,6 +441,11 @@ def generate_response_with_agent(agent,
             "thread_id": thread_id,
             "user_id":   user_or_patient.id,
             "user_name": user_name,
+            # conversation_id / patient_id / client_id / user_token. A remote
+            # graph calls the REST API to act on the conversation, so unlike an
+            # in-process tool it needs a credential as well as the ids. See
+            # ConvAI.conversation_actors and agent_tools.md.
+            **_run_identity(user_or_patient, thread_id),
         }
         if isinstance(extra_configurable, dict) and extra_configurable:
             configurable.update(extra_configurable)  # merge/override

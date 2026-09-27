@@ -1,6 +1,7 @@
 # ConvAI/api/views.py
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import timedelta
 
@@ -42,6 +43,8 @@ from .serializers import (
     PatientDetailsAppendOutSerializer,
     ConversationVisibilityInSerializer,
     ConversationVisibilityOutSerializer,
+    ConversationSummaryInSerializer,
+    ConversationSummaryOutSerializer,
 )
 from ..models import (
     Conversation, 
@@ -57,6 +60,8 @@ from ..models import (
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
 
 
 STALE_THREAD_HOURS = 2  # change to 3 if you prefer
@@ -950,14 +955,19 @@ class ConversationVisibilityView(APIView):
         conv = self._conversation(request, conversation_id)
         ser = ConversationVisibilityInSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        conversation_privacy.set_hidden(conv, ser.validated_data["hidden"])
+        hidden = ser.validated_data["hidden"]
+        conversation_privacy.set_hidden(conv, hidden)
+        # Logged with the acting account because a service token can write to
+        # any conversation (see ConvAI.conversation_actors). The log is what
+        # makes that traceable after the fact.
+        logger.info("Conversation %s visibility set to hidden=%s by %s",
+                    conv.id, hidden, request.user.get_username())
         return Response(self._out(conv), status=status.HTTP_200_OK)
 
     @staticmethod
     def _conversation(request, conversation_id):
         from django.http import Http404
-        from .. import conversation_privacy
-        from ..roles import is_admin
+        from .. import conversation_actors, conversation_privacy
 
         if not conversation_privacy.enabled():
             raise Http404
@@ -971,16 +981,14 @@ class ConversationVisibilityView(APIView):
         if conv is None:
             raise Http404
 
-        # Whose conversation it is: the account that held it (the API and the
-        # SDK), or the tester account standing in for the client on the web
-        # chat. Admins may act on any of them, since they already read all of
-        # them. A navigator is deliberately not on this list — the switch is
-        # the client's own answer about their own privacy, and a link worker
-        # setting it on their behalf would make it worth nothing.
-        tester_id = getattr(getattr(conv.patient, "tester_account", None), "id", None)
-        if not (is_admin(request.user)
-                or conv.user_id == request.user.id
-                or (tester_id and tester_id == request.user.id)):
+        # Whose conversation it is. One rule, in conversation_actors, shared
+        # with the summary endpoint — and bound to the *patient* rather than to
+        # a user account, because on WhatsApp and SMS there is no account to
+        # bind to: save_message has never set Conversation.user. A navigator is
+        # deliberately not on the list; the switch is the client's own answer
+        # about their own privacy, and a link worker setting it on their behalf
+        # would make it worth nothing.
+        if not conversation_actors.may_act_on(conv, request.user):
             raise Http404
         return conv
 
@@ -995,4 +1003,86 @@ class ConversationVisibilityView(APIView):
             "hidden": conv.hidden,
             "hidden_at": conv.hidden_at,
             "message_count": count,
+        }).data
+
+
+class ConversationSummaryView(APIView):
+    """
+    GET  /api/v1/conversations/<conversation_id>/summary/
+    POST /api/v1/conversations/<conversation_id>/summary/
+    Authorization: Bearer <token>  (or "Token <key>" under DRF TokenAuthentication)
+    Body (POST): { "summary": "..." }
+
+    What the agent that held this conversation says it was about. The contract
+    behind the `report_summary` tool, for remote agents that cannot reach the
+    ORM — see ConvAI/native_agents/summary_tool.py and agent_tools.md.
+
+    Deliberately **not** behind a feature switch, unlike the sibling visibility
+    endpoint. Gating that one is load-bearing: it decides whether the platform
+    may make a promise to a client. A summary is the same kind of thing the
+    classifier already writes unasked on every conversation, so a switch would
+    only mean a fresh installation's agents fail silently.
+
+    404 rather than 403 in every refusal, matching the visibility endpoint: a
+    caller who may not touch this conversation should not learn from the status
+    code whether it exists.
+
+    Idempotent. Each report replaces the last, and the response describes the
+    state the conversation is now in rather than what changed — a conversation
+    grows while it is happening, so the agent's latest reading of it is the one
+    worth keeping.
+    """
+    authentication_classes = AUTH_CLASSES
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, conversation_id):
+        conv = self._conversation(request, conversation_id)
+        return Response(self._out(conv), status=status.HTTP_200_OK)
+
+    def post(self, request, conversation_id):
+        from .. import conversation_summary
+
+        conv = self._conversation(request, conversation_id)
+        ser = ConversationSummaryInSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        text = ser.validated_data["summary"]
+        conversation_summary.set_agent_summary(conv, text)
+        # Logged with the acting account because a service token can write to
+        # any conversation (see ConvAI.conversation_actors). The length, not the
+        # text: a summary is content, and the application log is not where
+        # content belongs.
+        logger.info("Agent summary recorded for conversation %s (%d chars) by %s",
+                    conv.id, len(text), request.user.get_username())
+        return Response(self._out(conv), status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _conversation(request, conversation_id):
+        from django.http import Http404
+        from .. import conversation_actors
+
+        try:
+            conv_uuid = uuid.UUID(str(conversation_id))
+        except (TypeError, ValueError):
+            raise Http404
+        conv = (Conversation.objects
+                .select_related("patient__tester_account")
+                .filter(id=conv_uuid).first())
+        if conv is None:
+            raise Http404
+        if not conversation_actors.may_act_on(conv, request.user):
+            raise Http404
+        return conv
+
+    @staticmethod
+    def _out(conv):
+        from .. import conversation_summary
+
+        text, source, _when = conversation_summary.machine_summary(conv)
+        return ConversationSummaryOutSerializer({
+            "conversation_id": str(conv.id),
+            "summary": text,
+            "source": source,
+            "agent_summary": conv.agent_summary or "",
+            "agent_summary_at": conv.agent_summary_at,
+            "hidden": conv.hidden,
         }).data

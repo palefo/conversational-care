@@ -8,6 +8,7 @@ from .views import (
     PatientsListView, MeetingCreateView, PatientProtocolsFilledView,
     ProtocolQuestionsView, MeetingAnswersUpsertView, PatientMeetingsListView,
     PatientDetailsAppendView, ConversationVisibilityView,
+    ConversationSummaryView,
 )
 
 urlpatterns = [
@@ -28,4 +29,8 @@ urlpatterns = [
     # CONVERSATION_PRIVACY_ENABLED is off — see conversation_privacy.md.
     path("api/v1/conversations/<str:conversation_id>/visibility/",
          ConversationVisibilityView.as_view(), name="api_conversation_visibility"),
+    # What the agent says the conversation was about. Not behind a switch — see
+    # the view's docstring and agent_tools.md.
+    path("api/v1/conversations/<str:conversation_id>/summary/",
+         ConversationSummaryView.as_view(), name="api_conversation_summary"),
 ]

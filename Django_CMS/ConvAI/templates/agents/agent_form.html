@@ -54,8 +54,14 @@
     {% endif %}
 
     {# ── primary fields ── #}
+    {% comment %}
+      prompt_fields (the system prompt, the tool checkboxes and each tool's
+      prompt) are lifted out of this loop and drawn together as the tabbed
+      editor further down: they are one decision, not five, and a tool's wording
+      makes no sense on its own halfway up a form.
+    {% endcomment %}
     {% for field in form %}
-      {% if field.name not in classification_fields %}
+      {% if field.name not in classification_fields and field.name not in prompt_fields %}
         <div class="fld" {% if field.name == 'rag_top_k' %}data-rag-only{% endif %}>
           <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
           {{ field }}
@@ -88,6 +94,11 @@
         {% endif %}
       {% endif %}
     {% endfor %}
+
+    {# ── the prompt, and the prompt each tool adds to it ── #}
+    {% if 'system_prompt' in prompt_fields %}
+      {% include "agents/_prompt_tabs.html" %}
+    {% endif %}
 
     {# ── advanced: classification ── #}
     {% if show_classification %}

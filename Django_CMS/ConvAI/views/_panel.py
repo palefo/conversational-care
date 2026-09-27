@@ -19,7 +19,7 @@ from ._base import *  # noqa: F401,F403
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max, Min
 from django.utils.translation import gettext_lazy
-from .. import conversation_privacy, message_export
+from .. import conversation_privacy, conversation_summary, message_export
 
 __all__ = ['resolve_panel_item', 'panel_context', 'panel_fragment']
 
@@ -1268,11 +1268,54 @@ def _chat_panel(request, ident):
     shown = [m for m in shown if m.conversation_id not in withheld]
 
     # The day's own conversation may itself be withheld, and then everything
-    # written *from* its content goes with the messages — the classifier's
-    # summary, the topic it was filed under, the detector answers, and the
-    # navigator's review of an exchange they cannot read. What stays is that it
-    # happened, when, how long it was, and which agent held it.
+    # written *from* its content goes with the messages — the topic it was filed
+    # under, the detector answers, and the navigator's review of an exchange
+    # they cannot read. What stays is that it happened, when, how long it was,
+    # which agent held it — and, since the summary rollback, what it was about.
+    #
+    # The summary is the one deliberate exception, and it is a reversal: a link
+    # worker with no idea what their client needed cannot do the job the client
+    # is there for, and a client asking not to be transcribed is not usually
+    # asking to be left without care. See ConvAI.conversation_summary.
     conv_withheld = conversation_privacy.is_withheld(conv, request.user)
+
+    # Which summary the panel prints, and whose words it is. Two blocks: the
+    # model's, read-only, and the navigator's own beside it. Read-only because a
+    # correction and the model's original are different claims and the record is
+    # better for keeping both — and because the agent reporting again would
+    # otherwise shadow a navigator's rewrite with no explanation.
+    machine_text, machine_source, machine_when = conversation_summary.machine_summary(conv)
+    human_text, human_by, human_when = conversation_summary.human_summary(conv)
+    agent_name = conv.agent.name if conv and conv.agent else ''
+    if machine_source == conversation_summary.AGENT:
+        machine_src_label = (_("Reported by %(agent)s") % {'agent': agent_name}
+                             if agent_name else _("Reported by the agent"))
+    elif machine_source == conversation_summary.CLASSIFIER:
+        machine_src_label = _("Generated automatically")
+    else:
+        machine_src_label = ''
+
+    # The navigator's block. Offered to whoever may edit this client, and only
+    # once the conversation has a row to hang a SummaryEdit on. Drawn even when
+    # empty, so writing the first one is reachable — that was the bug the
+    # conditional overview block used to have.
+    human_block = None
+    if conv and _can_see(request.user, patient):
+        human_block = {
+            'overview_heading': _("Your summary"),
+            'overview': human_text,
+            'overview_empty': _("Nothing from you yet. Add what the automatic "
+                                "summary misses, or what you want the next "
+                                "person reading this to know."),
+            'overview_edit_url': reverse('edit_overview', args=['conversation', str(conv.id)]),
+            # Never the violet "a model wrote this" treatment: this block is a
+            # person's words by construction, so the claim is never made and
+            # never has to be dropped.
+            'overview_edited': True,
+            'overview_by': human_by,
+            'overview_when': human_when,
+            'overview_verb': _("Written by"),
+        }
     started = (first_msg.timestamp if first_msg
                else conv.started_at if conv
                else timezone.make_aware(dt.datetime.combine(day, dt.time.min)))
@@ -1328,19 +1371,18 @@ def _chat_panel(request, ident):
         # the Edit inside the block is what lets a navigator write one by hand,
         # which was unreachable while the block itself was conditional.
         'overview_heading': _("Summary") if conv else '',
-        'overview': conv.summary if conv and not conv_withheld else '',
-        'overview_empty': (
-            _("Hidden at the client's request. You can see that this "
-              "conversation happened and how long it was, but not what was "
-              "said or what it was about.") if conv_withheld
-            else _("Not summarised yet.") if conv and not conv.summary
-            else ''),
-        # No Edit either: the block is not an empty summary waiting to be
-        # written, it is a summary being withheld, and offering to overwrite it
-        # would be offering to publish it.
-        **({} if conv_withheld else
-           _overview_meta('conversation', conv, str(conv.id) if conv else '',
-                          conv.analyzed_at if conv else None)),
+        # Printed whether or not the conversation is withheld. On a hidden
+        # conversation this is the *only* thing derived from the words that the
+        # link worker gets, which is why report_summary's prompt tells the agent
+        # to write it knowing that.
+        'overview': machine_text,
+        'overview_empty': _("Not summarised yet.") if conv and not machine_text else '',
+        'overview_when': machine_when,
+        'overview_source_label': machine_src_label,
+        # No overview_edit_url: read-only. A navigator's words go in the block
+        # below instead of over the top of the model's.
+        'overview_edited': False,
+        'human_block': human_block,
         'points': [],
         'message_count': total,
         'messages': shown,

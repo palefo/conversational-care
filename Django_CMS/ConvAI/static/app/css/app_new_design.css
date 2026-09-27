@@ -1485,6 +1485,14 @@ button.dp-stamp:hover { color: #075985; text-decoration: underline; }
 }
 .dp-conv-hidden .material-icons-outlined { font-size: 14px; color: #94a3b8; }
 
+/* The same statement, said once at the top of the Summary tab rather than in
+   place of a run's bubbles — so the reader knows why the topic and the review
+   are missing before they go looking for them. It sits directly above the
+   summary block, which is the thing a hidden conversation now *does* show, so
+   the icon must not read as "and this is withheld too". */
+.dp-ov-hidnote { align-items: flex-start; margin: 0 0 10px; }
+.dp-ov-hidnote .material-icons-outlined { margin-top: 1px; }
+
 .dp-transcript { font-size: .6875rem; color: #475569; white-space: pre-line; line-height: 1.5; }
 
 /* ── Transcript, as turns ────────────────────────────────────────────────

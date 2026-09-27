@@ -464,6 +464,13 @@ the hook or that the pool dropped.
 `auto_flags` onto the Conversation, then raises one `Alert` per firing detector
 that has `raises` set, with:
 
+> The `summary` it writes is the **fallback**. Where the agent that held the
+> conversation reported one of its own through `report_summary`, that is what a
+> navigator reads — see [agent_tools.md](agent_tools.md). The classifier is not
+> summary-aware and does not need to be: the two fields are separate and neither
+> overwrites the other.
+
+
 * `alert_type = CONVERSATION` and no `created_by` — nobody created it
 * `data["conversation_id"]` — what the detail panel resolves the exchange from
 * `data["trigger"]` — one sentence naming the moment, shown above the summary
@@ -477,16 +484,30 @@ fourteen.
 ## Conversation privacy
 
 A client can ask that one conversation not be readable by their link worker —
-the navigator keeps the fact of it, its time span and its message count, and
-loses the content, the summary, the topic and the review. Off by default
+the navigator keeps the fact of it, its time span, its message count and its
+**summary**, and loses the messages, the topic and the review. Off by default
 (**Settings → Privacy**), overridden by the self-harm floor, and never hidden
 from admins.
 
-It reaches agents as two tools built by
-`ConvAI/native_agents/privacy_tool.py`, over the same rule as the REST endpoint
-`POST /api/v1/conversations/<id>/visibility/`. The tools are **not yet attached
-to any agent**: the turn that asks the client the question is the next piece of
-work. See [conversation_privacy.md](conversation_privacy.md).
+It reaches agents as two tools built by `ConvAI/native_agents/privacy_tool.py`,
+over the same rule as the REST endpoint
+`POST /api/v1/conversations/<id>/visibility/`. Tick **Conversation privacy** on a
+prompt-based agent to attach them. See
+[conversation_privacy.md](conversation_privacy.md) and
+[agent_tools.md](agent_tools.md).
+
+## Platform tools
+
+Prompt-based agents can be given platform tools from the agent form — a checkbox
+each, and a tab holding the wording that tool adds to the system prompt, editable
+per agent and resettable to the shipped default. Any tool at all makes the agent
+a react agent. Two ship: **Conversation privacy** and **Report summary**, the
+latter letting the agent write the summary the link worker reads, in preference
+to the classifier's.
+
+Remote agents get the same two over REST, and are handed `conversation_id`,
+`patient_id`, `client_id` and `user_token` in their run config to call back with.
+See [agent_tools.md](agent_tools.md).
 
 ## Which surface uses which agent
 

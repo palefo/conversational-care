@@ -3,6 +3,11 @@ from rest_framework import serializers
 from ..models import Alert, Patient, Meeting
 from django.contrib.auth import get_user_model
 
+# The one place the summary length limit is defined: the agent tool refuses
+# the same length the endpoint does, so an agent that hits the limit gets the
+# same answer whichever route it took.
+from ..native_agents.summary_tool import MAX_SUMMARY_CHARS
+
 User = get_user_model()
 
 class MessageInSerializer(serializers.Serializer):
@@ -179,3 +184,34 @@ class ConversationVisibilityOutSerializer(serializers.Serializer):
     # client exactly what was and was not kept from them, in the same breath
     # as confirming the change.
     message_count = serializers.IntegerField()
+
+
+class ConversationSummaryInSerializer(serializers.Serializer):
+    """What the agent says the conversation was about.
+
+    Trimmed and length-capped here rather than in the view, so the tool and the
+    endpoint refuse the same things for the same reasons. ``allow_blank`` is off
+    on purpose: erasing a summary a navigator may already have read is a
+    different act from writing one, and nothing has asked for it, so a blank
+    body is a 400 rather than a quiet delete.
+    """
+    summary = serializers.CharField(
+        allow_blank=False, trim_whitespace=True,
+        max_length=MAX_SUMMARY_CHARS,
+    )
+
+
+class ConversationSummaryOutSerializer(serializers.Serializer):
+    conversation_id = serializers.CharField()
+    # The summary the link worker will actually read, and which of the two
+    # writers produced it — 'agent', 'classifier', or '' when nothing has
+    # summarised it yet. Returned rather than left to the caller to infer, so an
+    # agent can tell whether its own report is the one on screen.
+    summary = serializers.CharField(allow_blank=True)
+    source = serializers.CharField(allow_blank=True)
+    agent_summary = serializers.CharField(allow_blank=True)
+    agent_summary_at = serializers.DateTimeField(allow_null=True)
+    # Whether the client asked their link worker not to read this conversation.
+    # Worth knowing when writing the summary: on a hidden conversation the
+    # summary is the *only* thing the link worker gets.
+    hidden = serializers.BooleanField()

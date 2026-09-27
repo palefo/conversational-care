@@ -52,6 +52,9 @@ Topic deep dives:
 - [Message export](message_export.md) — the optional CSV export of every stored
   message (one row per message) for behavioural analysis, the optional
   per-conversation download for navigators, and how to turn each on.
+- [Agent tools & summaries](agent_tools.md) — the platform tools a prompt-based
+  agent can be given from the agent form, the summary an agent writes for the
+  client's link worker, and how a remote agent authenticates to write one.
 - [Styling & layout](STYLING.md) — where the look of the app actually lives:
   the design system, the Tailwind build, the per-page `<style>` blocks, and the
   two colour systems that currently disagree. Read this before porting the

@@ -324,13 +324,28 @@ class ConversationAdmin(admin.ModelAdmin):
     date_hierarchy = "last_message_at"
     list_per_page = 50
 
-    readonly_fields = ("id", "started_at", "last_message_at", "analyzed_at", "hidden_at")
+    readonly_fields = ("id", "started_at", "last_message_at", "analyzed_at", "hidden_at",
+                       "agent_summary_at")
     fieldsets = (
         ("Identity & Timestamps", {
             "fields": ("id", "started_at", "last_message_at"),
         }),
         ("Feedback", {
             "fields": ("rating", "feedback", "human_flags"),
+        }),
+        # The agent's own summary is kept apart from the classifier's, above,
+        # because they have different authors and neither should be able to
+        # destroy the other. The panel prefers this one when it is set; clearing
+        # it here falls the display back to the classifier's. See
+        # ConvAI.conversation_summary.
+        ("Agent summary", {
+            "fields": ("agent_summary", "agent_summary_at"),
+            "description": (
+                "Written by the agent that held this conversation, through its "
+                "report_summary tool or the summary endpoint. Shown to the link "
+                "worker in preference to the automatic summary below, and shown "
+                "even when the conversation is hidden."
+            ),
         }),
         ("Analysis", {
             "fields": (
@@ -351,9 +366,9 @@ class ConversationAdmin(admin.ModelAdmin):
             "fields": ("hidden", "hidden_at"),
             "description": (
                 "When hidden, the client's link worker sees that this conversation "
-                "happened and how many messages it holds, but not its content, "
-                "summary or topic. Administrators are unaffected, and a conversation "
-                "that raised a self-harm alert is readable regardless."
+                "happened, how many messages it holds and its summary — but not its "
+                "content, topic or review. Administrators are unaffected, and a "
+                "conversation that raised a self-harm alert is readable regardless."
             ),
         }),
     )
@@ -395,6 +410,9 @@ class ConversationAdmin(admin.ModelAdmin):
 
     @admin.action(description="Clear analysis (summary/topic/flags) and mark unanalyzed")
     def action_clear_analysis(self, request, queryset):
+        # The agent's summary is deliberately left alone: it was not produced by
+        # the analysis this action clears, and re-running the classifier will not
+        # produce it again.
         queryset.update(
             summary="",
             topic="",

@@ -76,10 +76,19 @@ def transcribe_recording_view(request, sid):
 # Which field each kind keeps its overview in, and how its pk is looked up.
 # A recording is addressed by recording_sid everywhere else in the app, so it
 # is addressed that way here too.
+#
+# A **conversation** is the exception, and its field is None on purpose: the
+# generated summary there is read-only, and what a person writes goes into
+# SummaryEdit.body as a block of its own beside it. Two reasons. The model's
+# claim about an exchange and a person's claim about it are different claims and
+# the record is better for keeping both; and the agent that held the
+# conversation can report its own summary at any point, which would otherwise
+# shadow a navigator's rewrite with no explanation. See
+# ConvAI.conversation_summary.
 OVERVIEW = {
     "meeting": (Meeting, "protocol_summary", "pk"),
     "recording": (CallRecording, "transcript_summary", "recording_sid"),
-    "conversation": (Conversation, "summary", "pk"),
+    "conversation": (Conversation, None, "pk"),
     # Only classifier-raised alerts reach here; the panel withholds the edit
     # URL from the ones a person wrote, so there is nothing to post to.
     "alert": (Alert, "description", "pk"),
@@ -96,12 +105,18 @@ def _overview_patient(kind, obj):
 @login_required
 @require_POST
 def edit_overview(request, kind, pk):
-    """Replace a generated overview with what a person actually wants it to say.
+    """Record what a person wants the overview to say.
 
-    The generated text is not sacred — a navigator who was on the call knows
-    better than the model what the call was about, and correcting it in place
-    beats writing "actually, ..." in a note underneath. What matters is that
-    the record then says a person wrote it, which is what SummaryEdit is for.
+    On a meeting, recording or alert that replaces the generated text in place:
+    it is not sacred — a navigator who was on the call knows better than the
+    model what the call was about, and correcting it beats writing "actually,
+    ..." in a note underneath. What matters is that the record then says a
+    person wrote it, which is what SummaryEdit is for.
+
+    On a **conversation** it writes the person's summary alongside the generated
+    one instead of over it, because there the generated one has a second author
+    that can come back — the agent's own ``report_summary``. See
+    ConvAI.conversation_summary.
     """
     spec = OVERVIEW.get(kind)
     if spec is None:
@@ -125,13 +140,19 @@ def edit_overview(request, kind, pk):
     if not body:
         return JsonResponse({"ok": False, "error": _("Write something first.")}, status=400)
 
-    setattr(obj, field, body)
-    obj.save(update_fields=[field])
+    if field is not None:
+        setattr(obj, field, body)
+        obj.save(update_fields=[field])
 
     # update_or_create rather than a new row each time: this records who the
-    # text belongs to now, not every hand that has passed over it.
+    # text belongs to now, not every hand that has passed over it. For a
+    # conversation the row carries the text as well, since nothing was
+    # overwritten to carry it.
+    defaults = {"author": request.user}
+    if field is None:
+        defaults["body"] = body
     edit, _created = SummaryEdit.objects.update_or_create(
-        **{kind: obj}, defaults={"author": request.user},
+        **{kind: obj}, defaults=defaults,
     )
     return JsonResponse({
         "ok": True,

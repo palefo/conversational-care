@@ -179,11 +179,25 @@
           <span class="material-icons-outlined" aria-hidden="true">lock</span>
           <div>
             <p class="pcv-withheld-t">{% trans "This conversation is hidden at the client's request." %}</p>
-            <p class="pcv-withheld-b">{% trans "You can see that it happened, when, and how long it was. What was said, the summary and the topic are not available to you." %}</p>
+            {% comment %}
+              The summary is no longer on the withheld list. Withholding it left
+              a link worker with no idea what their client needed, and a client
+              asking not to be transcribed is not usually asking to be left
+              without care. See ConvAI.conversation_summary.
+            {% endcomment %}
+            <p class="pcv-withheld-b">{% trans "You can read the summary below, and see that it happened, when, and how long it was. What was said and the topic are not available to you." %}</p>
           </div>
         </div>
-      {% elif conv and conv.analyzed and conv.summary %}
-        <div class="pcv-summary mb-5">{{ conv.summary }}</div>
+        {% if conv.display_summary %}
+          <div class="pcv-summary mb-5">{{ conv.display_summary }}</div>
+        {% endif %}
+      {% elif conv.display_summary %}
+        {% comment %}
+          No longer gated on conv.analyzed: an agent can report its own summary
+          before the classifier has run, and a summary that exists should be
+          printed by whichever of the two wrote it.
+        {% endcomment %}
+        <div class="pcv-summary mb-5">{{ conv.display_summary }}</div>
       {% endif %}
 
       {% if not conv.withheld %}

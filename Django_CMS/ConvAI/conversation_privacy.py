@@ -5,11 +5,17 @@ they must not drift: the detail panel, the client's conversation page, the
 conversation download, and the API the agent's tool calls.
 
 What "hidden" means here is narrow on purpose. A navigator still sees that the
-conversation happened, when it ran, and how many messages are in it. What is
-withheld is everything derived from the *words*: the messages themselves, the
-classifier's summary, the topic, and the detector answers — an abstract of a
-conversation is the conversation, and withholding the bubbles while printing a
-paragraph describing them would be a promise kept in form only.
+conversation happened, when it ran, how many messages are in it — and its
+summary. What is withheld is the messages themselves, the topic, and the
+detector answers.
+
+The summary used to be withheld too, on the argument that an abstract of a
+conversation *is* the conversation. That was reversed: a link worker with no
+idea what their client needed cannot do the job the client is there for, and a
+client asking not to be transcribed is not usually asking to be left without
+care. The line is now drawn at the words rather than at what they were about.
+The agent's own tool prompt says so before the client agrees to anything, which
+is what keeps the promise honest. See ConvAI.conversation_summary.
 
 Three things it is deliberately not:
 

@@ -4,8 +4,10 @@
 does not exist.
 
 *Hidden means the words, not the fact.* A navigator still sees that the
-conversation happened, when it ran and how many messages it held; the content,
-the classifier's summary, the topic and the review go.
+conversation happened, when it ran, how many messages it held — and its summary,
+which is the one thing derived from the words that a hidden conversation still
+shows (see test_conversation_summary; that decision was reversed deliberately).
+The content, the topic and the review go.
 
 *Three things the promise does not cover*: admins, the self-harm floor, and the
 switch being turned off afterwards — a promise already made keeps holding.
@@ -149,10 +151,18 @@ class WhatIsWithheld(PrivacyTestCase):
         # Three messages that day, and the count is not part of the secret.
         self.assertIn("3", pane)
 
-    def test_the_summary_and_the_topic_go_with_the_content(self):
-        pane = self.pane()
-        self.assertNotIn("Ada slept badly.", pane)
-        self.assertNotIn("Sleep", pane)
+    def test_the_summary_does_not(self):
+        """Reversed on purpose. See ConvAI.conversation_summary.
+
+        A link worker with no idea what their client needed cannot do the job the
+        client is there for, and a client asking not to be transcribed is not
+        usually asking to be left without care.
+
+        Read off the history page, which draws a card per conversation. The pane
+        has one summary block, and it belongs to the *last* conversation of the
+        day — see PaneLevelWithholding below for that one.
+        """
+        self.assertIn("Ada slept badly.", self.history())
 
     def test_the_other_conversation_that_day_is_untouched(self):
         pane = self.pane()
@@ -162,9 +172,45 @@ class WhatIsWithheld(PrivacyTestCase):
     def test_the_history_page_agrees_with_the_pane(self):
         page = self.history()
         self.assertNotIn("I slept badly", page)
-        self.assertNotIn("Ada slept badly.", page)
         self.assertIn("hidden at the client", page.lower())
         self.assertIn("she ate well", page)
+
+
+class PaneLevelWithholding(PrivacyTestCase):
+    """The pane's one summary block, topic and review belong to the *last*
+    conversation of the day, so they are only withheld when that one is hidden.
+
+    Hiding the morning conversation used to be what these assertions were
+    written against, which meant they passed without testing anything: the
+    morning thread's topic was never on the pane to begin with.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.turn_on("1")
+        self.hide(self.evening)
+
+    def test_the_topic_goes_with_the_content(self):
+        self.assertNotIn("Meals", self.pane())
+
+    def test_the_summary_stays(self):
+        self.assertIn("Ada ate well.", self.pane())
+
+    def test_the_review_goes(self):
+        """The whole block, not just its save URL.
+
+        It used to be drawn with the URL blanked, so a withheld conversation
+        offered a navigator empty stars and a note box that posted nowhere.
+        """
+        pane = self.pane()
+        self.assertNotIn(reverse("conversation_feedback", args=[str(self.evening.id)]),
+                         pane)
+        self.assertNotIn("Your review of this conversation", pane)
+
+    def test_the_review_is_there_when_nothing_is_hidden(self):
+        self.evening.hidden = False
+        self.evening.save(update_fields=["hidden"])
+        self.assertIn("Your review of this conversation", self.pane())
 
     def test_nothing_is_withheld_when_nothing_is_hidden(self):
         self.morning.hidden = False

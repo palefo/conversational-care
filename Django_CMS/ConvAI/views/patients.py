@@ -1,7 +1,7 @@
 from ._base import *  # noqa: F401,F403
 from ._panel import panel_context, fold_recordings
 from django.db.models import Max
-from .. import conversation_privacy
+from .. import conversation_privacy, conversation_summary
 from ..forms import ClientForm, PatientForm
 
 __all__ = ['build_patient_events', 'save_client_note', 'update_client_terms', 'toggle_patient_chatbot', 'raise_alert', 'create_client', 'download_care_plan', 'edit_care_plan', 'edit_patient', 'edit_patient_details', 'extract_study_id', 'patient_list', 'patient_conversation_detail', 'patient_detail', 'view_care_plan']
@@ -649,12 +649,20 @@ def patient_conversation_detail(request, pk, day):
     conversations = Conversation.objects.filter(id__in=conv_uuids)
     conv_map = {str(c.id): c for c in conversations}
 
+    # Which of the two machine summaries each card prints. Resolved here rather
+    # than in the template so this page and the detail panel cannot disagree
+    # about which summary a conversation has — the agent's own is preferred over
+    # the classifier's. See ConvAI.conversation_summary.
+    for _c in conv_map.values():
+        _c.display_summary = conversation_summary.machine_summary(_c)[0]
+
     # Conversations the client asked their link worker not to read. The page
-    # keeps the card, the time span and the message count and loses everything
-    # written out of the words: the bubbles, the summary, the topic, and the
-    # review of an exchange this reader cannot read. An admin sees all of it,
-    # and so does anybody looking at a conversation that tripped the self-harm
-    # floor. See ConvAI.conversation_privacy.
+    # keeps the card, the time span, the message count — and the summary, which
+    # is the one thing written out of the words that a hidden conversation still
+    # shows. What it loses is the bubbles, the topic and the review. An admin
+    # sees all of it, and so does anybody looking at a conversation that tripped
+    # the self-harm floor. See ConvAI.conversation_privacy and
+    # ConvAI.conversation_summary.
     withheld = conversation_privacy.withheld_ids(conv_map.keys(), request.user)
     if withheld:
         by_thread = {}

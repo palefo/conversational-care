@@ -1,0 +1,249 @@
+{% load i18n %}
+{% comment %}
+  The agent's system prompt and the wording each enabled tool adds to it, as one
+  tabbed editor.
+
+  Why tabs rather than a stack of textareas: what the model is actually sent is
+  one prompt, and the tabs say so — the same field, seen a page at a time. A tool
+  ticked on is a tab that appears; unticked, it disappears. The Preview tab is
+  the assembled result, exactly in the order the graph builder concatenates it
+  (registry order, see native_agents/tool_registry.py), so an admin can read what
+  they are about to send rather than imagine it.
+
+  "Reset to default" appears only once the text differs from the shipped default,
+  and resetting means *storing no override at all* — so a later improvement to
+  the shipped wording reaches this agent. The form does that comparison again on
+  save; this is only what makes it visible.
+
+  Everything here works without JS except the tab switching: with scripting off,
+  every panel is visible and the form still saves.
+{% endcomment %}
+<style>
+  .pt-wrap { border: 1px solid #e5e7eb; border-radius: .6rem; overflow: hidden; margin-bottom: 1.1rem; }
+  .pt-tools { padding: .9rem 1rem; background: #fafafa; border-bottom: 1px solid #e5e7eb; }
+  .pt-tools-h { font-size: .8125rem; font-weight: 600; color: #374151; }
+  .pt-tools-s { font-size: .75rem; color: #6b7280; margin: .15rem 0 .6rem; }
+  .pt-tool { display: flex; gap: .6rem; align-items: flex-start; padding: .4rem 0; }
+  /* Sized explicitly: the label is a flex row, and a checkbox left at `auto`
+     is shrunk to a sliver by the description beside it. */
+  .pt-tool input[type=checkbox] { margin-top: .15rem; flex: 0 0 auto;
+                                  width: 1rem; height: 1rem; }
+  .pt-tool-l { display: block; font-size: .8125rem; font-weight: 500; color: #111827; }
+  .pt-tool-d { display: block; font-size: .75rem; color: #6b7280; line-height: 1.5; }
+  .pt-tool-off .pt-tool-l, .pt-tool-off .pt-tool-d { color: #9ca3af; }
+  .pt-tool-warn { font-size: .75rem; color: #b45309; line-height: 1.5; margin-top: .15rem; }
+  .pt-strip { display: flex; gap: .125rem; padding: 0 .5rem; background: #fff;
+              border-bottom: 1px solid #e5e7eb; overflow-x: auto; }
+  .pt-tab { appearance: none; background: none; border: 0; border-bottom: 2px solid transparent;
+            padding: .6rem .7rem; font-size: .8125rem; color: #6b7280; cursor: pointer;
+            white-space: nowrap; }
+  .pt-tab:hover { color: #374151; }
+  .pt-tab[aria-selected=true] { color: var(--brand-primary); border-bottom-color: var(--brand-primary);
+                                font-weight: 600; }
+  .pt-tab-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+                background: #f59e0b; margin-left: .35rem; vertical-align: middle; }
+  /* An author `display` beats the UA stylesheet's `[hidden] { display: none }`,
+     so the dot has to opt back out by name or every tab looks edited. */
+  .pt-tab-dot[hidden] { display: none; }
+  .pt-panel { padding: .9rem 1rem; }
+  .pt-panel-h { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .45rem; }
+  .pt-panel-d { font-size: .75rem; color: #6b7280; line-height: 1.5; margin: 0 0 .6rem; }
+  .pt-reset { margin-left: auto; font-size: .75rem; color: var(--brand-primary);
+              background: none; border: 0; cursor: pointer; padding: 0; }
+  .pt-reset:hover { text-decoration: underline; }
+  .pt-preview { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                font-size: .75rem; line-height: 1.6; color: #111827; white-space: pre-wrap;
+                word-break: break-word; background: #f9fafb; border: 1px solid #e5e7eb;
+                border-radius: .4rem; padding: .75rem; max-height: 26rem; overflow: auto; }
+  .pt-preview-n { font-size: .75rem; color: #6b7280; margin: .5rem 0 0; }
+  /* No JS: no strip, every panel open, each with its own heading. */
+  .pt-nojs .pt-strip { display: none; }
+</style>
+
+<div class="pt-wrap pt-nojs" data-prompt-tabs>
+
+  {% if tool_specs %}
+    <div class="pt-tools">
+      <div class="pt-tools-h">{{ form.tool_slugs.label }}</div>
+      <p class="pt-tools-s">{{ form.tool_slugs.help_text }}</p>
+      {% for t in tool_specs %}
+        <label class="pt-tool{% if not t.available %} pt-tool-off{% endif %}">
+          <input type="checkbox" name="tool_slugs" value="{{ t.slug }}"
+                 data-tool-check="{{ t.slug }}"
+                 {% if t.enabled %}checked{% endif %}>
+          <span>
+            <span class="pt-tool-l">{{ t.label }}</span>
+            <span class="pt-tool-d">{{ t.description }}</span>
+            {% if not t.available and t.unavailable %}
+              <span class="pt-tool-warn">{{ t.unavailable }}</span>
+            {% endif %}
+          </span>
+        </label>
+      {% endfor %}
+      {% for e in form.tool_slugs.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="pt-strip" role="tablist">
+    <button type="button" class="pt-tab" role="tab" aria-selected="true"
+            data-pt-tab="main">{% trans "System prompt" %}</button>
+    {% for t in tool_specs %}
+      <button type="button" class="pt-tab" role="tab" aria-selected="false" hidden
+              data-pt-tab="{{ t.slug }}">{{ t.tab }}<span class="pt-tab-dot" hidden data-pt-dot></span></button>
+    {% endfor %}
+    <button type="button" class="pt-tab" role="tab" aria-selected="false"
+            data-pt-tab="__preview">{% trans "Preview" %}</button>
+  </div>
+
+  <div class="pt-panel" role="tabpanel" data-pt-panel="main">
+    <div class="pt-panel-h">
+      <label class="block text-sm font-medium text-gray-700" for="{{ form.system_prompt.id_for_label }}">
+        {{ form.system_prompt.label }}
+      </label>
+    </div>
+    {{ form.system_prompt }}
+    {% if form.system_prompt.help_text %}<p class="pt-panel-d mt-1">{{ form.system_prompt.help_text }}</p>{% endif %}
+    {% for e in form.system_prompt.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+  </div>
+
+  {% for t in tool_specs %}
+    <div class="pt-panel" role="tabpanel" data-pt-panel="{{ t.slug }}" hidden>
+      <div class="pt-panel-h">
+        <label class="block text-sm font-medium text-gray-700" for="{{ t.field.id_for_label }}">
+          {% blocktrans with tool=t.label %}What the agent is told about {{ tool }}{% endblocktrans %}
+        </label>
+        <button type="button" class="pt-reset" data-pt-reset="{{ t.slug }}" hidden>
+          {% trans "Reset to default" %}
+        </button>
+      </div>
+      <p class="pt-panel-d">
+        {% trans "Appended to the system prompt above whenever this tool is on. Editing it here changes this agent only; resetting it puts the agent back on the shipped wording, so future improvements to it reach this agent." %}
+      </p>
+      {{ t.field }}
+      {% for e in t.field.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+      {% comment %}
+        The shipped wording, for the Reset button and the "edited" dot to
+        compare against. json_script rather than a plain text node: these
+        prompts are full of apostrophes, and an HTML-escaped &#x27; inside a
+        script element is still escaped when read back through textContent — so
+        every tab claimed to have been edited the moment the page drew it.
+      {% endcomment %}
+      {{ t.default|json_script:t.json_id }}
+    </div>
+  {% endfor %}
+
+  <div class="pt-panel" role="tabpanel" data-pt-panel="__preview" hidden>
+    <div class="pt-panel-h">
+      <span class="block text-sm font-medium text-gray-700">{% trans "What the agent will be sent" %}</span>
+    </div>
+    <pre class="pt-preview" data-pt-preview></pre>
+    <p class="pt-preview-n">
+      {% trans "The system message on every turn: your prompt, then each enabled tool's wording. A knowledge base adds its own paragraph too, which is not shown here." %}
+    </p>
+  </div>
+</div>
+
+<script>
+  // Tab switching, the "edited" dot, Reset, and the live preview. All of it is
+  // decoration over a form that already works: with scripting off the .pt-nojs
+  // class keeps every panel open and the strip hidden.
+  (function () {
+    var wrap = document.querySelector('[data-prompt-tabs]');
+    if (!wrap) return;
+    wrap.classList.remove('pt-nojs');
+
+    var tabs = wrap.querySelectorAll('[data-pt-tab]');
+    var panels = wrap.querySelectorAll('[data-pt-panel]');
+    var mainInput = document.getElementById('{{ form.system_prompt.id_for_label }}');
+    var preview = wrap.querySelector('[data-pt-preview]');
+
+    // slug -> {check, panel, tab, input, default}
+    var tools = [];
+    {% for t in tool_specs %}
+    (function () {
+      var slug = '{{ t.slug|escapejs }}';
+      var defEl = document.getElementById('{{ t.json_id|escapejs }}');
+      tools.push({
+        slug: slug,
+        check: wrap.querySelector('[data-tool-check="' + slug + '"]'),
+        panel: wrap.querySelector('[data-pt-panel="' + slug + '"]'),
+        tab: wrap.querySelector('[data-pt-tab="' + slug + '"]'),
+        input: document.getElementById('{{ t.field.id_for_label|escapejs }}'),
+        reset: wrap.querySelector('[data-pt-reset="' + slug + '"]'),
+        dflt: defEl ? String(JSON.parse(defEl.textContent) || '').trim() : ''
+      });
+    })();
+    {% endfor %}
+
+    function show(name) {
+      Array.prototype.forEach.call(tabs, function (t) {
+        t.setAttribute('aria-selected', String(t.dataset.ptTab === name));
+      });
+      Array.prototype.forEach.call(panels, function (p) {
+        p.hidden = p.dataset.ptPanel !== name;
+      });
+      if (name === '__preview') renderPreview();
+    }
+
+    function renderPreview() {
+      if (!preview) return;
+      var out = (mainInput ? mainInput.value : '').trim();
+      // Registry order, which is the order `tools` was rendered in and the order
+      // tool_registry.prompt_suffix concatenates — so the preview is the prompt,
+      // not an approximation of it.
+      tools.forEach(function (t) {
+        if (!t.check || !t.check.checked) return;
+        var text = (t.input ? t.input.value : '').trim();
+        if (text) out += '\n\n' + text;
+      });
+      preview.textContent = out;
+    }
+
+    // A ticked tool has a tab; an unticked one does not, and switching away from
+    // a tab that just vanished would leave the editor on a blank panel.
+    function syncTabs() {
+      var selected = wrap.querySelector('[data-pt-tab][aria-selected=true]');
+      var current = selected ? selected.dataset.ptTab : 'main';
+      var lost = false;
+      tools.forEach(function (t) {
+        var on = !!(t.check && t.check.checked);
+        if (t.tab) t.tab.hidden = !on;
+        if (!on && current === t.slug) lost = true;
+      });
+      show(lost ? 'main' : current);
+    }
+
+    // The dot and the Reset link both answer the same question — has this agent
+    // been moved off the shipped wording — so they are set together.
+    function syncEdited(t) {
+      var changed = !!(t.input && t.input.value.trim() !== t.dflt);
+      var dot = t.tab ? t.tab.querySelector('[data-pt-dot]') : null;
+      if (dot) dot.hidden = !changed;
+      if (t.reset) t.reset.hidden = !changed;
+    }
+
+    Array.prototype.forEach.call(tabs, function (t) {
+      t.addEventListener('click', function () { show(t.dataset.ptTab); });
+    });
+
+    tools.forEach(function (t) {
+      if (t.check) t.check.addEventListener('change', function () {
+        syncTabs();
+        // Ticking a tool is the moment its wording becomes relevant, so go
+        // there — an admin who did not know the tool adds a prompt now does.
+        if (t.check.checked) show(t.slug);
+      });
+      if (t.input) t.input.addEventListener('input', function () { syncEdited(t); });
+      if (t.reset) t.reset.addEventListener('click', function () {
+        if (t.input) { t.input.value = t.dflt; }
+        syncEdited(t);
+      });
+      syncEdited(t);
+    });
+    if (mainInput) mainInput.addEventListener('input', function () {
+      if (wrap.querySelector('[data-pt-panel="__preview"]:not([hidden])')) renderPreview();
+    });
+
+    syncTabs();
+  })();
+</script>

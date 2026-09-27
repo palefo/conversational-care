@@ -1,8 +1,8 @@
 # Conversation privacy
 
 A client can ask that one conversation not be readable by their link worker.
-Their link worker still sees that it happened, when it ran and how many
-messages it held — what is withheld is everything derived from the *words*.
+Their link worker still sees that it happened, when it ran, how many messages it
+held — and its summary. What is withheld is the conversation itself.
 
 **Off by default.** The switch lives in **Settings → Privacy**
 (`SiteConfiguration.conversation_privacy_enabled`, or
@@ -15,17 +15,40 @@ on any screen.
 | Kept | Withheld |
 |---|---|
 | That the conversation happened | The messages |
-| When it started and ended | The classifier's summary |
-| How many messages it holds | The topic |
-| Which agent held it | The detector answers and the review |
-| That an alert was raised from it | The sentence that triggered the alert |
-| | The CSV download |
+| When it started and ended | The topic |
+| How many messages it holds | The detector answers and the review |
+| Which agent held it | The sentence that triggered the alert |
+| **The summary** | The CSV download |
+| That an alert was raised from it | |
 
-The line is drawn at the words rather than at the bubbles on purpose. An
-abstract of a conversation *is* the conversation: withholding the messages
-while printing a paragraph describing them would be a promise kept in form
-only. The same reasoning removes the rating and the detector checkboxes — a
-verdict on an exchange nobody here can read is not a verdict.
+### The summary was withheld, and is not any more
+
+The original decision put the summary on the right-hand column, on the argument
+that an abstract of a conversation *is* the conversation: withholding the
+messages while printing a paragraph describing them would be a promise kept in
+form only.
+
+That was reversed. The argument is sound about what a summary *is* and wrong
+about what the privacy request is *for*. A client asking not to be transcribed
+is asking not to have their words read; they are not, in the ordinary case,
+asking their link worker to stop knowing what they need. A navigator holding a
+row that says "4 messages, nothing else" cannot do the job the client is there
+for — and the most likely way that ends is the navigator ringing to ask what it
+was about, which is worse for the client than the summary was.
+
+So the line moved from *what the conversation was about* to *the words
+themselves*. Three things make that honest rather than a quiet erosion:
+
+* **The agent says so before the client agrees.** `PRIVACY_PROMPT_SUFFIX` now
+  tells them their link worker still reads a summary, and invites them to say
+  if there is something they would not want summarised either. A promise the
+  client was only half-told is worse than not offering it.
+* **The agent writes the summary knowing this.** `report_summary`'s prompt says
+  that on a hidden conversation the summary is the only thing the link worker
+  gets, so it must be something the person would expect them to read.
+* **Nothing else moved.** The rating and the detector checkboxes are still
+  withheld — a verdict on an exchange nobody here can read is not a verdict —
+  and so are the topic, the messages and the download.
 
 The counts stay whole. A navigator seeing "4 messages · 14:02 – 14:08" over a
 locked panel knows there is something they have not read, which is the whole
@@ -70,10 +93,10 @@ withheld_ids(conversation_ids, user)   # the subset on screen, in one query
 
 | Surface | What it does |
 |---|---|
-| The detail panel (`views/_panel.py`) | `_conversation_runs` keeps the divider, the span and the count; drops the messages and the download. Chat panes and alert panes both. |
-| The client's conversation page (`views/patients.py`) | The card stays in its place in the day, headed *Hidden by the client*. |
+| The detail panel (`views/_panel.py`) | `_conversation_runs` keeps the divider, the span and the count; drops the messages and the download. The Summary tab keeps its summary blocks and loses the topic, the review and the flags. Chat panes and alert panes both. |
+| The client's conversation page (`views/patients.py`) | The card stays in its place in the day, headed *Hidden by the client*, with its summary under the notice. |
 | The conversation download (`views/exports.py`) | 404. Checked in the view, not only by dropping the button — the URL is a plain GET anyone can keep. |
-| The visibility API (`api/views.py`) | Where the answer is recorded. |
+| The visibility API (`api/views.py`) | Where the answer is recorded. Ownership comes from `conversation_actors.may_act_on`, shared with the summary endpoint. |
 
 Message bodies are dropped in the **view**, never merely guarded in the
 template. A body that does not reach the context cannot be printed by a later
@@ -122,6 +145,10 @@ to find. The endpoint is idempotent: an agent whose client says "hide it" twice
 should not have to care, and the response always describes the state the
 conversation is now in.
 
+Who may call it is now decided by `ConvAI/conversation_actors.py`, shared with
+the summary endpoint — see `agent_tools.md` for why it is bound to the patient
+rather than to a user account, and what that costs.
+
 `hidden_at` is stamped on the way in and left alone on the way out. What it
 answers is "when did they ask for this", and a conversation that was hidden and
 then opened again is better described by the fact that it once was than by
@@ -142,12 +169,9 @@ before it acts: what the link worker still sees, that an admin can still read
 it, that a self-harm disclosure overrides it, and that it covers this
 conversation only.
 
-> **Not attached to any agent yet.** The tools exist and are tested;
-> nothing hands them to a graph. Wiring them to a prompt-based agent turns that
-> agent into a react agent — a plain prompt agent has no tool loop at all — and
-> the conversation that *asks* the client the question is the next piece of
-> work. Until then the switch is reachable through the API and the Django admin
-> (Conversation → Privacy).
+Attached to a prompt-based agent by ticking **Conversation privacy** on the
+agent form, which also appends `PRIVACY_PROMPT_SUFFIX` to that agent's system
+prompt and turns it into a react agent. See `agent_tools.md`.
 
 ## Data model
 
@@ -166,4 +190,5 @@ stops seeing their care.
 
 Migration `0087_conversation_privacy`, additive and off by default.
 
-Tests: `ConvAI/test_conversation_privacy.py`.
+Tests: `ConvAI/test_conversation_privacy.py`, and
+`ConvAI/test_conversation_summary.py` for the summary rollback.

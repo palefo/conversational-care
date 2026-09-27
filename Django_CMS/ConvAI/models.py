@@ -859,6 +859,29 @@ class Agent(models.Model):
         help_text=_("How many document extracts the search tool returns per query."),
     )
 
+    # For prompt-based agents: which platform tools this agent may call, and
+    # the wording that tells it how. See ConvAI.native_agents.tool_registry,
+    # which owns the slugs and the shipped default prompt for each.
+    #
+    #     {"conversation_privacy": {}, "report_summary": {"prompt": "..."}}
+    #
+    # Presence of the key is what "enabled" means, and an *absent* "prompt"
+    # key is what "use the shipped default" means. That is deliberate: storing
+    # a copy of the default would freeze it, so an improvement to the shipped
+    # wording would reach no existing agent, and "Reset to default" becomes a
+    # key deletion rather than a copy that is right only until the next
+    # release. A JSONField rather than a field pair per tool for the same
+    # reason `detectors` is one: a third tool should not need a migration.
+    #
+    # Any enabled tool makes the agent a react agent — a plain prompt agent has
+    # no tool loop at all. build_prompt_graph takes that branch on its own; the
+    # form does not ask.
+    tools = models.JSONField(
+        default=dict, blank=True,
+        help_text=_("Prompt-based agents only: platform tools this agent may call, "
+                    "keyed by tool slug, with an optional prompt override."),
+    )
+
     # Model behind in-process agents (native + prompt-based). Blank uses the
     # platform default (DEFAULT_AGENT_MODEL). May be provider-prefixed, e.g.
     # 'openai/gpt-4.1-mini', 'anthropic/claude-sonnet-4-6'. Under USE_AZURE it is
@@ -1065,6 +1088,27 @@ class Conversation(models.Model):
 
     summary       = models.TextField(blank=True, help_text="Automatic short abstract")
     topic         = models.CharField(max_length=120, blank=True, help_text="Classification label/topic")
+
+    # --- The agent's own summary (see agent_tools.md) ---
+    # Written by the agent that held the conversation, through the
+    # `report_summary` tool or the summary endpoint, rather than by the
+    # classifier reading the transcript afterwards. Kept in its own field
+    # instead of overwriting `summary`, because the two are different claims
+    # and neither should be able to silently destroy the other: the classifier
+    # re-runs on every batch pass, and an agent that reports twice in a
+    # conversation should not be racing it.
+    #
+    # Preferred over `summary` when the panel draws one — the agent was in the
+    # conversation and the classifier was reading it from outside. See
+    # ConvAI.conversation_summary, which is the only place that rule lives.
+    agent_summary = models.TextField(
+        blank=True, default="",
+        help_text="Summary reported by the agent that held this conversation.",
+    )
+    agent_summary_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the agent last reported a summary for this conversation.",
+    )
     is_important  = models.BooleanField(default=False, db_index=True, help_text="Requires human attention?")
     visited       = models.BooleanField(default=False, db_index=True, help_text="Has been reviewed in dashboard?")
     analyzed      = models.BooleanField(default=False, db_index=True, help_text="Has analysis been run?")
@@ -1083,8 +1127,10 @@ class Conversation(models.Model):
     # Set by the client themselves, through a tool the agent offers them: this
     # exchange is not for their link worker to read. The navigator still sees
     # that it happened and how long it was — the row, the time span, the
-    # message count — but not a word of what was said, nor the summary, topic
-    # or detector answers the classifier wrote from it.
+    # message count — and its summary, which is the one thing written out of
+    # the words that a hidden conversation still shows (see
+    # ConvAI.conversation_summary). What goes is the messages themselves, the
+    # topic, and the detector answers the classifier wrote from them.
     #
     # Per conversation and nothing wider. The client is answering "this one",
     # not signing a standing policy, and a thread rolls over after a couple of
@@ -1526,14 +1572,21 @@ class Note(models.Model):
 
 
 class SummaryEdit(models.Model):
-    """Who last replaced a generated overview with their own words.
+    """A person's own words about something a model also summarised.
 
-    The overview is the one block in a panel the model writes rather than a
-    person, which is the whole reason it is drawn in violet instead of the
-    product blue. The moment someone edits it that stops being true, so the
-    fact is recorded rather than guessed at: the panel drops the generated
-    styling, names the author, and warns before regenerating over the top of
-    what they wrote.
+    Two shapes, for historical reasons that are worth keeping straight.
+
+    On a **meeting, recording or alert** this row records that somebody
+    replaced the generated overview *in place*: the text lives in the parent's
+    own field and this only says whose words they now are, which is why the
+    panel drops the violet "a model wrote this" styling and prints a byline.
+
+    On a **conversation** the generated summary is read-only, and ``body``
+    holds the navigator's summary as a block of its own alongside it. Nothing
+    is overwritten in either direction: the machine's claim about the exchange
+    and a person's claim about it are different claims, and the panel shows
+    both rather than letting the later one erase the earlier. See
+    ConvAI.conversation_summary.
 
     The parent is an explicit nullable one-to-one per kind, following Note
     rather than a generic relation, so a deleted parent takes its edit record
@@ -1547,6 +1600,17 @@ class SummaryEdit(models.Model):
         related_name="summary_edits",
     )
     edited_at = models.DateTimeField(auto_now=True)
+
+    # The person's own summary, where it is kept beside the generated one
+    # rather than written over it. Blank on the in-place kinds, whose text is
+    # in the parent's field — so a blank body is "edited in place", not "wrote
+    # nothing", and the panel must not read it as an empty human summary.
+    body = models.TextField(
+        blank=True, default="",
+        help_text=("The person's own summary, kept alongside the generated one. "
+                   "Used for conversations; blank for the kinds whose overview "
+                   "is edited in place."),
+    )
 
     meeting = models.OneToOneField(
         Meeting, null=True, blank=True, on_delete=models.CASCADE, related_name="summary_edit")
