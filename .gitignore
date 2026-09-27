@@ -61,3 +61,4 @@ STYLING.md
 
 # Claude Code agent worktrees (a checkout of this repo, not source)
 .claude/worktrees/
+agent_collection-main.zip
