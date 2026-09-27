@@ -39,7 +39,7 @@ def update_twilio_phonecalls(request):
         return redirect('config')
 
 
-def _qr_svg(data: str) -> str:
+def _qr_svg(data: str, svg_id: str = "srQrSvg") -> str:
     """Render ``data`` as a compact, dependency-light QR SVG (run-length rects).
 
     Scalable and CSP-safe (no external JS): the browser can also rasterise it to
@@ -74,7 +74,7 @@ def _qr_svg(data: str) -> str:
     # Explicit width/height (attributes) give the SVG an intrinsic size so it can
     # be rasterised to a canvas; CSS in the template controls the displayed size.
     return (
-        f'<svg id="srQrSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {n} {n}" '
+        f'<svg id="{svg_id}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {n} {n}" '
         f'width="{n}" height="{n}" shape-rendering="crispEdges" '
         f'style="width:100%;height:auto;display:block">'
         f'<rect width="{n}" height="{n}" fill="#ffffff"/>'
@@ -83,29 +83,51 @@ def _qr_svg(data: str) -> str:
 
 
 def _selfreg_qr_context(request):
-    """Build the WhatsApp "join" QR context for the Self-registration tab.
+    """Build the "join" QR codes for the Self-registration tab: one per channel.
 
-    The QR encodes a ``wa.me`` deep link that opens WhatsApp to the platform
-    number with a pre-filled message in the platform language.
+    Both open the phone's app on the platform number with a pre-filled message
+    in the platform language; whichever the person sends, an unknown number is
+    handed to the self-registration agent (``utils._handle_self_registration_flow``).
+
+    * **WhatsApp** encodes a ``wa.me`` deep link to ``PLATFORM_PHONE``.
+    * **SMS** encodes ``SMSTO:<number>:<message>``, the form phone cameras
+      recognise as "send a text", to the number SMS is sent from
+      (``TWILIO_SMS_FROM``, else ``PLATFORM_PHONE`` — as :func:`send_sms_text`).
+      The shareable link is the ``sms:`` URI, for a web page or an email.
     """
     from urllib.parse import quote
 
-    raw_phone = (get_setting("PLATFORM_PHONE") or "").strip()
-    digits = re.sub(r"\D", "", raw_phone)
     message = str(_("Hi! I want to register"))
 
-    ctx = {
+    def number(setting):
+        raw = (get_setting(setting) or "").strip()
+        digits = re.sub(r"\D", "", raw)
+        return raw, (f"+{digits}" if digits else "")
+
+    wa_raw, wa_e164 = number("PLATFORM_PHONE")
+    sms_raw, sms_e164 = number("TWILIO_SMS_FROM")
+    sms_from_platform = not sms_e164
+    if sms_from_platform:
+        sms_raw, sms_e164 = wa_raw, wa_e164
+
+    whatsapp = {"phone": wa_raw, "url": "", "qr_svg": ""}
+    if wa_e164:
+        whatsapp["url"] = f"https://wa.me/{wa_e164[1:]}?text={quote(message)}"
+        whatsapp["qr_svg"] = _qr_svg(whatsapp["url"], "srQrSvgWhatsapp")
+
+    sms = {"phone": sms_raw, "from_platform": sms_from_platform, "url": "", "qr_svg": ""}
+    if sms_e164:
+        # "?&body=" rather than "?body=": the one spelling both iOS and Android read.
+        sms["url"] = f"sms:{sms_e164}?&body={quote(message)}"
+        sms["qr_svg"] = _qr_svg(f"SMSTO:{sms_e164}:{message}", "srQrSvgSms")
+
+    return {
         "enabled": get_bool("SELF_REGISTRATION_ENABLED"),
         "agent_name": (get_setting("SELF_REG_AGENT_NAME") or "").strip(),
-        "phone": raw_phone,
         "message": message,
-        "url": "",
-        "qr_svg": "",
+        "whatsapp": whatsapp,
+        "sms": sms,
     }
-    if digits:
-        ctx["url"] = f"https://wa.me/{digits}?text={quote(message)}"
-        ctx["qr_svg"] = _qr_svg(ctx["url"])
-    return ctx
 
 
 def _email_status_context(request):

@@ -1,6 +1,6 @@
 """Self-registration native agent.
 
-Greets people who message the service from an *unknown* WhatsApp number, collects
+Greets people who message the service from an *unknown* WhatsApp or SMS number, collects
 their first name, last name and phone number, and files a ``SelfRegistration`` row
 (state ``REGISTERED``) for an admin to approve later.
 
@@ -8,7 +8,9 @@ Unlike the other native agents this one runs **without a Patient**: it is invoke
 by ``utils._handle_self_registration_flow`` for inbound messages whose sender does
 not match any patient/caregiver. The caller's phone number is passed through
 ``config["configurable"]["phone_number"]`` on every turn and surfaced to the model
-as system context, so the number rarely has to be typed by hand.
+as system context, so the number rarely has to be typed by hand. So is the
+``channel`` it arrived on (``"whatsapp"`` or ``"sms"``), which is also kept on the
+registration so whoever approves it knows how the person wrote in.
 
 Like ``protocol_qa`` it is an in-process ``create_react_agent`` with a single
 **synchronous** tool (safe for Django ORM: LangGraph runs sync tools in a worker
@@ -57,7 +59,10 @@ def valid_e164(phone: str) -> bool:
 # ----------------------------
 # ORM helper (sync; runs in LangGraph's worker thread)
 # ----------------------------
-def _create_self_registration(name: str, lastname: str, phone: str) -> dict:
+CHANNEL_NAMES = {"whatsapp": "WhatsApp", "sms": "SMS"}
+
+
+def _create_self_registration(name: str, lastname: str, phone: str, channel: str | None = None) -> dict:
     """Create (or reuse) a pending self-registration for this phone number."""
     from ..models import SelfRegistration
 
@@ -83,7 +88,8 @@ def _create_self_registration(name: str, lastname: str, phone: str) -> dict:
         lastname=lastname,
         phone_number=phone,
         state=SelfRegistration.State.REGISTERED,
-        details={"source": "self-registration-agent"},
+        details={"source": "self-registration-agent",
+                 **({"channel": channel} if channel in CHANNEL_NAMES else {})},
     )
     return {"ok": True, "already_registered": False, "id": sr.id}
 
@@ -114,7 +120,8 @@ def build(checkpointer, model_name=None):
         number. If the phone number is already known from the system context, pass
         that value. Returns {ok, already_registered}."""
         try:
-            return _create_self_registration(name, lastname, phone_number)
+            return _create_self_registration(name, lastname, phone_number,
+                                             channel=_ctx().get("channel"))
         except Exception as e:  # pragma: no cover - defensive
             return {"ok": False, "error": f"Could not submit registration: {e}"}
 
@@ -133,12 +140,17 @@ def build(checkpointer, model_name=None):
             sys += f"\nYou are registering people for {brand}."
         if language:
             sys += f"\nThe platform language is '{language}'. Start in this language."
+        channel = CHANNEL_NAMES.get(cfg.get("channel"), "WhatsApp")
+        sys += f"\nThe person is writing to the service by {channel}."
+        if channel == "SMS":
+            sys += (" Keep every reply to one or two short sentences: each text message "
+                    "costs them, and long ones arrive split into pieces.")
         if phone_number:
-            sys += (f"\nThe person is writing from WhatsApp number {phone_number}. "
+            sys += (f"\nThey are writing from {channel} number {phone_number}. "
                     "Use this as the default phone number to register — just confirm "
                     "it with them; do not ask them to type it unless they want a different one.")
         else:
-            sys += "\nTheir WhatsApp number is not available, so you must ask for it."
+            sys += f"\nTheir {channel} number is not available, so you must ask for it."
 
         msgs = state["messages"][-RECENT_MSG_LIMIT:] if state.get("messages") else []
         return [{"role": "system", "content": sys}] + msgs

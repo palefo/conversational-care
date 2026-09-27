@@ -397,7 +397,10 @@ Full detail in [agents.md](../agents.md). Summary:
 - Bundled native agents: **Loopback** (echo/connectivity reference),
   **Link Worker** (the navigator chatbot bubble; scaffolded), the
   **Protocol Q&A** agent, and the **Self Registration** agent that answers the
-  WhatsApp QR flow (Settings → Registrations).
+  WhatsApp and SMS QR flows (Settings → Self registration). It is told which
+  channel the person wrote in on (`configurable["channel"]`, also sent to a
+  remote registration agent), and the registration records it in
+  `details["channel"]`.
 - **`Agent.description`** — one line on what the agent does, shown on its card
   on the Agents page and editable for every kind. Native agents are seeded with
   one (migration `0082`); a blank description falls back to the card's old

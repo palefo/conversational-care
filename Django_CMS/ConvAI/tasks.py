@@ -31,7 +31,7 @@ def job_reply_text(channel: str, from_number_raw: str, body_text: str) -> None:
     body_text: incoming text (already merged with any media note)
     """
     phone = from_number_raw.replace("whatsapp:", "").strip()
-    reply = process_received_message(phone, body_text)
+    reply = process_received_message(phone, body_text, channel=channel)
     if channel == "whatsapp":
         send_whatsapp_text(phone, reply)
     else:
@@ -79,7 +79,7 @@ def job_process_whatsapp_audio(
     # If no patient, just process as plain text using whatever transcript we got
     if not patient:
         body = (f"<number of attached files: 1> {body_text} {transcript}").strip() if transcript else (body_text or "")
-        reply = process_received_message(phone, body)
+        reply = process_received_message(phone, body, channel="whatsapp")
         send_whatsapp_text(phone, reply)
         return
 

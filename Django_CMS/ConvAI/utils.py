@@ -776,14 +776,20 @@ def process_message_for_patient(patient: Patient, raw_message: str, *, user_labe
     return reply
 
 
-def process_received_message(phone_number: str, raw_message: str) -> str:
+def process_received_message(phone_number: str, raw_message: str, channel: str | None = None) -> str:
     """
     Main entry for inbound SMS/WhatsApp.
     Resolves the patient by phone, then delegates to
     :func:`process_message_for_patient`.
+
+    ``channel`` is ``"whatsapp"`` or ``"sms"``; when not given it is read off the
+    ``whatsapp:`` prefix Twilio puts on WhatsApp senders. Only the unknown-sender
+    (self-registration) path uses it, to tell the agent how the person wrote in.
     """
     from .message_attribution import normalise, resolve_inbound
 
+    if channel not in ("whatsapp", "sms"):
+        channel = "whatsapp" if str(phone_number or "").startswith("whatsapp:") else "sms"
     phone = normalise(phone_number)
     text = raw_message.strip()
 
@@ -794,7 +800,7 @@ def process_received_message(phone_number: str, raw_message: str) -> str:
     inbound = resolve_inbound(phone)
     patient = inbound.patient
     if not patient:
-        sr_reply = _handle_self_registration_flow(phone, text)
+        sr_reply = _handle_self_registration_flow(phone, text, channel=channel)
         if sr_reply is not None:
             return sr_reply
         return "Sorry, we could not find a patient matching this number."
@@ -1423,7 +1429,8 @@ def agent_host_allowed(host: str) -> bool:
     return (host or "").strip().lower() in allow
 
 
-def _invoke_langgraph_for_agent(agent: Agent, user_message: str, thread_id: str, phone: str | None = None) -> str:
+def _invoke_langgraph_for_agent(agent: Agent, user_message: str, thread_id: str, phone: str | None = None,
+                                channel: str | None = None) -> str:
     # AS-06/F8 fix: refuse to contact a non-allow-listed agent host.
     if not agent_host_allowed(getattr(agent, "host", "")):
         return "Sorry, the configured agent host is not permitted."
@@ -1457,6 +1464,8 @@ def _invoke_langgraph_for_agent(agent: Agent, user_message: str, thread_id: str,
     cfg = {"configurable": {"thread_id": thread_id}}
     if phone:
         cfg["configurable"]["phone_number"] = phone
+    if channel:
+        cfg["configurable"]["channel"] = channel
 
     try:
         result = rg.invoke({"messages": msgs}, config=cfg)
@@ -1471,7 +1480,7 @@ def _invoke_langgraph_for_agent(agent: Agent, user_message: str, thread_id: str,
     except Exception:
         return "Sorry, something went wrong generating the response."
 
-def _handle_self_registration_flow(phone: str, text: str) -> str | None:
+def _handle_self_registration_flow(phone: str, text: str, channel: str = "whatsapp") -> str | None:
     if not _selfreg_enabled():
         return None
     agent = _get_selfreg_agent()
@@ -1492,13 +1501,14 @@ def _handle_self_registration_flow(phone: str, text: str) -> str | None:
         from .native_agents import run_native
         configurable = {
             "phone_number": phone,
+            "channel": channel,
             "platform_language": getattr(settings, "LANGUAGE_CODE", None),
             "brand_name": brand_name(),
         }
         model_name = (getattr(agent, "model", "") or "").strip() or None
         reply = run_native(agent.native_key, thread_id, text, configurable, model_name)
     else:
-        reply = _invoke_langgraph_for_agent(agent, text, thread_id, phone=phone)
+        reply = _invoke_langgraph_for_agent(agent, text, thread_id, phone=phone, channel=channel)
 
     conv, _created = Conversation.objects.get_or_create(
         id=conv_uuid,

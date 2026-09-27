@@ -684,6 +684,7 @@ print(result)</code></pre>
               <tr class="text-left text-gray-500 border-b">
                 <th class="py-2 pr-4">{% trans "Name" %}</th>
                 <th class="py-2 pr-4">{% trans "Phone" %}</th>
+                <th class="py-2 pr-4">{% trans "Via" %}</th>
                 <th class="py-2 pr-4">{% trans "E-mail" %}</th>
                 <th class="py-2 pr-4">{% trans "Status" %}</th>
                 <th class="py-2 pr-4">{% trans "Created" %}</th>
@@ -695,6 +696,7 @@ print(result)</code></pre>
                 <tr class="border-b">
                   <td class="py-2 pr-4">{{ sr.name }} {{ sr.lastname }}</td>
                   <td class="py-2 pr-4">{{ sr.phone_number|default:"—" }}</td>
+                  <td class="py-2 pr-4">{% if sr.details.channel == "sms" %}{% trans "SMS" %}{% elif sr.details.channel == "whatsapp" %}{% trans "WhatsApp" %}{% else %}—{% endif %}</td>
                   <td class="py-2 pr-4">{{ sr.email|default:"—" }}</td>
                   <td class="py-2 pr-4">
                     {% if sr.state == 0 %}
@@ -749,7 +751,7 @@ print(result)</code></pre>
               </span>
             {% endif %}
           </div>
-          <p class="text-sm text-gray-500">{% trans "Share this QR in demos so people can start a WhatsApp chat that registers them. Scanning opens WhatsApp with a pre-filled message in the platform language." %}</p>
+          <p class="text-sm text-gray-500">{% trans "Share these QR codes so people can register themselves, on WhatsApp or by SMS. Scanning opens the app with a pre-filled message in the platform language; whichever they send, the registration agent answers on the same channel." %}</p>
         </div>
       </div>
 
@@ -763,65 +765,23 @@ print(result)</code></pre>
         </div>
       {% endif %}
 
-      {% if selfreg.url %}
-        <div class="flex flex-col md:flex-row gap-6 items-start">
-          {# QR #}
-          <div class="flex-shrink-0">
-            <div class="border border-gray-200 rounded-xl p-3 bg-white" style="width:220px;">
-              {{ selfreg.qr_svg|safe }}
-            </div>
-            <div class="flex items-center gap-2 mt-3">
-              <button type="button" onclick="srDownloadPng()" class="button-primary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1">
-                <span class="material-icons-outlined text-base">download</span>{% trans "Download" %}
-              </button>
-              <button type="button" onclick="srCopyImage()" class="button-secondary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1">
-                <span class="material-icons-outlined text-base">content_copy</span>{% trans "Copy image" %}
-              </button>
-            </div>
-          </div>
-
-          {# Details #}
-          <div class="flex-1 min-w-0 w-full">
-            <div class="mb-4">
-              <span class="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">{% trans "Pre-filled message" %}</span>
-              <p class="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">“{{ selfreg.message }}”</p>
-            </div>
-
-            <div class="mb-4">
-              <span class="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">{% trans "WhatsApp link" %}</span>
-              <div class="flex items-center gap-2">
-                <code id="srLink" class="flex-1 min-w-0 text-xs bg-gray-50 border border-gray-200 rounded-lg p-2 break-all select-all">{{ selfreg.url }}</code>
-                <button type="button" onclick="srCopyLink(this)" class="button-secondary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1 flex-shrink-0">
-                  <span class="material-icons-outlined text-base">link</span>{% trans "Copy" %}
-                </button>
-              </div>
-            </div>
-
-            <dl class="text-sm divide-y divide-gray-100">
-              <div class="flex justify-between py-2">
-                <dt class="text-gray-500">{% trans "Platform number" %}</dt>
-                <dd class="font-medium text-gray-800">{{ selfreg.phone }}</dd>
-              </div>
-              <div class="flex justify-between py-2">
-                <dt class="text-gray-500">{% trans "Handled by" %}</dt>
-                <dd class="font-medium text-gray-800">{{ selfreg.agent_name|default:_("— not selected —") }}</dd>
-              </div>
-            </dl>
-            <a href="{{ selfreg.url }}" target="_blank" rel="noopener"
-               class="button-secondary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1 mt-4">
-              <span class="material-icons-outlined text-base">open_in_new</span>{% trans "Test the link" %}
-            </a>
-          </div>
+      <dl class="text-sm divide-y divide-gray-100 mb-5 max-w-xl">
+        <div class="flex justify-between gap-4 py-2">
+          <dt class="text-gray-500">{% trans "Pre-filled message" %}</dt>
+          <dd class="font-medium text-gray-800">“{{ selfreg.message }}”</dd>
         </div>
-      {% else %}
-        <div class="px-4 py-3 rounded-lg bg-red-50 border border-red-300 text-red-800 text-sm flex items-start gap-2">
-          <span class="material-icons-outlined text-base">error_outline</span>
-          <div>
-            {% blocktrans %}No <b>platform phone number</b> is configured, so a WhatsApp link can't be built. Add it under{% endblocktrans %}
-            <button type="button" class="underline font-medium" data-goto-tab="integrations">{% trans "Integrations" %}</button>.
-          </div>
+        <div class="flex justify-between gap-4 py-2">
+          <dt class="text-gray-500">{% trans "Handled by" %}</dt>
+          <dd class="font-medium text-gray-800">{{ selfreg.agent_name|default:_("— not selected —") }}</dd>
         </div>
-      {% endif %}
+      </dl>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% trans "WhatsApp" as t_wa %}{% trans "WhatsApp link" as l_wa %}
+        {% include "settings/_selfreg_qr_card.html" with ch="whatsapp" title=t_wa icon="chat" qr=selfreg.whatsapp link_label=l_wa file="whatsapp-registration-qr.png" %}
+        {% trans "SMS" as t_sms %}{% trans "SMS link" as l_sms %}
+        {% include "settings/_selfreg_qr_card.html" with ch="sms" title=t_sms icon="sms" qr=selfreg.sms link_label=l_sms file="sms-registration-qr.png" %}
+      </div>
     </div>
   </section>
 
@@ -1021,16 +981,16 @@ print(result)</code></pre>
     icon.textContent = 'check';
     setTimeout(() => { icon.textContent = prev; }, 1500);
   }
-  function srCopyLink(btn) {
-    const link = document.getElementById('srLink');
+  function srCopyLink(btn, ch) {
+    const link = document.getElementById('srLink-' + ch);
     const text = link ? link.textContent.trim() : '';
     if (!text) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(() => srFlash(btn), () => {});
     }
   }
-  function srRasterize(cb, size) {
-    const svg = document.getElementById('srQrSvg');
+  function srRasterize(ch, cb, size) {
+    const svg = document.getElementById(ch === 'sms' ? 'srQrSvgSms' : 'srQrSvgWhatsapp');
     if (!svg) return;
     const xml = new XMLSerializer().serializeToString(svg);
     const src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
@@ -1046,25 +1006,25 @@ print(result)</code></pre>
     };
     img.src = src;
   }
-  function srDownloadPng() {
-    srRasterize(function (blob) {
+  function srDownloadPng(ch, filename) {
+    srRasterize(ch, function (blob) {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'whatsapp-registration-qr.png';
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
     }, 1024);
   }
-  function srCopyImage() {
+  function srCopyImage(ch) {
     if (!(navigator.clipboard && window.ClipboardItem)) {
       alert('{% trans "This browser cannot copy images. Use Download instead." %}');
       return;
     }
-    srRasterize(function (blob) {
+    srRasterize(ch, function (blob) {
       if (!blob) return;
       navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).catch(function () {
         alert('{% trans "Could not copy the image. Use Download instead." %}');

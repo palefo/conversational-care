@@ -1,0 +1,55 @@
+{% load i18n %}
+{# One channel's registration QR. Included with: ch (whatsapp|sms), title, icon, qr (the channel dict), link_label, file. #}
+<div class="border border-gray-200 rounded-xl p-4 flex flex-col">
+  <div class="flex items-center gap-2 mb-3">
+    <span class="material-icons-outlined text-base text-gray-500">{{ icon }}</span>
+    <h3 class="font-semibold text-gray-800">{{ title }}</h3>
+  </div>
+
+  {% if qr.url %}
+    <div class="flex flex-col gap-4 items-start">
+      <div class="flex-shrink-0">
+        <div class="border border-gray-200 rounded-xl p-3 bg-white" style="width:180px;">
+          {{ qr.qr_svg|safe }}
+        </div>
+        <div class="flex items-center gap-2 mt-3">
+          <button type="button" onclick="srDownloadPng('{{ ch }}', '{{ file }}')" class="button-primary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+            <span class="material-icons-outlined text-base">download</span>{% trans "Download" %}
+          </button>
+          <button type="button" onclick="srCopyImage('{{ ch }}')" class="button-secondary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1" title="{% trans 'Copy image' %}">
+            <span class="material-icons-outlined text-base">content_copy</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex-1 min-w-0 w-full">
+        <dl class="text-sm mb-3">
+          <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">{% trans "Sends to" %}</dt>
+          <dd class="font-medium text-gray-800">{{ qr.phone }}</dd>
+          {% if ch == "sms" and qr.from_platform %}
+            <dd class="text-xs text-gray-500 mt-0.5">{% trans "The platform number, as no separate SMS sender number is set." %}</dd>
+          {% endif %}
+        </dl>
+        <span class="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">{{ link_label }}</span>
+        <div class="flex items-center gap-2">
+          <code id="srLink-{{ ch }}" class="flex-1 min-w-0 text-xs bg-gray-50 border border-gray-200 rounded-lg p-2 break-all select-all">{{ qr.url }}</code>
+          <button type="button" onclick="srCopyLink(this, '{{ ch }}')" class="button-secondary py-1.5 px-2 rounded-lg text-sm font-medium inline-flex items-center flex-shrink-0" title="{% trans 'Copy' %}">
+            <span class="material-icons-outlined text-base">link</span>
+          </button>
+        </div>
+        <a href="{{ qr.url }}" target="_blank" rel="noopener"
+           class="button-secondary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1 mt-3">
+          <span class="material-icons-outlined text-base">open_in_new</span>{% trans "Test the link" %}
+        </a>
+      </div>
+    </div>
+  {% else %}
+    <div class="px-3 py-2 rounded-lg bg-red-50 border border-red-300 text-red-800 text-sm flex items-start gap-2">
+      <span class="material-icons-outlined text-base">error_outline</span>
+      <div>
+        {% blocktrans %}No <b>platform phone number</b> is configured, so this link can't be built. Add it under{% endblocktrans %}
+        <button type="button" class="underline font-medium" data-goto-tab="integrations">{% trans "Integrations" %}</button>.
+      </div>
+    </div>
+  {% endif %}
+</div>
