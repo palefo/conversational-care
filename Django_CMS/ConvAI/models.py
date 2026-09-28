@@ -52,6 +52,20 @@ class ConvAIUser(AbstractUser):
         help_text=_("Preferred interface language; blank uses the system default."),
     )
 
+    # Which study's participants this person works with. Blank means all of them,
+    # which is the right default: a platform with one study, or none, should not
+    # make anybody choose. Set it and the enrolment panel on Clients narrows to
+    # that arm — useful where two studies share an installation and their teams
+    # should not be reading each other's cohort. Never a permission on its own: it narrows
+    # what an already-authorised member of staff sees, and admins ignore it.
+    study = models.ForeignKey(
+        'Study',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="staff",
+        help_text=_("Limit this user to one study's participants. Blank sees all studies."),
+    )
+
 
 
 
@@ -1486,6 +1500,51 @@ class SiteConfiguration(models.Model):
     # Turning it off again does not un-hide anything — see Conversation.hidden.
     conversation_privacy_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
 
+    # --- Study enrolment (live) ---
+    # Off by default, like conversation privacy above. Running a study is what a
+    # few deployments do, not what the platform is for: an installation that
+    # never enrolled anybody should not carry an enrolment panel, a public
+    # /join/ URL or a consent flow it has no use for. While it is off every
+    # enrolment route 404s and Settings -> Participants holds only this switch.
+    #
+    # Turning it off again deletes nothing — the enrolments and the consent
+    # records they signed stay exactly as they are. See participant_management.md.
+    study_enrolment_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # How many words an access code is built from. Three (~250^3) is the default:
+    # enough space that the rate limit below does the real work, short enough to
+    # read down a phone line without losing your place.
+    enrolment_code_words = models.PositiveSmallIntegerField(
+        default=3,
+        validators=[MinValueValidator(2)],
+        help_text="Words per participant access code (2-4). Three is usually right.",
+    )
+
+    # Wrong-code attempts allowed from one address per hour. An access code is a
+    # credential handed out over the phone, so this — not the size of the code
+    # space — is what actually stands between it and a brute-force.
+    enrolment_code_attempt_limit = models.PositiveSmallIntegerField(
+        default=10,
+        validators=[MinValueValidator(1)],
+        help_text="Wrong access-code attempts allowed per address per hour before a lockout.",
+    )
+
+    # Whether the claim form asks for a date of birth at all. Off by default: a
+    # study that does not need to identify people this way should not be holding
+    # their date of birth to no purpose.
+    enrolment_require_dob = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # Whether claiming a valid code creates the client straight away, or files it
+    # for an admin the way a SelfRegistration is filed. On by default, because
+    # issuing the code *was* the vouching — asking an admin to confirm what a
+    # clinician already decided is a queue that teaches people to click through.
+    enrolment_auto_approve = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # The wording on the public /join/ page. The first thing a participant reads,
+    # and entirely local to the study, so it is content rather than code. Blank
+    # falls back to a shipped neutral default.
+    enrolment_landing_text = models.TextField(blank=True, default="")
+
     # --- Editable content (live) ---
     # Markdown source for the Help page. Blank falls back to the shipped default
     # (see ConvAI.default_help.DEFAULT_HELP_MARKDOWN) until an admin edits it.
@@ -1699,3 +1758,327 @@ class SummaryEdit(models.Model):
     @property
     def parent(self):
         return self.meeting or self.recording or self.conversation or self.alert
+
+
+### Study enrolment
+#
+# Three models behind one switch (SiteConfiguration.study_enrolment_enabled):
+# a Study people are enrolled into, an Enrolment per person, and an append-only
+# ConsentRecord of what they agreed to. See participant_management.md.
+
+
+# What a new Study starts with, so the first consent page is not a blank form an
+# admin has to invent from nothing. Deliberately generic — a real study replaces
+# the wording — but the third item is the one that matters here: this platform
+# runs a classifier over every inbound message and raises safety alerts from it,
+# and until now nothing recorded anybody agreeing to that.
+DEFAULT_CONSENT_ITEMS = [
+    {
+        "key": "participation",
+        "text": ("I confirm I have read the Participant Information Sheet, or had it "
+                 "explained to me, and have had the opportunity to ask questions. I "
+                 "agree to take part. I understand participation is voluntary and I "
+                 "can withdraw at any time without giving a reason and without it "
+                 "affecting my care."),
+        "required": True,
+    },
+    {
+        "key": "data",
+        "text": ("I understand that my conversations, including my messages, the "
+                 "replies, timestamps and engagement data, will be collected and "
+                 "analysed for this study, and de-identified where possible before "
+                 "analysis, reporting or publication."),
+        "required": True,
+    },
+    {
+        "key": "safety_monitoring",
+        "text": ("I understand that automated methods may review my conversations for "
+                 "content suggesting severe distress, self-harm, suicidality or "
+                 "safeguarding concerns, that these support human review and do not "
+                 "make clinical decisions, and that confidentiality will be maintained "
+                 "unless something suggests a serious risk to me or to others."),
+        "required": True,
+    },
+]
+
+
+class Study(models.Model):
+    """One study, or one arm of one, that participants are enrolled into.
+
+    The archive this came from fixed its two arms as a choice list on the model,
+    which meant a third arm — or a different institution's study entirely — was a
+    migration. It is a row here instead: which studies exist is a fact about a
+    deployment, not about the platform.
+
+    A Study also owns its **consent wording**, as data rather than template
+    markup. That is what lets a study team correct a sentence without waiting for
+    a deploy, and it is why ConsentRecord can record per-item answers against
+    keys nobody hard-coded.
+    """
+
+    slug = models.SlugField(
+        max_length=50, unique=True,
+        help_text="Short identifier used in URLs and exports, e.g. 'health-coach'.",
+    )
+    display_name = models.CharField(
+        max_length=200,
+        help_text="Full name shown to participants, e.g. 'Health Coaching Waitlist Study'.",
+    )
+
+    # Closed rather than deleted: a finished study still has to answer for the
+    # people in it. Closing refuses new enrolments and leaves everything else
+    # working, so existing participants keep their agent and their history.
+    is_open = models.BooleanField(
+        default=True,
+        help_text="When off, existing participants continue but no new enrolments are accepted.",
+    )
+
+    # --- Consent ---
+    pis_url = models.URLField(
+        blank=True, default="",
+        help_text="Link to the Participant Information Sheet.",
+    )
+    consent_version = models.CharField(
+        max_length=20, default="1.0",
+        help_text="Version shown to participants and stored on every consent record.",
+    )
+    consent_intro = models.TextField(
+        blank=True, default="",
+        help_text="The paragraph shown above the consent tick-boxes.",
+    )
+    consent_items = models.JSONField(
+        blank=True, default=list,
+        help_text="The tick-boxes themselves: a list of {key, text, required}.",
+    )
+
+    # --- External questionnaires ---
+    # Redirects, not integrations. The archive hard-coded two Qualtrics URLs as
+    # module constants; they belong to the study, so they live on it.
+    consent_survey_url = models.URLField(
+        blank=True, default="",
+        help_text="Optional survey to send the participant to straight after consent.",
+    )
+    baseline_url = models.URLField(
+        blank=True, default="",
+        help_text="Optional baseline questionnaire, after the consent survey.",
+    )
+
+    # --- Enrolment behaviour for this arm ---
+    # Per study rather than platform-wide: an arm that talks to people by SMS
+    # cannot work without a number, and one that talks in the browser can.
+    require_phone = models.BooleanField(
+        default=False,
+        help_text="Require a phone number to claim a code. Needed for SMS or WhatsApp arms.",
+    )
+    default_agent = models.ForeignKey(
+        'Agent',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="studies",
+        help_text="Agent given to this study's participants when they consent. Without one, their messages get no reply.",
+    )
+
+    # --- Governance paper trail ---
+    chief_investigator = models.CharField(max_length=200, blank=True, default="")
+    iras_project_id = models.CharField(max_length=50, blank=True, default="")
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Studies"
+        ordering = ["display_name"]
+
+    def __str__(self):
+        return f"{self.display_name} (v{self.consent_version})"
+
+    def save(self, *args, **kwargs):
+        # A study with no tick-boxes would render a consent page that consents to
+        # nothing, so a new one starts from the shipped set rather than empty.
+        if not self.consent_items:
+            self.consent_items = [dict(item) for item in DEFAULT_CONSENT_ITEMS]
+        super().save(*args, **kwargs)
+
+    @property
+    def consent_locked(self) -> bool:
+        """True once somebody has consented to the *current* version.
+
+        Same rule a Protocol follows once answers are recorded against it: the
+        wording somebody agreed to is evidence, and evidence does not get edited
+        underneath them. Changing it from here on means bumping
+        ``consent_version``, which starts a fresh version and leaves the existing
+        records pointing at the text those people actually read.
+        """
+        return ConsentRecord.objects.filter(
+            enrolment__study=self, consent_version=self.consent_version
+        ).exists()
+
+    @property
+    def stale_consent_count(self) -> int:
+        """Participants whose latest consent predates the current version.
+
+        Worth surfacing rather than inferring: it is the difference between "this
+        cohort consented to what is on the page" and "this cohort consented to
+        something we have since rewritten", which is a question a study team gets
+        asked and should not have to run a query to answer.
+        """
+        return (
+            Enrolment.objects
+            .filter(study=self, consents__isnull=False)
+            .exclude(consents__consent_version=self.consent_version)
+            .distinct()
+            .count()
+        )
+
+    def required_item_keys(self) -> list:
+        return [i.get("key") for i in (self.consent_items or []) if i.get("required")]
+
+
+class Enrolment(models.Model):
+    """One person's place in a study, from before they arrive until they finish.
+
+    This is deliberately **not** a ``SelfRegistration``. That model is the inbox
+    for someone unknown who messaged the service: it is keyed on their phone
+    number and it is consumed the moment an admin approves it. An enrolment runs
+    the other way — a clinician who already knows the person issues a code, and
+    the record has to outlive the approval to carry the study arm, the lifecycle
+    and the consent history for as long as the study lasts.
+
+    ``patient`` is null until the participant consents, so the Clients page can
+    list people who have not arrived yet (its enrolment panel) without the client
+    table filling up with records for people who never agreed to anything.
+    """
+
+    class Status(models.TextChoices):
+        INVITED = "invited", _("Invited")
+        CONSENTED = "consented", _("Consented")
+        ACTIVE = "active", _("Active")
+        COMPLETED = "completed", _("Completed")
+        WITHDRAWN = "withdrawn", _("Withdrawn")
+
+    # The only statuses a member of staff sets by hand. Invited and consented
+    # are facts the platform records — a consent record exists or it does not —
+    # so letting somebody pick them from a list would let the list say a person
+    # consented when nobody has. Withdrawn has side effects and its own action.
+    MANUAL_STATUSES = (Status.ACTIVE, Status.COMPLETED)
+
+    study = models.ForeignKey(Study, on_delete=models.PROTECT, related_name="enrolments")
+
+    # Null until claimed. PROTECT is wrong here and SET_NULL is right: deleting a
+    # client should not silently delete the study's record that they were in it.
+    patient = models.OneToOneField(
+        'Patient',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="enrolment",
+    )
+
+    access_code = models.CharField(
+        max_length=64, unique=True, db_index=True,
+        help_text="The code the participant uses to claim their place. Single use.",
+    )
+
+    # Held here, not on Patient: at pre-enrolment there is no Patient yet. After
+    # the claim the Patient carries the working copy and this stays as what the
+    # clinician originally entered.
+    name = models.CharField(max_length=120)
+    lastname = models.CharField(max_length=120)
+
+    # Nullable, and no sentinel date. The archive wrote '2000-01-01' as a
+    # placeholder and then tested against that string to tell whether a code had
+    # been claimed, which conflates "unknown" with a real date somebody might
+    # have.
+    date_of_birth = models.DateField(null=True, blank=True)
+    phone_number = PhoneNumberField(blank=True, null=True)
+
+    status = models.CharField(
+        max_length=12, choices=Status.choices, default=Status.INVITED, db_index=True,
+    )
+
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    withdrawn_at = models.DateTimeField(null=True, blank=True)
+    withdrawn_reason = models.CharField(max_length=300, blank=True, default="")
+
+    created_by = models.ForeignKey(
+        ConvAIUser,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="enrolments_created",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["study", "status"]),
+            models.Index(fields=["-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.name} {self.lastname} — {self.study.slug} ({self.get_status_display()})"
+
+    @property
+    def is_claimed(self) -> bool:
+        return self.claimed_at is not None
+
+    @property
+    def latest_consent(self):
+        return self.consents.order_by("-agreed_at").first()
+
+    @property
+    def consent_is_current(self) -> bool:
+        """Whether this person's latest consent matches their study's version."""
+        latest = self.latest_consent
+        return bool(latest and latest.consent_version == self.study.consent_version)
+
+
+class ConsentRecord(models.Model):
+    """What one person agreed to, when, and in which words.
+
+    **Append-only.** Re-consenting to a new version inserts a row; nothing is
+    ever updated. That is the whole point of the model: the archive kept consent
+    as three booleans on the participant, so a reworded form quietly became the
+    thing everybody had supposedly agreed to, and there was no way to show what
+    any individual had actually read.
+
+    ``items_text`` snapshots the wording alongside the answers, because a Study's
+    ``consent_items`` can be corrected and a record that only stored keys would
+    lose the sentence it was evidence for.
+    """
+
+    enrolment = models.ForeignKey(Enrolment, on_delete=models.CASCADE, related_name="consents")
+
+    consent_version = models.CharField(max_length=20)
+
+    # {key: bool} for every tick-box presented, so an optional item that was
+    # declined is recorded as declined rather than missing.
+    items = models.JSONField(default=dict)
+
+    # The wording as presented, keyed the same way. Kept so this row still means
+    # something after the study edits its form.
+    items_text = models.JSONField(blank=True, default=dict)
+
+    agreed_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    # Routine provenance for a consent record. Nullable because a record written
+    # by a clinician on someone's behalf, or by a test, has neither.
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=400, blank=True, default="")
+
+    class Meta:
+        ordering = ["-agreed_at"]
+        indexes = [models.Index(fields=["enrolment", "-agreed_at"])]
+
+    def __str__(self):
+        return f"Consent v{self.consent_version} — {self.enrolment_id} @ {self.agreed_at:%Y-%m-%d}"
+
+    def save(self, *args, **kwargs):
+        # Guard rather than trust: this model's value is that rows are immutable,
+        # and an accidental .save() on a loaded instance would be the one way to
+        # lose that without noticing.
+        if self.pk is not None:
+            raise ValidationError(
+                "ConsentRecord is append-only; record a new consent instead of editing one."
+            )
+        super().save(*args, **kwargs)

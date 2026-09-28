@@ -1,0 +1,70 @@
+{% comment %}
+  Shell for the public join pages. Mirrors registration/_auth_base.html for the
+  same reason that file gives — base.html assumes a signed-in user and a sidebar,
+  and nobody on these pages has either.
+
+  It is a separate file rather than a reuse of _auth_base because the consent page
+  is a wall of text with a list of tick-boxes, which needs a wider card and some
+  styling of its own. The `wide` block is what switches that on.
+{% endcomment %}
+{% load static custom_filters i18n %}
+<!doctype html>
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}{% brand_name %}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'app/css/vars.css' %}">
+    <link rel="stylesheet" href="{% static 'app/css/login.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      /* Scoped to these pages: the shared login stylesheet sizes a card for a
+         username and a password, not for a consent form. */
+      .join-card--wide { max-width: 44rem; }
+      .join-steps {
+        display: flex; gap: .4rem; justify-content: center;
+        margin: 0 0 1.25rem; font-size: .75rem; color: var(--muted, #64748b);
+      }
+      .join-steps span { display: inline-flex; align-items: center; gap: .4rem; }
+      .join-steps span::after { content: "\203A"; opacity: .5; }
+      .join-steps span:last-child::after { content: ""; }
+      .join-steps .is-now { color: var(--fg, #0f172a); font-weight: 600; }
+      .join-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                   letter-spacing: .04em; text-transform: lowercase; }
+      .join-intro { font-size: .9rem; line-height: 1.6; color: var(--muted, #475569);
+                    background: var(--surface-2, #f8fafc); border: 1px solid var(--border, #e2e8f0);
+                    border-radius: .75rem; padding: 1rem; margin-bottom: 1.25rem; }
+      .consent-item { display: flex; gap: .75rem; align-items: flex-start;
+                      padding: .85rem 0; border-top: 1px solid var(--border, #e2e8f0); }
+      .consent-item:first-of-type { border-top: 0; }
+      .consent-item input { margin-top: .3rem; flex: 0 0 auto; width: 1.05rem; height: 1.05rem; }
+      .consent-item span { font-size: .875rem; line-height: 1.55; }
+      .consent-required { color: #dc2626; }
+      .join-meta { font-size: .75rem; color: var(--muted, #64748b); margin-top: 1rem;
+                   display: flex; flex-wrap: wrap; gap: .25rem 1rem; }
+      .join-locked { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;
+                     border-radius: .6rem; padding: .8rem 1rem; font-size: .85rem;
+                     margin-bottom: 1rem; }
+      @media (max-width: 640px) { .join-card--wide { max-width: 100%; } }
+    </style>
+  </head>
+  <body>
+    <div class="login">
+      <div class="login-card {% block card_class %}{% endblock %}">
+        <div class="login-title">
+          <img class="brand-logo" src="{% brand_logo_url %}" alt="{% brand_name %}" />
+          <p class="login-subtitle">{% block subtitle %}{% endblock %}</p>
+        </div>
+        {% block steps %}{% endblock %}
+        {% if messages %}
+          {% for message in messages %}
+            <div class="login-error">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+  </body>
+</html>

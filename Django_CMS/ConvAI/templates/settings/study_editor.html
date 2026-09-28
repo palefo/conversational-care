@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+{% load i18n static custom_filters %}
+
+{% block title %}{{ study.display_name }}{% endblock %}
+
+{% block content %}
+{% comment %}
+  One study's settings, opened from Settings → Participants. A page of its own
+  rather than a panel, following the protocol editor: a consent form is too much
+  to edit inside a tab and too important to edit in a modal.
+
+  The field styling is deliberately a copy of the `.settings-panel` rules in
+  config.html, scoped to `.sed`. Those rules are what every other settings form
+  looks like, but they are scoped to a wrapper that only exists on that page, so
+  a form outside it falls back to browser defaults and renders as a row of narrow
+  boxes. Same vocabulary, applied where it is needed.
+{% endcomment %}
+<style>
+  .sed { max-width: 62rem; }
+
+  .sed-back { font-size: .8rem; color: var(--brand-primary); text-decoration: none; }
+  .sed-back:hover { text-decoration: underline; }
+  .sed-h { font-size: 1.6rem; font-weight: 600; color: var(--text-primary);
+           margin: .45rem 0 .35rem; }
+  .sed-meta { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap;
+              margin-bottom: 1.25rem; }
+  .sed-pill { font-size: .72rem; line-height: 1; padding: .3rem .55rem;
+              border-radius: 999px; background: var(--card-background);
+              border: 1px solid var(--border-color); color: var(--text-secondary); }
+  .sed-pill b { color: var(--text-primary); font-weight: 600; }
+  .sed-pill--open { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+  .sed-pill--shut { background: var(--surface-background); color: var(--text-muted); }
+  .sed-pill--lock { background: #fffbeb; border-color: #fde68a; color: #92400e;
+                    display: inline-flex; align-items: center; gap: .25rem; }
+  .sed-pill--lock .material-icons-outlined { font-size: .85rem; }
+
+  /* ── cards & sections ── */
+  .sed-card { background: var(--card-background); border: 1px solid var(--border-color);
+              border-radius: .5rem; padding: 1.25rem 1.4rem; margin-bottom: 1rem; }
+  .sed-sec { font-size: .7rem; font-weight: 700; text-transform: uppercase;
+             letter-spacing: .06em; color: var(--text-muted); margin-bottom: .2rem; }
+  .sed-sec-note { font-size: .8rem; color: var(--text-secondary); margin-bottom: 1.1rem; }
+
+  /* ── fields: the settings vocabulary, applied here ── */
+  .sed .stg-field { margin-bottom: 1.15rem; }
+  .sed .stg-field:last-child { margin-bottom: 0; }
+  .sed .stg-field label { display: block; font-size: .8rem; font-weight: 500;
+                          color: var(--text-secondary); margin-bottom: .3rem; }
+  .sed input:not([type=checkbox]):not([type=radio]):not([type=file]),
+  .sed select,
+  .sed textarea {
+    width: 100%; border-radius: .5rem; border: 1px solid #d1d5db;
+    padding: .55rem .75rem; font-size: .875rem;
+    /* background-color, not `background`: the shorthand erases the chevron the
+       Tailwind forms plugin paints on a select. */
+    background-color: #fff; color: #111827;
+  }
+  .sed select { padding-right: 2.2rem; }
+  .sed textarea { line-height: 1.5; resize: vertical; }
+  .sed input:focus, .sed select:focus, .sed textarea:focus {
+    outline: none; border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(3, 105, 161, .15);
+  }
+  /* Specificity has to match the base rule above, which uses three :not()s —
+     otherwise a locked field keeps the plain white background and looks
+     editable when it is not. */
+  .sed input[readonly]:not([type=checkbox]):not([type=radio]):not([type=file]),
+  .sed .sed-item textarea[readonly],
+  .sed textarea[readonly] {
+    background-color: var(--surface-background); color: var(--text-secondary);
+    cursor: not-allowed;
+  }
+  .sed input:disabled, .sed .sed-req input:disabled { cursor: not-allowed; opacity: .6; }
+  .sed .stg-field p { font-size: .75rem; color: var(--text-muted); margin-top: .3rem;
+                      line-height: 1.45; }
+  .sed-grid2 { display: grid; grid-template-columns: 1fr; gap: 0 1.25rem; }
+  @media (min-width: 720px) { .sed-grid2 { grid-template-columns: 1fr 1fr; } }
+
+  /* ── switches ── */
+  .sed-check { display: flex; gap: .6rem; align-items: flex-start; padding: .7rem 0;
+               border-top: 1px solid #f1f5f9; }
+  .sed-check:first-of-type { border-top: 0; }
+  .sed-check input { margin-top: .15rem; width: 1rem; height: 1rem; flex: 0 0 auto;
+                     accent-color: var(--brand-primary); }
+  .sed-check-t { font-size: .85rem; font-weight: 500; color: var(--text-primary); }
+  .sed-check-h { font-size: .75rem; color: var(--text-muted); margin-top: .1rem;
+                 line-height: 1.45; }
+
+  /* ── notices ── */
+  .sed-note { border-radius: .5rem; padding: .85rem 1rem; font-size: .82rem;
+              line-height: 1.5; margin-bottom: 1.1rem; display: flex; gap: .6rem; }
+  .sed-note .material-icons-outlined { font-size: 1.05rem; flex: 0 0 auto; margin-top: .05rem; }
+  /* The lock toggles these with the hidden attribute, which loses to any
+     display rule of their own without this. */
+  .sed [hidden] { display: none !important; }
+  .sed-note--lock { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+  .sed-note--stale { background: var(--brand-light); border: 1px solid #bae6fd;
+                     color: var(--brand-secondary); }
+  .sed-note--err { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+  .sed-note--ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+
+  /* ── consent tick-boxes ── */
+  .sed-items { margin-top: .4rem; }
+  .sed-item { border: 1px solid var(--border-color); border-radius: .5rem;
+              padding: .85rem .95rem; margin-bottom: .7rem;
+              background: var(--surface-background); }
+  .sed-item-top { display: flex; align-items: center; gap: .6rem; margin-bottom: .55rem; }
+  .sed-item-n { width: 1.5rem; height: 1.5rem; border-radius: 999px; flex: 0 0 auto;
+                display: flex; align-items: center; justify-content: center;
+                background: var(--brand-light); color: var(--brand-primary);
+                font-size: .72rem; font-weight: 600; }
+  .sed-item-top input[type=text] { flex: 1 1 auto; min-width: 0;
+                                   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                                   font-size: .78rem; padding: .35rem .55rem; }
+  .sed-req { display: inline-flex; align-items: center; gap: .3rem; font-size: .75rem;
+             color: var(--text-secondary); white-space: nowrap; cursor: pointer; }
+  .sed-req input { accent-color: var(--brand-primary); }
+  .sed-del { background: none; border: 0; color: var(--text-muted); cursor: pointer;
+             display: inline-flex; padding: .2rem; border-radius: .3rem; }
+  .sed-del:hover { color: #b91c1c; background: #fef2f2; }
+  .sed-item textarea { background-color: #fff; }
+  .sed-add { display: inline-flex; align-items: center; gap: .35rem;
+             padding: .45rem .8rem; border-radius: .375rem; border: 1px dashed #cbd5e1;
+             background: #fff; color: var(--brand-primary); font-size: .8rem;
+             font-weight: 500; cursor: pointer; }
+  .sed-add:hover { border-color: var(--brand-primary); background: var(--brand-light); }
+  .sed-add .material-icons-outlined { font-size: 1rem; }
+
+  /* ── actions ── */
+  .sed-acts { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap;
+              padding: 1rem 0 .4rem; }
+  .sed-save { padding: .6rem 1.3rem; border-radius: .375rem; border: 0;
+              background: var(--brand-primary); color: #fff; font-size: .85rem;
+              font-weight: 500; cursor: pointer; }
+  .sed-save:hover { background: var(--brand-secondary); }
+  .sed-cancel { font-size: .82rem; color: var(--text-secondary); text-decoration: none; }
+  .sed-cancel:hover { text-decoration: underline; }
+  .sed-danger { margin-top: 1.5rem; padding-top: 1.1rem;
+                border-top: 1px solid var(--border-color); }
+  .sed-danger button { background: none; border: 0; color: #b91c1c; font-size: .82rem;
+                       cursor: pointer; padding: 0; }
+  .sed-danger button:hover { text-decoration: underline; }
+  .sed-danger p { font-size: .75rem; color: var(--text-muted); margin-top: .25rem; }
+</style>
+
+<div class="sed">
+
+  <a class="sed-back" href="{% url 'config' %}?tab=participants#participants">
+    &larr; {% trans "Settings → Participants" %}
+  </a>
+  <h1 class="sed-h">{{ study.display_name }}</h1>
+  <div class="sed-meta">
+    {% if study.is_open %}
+      <span class="sed-pill sed-pill--open">{% trans "Open to enrolment" %}</span>
+    {% else %}
+      <span class="sed-pill sed-pill--shut">{% trans "Closed" %}</span>
+    {% endif %}
+    <span class="sed-pill"><b>{{ enrolment_count }}</b> {% trans "participants" %}</span>
+    <span class="sed-pill"><b>{{ consent_count }}</b> {% trans "consent records" %}</span>
+    <span class="sed-pill">{% trans "Consent" %} <b>v{{ study.consent_version }}</b></span>
+    {% if consent_locked %}
+      <span class="sed-pill sed-pill--lock">
+        <span class="material-icons-outlined">lock</span>{% trans "wording locked" %}
+      </span>
+    {% endif %}
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="sed-note {% if message.tags == 'error' %}sed-note--err{% else %}sed-note--ok{% endif %}">
+        <span class="material-icons-outlined">
+          {% if message.tags == 'error' %}error_outline{% else %}check_circle{% endif %}
+        </span>
+        <span>{{ message }}</span>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  {% if form.errors %}
+    <div class="sed-note sed-note--err">
+      <span class="material-icons-outlined">error_outline</span>
+      <span>
+        {% for field, errs in form.errors.items %}
+          {% for e in errs %}<div>{{ e }}</div>{% endfor %}
+        {% endfor %}
+      </span>
+    </div>
+  {% endif %}
+
+  <form method="post" action="{% url 'study_editor_save' study.pk %}">
+    {% csrf_token %}
+    {% comment %}Says this POST came from the consent editor, so deleting every
+       tick-box is understood as a deletion rather than as "no list sent".{% endcomment %}
+    <input type="hidden" name="items_submitted" value="1">
+
+    {# ── The study ──────────────────────────────────────────── #}
+    <div class="sed-card">
+      <div class="sed-sec">{% trans "The study" %}</div>
+      <p class="sed-sec-note">
+        {% trans "What this study is called, and how people join it." %}
+      </p>
+
+      <div class="sed-grid2">
+        {% include "settings/_field.html" with field=form.display_name %}
+        {% include "settings/_field.html" with field=form.slug %}
+      </div>
+
+      <label class="sed-check">
+        {{ form.is_open }}
+        <span>
+          <span class="sed-check-t">{{ form.is_open.label }}</span>
+          <span class="sed-check-h">{{ form.is_open.help_text }}</span>
+        </span>
+      </label>
+      <label class="sed-check">
+        {{ form.require_phone }}
+        <span>
+          <span class="sed-check-t">{{ form.require_phone.label }}</span>
+          <span class="sed-check-h">{{ form.require_phone.help_text }}</span>
+        </span>
+      </label>
+
+      <div style="margin-top:1.1rem">
+        {% include "settings/_field.html" with field=form.default_agent %}
+      </div>
+    </div>
+
+    {# ── Consent ────────────────────────────────────────────── #}
+    <div class="sed-card">
+      <div class="sed-sec">{% trans "Consent" %}</div>
+      <p class="sed-sec-note">
+        {% trans "What a participant reads and agrees to before they join. Every consent record stores this wording as it was shown, so it can always be shown again." %}
+      </p>
+
+      {% if consent_locked %}
+        <div class="sed-note sed-note--lock" id="lockNote">
+          <span class="material-icons-outlined">lock</span>
+          <span>
+            {% blocktrans with v=study.consent_version %}Somebody has already consented to version {{ v }}, so its wording is locked. Raise the consent version to start a new one — the records already signed keep pointing at the text those participants read.{% endblocktrans %}
+          </span>
+        </div>
+        <div class="sed-note sed-note--stale" id="newVersionNote" hidden>
+          <span class="material-icons-outlined">edit_note</span>
+          <span>
+            {% blocktrans with v=study.consent_version %}Saving starts version <b data-new-version></b>, so the tick-boxes can be edited again. Everyone who consented to version {{ v }} keeps that record and will be asked to consent again on their next visit.{% endblocktrans %}
+          </span>
+        </div>
+      {% endif %}
+
+      {% if stale_consent_count %}
+        <div class="sed-note sed-note--stale">
+          <span class="material-icons-outlined">info</span>
+          <span>
+            {% blocktrans count n=stale_consent_count %}{{ n }} participant consented to an earlier version and will be asked again on their next visit.{% plural %}{{ n }} participants consented to an earlier version and will be asked again on their next visit.{% endblocktrans %}
+          </span>
+        </div>
+      {% endif %}
+
+      <div class="sed-grid2">
+        {% include "settings/_field.html" with field=form.consent_version %}
+        {% include "settings/_field.html" with field=form.pis_url %}
+      </div>
+      {% include "settings/_field.html" with field=form.consent_intro %}
+
+      <div style="margin-top:1.4rem">
+        <div class="sed-sec">{% trans "Tick-boxes" %}</div>
+        <p class="sed-sec-note">
+          {% trans "The key is stored on every consent record, so keep it stable once anybody has signed. The text is what the participant reads." %}
+        </p>
+
+        <div class="sed-items" id="itemRows"
+             {% if consent_locked %}data-signed-version="{{ study.consent_version }}"{% endif %}>
+          {% for item in form.items_for_display %}
+            <div class="sed-item" data-row="1">
+              <div class="sed-item-top">
+                <span class="sed-item-n">{{ forloop.counter }}</span>
+                <input type="text" name="item_key" value="{{ item.key }}"
+                       placeholder="{% trans 'key' %}" spellcheck="false"
+                       aria-label="{% trans 'Item key' %}"
+                       {% if consent_locked %}readonly{% endif %}>
+                <label class="sed-req">
+                  <input type="checkbox" name="item_required" value="{{ item.key }}"
+                         {% if item.required %}checked{% endif %}
+                         {% if consent_locked %}disabled{% endif %}>
+                  {% trans "required" %}
+                </label>
+                <button type="button" class="sed-del" data-del="1"
+                        title="{% trans 'Remove this item' %}"
+                        aria-label="{% trans 'Remove this item' %}"
+                        {% if consent_locked %}hidden{% endif %}>
+                  <span class="material-icons-outlined">delete_outline</span>
+                </button>
+              </div>
+              <textarea name="item_text" rows="4"
+                        aria-label="{% trans 'Item text' %}"
+                        {% if consent_locked %}readonly{% endif %}>{{ item.text }}</textarea>
+            </div>
+          {% endfor %}
+        </div>
+
+        <button type="button" class="sed-add" id="addItemBtn"
+                {% if consent_locked %}hidden{% endif %}>
+          <span class="material-icons-outlined">add</span>{% trans "Add a tick-box" %}
+        </button>
+      </div>
+    </div>
+
+    {# ── Questionnaires ─────────────────────────────────────── #}
+    <div class="sed-card">
+      <div class="sed-sec">{% trans "Questionnaires" %}</div>
+      <p class="sed-sec-note">
+        {% trans "Optional hand-offs after consent. These are links out, so completion is not reported back." %}
+      </p>
+      <div class="sed-grid2">
+        {% include "settings/_field.html" with field=form.consent_survey_url %}
+        {% include "settings/_field.html" with field=form.baseline_url %}
+      </div>
+    </div>
+
+    {# ── Governance ─────────────────────────────────────────── #}
+    <div class="sed-card">
+      <div class="sed-sec">{% trans "Governance" %}</div>
+      <p class="sed-sec-note">{% trans "Shown to participants on the consent page." %}</p>
+      <div class="sed-grid2">
+        {% include "settings/_field.html" with field=form.chief_investigator %}
+        {% include "settings/_field.html" with field=form.iras_project_id %}
+      </div>
+    </div>
+
+    <div class="sed-acts">
+      <button type="submit" class="sed-save">{% trans "Save study" %}</button>
+      <a class="sed-cancel" href="{% url 'config' %}?tab=participants#participants">
+        {% trans "Cancel" %}
+      </a>
+    </div>
+  </form>
+
+  {% if not enrolment_count %}
+    {% trans "Delete this study? This cannot be undone." as t_confirm_delete %}
+    <form method="post" action="{% url 'study_delete' study.pk %}" class="sed-danger"
+          onsubmit="return confirm('{{ t_confirm_delete|escapejs }}');">
+      {% csrf_token %}
+      <button type="submit">{% trans "Delete this study" %}</button>
+      <p>{% trans "Possible only while nobody is enrolled. Once there are participants, close the study instead." %}</p>
+    </form>
+  {% endif %}
+</div>
+
+{% trans "key" as t_key %}{% trans "required" as t_required %}
+<script>
+  (function () {
+    var rows = document.getElementById('itemRows');
+    var add  = document.getElementById('addItemBtn');
+
+    function renumber() {
+      rows.querySelectorAll('[data-row] .sed-item-n').forEach(function (el, i) {
+        el.textContent = String(i + 1);
+      });
+    }
+
+    if (rows) {
+      rows.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('[data-del]');
+        if (btn) { btn.closest('[data-row]').remove(); renumber(); }
+      });
+
+      // The "required" checkbox carries its row's key as its value, so renaming a
+      // key has to move the tick with it — otherwise editing a key silently makes
+      // a required item optional.
+      rows.addEventListener('input', function (ev) {
+        if (!ev.target.matches('[name="item_key"]')) { return; }
+        var req = ev.target.closest('[data-row]').querySelector('[name="item_required"]');
+        if (req) { req.value = ev.target.value.trim(); }
+      });
+    }
+
+    // A signed version is read-only, but raising the version number is exactly
+    // how new wording starts — so the tick-boxes open up as soon as the version
+    // field holds something other than the signed one, and close again if it is
+    // put back. The server applies the same rule to whatever is posted.
+    var ver = document.querySelector('[name="consent_version"]');
+    if (rows && ver && rows.hasAttribute('data-signed-version')) {
+      var signed = rows.getAttribute('data-signed-version');
+      var lockNote = document.getElementById('lockNote');
+      var newNote = document.getElementById('newVersionNote');
+      var sync = function () {
+        var v = ver.value.trim();
+        var open = v !== '' && v !== signed;
+        rows.querySelectorAll('[name="item_key"], [name="item_text"]').forEach(function (el) {
+          el.readOnly = !open;
+        });
+        rows.querySelectorAll('[name="item_required"]').forEach(function (el) {
+          el.disabled = !open;
+        });
+        rows.querySelectorAll('[data-del]').forEach(function (el) { el.hidden = !open; });
+        if (add) { add.hidden = !open; }
+        if (lockNote) { lockNote.hidden = open; }
+        if (newNote) {
+          newNote.hidden = !open;
+          newNote.querySelector('[data-new-version]').textContent = v;
+        }
+      };
+      ver.addEventListener('input', sync);
+      sync();
+    }
+
+    if (add && rows) {
+      add.addEventListener('click', function () {
+        var row = document.createElement('div');
+        row.className = 'sed-item';
+        row.setAttribute('data-row', '1');
+        row.innerHTML =
+          '<div class="sed-item-top">' +
+            '<span class="sed-item-n"></span>' +
+            '<input type="text" name="item_key" placeholder="{{ t_key|force_escape|escapejs }}" spellcheck="false">' +
+            '<label class="sed-req"><input type="checkbox" name="item_required" value="" checked> {{ t_required|force_escape|escapejs }}</label>' +
+            '<button type="button" class="sed-del" data-del="1">' +
+            '<span class="material-icons-outlined">delete_outline</span></button>' +
+          '</div>' +
+          '<textarea name="item_text" rows="4"></textarea>';
+        rows.appendChild(row);
+        renumber();
+        row.querySelector('[name="item_key"]').focus();
+      });
+    }
+  }());
+</script>
+{% endblock %}

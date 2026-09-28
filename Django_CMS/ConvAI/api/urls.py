@@ -9,6 +9,7 @@ from .views import (
     ProtocolQuestionsView, MeetingAnswersUpsertView, PatientMeetingsListView,
     PatientDetailsAppendView, ConversationVisibilityView,
     ConversationSummaryView, RunView, RunSummaryView, RunVisibilityView,
+    EnrolmentLookupView,
 )
 
 urlpatterns = [
@@ -39,4 +40,7 @@ urlpatterns = [
     path("api/v1/run/", RunView.as_view(), name="api_run"),
     path("api/v1/run/summary/", RunSummaryView.as_view(), name="api_run_summary"),
     path("api/v1/run/visibility/", RunVisibilityView.as_view(), name="api_run_visibility"),
+    # Is this person enrolled in a study? 404s while STUDY_ENROLMENT_ENABLED is
+    # off. Token-authenticated, and never returns the access code itself.
+    path("api/v1/enrolments/", EnrolmentLookupView.as_view(), name="api_enrolments"),
 ]

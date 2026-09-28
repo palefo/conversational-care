@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import ConvAIUser, Message, CallLeg, CallRecording, Caregiver, Patient, Meeting, Protocol, Question, Answer, Agent, Conversation, SelfRegistration, Alert, RagDocument
+from .models import ConvAIUser, Message, CallLeg, CallRecording, Caregiver, Patient, Meeting, Protocol, Question, Answer, Agent, Conversation, SelfRegistration, Alert, RagDocument, Study, Enrolment, ConsentRecord
 from django.db.models import Q
 from django.utils.html import format_html, escape
 from django.utils.safestring import mark_safe
@@ -19,6 +19,24 @@ class ConvAIUserAdmin(UserAdmin):
     add_fieldsets = UserAdmin.add_fieldsets + (
         ("Settings", {"fields": ("phone_number", "agent")}),
     )
+
+    def get_fieldsets(self, request, obj=None):
+        """Offer the study field only where study enrolment is switched on.
+
+        With it off the platform has to look exactly as it did before the feature
+        existed, so an installation that never runs a study is never asked which
+        study a member of staff belongs to.
+        """
+        from .site_config import get_bool
+
+        fieldsets = super().get_fieldsets(request, obj)
+        if not get_bool("STUDY_ENROLMENT_ENABLED"):
+            return fieldsets
+        return tuple(
+            (name, {**opts, "fields": tuple(opts["fields"]) + ("study",)}
+                   if name == "Settings" else opts)
+            for name, opts in fieldsets
+        )
 
 
 class HasInputAudioFilter(admin.SimpleListFilter):
@@ -431,3 +449,118 @@ class AlertAdmin(admin.ModelAdmin):
     list_filter = ("alert_type", "priority", "status", "user")
     search_fields = ("title", "description", "data")
     actions = [mark_resolved]
+
+### Study enrolment
+#
+# The app has its own pages for all of this (Settings -> Participants, the
+# enrolment panel on Clients, and each participant's page), which is where a
+# study team should work. These registrations
+# are the administrator's fallback: somewhere to look when a row is behaving oddly,
+# and somewhere to fix data the UI deliberately will not let anybody touch.
+
+
+class _EnrolmentGatedAdmin(admin.ModelAdmin):
+    """Present in the registry, invisible while study enrolment is off.
+
+    Admin registration happens at import time, long before the database can be
+    read, so these cannot be registered conditionally. Denying module permission
+    achieves the same thing at the point it matters: the models vanish from the
+    admin index and their pages 403, so an installation that is not running a
+    study sees the admin exactly as it was before this feature.
+    """
+
+    @staticmethod
+    def _on() -> bool:
+        from .site_config import get_bool
+        return get_bool("STUDY_ENROLMENT_ENABLED")
+
+    def has_module_permission(self, request):
+        return self._on() and super().has_module_permission(request)
+
+    def has_view_permission(self, request, obj=None):
+        return self._on() and super().has_view_permission(request, obj)
+
+    def has_add_permission(self, request):
+        return self._on() and super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self._on() and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._on() and super().has_delete_permission(request, obj)
+
+
+class ConsentRecordInline(admin.TabularInline):
+    """Read-only by construction: ConsentRecord refuses to be re-saved.
+
+    Shown inline because the consent history is the thing you actually want when
+    you open an enrolment in the admin.
+    """
+    model = ConsentRecord
+    extra = 0
+    can_delete = False
+    fields = ("consent_version", "items", "agreed_at", "ip_address")
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Study)
+class StudyAdmin(_EnrolmentGatedAdmin):
+    list_display = ("display_name", "slug", "consent_version", "is_open",
+                    "enrolment_count", "chief_investigator")
+    list_filter = ("is_open",)
+    search_fields = ("display_name", "slug", "iras_project_id", "chief_investigator")
+    readonly_fields = ("created_at", "updated_at")
+
+    @admin.display(description="Participants")
+    def enrolment_count(self, obj):
+        return obj.enrolments.count()
+
+    def has_delete_permission(self, request, obj=None):
+        # A study with participants is a record about real people. The FK is
+        # PROTECTed anyway; this keeps the button from appearing at all.
+        if obj is not None and obj.enrolments.exists():
+            return False
+        return request.user.is_superuser and super().has_delete_permission(request, obj)
+
+
+@admin.register(Enrolment)
+class EnrolmentAdmin(_EnrolmentGatedAdmin):
+    list_display = ("name", "lastname", "study", "access_code", "status",
+                    "claimed_at", "patient", "created_at")
+    list_filter = ("study", "status")
+    search_fields = ("name", "lastname", "access_code")
+    readonly_fields = ("claimed_at", "created_at", "updated_at", "withdrawn_at")
+    autocomplete_fields = ()
+    inlines = [ConsentRecordInline]
+
+    def has_delete_permission(self, request, obj=None):
+        # Deleting an enrolment would cascade to its consent records, which are
+        # not deletable on their own for good reason. Withdraw instead.
+        if obj is not None and obj.consents.exists():
+            return False
+        return request.user.is_superuser and super().has_delete_permission(request, obj)
+
+
+@admin.register(ConsentRecord)
+class ConsentRecordAdmin(_EnrolmentGatedAdmin):
+    """Deliberately look-only. The model raises on any re-save; this makes the
+    admin agree with it rather than offering a form that cannot be submitted."""
+
+    list_display = ("enrolment", "consent_version", "agreed_at", "ip_address")
+    list_filter = ("consent_version", "enrolment__study")
+    search_fields = ("enrolment__name", "enrolment__lastname", "enrolment__access_code")
+    readonly_fields = ("enrolment", "consent_version", "items", "items_text",
+                       "agreed_at", "ip_address", "user_agent")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # Consent is evidence. Deleting it is not an administrative convenience.
+        return False

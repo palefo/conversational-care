@@ -1,0 +1,101 @@
+{% extends "enrolment/_base.html" %}{% load i18n %}
+{% block title %}{% trans "Consent" %}{% endblock %}
+{% block card_class %}join-card--wide{% endblock %}
+{% block subtitle %}{{ study.display_name }}{% endblock %}
+{% block steps %}
+  <div class="join-steps">
+    <span>{% trans "Your code" %}</span>
+    <span class="is-now">{% trans "Consent" %}</span>
+    <span>{% trans "Done" %}</span>
+  </div>
+{% endblock %}
+{% block content %}
+
+  {% if study.consent_intro %}
+    <div class="join-intro">{{ study.consent_intro|linebreaksbr }}</div>
+  {% endif %}
+
+  {% if study.pis_url %}
+    {% comment %}
+      The information sheet gates the form: the tick-boxes stay disabled until it
+      has been opened. Kept from the original implementation, because somebody
+      agreeing to a study they have not been able to read about is the failure
+      this page exists to prevent. It is a prompt, not proof — noted as a
+      limitation in the documentation rather than dressed up as one.
+    {% endcomment %}
+    <p class="join-intro" style="margin-bottom:1rem">
+      <a id="pisLink" href="{{ study.pis_url }}" target="_blank" rel="noopener">
+        {% trans "Open the Participant Information Sheet (new tab)" %} &rarr;
+      </a>
+    </p>
+  {% endif %}
+
+  <form method="post" class="form" id="consentForm">
+    {% csrf_token %}
+
+    <div>
+      {% for item in items %}
+        <label class="consent-item">
+          <input type="checkbox" name="item_{{ item.key }}"
+                 data-consent-box="1"
+                 {% if item.required %}data-required="1"{% endif %}
+                 {% if item.checked %}checked{% endif %}
+                 {% if study.pis_url %}disabled{% endif %}>
+          <span>
+            {{ item.text }}
+            {% if item.required %}<span class="consent-required">*</span>{% endif %}
+          </span>
+        </label>
+      {% endfor %}
+    </div>
+
+    {% if study.pis_url %}
+      <p class="field-hint" id="gateHint">
+        {% trans "Please open the information sheet above to enable these boxes." %}
+      </p>
+    {% endif %}
+
+    <button type="submit" class="submit-button" id="consentSubmit" disabled>
+      {% trans "I agree — continue" %}
+    </button>
+  </form>
+
+  <div class="join-meta">
+    <span>{% trans "Consent version" %} {{ study.consent_version }}</span>
+    {% if study.chief_investigator %}
+      <span>{% trans "Chief investigator" %}: {{ study.chief_investigator }}</span>
+    {% endif %}
+    {% if study.iras_project_id %}
+      <span>IRAS {{ study.iras_project_id }}</span>
+    {% endif %}
+  </div>
+
+  {% trans "Please tick each required box to continue." as t_tick_each %}
+  <script>
+    (function () {
+      var boxes  = Array.prototype.slice.call(document.querySelectorAll('[data-consent-box]'));
+      var submit = document.getElementById('consentSubmit');
+      var pis    = document.getElementById('pisLink');
+      var hint   = document.getElementById('gateHint');
+
+      function refresh() {
+        // Every *required* box must be ticked. Optional ones are recorded either
+        // way, so they must not block the button.
+        var ok = boxes.every(function (b) {
+          return b.dataset.required !== '1' || b.checked;
+        });
+        submit.disabled = !ok || boxes.some(function (b) { return b.disabled; });
+      }
+
+      function unlock() {
+        boxes.forEach(function (b) { b.disabled = false; });
+        if (hint) { hint.textContent = '{{ t_tick_each|escapejs }}'; }
+        refresh();
+      }
+
+      boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+      if (pis) { pis.addEventListener('click', unlock); } else { unlock(); }
+      refresh();
+    }());
+  </script>
+{% endblock %}

@@ -1480,6 +1480,29 @@ def _invoke_langgraph_for_agent(agent: Agent, user_message: str, thread_id: str,
     except Exception:
         return "Sorry, something went wrong generating the response."
 
+def _enrolment_join_url() -> str:
+    """Absolute URL of the public join page, or "" when it cannot be built.
+
+    Absolute because it is about to be sent to somebody's phone, where a relative
+    path is useless — and there is no request to build it from, since an inbound
+    WhatsApp message is not a page view.
+
+    It reuses ``AGENT_CALLBACK_URL``, which is already "this platform's public
+    base URL" (it is what remote agents are told to call back on). A second
+    setting holding the same hostname would be one more thing to get out of step.
+    Blank there simply means no link is offered; the agent then registers the
+    person normally rather than pointing them at a URL it had to invent.
+    """
+    from .site_config import get_bool, get_setting
+
+    if not get_bool("STUDY_ENROLMENT_ENABLED"):
+        return ""
+    base = (get_setting("AGENT_CALLBACK_URL") or "").strip().rstrip("/")
+    if not base.startswith(("http://", "https://")):
+        return ""
+    return f"{base}/join/"
+
+
 def _handle_self_registration_flow(phone: str, text: str, channel: str = "whatsapp") -> str | None:
     if not _selfreg_enabled():
         return None
@@ -1505,6 +1528,11 @@ def _handle_self_registration_flow(phone: str, text: str, channel: str = "whatsa
             "platform_language": getattr(settings, "LANGUAGE_CODE", None),
             "brand_name": brand_name(),
         }
+        # Only where a study is running. Its presence is what switches the agent
+        # over to asking about access codes at all — see participant_management.md.
+        join_url = _enrolment_join_url()
+        if join_url:
+            configurable["join_url"] = join_url
         model_name = (getattr(agent, "model", "") or "").strip() or None
         reply = run_native(agent.native_key, thread_id, text, configurable, model_name)
     else:

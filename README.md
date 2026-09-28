@@ -55,6 +55,9 @@ Topic deep dives:
 - [Whose a message is](message_attribution.md) — how every message is tied to
   a client (or a login) when it arrives, so a phone number that changes hands
   takes neither the history nor the access with it.
+- [Participant management](participant_management.md) — for deployments running a
+  research study: pre-enrolling participants, three-word access codes, the public
+  join page, and versioned append-only consent. Off by default.
 - [Agent tools & summaries](agent_tools.md) — the platform tools a prompt-based
   agent can be given from the agent form, the summary an agent writes for the
   client's link worker, and how a remote agent authenticates to write one.

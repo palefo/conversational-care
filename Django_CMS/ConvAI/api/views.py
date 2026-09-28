@@ -1212,3 +1212,68 @@ class RunVisibilityView(_RunView):
         logger.info("Conversation %s visibility set to hidden=%s by %s",
                     conv.id, hidden, request.user.get_username())
         return Response(self._out(conv, request.auth), status=status.HTTP_200_OK)
+
+
+class EnrolmentLookupView(APIView):
+    """
+    GET /api/v1/enrolments/?phone=+447700900000
+    GET /api/v1/enrolments/?code=maple-crane-frost
+
+    Whether somebody is enrolled in a study, for an external agent that needs to
+    know who it is talking to before it answers.
+
+    This replaces an endpoint in the implementation it came from that was
+    unauthenticated and CSRF-exempt, and returned a participant's name for any
+    phone number posted to it — a lookup oracle for whether a given person is in
+    a study. Here it needs the same bearer token as everything else, and 404s
+    entirely while study enrolment is switched off.
+
+    It deliberately does not return the access code: the code is a credential,
+    and reading it back out over the API would make a token that can list
+    participants into a token that can impersonate them.
+    """
+    authentication_classes = AUTH_CLASSES
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        from django.http import Http404
+
+        from .. import enrolment as enrolment_service
+        from ..enrolment.codes import normalise_code
+        from ..models import Enrolment
+
+        if not enrolment_service.enabled():
+            raise Http404
+
+        phone = (request.query_params.get("phone") or "").strip()
+        code = normalise_code(request.query_params.get("code") or "")
+        if not phone and not code:
+            return Response(
+                {"detail": "Provide either ?phone= or ?code=."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Newest first: one number can have been enrolled more than once (a
+        # withdrawal and a later re-enrolment), and the latest is the live one.
+        qs = Enrolment.objects.select_related("study", "patient").order_by("-created_at")
+        row = qs.filter(access_code=code).first() if code else qs.filter(phone_number=phone).first()
+
+        if row is None:
+            return Response({"enrolled": False}, status=status.HTTP_200_OK)
+
+        latest = row.latest_consent
+        return Response({
+            "enrolled": True,
+            "name": row.name,
+            "lastname": row.lastname,
+            "study": row.study.slug,
+            "study_name": row.study.display_name,
+            "status": row.status,
+            "patient_id": row.patient_id,
+            "consent": {
+                "given": latest is not None,
+                "version": latest.consent_version if latest else None,
+                "current": row.consent_is_current,
+                "at": latest.agreed_at.isoformat() if latest else None,
+            },
+        }, status=status.HTTP_200_OK)

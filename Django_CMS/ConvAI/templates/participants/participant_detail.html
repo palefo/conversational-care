@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% load i18n static custom_filters %}
+
+{% block title %}{{ enrolment.name }} {{ enrolment.lastname }}{% endblock %}
+
+{% block content %}
+<style>
+  .pd-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:1.25rem; }
+  @media (max-width:900px) { .pd-grid { grid-template-columns:minmax(0,1fr); } }
+  /* display:block is load-bearing: a global rule lays every <dl> out as a
+     three-column grid, which turns each row below into a grid cell. */
+  .pd-dl { display:block; font-size:.875rem; }
+  .pd-dl div { display:flex; justify-content:space-between; gap:1rem;
+               padding:.5rem 0; border-bottom:1px solid var(--border,#eef2f6); }
+  .pd-dl dt { color:var(--muted,#64748b); }
+  .pd-dl dd { margin:0; text-align:right; color:var(--fg,#0f172a); }
+  .pd-code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+             background:var(--surface-2,#f1f5f9); padding:.15rem .45rem; border-radius:.35rem; }
+  .pd-status { font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;
+               font-weight:600; padding:.2rem .5rem; border-radius:999px; }
+  .s-invited{background:#eff6ff;color:#1d4ed8}.s-consented{background:#f0fdf4;color:#15803d}
+  .s-active{background:#ecfdf5;color:#047857}.s-completed{background:#f5f3ff;color:#6d28d9}
+  .s-withdrawn{background:#fef2f2;color:#b91c1c}
+  .pd-consent { border:1px solid var(--border,#e2e8f0); border-radius:.6rem;
+                padding:.85rem 1rem; margin-bottom:.75rem; font-size:.8rem; }
+  .pd-consent-items { margin-top:.6rem; }
+  .pd-consent-items li { list-style:none; display:flex; gap:.5rem; padding:.2rem 0;
+                         color:var(--muted,#475569); line-height:1.45; }
+  .pd-yes { color:#15803d; font-weight:700; }
+  .pd-no  { color:#b91c1c; font-weight:700; }
+</style>
+
+<div class="mb-5">
+  <a href="{% url 'patients' %}" class="text-sm text-sky-700 hover:underline">
+    &larr; {% trans "Clients" %}
+  </a>
+  <h1 class="text-2xl font-semibold text-gray-800 mt-2">
+    {{ enrolment.name }} {{ enrolment.lastname }}
+    <span class="pd-status s-{{ enrolment.status }}">{{ enrolment.get_status_display }}</span>
+  </h1>
+  <p class="text-sm text-gray-500 mt-1">{{ enrolment.study.display_name }}</p>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="mb-4 px-4 py-3 rounded-lg text-sm
+      {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200
+      {% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
+      {{ message }}
+    </div>
+  {% endfor %}
+{% endif %}
+
+{% if enrolment.status == 'consented' and not enrolment.patient %}
+  <div class="mb-5 px-4 py-3 rounded-lg bg-sky-50 border border-sky-100 text-sky-900 text-sm">
+    {% trans "This participant has consented but has no client record yet." %}
+    {% if not auto_approve %}
+      <form method="post" action="{% url 'participant_approve' enrolment.pk %}" style="display:inline">
+        {% csrf_token %}
+        <button type="submit" class="underline font-medium">{% trans "Admit them now" %}</button>
+      </form>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% if not consent_is_current and enrolment.latest_consent %}
+  <div class="mb-5 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+    {% blocktrans with had=enrolment.latest_consent.consent_version now=enrolment.study.consent_version %}
+      This participant consented to version {{ had }}, but the study is now on version {{ now }}.
+      They will be asked to consent again next time they visit the join page.
+    {% endblocktrans %}
+  </div>
+{% endif %}
+
+<div class="pd-grid">
+
+  {# ── Enrolment ─────────────────────────────────────────────── #}
+  <div class="card p-5">
+    <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+      {% trans "Enrolment" %}
+    </div>
+    <dl class="pd-dl">
+      <div><dt>{% trans "Access code" %}</dt><dd><span class="pd-code">{{ enrolment.access_code }}</span></dd></div>
+      <div><dt>{% trans "Study" %}</dt><dd>{{ enrolment.study.display_name }}</dd></div>
+      <div><dt>{% trans "Enrolled" %}</dt><dd>{{ enrolment.created_at|date:"j M Y, H:i" }}</dd></div>
+      <div><dt>{% trans "Enrolled by" %}</dt><dd>{{ enrolment.created_by|default:"&mdash;" }}</dd></div>
+      <div><dt>{% trans "Claimed" %}</dt>
+        <dd>{% if enrolment.claimed_at %}{{ enrolment.claimed_at|date:"j M Y, H:i" }}
+            {% else %}<span class="text-gray-400">{% trans "not yet" %}</span>{% endif %}</dd></div>
+      {% if enrolment.date_of_birth %}
+        <div><dt>{% trans "Date of birth" %}</dt><dd>{{ enrolment.date_of_birth|date:"j M Y" }}</dd></div>
+      {% endif %}
+      <div><dt>{% trans "Mobile" %}</dt><dd>{{ enrolment.phone_number|default:"&mdash;" }}</dd></div>
+      <div><dt>{% trans "Client record" %}</dt>
+        <dd>{% if enrolment.patient %}
+              <a href="{% url 'patient_detail' enrolment.patient.pk %}" class="text-sky-700 hover:underline">
+                {% trans "open" %} &rarr;</a>
+            {% else %}<span class="text-gray-400">{% trans "none" %}</span>{% endif %}</dd></div>
+      {% if enrolment.withdrawn_at %}
+        <div><dt>{% trans "Withdrawn" %}</dt><dd>{{ enrolment.withdrawn_at|date:"j M Y, H:i" }}</dd></div>
+        {% if enrolment.withdrawn_reason %}
+          <div><dt>{% trans "Reason" %}</dt><dd>{{ enrolment.withdrawn_reason }}</dd></div>
+        {% endif %}
+      {% endif %}
+    </dl>
+
+    {% if enrolment.status != 'withdrawn' %}
+      {% if enrolment.patient %}
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:flex-end;margin-top:1rem">
+        <form method="post" action="{% url 'participant_status' enrolment.pk %}"
+              style="display:flex;gap:.5rem;align-items:flex-end">
+          {% csrf_token %}
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">{% trans "Status" %}</label>
+            <select name="status" class="form-select">
+              {% for value, label in manual_statuses %}
+                <option value="{{ value }}" {% if enrolment.status == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="button-secondary py-2 px-3 rounded-lg text-sm">{% trans "Update" %}</button>
+        </form>
+      </div>
+      {% endif %}
+
+      <details style="margin-top:1.25rem">
+        <summary class="text-sm text-red-700" style="cursor:pointer">{% trans "Withdraw this participant" %}</summary>
+        <div class="px-4 py-3 mt-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-600">
+          <p class="mb-2">
+            {% trans "Withdrawing stops the platform messaging them: their agent is switched off. It does not delete anything — the conversations they had and the consent they gave are part of the study's record." %}
+          </p>
+          <form method="post" action="{% url 'participant_withdraw' enrolment.pk %}">
+            {% csrf_token %}
+            <input type="text" name="reason" class="form-control mb-2"
+                   placeholder="{% trans 'Reason (optional)' %}">
+            <button type="submit" class="py-2 px-4 rounded-lg text-sm font-medium"
+                    style="background:#b91c1c;color:#fff">{% trans "Withdraw" %}</button>
+          </form>
+        </div>
+      </details>
+    {% endif %}
+  </div>
+
+  {# ── Consent history ───────────────────────────────────────── #}
+  <div class="card p-5">
+    <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+      {% trans "Consent history" %}
+    </div>
+    {% comment %}
+      Every consent ever given, newest first, with the wording as it was shown at
+      the time. Records are never edited, so this is the audit trail: what this
+      person agreed to, in the words they actually read.
+    {% endcomment %}
+    {% if consents %}
+      {% for c in consents %}
+        <div class="pd-consent">
+          <div style="display:flex;justify-content:space-between;gap:1rem">
+            <strong>{% trans "Version" %} {{ c.consent_version }}</strong>
+            <span class="text-gray-500">{{ c.agreed_at|date:"j M Y, H:i" }}</span>
+          </div>
+          <ul class="pd-consent-items">
+            {% for key, agreed in c.items.items %}
+              <li>
+                <span class="{% if agreed %}pd-yes{% else %}pd-no{% endif %}">
+                  {% if agreed %}&check;{% else %}&times;{% endif %}
+                </span>
+                <span>{{ c.items_text|get_item:key|default:key }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+          {% if c.ip_address %}
+            <div class="text-xs text-gray-400 mt-2">{% trans "Recorded from" %} {{ c.ip_address }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-sm text-gray-500">
+        {% trans "No consent recorded yet. This participant has not completed the join page." %}
+      </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

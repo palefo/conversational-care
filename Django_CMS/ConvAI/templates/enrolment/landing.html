@@ -1,0 +1,13 @@
+{% extends "enrolment/_base.html" %}{% load i18n %}
+{% block title %}{% trans "Join" %}{% endblock %}
+{% block subtitle %}{% trans "Welcome" %}{% endblock %}
+{% block content %}
+  <p class="join-intro">{{ landing_text }}</p>
+
+  <a class="submit-button" style="display:block;text-align:center;text-decoration:none"
+     href="{% url 'enrolment_claim' %}">{% trans "I have an access code" %}</a>
+
+  <a class="auth-link" href="{% url 'enrolment_resume' %}">
+    {% trans "I have already joined — continue where I left off" %}
+  </a>
+{% endblock %}
