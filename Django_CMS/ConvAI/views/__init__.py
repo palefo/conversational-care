@@ -10,11 +10,14 @@ from .communications import *
 from .dashboard import *
 from .exports import *
 from .feedback import *
+from .join import *
 from .media import *
 from .notes import *
+from .participants import *
 from .patients import *
 from .protocols import *
 from .rag import *
 from .settings_views import *
+from .studies import *
 from .summaries import *
 from .users import *

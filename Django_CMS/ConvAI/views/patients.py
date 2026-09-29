@@ -1,5 +1,6 @@
 from ._base import *  # noqa: F401,F403
 from ._panel import panel_context, fold_recordings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max
 from .. import conversation_privacy, conversation_summary
 from ..forms import ClientForm, PatientForm
@@ -187,12 +188,18 @@ def patient_list(request):
         })
 
     admin = is_admin(request.user)
+    # Study enrolment, where it is switched on: the people who have been issued a
+    # code and not arrived yet, and the form for issuing one. Falsy while the
+    # feature is off, and the template then renders exactly as it did before.
+    from .participants import enrolment_context
+
     return render(request, 'patients/patient_list.html', {
         'rows_json': json.dumps(rows_data),
         'navigator_options_json': json.dumps(sorted(navigator_names)),
         'active_page': 'patients',
         'client_form': ClientForm(is_admin=admin),
         'client_admin': admin,
+        'enrolment': enrolment_context(request),
     })
 
 
@@ -446,6 +453,24 @@ def build_patient_events(patient, protocol_numbers=None):
     return events
 
 
+def _client_enrolment(patient):
+    """This client's study enrolment, or None.
+
+    None both when the feature is off and when the client was never enrolled
+    through a study — most clients on most installations. The related name is
+    a reverse one-to-one, so a client with no enrolment raises rather than
+    returning None, which is what the try covers.
+    """
+    from .. import enrolment as enrolment_service
+
+    if not enrolment_service.enabled():
+        return None
+    try:
+        return patient.enrolment
+    except ObjectDoesNotExist:
+        return None
+
+
 @login_required
 def patient_detail(request, pk):
     patient = get_object_or_404(
@@ -562,6 +587,10 @@ def patient_detail(request, pk):
         'timeline_count': len(timeline),
         'last_contact': last_contact,
         'protocols_executed': protocols_executed,
+        # The study this client came in through, where the platform runs one and
+        # this client was enrolled through it. None otherwise, and the template
+        # then renders exactly as it did before study enrolment existed.
+        'enrolment': _client_enrolment(patient),
         # send_care_plan_whatsapp 403s when the flag is off, so the button is
         # hidden rather than shown and broken. A caregiver number is the other
         # half of it — there is nowhere to send it without one.

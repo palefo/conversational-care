@@ -1,0 +1,43 @@
+{% extends "enrolment/_base.html" %}{% load i18n %}
+{% block title %}{% trans "You are all set" %}{% endblock %}
+{% block subtitle %}{% trans "Thank you" %}{% endblock %}
+{% block steps %}
+  <div class="join-steps">
+    <span>{% trans "Your code" %}</span>
+    <span>{% trans "Consent" %}</span>
+    <span class="is-now">{% trans "Done" %}</span>
+  </div>
+{% endblock %}
+{% block content %}
+
+  <div class="join-intro">
+    <p><strong>{% blocktrans with name=enrolment.name %}Thank you, {{ name }}.{% endblocktrans %}</strong></p>
+    <p style="margin-top:.5rem">
+      {% blocktrans with study=study.display_name %}Your consent for {{ study }} has been recorded.{% endblocktrans %}
+      {% if awaiting_approval %}
+        {% trans "Someone from the study team will be in touch shortly to finish setting up your account." %}
+      {% endif %}
+    </p>
+  </div>
+
+  {% if study.consent_survey_url %}
+    <a class="submit-button" style="display:block;text-align:center;text-decoration:none"
+       href="{{ study.consent_survey_url }}">{% trans "Continue to the questionnaire" %}</a>
+    <p class="field-hint" style="text-align:center;margin-top:.5rem">
+      {% trans "This opens a short form hosted by the study team." %}
+    </p>
+  {% elif study.baseline_url %}
+    <a class="submit-button" style="display:block;text-align:center;text-decoration:none"
+       href="{{ study.baseline_url }}">{% trans "Continue to the baseline questionnaire" %}</a>
+  {% endif %}
+
+  <div class="join-meta">
+    <span>{% trans "Access code" %}: <span class="join-code">{{ enrolment.access_code }}</span></span>
+    <span>{% trans "Consent version" %} {{ consent.consent_version }}</span>
+    <span>{{ consent.agreed_at|date:"j M Y, H:i" }}</span>
+  </div>
+
+  <p class="field-hint" style="margin-top:1rem">
+    {% trans "Keep your access code. You can use it to come back to this page at any time." %}
+  </p>
+{% endblock %}

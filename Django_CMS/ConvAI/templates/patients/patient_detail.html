@@ -286,6 +286,78 @@
     </div>
   </form>
 
+  {% comment %}
+    Study enrolment, for a client who came in through one. It lives here rather
+    than on a separate participants page because this person *is* the
+    participant — one Patient row — and their link worker should not have to go
+    somewhere else to see what they consented to.
+
+    Absent entirely for a client who was not enrolled through a study, and while
+    the feature is off.
+  {% endcomment %}
+  {% if enrolment %}
+    <div class="pd-sec">
+      <p class="pd-sect">{% trans "Study" %}</p>
+      <div class="pd-box">
+        <dl class="pd-dl" style="display:block">
+          <div>
+            <dt>{% trans "Study" %}</dt>
+            <dd>{{ enrolment.study.display_name }}</dd>
+          </div>
+          <div>
+            <dt>{% trans "Status" %}</dt>
+            <dd>{{ enrolment.get_status_display }}</dd>
+          </div>
+          <div>
+            <dt>{% trans "Access code" %}</dt>
+            <dd><code>{{ enrolment.access_code }}</code></dd>
+          </div>
+          {% if enrolment.claimed_at %}
+            <div>
+              <dt>{% trans "Joined" %}</dt>
+              <dd>{{ enrolment.claimed_at|date:"j M Y" }}</dd>
+            </div>
+          {% endif %}
+        </dl>
+
+        {% if not enrolment.consent_is_current and enrolment.latest_consent %}
+          <p class="pd-warn" style="margin-top:.6rem;color:#92400e">
+            {% blocktrans with had=enrolment.latest_consent.consent_version now=enrolment.study.consent_version %}Consented to version {{ had }}; the study is now on {{ now }}. They will be asked again on their next visit.{% endblocktrans %}
+          </p>
+        {% endif %}
+
+        {% if enrolment.consents.all %}
+          <p class="pd-sect" style="margin-top:.9rem">{% trans "Consent" %}</p>
+          {% for c in enrolment.consents.all %}
+            <div style="border:1px solid #e2e8f0;border-radius:.5rem;padding:.7rem .85rem;margin-bottom:.5rem">
+              <div style="display:flex;justify-content:space-between;gap:1rem;font-size:.82rem">
+                <strong>{% trans "Version" %} {{ c.consent_version }}</strong>
+                <span style="color:#64748b">{{ c.agreed_at|date:"j M Y, H:i" }}</span>
+              </div>
+              <ul style="margin:.45rem 0 0;padding:0;list-style:none">
+                {% for key, agreed in c.items.items %}
+                  <li style="display:flex;gap:.45rem;padding:.15rem 0;font-size:.78rem;line-height:1.45;color:#475569">
+                    <span style="font-weight:700;color:{% if agreed %}#15803d{% else %}#b91c1c{% endif %}">
+                      {% if agreed %}&check;{% else %}&times;{% endif %}
+                    </span>
+                    <span>{{ c.items_text|get_item:key|default:key }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p style="font-size:.82rem;color:#64748b;margin-top:.6rem">
+            {% trans "No consent recorded." %}
+          </p>
+        {% endif %}
+
+        <a href="{% url 'participant_detail' enrolment.pk %}"
+           style="font-size:.8rem">{% trans "Manage enrolment" %} &rarr;</a>
+      </div>
+    </div>
+  {% endif %}
+
   {% if protocols_executed %}
     <div class="pd-sec">
       <p class="pd-sect">{% trans "Protocols completed" %}</p>

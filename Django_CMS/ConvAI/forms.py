@@ -2,7 +2,8 @@ import json
 import secrets
 
 from django import forms
-from .models import Meeting, Patient, Question, Answer, Agent, SiteConfiguration
+from .models import (Meeting, Patient, Question, Answer, Agent, SiteConfiguration, Study,
+                     ConsentRecord)
 from datetime import date
 from django.contrib.auth import get_user_model
 from django.utils.html import format_html, format_html_join
@@ -1115,6 +1116,258 @@ class ExportConfigForm(forms.ModelForm):
             "message_export_enabled": forms.Select(attrs=_SELECT),
             "conversation_download_enabled": forms.Select(attrs=_SELECT),
         }
+
+
+class ParticipantsConfigForm(forms.ModelForm):
+    """Settings -> Participants: the switch, plus how enrolment behaves.
+
+    One form for all of it, for the reason ExportConfigForm gives: config_save
+    binds the whole form, so splitting the switch from the behaviour would reset
+    whichever half was not on screen.
+    """
+
+    class Meta:
+        model = SiteConfiguration
+        fields = [
+            "study_enrolment_enabled",
+            "enrolment_code_words",
+            "enrolment_code_attempt_limit",
+            "enrolment_require_dob",
+            "enrolment_auto_approve",
+            "enrolment_landing_text",
+        ]
+        labels = {
+            "study_enrolment_enabled": _("Enable study enrolment"),
+            "enrolment_code_words": _("Words per access code"),
+            "enrolment_code_attempt_limit": _("Wrong attempts allowed per hour"),
+            "enrolment_require_dob": _("Ask for date of birth"),
+            "enrolment_auto_approve": _("Admit participants automatically"),
+            "enrolment_landing_text": _("Welcome text on the join page"),
+        }
+        help_texts = {
+            "study_enrolment_enabled": _(
+                "Off by default. When on, you can pre-enrol participants, issue them an "
+                "access code, and take versioned consent at a public join page. While it "
+                "is off that page does not exist, the enrolment panel on Clients is "
+                "hidden, and this tab shows only this switch. "
+                "Switching it off later hides the pages but deletes nothing — "
+                "enrolments and the consent records people signed are kept."),
+            "enrolment_code_words": _(
+                "Three is usually right: short enough to read down a phone line, long "
+                "enough that guessing is hopeless. The limit below is what actually stops "
+                "a script."),
+            "enrolment_code_attempt_limit": _(
+                "How many wrong codes one address may try in an hour before it is locked "
+                "out. An access code is a credential, and this is its real protection."),
+            "enrolment_require_dob": _(
+                "Off by default. Only turn this on if your study needs a date of birth to "
+                "identify participants — if it does not, do not collect it."),
+            "enrolment_auto_approve": _(
+                "On by default. A clinician issuing the code is the vouching, so a valid "
+                "code plus consent creates the client straight away. Turn it off to review "
+                "each one by hand first."),
+            "enrolment_landing_text": _(
+                "Shown on the public join page above the access-code box. Blank uses a "
+                "neutral default."),
+        }
+        widgets = {
+            "study_enrolment_enabled": forms.Select(attrs=_SELECT),
+            "enrolment_require_dob": forms.Select(attrs=_SELECT),
+            "enrolment_auto_approve": forms.Select(attrs=_SELECT),
+            "enrolment_code_words": forms.NumberInput(attrs={**_INPUT, "min": 2, "max": 4}),
+            "enrolment_code_attempt_limit": forms.NumberInput(attrs={**_INPUT, "min": 1, "max": 100}),
+            "enrolment_landing_text": forms.Textarea(attrs={**_INPUT, "rows": 3}),
+        }
+
+    def clean_enrolment_code_words(self):
+        n = self.cleaned_data.get("enrolment_code_words") or 3
+        if not 2 <= n <= 4:
+            raise forms.ValidationError(_("Choose between 2 and 4 words."))
+        return n
+
+
+def _wording(items):
+    """The part of a consent item a participant reads, for comparing versions."""
+    return [(i.get("key"), i.get("text")) for i in items]
+
+
+class StudyForm(forms.ModelForm):
+    """Create or edit one study, including the consent wording participants read.
+
+    The consent tick-boxes are edited as a small table rather than raw JSON, for
+    the same reason the detector table exists: an admin correcting a sentence in a
+    consent form should not be able to break it with a misplaced brace.
+
+    Once somebody has consented to the current version the wording locks, exactly
+    as a protocol locks once answers are recorded against it. Editing from then on
+    means bumping the version, which starts a new one and leaves the existing
+    records pointing at the text those people actually read.
+    """
+
+    # Posted by the consent editor so the form can tell "every tick-box was
+    # deleted" from "this form was built without the editor at all". Without it
+    # an emptied list is indistinguishable from no list, and the save below would
+    # quietly keep the old wording while the admin believed they had removed it.
+    items_submitted = forms.CharField(required=False, widget=forms.HiddenInput)
+
+    class Meta:
+        model = Study
+        fields = [
+            "slug", "display_name", "is_open",
+            "pis_url", "consent_version", "consent_intro",
+            "consent_survey_url", "baseline_url",
+            "require_phone", "default_agent",
+            "chief_investigator", "iras_project_id",
+        ]
+        labels = {
+            "slug": _("Short identifier"),
+            "display_name": _("Study name"),
+            "is_open": _("Open to new enrolments"),
+            "pis_url": _("Participant Information Sheet URL"),
+            "consent_version": _("Consent version"),
+            "consent_intro": _("Introduction above the tick-boxes"),
+            "consent_survey_url": _("Survey after consent"),
+            "baseline_url": _("Baseline questionnaire"),
+            "require_phone": _("Require a mobile number"),
+            "default_agent": _("Agent for this study's participants"),
+            "chief_investigator": _("Chief investigator"),
+            "iras_project_id": _("IRAS project ID"),
+        }
+        help_texts = {
+            "slug": _("Used in URLs and exports. Lower case, no spaces."),
+            "is_open": _("When off, the people already enrolled carry on as normal but "
+                         "no new codes can be claimed."),
+            "consent_version": _("Shown to participants and stored on every consent record. "
+                                 "Bump it whenever the wording below changes materially."),
+            "consent_survey_url": _("Optional. Participants are sent here straight after "
+                                    "consenting, e.g. a Qualtrics form."),
+            "baseline_url": _("Optional. Offered on the confirmation page when no survey is "
+                              "set above. With a survey, have the survey send people on to "
+                              "this when they finish."),
+            "require_phone": _("Needed for a study that reaches people by SMS or WhatsApp."),
+            "default_agent": _("Given to each participant when they consent. Without one, the platform answers their messages with \"no agent is configured\", so set one before anybody joins."),
+        }
+        widgets = {
+            "slug": forms.TextInput(attrs=_INPUT),
+            "display_name": forms.TextInput(attrs=_INPUT),
+            "pis_url": forms.URLInput(attrs=_INPUT),
+            "consent_version": forms.TextInput(attrs=_INPUT),
+            "consent_intro": forms.Textarea(attrs={**_INPUT, "rows": 4}),
+            "consent_survey_url": forms.URLInput(attrs=_INPUT),
+            "baseline_url": forms.URLInput(attrs=_INPUT),
+            "default_agent": forms.Select(attrs=_SELECT),
+            "chief_investigator": forms.TextInput(attrs=_INPUT),
+            "iras_project_id": forms.TextInput(attrs=_INPUT),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["default_agent"].queryset = Agent.objects.all().order_by("name")
+        self.fields["default_agent"].required = False
+        self.fields["default_agent"].empty_label = _("No agent — participants will get no replies")
+        # A locked study still shows its wording; it just cannot be rewritten.
+        self.consent_locked = bool(self.instance.pk and self.instance.consent_locked)
+
+    def _editor_posted(self) -> bool:
+        return bool((self.data.get("items_submitted") or "").strip())
+
+    def _signed(self, version: str) -> bool:
+        """Whether anybody has consented to this study under ``version``."""
+        if not self.instance.pk or not version:
+            return False
+        return ConsentRecord.objects.filter(
+            enrolment__study_id=self.instance.pk, consent_version=version).exists()
+
+    def clean(self):
+        cleaned = super().clean()
+        version = (cleaned.get("consent_version") or "").strip()
+        posted = self._posted_items()
+
+        # The lock belongs to the version being *saved*, not the one on record.
+        # Raising the version and rewording in one save is the whole point of
+        # raising it, so the new wording must go through; keeping the old
+        # version is what keeps the old wording.
+        self.items_locked = self._signed(version)
+
+        if self.items_locked:
+            if version != self.instance.consent_version:
+                raise forms.ValidationError(_(
+                    "Version %(v)s has already been signed under other wording, so it "
+                    "cannot be used again. Choose a version number nobody has signed."
+                ) % {"v": version})
+            # Key and text only. The "required" boxes are disabled while locked,
+            # and a disabled box is never posted — comparing them would make every
+            # save of a signed study look like an attempt to rewrite it, and a
+            # study could then not even be closed.
+            if posted and _wording(posted) != _wording(self.instance.consent_items or []):
+                raise forms.ValidationError(_(
+                    "Somebody has already consented to version %(v)s, so its wording "
+                    "cannot be changed. Raise the consent version to start a new one — "
+                    "the records already signed will keep pointing at the text those "
+                    "participants read."
+                ) % {"v": version})
+        elif self._editor_posted() and not posted:
+            # A consent page with no tick-boxes consents to nothing, and an empty
+            # list would be re-seeded with the shipped defaults by Study.save() —
+            # so the admin would be told nothing and get back wording they did
+            # not choose.
+            raise forms.ValidationError(_(
+                "A study needs at least one consent tick-box. Add one, or close "
+                "the study if it is no longer taking part."
+            ))
+        return cleaned
+
+    @property
+    def items_for_display(self):
+        """What the editor should show: what was typed, after a failed save.
+
+        Re-rendering from the database would throw away consent wording somebody
+        has just written, over an unrelated mistake elsewhere on the page.
+        """
+        if self.is_bound and self._editor_posted():
+            posted = self._posted_items()
+            if posted:
+                return posted
+        return self.instance.consent_items or []
+
+    def _posted_items(self):
+        """Rebuild consent_items from the posted rows, dropping blank ones."""
+        data = self.data
+
+        def many(field):
+            # A real POST is a QueryDict, but the form is also constructed with a
+            # plain dict in tests and scripts. Silently returning nothing there
+            # would drop the consent wording without anybody noticing, which is
+            # the one failure this form must not have.
+            if hasattr(data, "getlist"):
+                return data.getlist(field)
+            value = data.get(field)
+            if value is None:
+                return []
+            return list(value) if isinstance(value, (list, tuple)) else [value]
+
+        keys = many("item_key")
+        texts = many("item_text")
+        required = set(many("item_required"))
+
+        items, seen = [], set()
+        for i, key in enumerate(keys):
+            key = (key or "").strip()
+            text = (texts[i] if i < len(texts) else "").strip()
+            if not key or not text or key in seen:
+                continue
+            seen.add(key)
+            items.append({"key": key, "text": text, "required": key in required})
+        return items
+
+    def save(self, commit=True):
+        study = super().save(commit=False)
+        posted = self._posted_items()
+        if posted and not getattr(self, "items_locked", self.consent_locked):
+            study.consent_items = posted
+        if commit:
+            study.save()
+        return study
 
 
 class ConversationPrivacyConfigForm(forms.ModelForm):

@@ -162,6 +162,55 @@ def _sensei_status_context():
     }
 
 
+def _participants_context(request):
+    """The Participants tab: the studies, the cohort counts, and what is wrong.
+
+    The warnings are the point. A switched-on feature with no open study is a
+    public page that cannot be used, and a study whose consent version has moved
+    past its participants is a governance question somebody will be asked — both
+    are cheap to detect here and expensive to discover later.
+    """
+    from .. import enrolment as enrolment_service
+
+    if not enrolment_service.enabled():
+        # The tab is not rendered at all while the feature is off, so nothing here
+        # is needed — and the settings page should cost exactly what it did before
+        # this feature existed.
+        return {"enabled": False, "studies": [], "any_open": False}
+
+    studies = []
+    for study in Study.objects.all().order_by("display_name"):
+        counts = {
+            row["status"]: row["n"]
+            for row in (Enrolment.objects.filter(study=study)
+                        .values("status").annotate(n=Count("id")))
+        }
+        studies.append({
+            "obj": study,
+            "counts": counts,
+            "total": sum(counts.values()),
+            "consent_locked": study.consent_locked,
+            "stale": study.stale_consent_count,
+            "items": study.consent_items or [],
+        })
+
+    join_url = request.build_absolute_uri(reverse("enrolment_landing"))
+
+    return {
+        "enabled": True,
+        "studies": studies,
+        "any_open": any(s["obj"].is_open for s in studies),
+        "join_url": join_url,
+        "join_qr_svg": _qr_svg(join_url, "enrolJoinQr"),
+        "auto_approve": enrolment_service.auto_approve(),
+        "awaiting_approval": Enrolment.objects.filter(
+            status=Enrolment.Status.CONSENTED, patient__isnull=True
+        ).count(),
+        "total_enrolments": Enrolment.objects.count(),
+        "total_consents": ConsentRecord.objects.count(),
+    }
+
+
 def _build_config_context(request, forms_override=None, active_tab="general"):
     """Assemble the settings-page context, letting one bound (invalid) form be
     injected so validation errors render inline."""
@@ -183,6 +232,8 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
     def _form(name):
         return forms_override.get(name) or _CONFIG_FORMS[name](instance=cfg)
 
+    participants = _participants_context(request)
+
     return {
         "active_page": "admin",
         "active_tab": active_tab,
@@ -199,6 +250,9 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
             ("protocols", _("Protocols"), "checklist"),
             ("registrations", _("Registrations"), "how_to_reg"),
             ("selfreg", _("Self registration"), "qr_code_2"),
+            # Always listed, because it holds the study-enrolment switch; while
+            # enrolment is off the switch is all it holds (see config.html).
+            ("participants", _("Participants"), "groups"),
             ("api", _("API client"), "terminal"),
             ("privacy", _("Privacy"), "lock"),
             ("export", _("Export"), "download"),
@@ -240,6 +294,8 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
         # feature is off while a hundred exchanges are still withheld would be
         # the one thing an admin reading this page must not be told.
         "hidden_conversation_count": Conversation.objects.filter(hidden=True).count(),
+        "participants_form": _form("participants"),
+        "participants": participants,
         "export_columns": message_export.COLUMN_NOTES,
         # Boot-only values shown read-only (require .env change + restart).
         "boot_info": {

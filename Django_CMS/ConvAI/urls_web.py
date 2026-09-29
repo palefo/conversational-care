@@ -35,6 +35,13 @@ from .views import (
     start_protocol_automation, dismiss_sms_offer, communications, panel_fragment,
     summarize_meeting_view, transcribe_recording_view, edit_overview,
     download_client_sdk, export_messages, download_conversation,
+    # Study enrolment (participant management). Every one of these 404s unless
+    # STUDY_ENROLMENT_ENABLED is on; the check is in the view.
+    participant_enrol, participant_generate_code,
+    participant_detail, participant_status, participant_withdraw, participant_approve,
+    study_create, study_editor, study_editor_save, study_delete,
+    enrolment_landing, enrolment_claim, enrolment_consent, enrolment_done,
+    enrolment_resume,
 )
 from .utils import navigator_required, patient_tester_required
 
@@ -162,4 +169,33 @@ urlpatterns = [
     path("meetings/<int:meeting_id>/protocol/<int:protocol_num>/automation/start/", start_protocol_automation, name="start_protocol_automation"),
     path("protocol/automation/sms-offer/dismiss/", dismiss_sms_offer, name="dismiss_sms_offer"),
     path("communications/", navigator_required(communications), name="communications"),
+
+    # --- Study enrolment: staff side -----------------------------------------
+    # No list route: enrolling and the not-yet-arrived queue live on the Clients
+    # page, and a consented participant is a client. Role gates as elsewhere; the
+    # feature switch is checked inside each view, so a switched-off installation
+    # 404s rather than redirecting to a login.
+    path('participants/enrol/', navigator_required(participant_enrol), name='participant_enrol'),
+    path('participants/generate-code/', navigator_required(participant_generate_code),
+         name='participant_generate_code'),
+    path('participants/<int:pk>/', navigator_required(participant_detail), name='participant_detail'),
+    path('participants/<int:pk>/status/', navigator_required(participant_status),
+         name='participant_status'),
+    path('participants/<int:pk>/withdraw/', navigator_required(participant_withdraw),
+         name='participant_withdraw'),
+    path('participants/<int:pk>/approve/', participant_approve, name='participant_approve'),
+    path('studies/create/', study_create, name='study_create'),
+    path('studies/<int:pk>/editor/', study_editor, name='study_editor'),
+    path('studies/<int:pk>/editor/save/', study_editor_save, name='study_editor_save'),
+    path('studies/<int:pk>/delete/', study_delete, name='study_delete'),
+
+    # --- Study enrolment: the public flow ------------------------------------
+    # The only unauthenticated pages in the platform. No role gate by design;
+    # the feature switch and the attempt limiter are what guard them. See
+    # participant_management.md.
+    path('join/', enrolment_landing, name='enrolment_landing'),
+    path('join/claim/', enrolment_claim, name='enrolment_claim'),
+    path('join/consent/', enrolment_consent, name='enrolment_consent'),
+    path('join/done/', enrolment_done, name='enrolment_done'),
+    path('join/resume/', enrolment_resume, name='enrolment_resume'),
 ]

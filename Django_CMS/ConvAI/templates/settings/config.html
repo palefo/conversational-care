@@ -785,6 +785,303 @@ print(result)</code></pre>
     </div>
   </section>
 
+  {# ═════════ Participants ═════════ #}
+  {% comment %}
+    While study enrolment is off this tab holds the switch and nothing else —
+    no options, no join link, no studies, no queries. The switch has to be
+    somewhere an admin can reach it: SiteConfiguration is not in the Django
+    admin, so hiding the whole tab would leave .env as the only way in, and an
+    admin who switched it Off here could never switch it back.
+
+    Order matters here. The switch is the decision somebody came to this tab to
+    make, so it is first and it looks like a switch. The caveats stay on the
+    page — they are the honest part — but below the controls rather than in
+    front of them, where a wall of grey was the first thing anybody saw.
+  {% endcomment %}
+  <style>
+    .pt-switch {
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+      padding: .9rem 1rem; border-radius: .6rem;
+      background: var(--brand-light); border: 1px solid #bae6fd;
+      margin-bottom: 1.25rem;
+    }
+    .pt-switch-t { font-size: .9rem; font-weight: 600; color: var(--text-primary); }
+    .pt-switch-h { font-size: .78rem; color: var(--text-secondary); margin-top: .15rem;
+                   line-height: 1.5; max-width: 46rem; }
+    .pt-switch-c { flex: 0 0 11rem; margin-left: auto; }
+    .pt-switch-c select { margin: 0; }
+    .pt-switch .stg-field { margin: 0; }
+    /* The panel renders this field's label and help text itself, so the ones
+       _field.html emits are hidden — but not its errors, which are also <p>
+       and are the one thing that must never be silently swallowed. */
+    .pt-switch .stg-field label,
+    .pt-switch .stg-field p.text-gray-500 { display: none; }
+
+    .pt-join { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start;
+               padding-top: 1.25rem; margin-top: 1.25rem;
+               border-top: 1px solid #f1f5f9; }
+    .pt-join-main { flex: 1 1 22rem; min-width: 0; }
+    .pt-join-row { display: flex; gap: .5rem; margin: .5rem 0 .9rem; }
+    .pt-join-row input { flex: 1 1 auto; min-width: 0; font-size: .8rem !important; }
+    .pt-copy { flex: 0 0 auto; display: inline-flex; align-items: center;
+               justify-content: center; width: 2.4rem; border-radius: .5rem;
+               border: 1px solid #d1d5db; background: #fff; color: var(--text-secondary);
+               cursor: pointer; }
+    .pt-copy:hover { border-color: var(--brand-primary); color: var(--brand-primary);
+                     background: var(--brand-light); }
+    .pt-copy.is-done { border-color: #16a34a; color: #16a34a; background: #f0fdf4; }
+    .pt-stats { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .pt-stat { flex: 1 1 7rem; padding: .6rem .75rem; border-radius: .5rem;
+               background: var(--surface-background); border: 1px solid var(--border-color); }
+    .pt-stat b { display: block; font-size: 1.15rem; font-weight: 600;
+                 color: var(--text-primary); line-height: 1.2; }
+    .pt-stat span { font-size: .72rem; color: var(--text-muted); }
+    .pt-qr { flex: 0 0 auto; text-align: center; }
+    .pt-qr-img { width: 7.5rem; }
+    .pt-qr-cap { font-size: .68rem; color: var(--text-muted); margin-top: .3rem; }
+
+    .pt-caveat { margin-top: 1.25rem; padding: .85rem 0 0;
+                 border-top: 1px solid #f1f5f9; }
+    .pt-caveat summary { font-size: .78rem; font-weight: 500; color: var(--text-secondary);
+                         cursor: pointer; display: inline-flex; align-items: center;
+                         gap: .35rem; list-style: none; }
+    .pt-caveat summary::-webkit-details-marker { display: none; }
+    .pt-caveat summary .material-icons-outlined { font-size: 1rem; transition: transform .15s; }
+    .pt-caveat[open] summary .material-icons-outlined { transform: rotate(90deg); }
+    .pt-caveat ul { margin: .7rem 0 0; padding-left: 1.1rem; border-left: 2px solid #e2e8f0; }
+    .pt-caveat li { font-size: .78rem; color: var(--text-secondary); line-height: 1.55;
+                    margin-bottom: .45rem; list-style: none; position: relative; }
+    .pt-caveat li::before { content: "—"; color: var(--text-muted); margin-right: .4rem; }
+
+    .pt-sttbl { width: 100%; font-size: .85rem; border-collapse: collapse; }
+    .pt-sttbl th { text-align: left; padding: .5rem .75rem .5rem 0; font-weight: 500;
+                   color: var(--text-muted); font-size: .75rem;
+                   border-bottom: 1px solid var(--border-color); }
+    .pt-sttbl td { padding: .75rem .75rem .75rem 0; border-bottom: 1px solid #f1f5f9;
+                   vertical-align: top; }
+    .pt-sttbl tr:last-child td { border-bottom: 0; }
+    .pt-st-nm { font-weight: 500; color: var(--text-primary); }
+    .pt-st-slug { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                  font-size: .72rem; color: var(--text-muted); margin-top: .1rem; }
+    .pt-tag { display: inline-flex; align-items: center; gap: .25rem; font-size: .7rem;
+              padding: .18rem .45rem; border-radius: 999px; white-space: nowrap; }
+    .pt-tag--lock { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+    .pt-tag--open { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .pt-tag--shut { background: var(--surface-background); color: var(--text-muted);
+                    border: 1px solid var(--border-color); }
+    .pt-tag .material-icons-outlined { font-size: .8rem; }
+    .pt-stale { font-size: .72rem; color: #b45309; margin-top: .25rem; }
+    .pt-edit { color: var(--brand-primary); text-decoration: none; font-size: .82rem; }
+    .pt-edit:hover { text-decoration: underline; }
+  </style>
+
+  <section class="settings-panel hidden" data-tab="participants">
+    <div class="card p-6 mb-5">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">groups</span>
+        <div class="flex-1">
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Study enrolment" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Pre-enrol participants, issue each one an access code, and take versioned consent on a public join page. For running a research study on this platform." %}</p>
+        </div>
+      </div>
+
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="participants">
+
+        {# The decision somebody came here to make, first and unmissable. #}
+        <div class="pt-switch">
+          <div style="flex:1 1 20rem;min-width:0">
+            <div class="pt-switch-t">{{ participants_form.study_enrolment_enabled.label }}</div>
+            <div class="pt-switch-h">{{ participants_form.study_enrolment_enabled.help_text }}</div>
+          </div>
+          <div class="pt-switch-c">
+            {% include "settings/_field.html" with field=participants_form.study_enrolment_enabled %}
+          </div>
+        </div>
+
+        {% if participants.enabled %}
+        {% if not participants.any_open %}
+          <div class="mb-5 px-4 py-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 text-sm flex items-start gap-2">
+            <span class="material-icons-outlined text-base">warning</span>
+            <div>{% trans "Enrolment is on but no study is open, so the join page cannot be used. Create or open a study below." %}</div>
+          </div>
+        {% endif %}
+
+        <div class="stg-grid2">
+          {% include "settings/_field.html" with field=participants_form.enrolment_auto_approve %}
+          {% include "settings/_field.html" with field=participants_form.enrolment_require_dob %}
+          {% include "settings/_field.html" with field=participants_form.enrolment_code_words %}
+          {% include "settings/_field.html" with field=participants_form.enrolment_code_attempt_limit %}
+        </div>
+        {% include "settings/_field.html" with field=participants_form.enrolment_landing_text %}
+        {% else %}
+          {% comment %}config_save binds the whole form, so the options travel
+            along unseen: switching enrolment on or off must not reset them.{% endcomment %}
+          {{ participants_form.enrolment_auto_approve.as_hidden }}
+          {{ participants_form.enrolment_require_dob.as_hidden }}
+          {{ participants_form.enrolment_code_words.as_hidden }}
+          {{ participants_form.enrolment_code_attempt_limit.as_hidden }}
+          {{ participants_form.enrolment_landing_text.as_hidden }}
+        {% endif %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+
+      {% if participants.enabled %}
+      {# ── the join page ── #}
+      <div class="pt-join">
+        <div class="pt-join-main">
+          <div class="stg-group-title" style="margin-bottom:0">{% trans "Join page" %}</div>
+          <p class="text-sm text-gray-500">{% trans "Give participants this link, or print the code." %}</p>
+          <div class="pt-join-row">
+            <input type="text" readonly value="{{ participants.join_url }}" id="joinUrlField">
+            <button type="button" class="pt-copy" id="joinCopyBtn"
+                    title="{% trans 'Copy the link' %}" aria-label="{% trans 'Copy the link' %}">
+              <span class="material-icons-outlined text-sm">content_copy</span>
+            </button>
+          </div>
+          <div class="pt-stats">
+            <div class="pt-stat">
+              <b>{{ participants.total_enrolments }}</b>
+              <span>{% trans "participants enrolled" %}</span>
+            </div>
+            <div class="pt-stat">
+              <b>{{ participants.total_consents }}</b>
+              <span>{% trans "consent records" %}</span>
+            </div>
+            {% if not participants.auto_approve %}
+              <div class="pt-stat">
+                <b>{{ participants.awaiting_approval }}</b>
+                <span>{% trans "awaiting admission" %}</span>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        {% if participants.join_qr_svg %}
+          <div class="pt-qr">
+            <div class="pt-qr-img">{{ participants.join_qr_svg|safe }}</div>
+            <div class="pt-qr-cap">{% trans "Scan to join" %}</div>
+          </div>
+        {% endif %}
+      </div>
+
+      {# ── the caveats: still here, no longer in the way ── #}
+      <details class="pt-caveat">
+        <summary>
+          <span class="material-icons-outlined">chevron_right</span>
+          {% trans "What this does not cover" %}
+        </summary>
+        <ul>
+          <li>{% trans "It records that somebody agreed. It is not a qualified e-consent system — there is no signature, no witness step and no sponsor approval built in." %}</li>
+          <li>{% trans "Withdrawing a participant stops the platform contacting them and switches their agent off. It does not erase the conversations they already had." %}</li>
+          <li>{% trans "An access code is a single credential in plain text. Its protection is the attempt limit above, not secrecy." %}</li>
+          <li>{% trans "Nobody is randomised to a study arm. Whoever enrols the participant chooses it." %}</li>
+        </ul>
+      </details>
+      {% endif %}
+    </div>
+
+    {% if participants.enabled %}
+
+    {# ── Studies ─────────────────────────────────────────────── #}
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-4">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">science</span>
+        <div class="flex-1">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-lg font-semibold text-gray-800">{% trans "Studies" %}</h2>
+            <form method="post" action="{% url 'study_create' %}">
+              {% csrf_token %}
+              <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+                <span class="material-icons-outlined text-sm">add</span>{% trans "New study" %}
+              </button>
+            </form>
+          </div>
+          <p class="text-sm text-gray-500">{% trans "Each study owns its consent wording, its information sheet and the agent its participants talk to. Consent wording stays editable until somebody consents to it, after which raising the version starts a new one." %}</p>
+        </div>
+      </div>
+
+      {% if participants.studies %}
+        <div class="overflow-x-auto">
+          <table class="pt-sttbl">
+            <thead>
+              <tr>
+                <th>{% trans "Study" %}</th>
+                <th>{% trans "Consent" %}</th>
+                <th>{% trans "Participants" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in participants.studies %}
+                <tr>
+                  <td>
+                    <div class="pt-st-nm">{{ s.obj.display_name }}</div>
+                    <div class="pt-st-slug">{{ s.obj.slug }}</div>
+                    {% if not s.obj.default_agent_id %}
+                      <div class="pt-stale">{% trans "No agent set — its participants will get no replies" %}</div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
+                      <span>v{{ s.obj.consent_version }}</span>
+                      <span style="color:var(--text-muted)">&middot; {{ s.items|length }} {% trans "items" %}</span>
+                      {% if s.consent_locked %}
+                        <span class="pt-tag pt-tag--lock">
+                          <span class="material-icons-outlined">lock</span>{% trans "signed" %}
+                        </span>
+                      {% endif %}
+                    </div>
+                    {% if s.stale %}
+                      <div class="pt-stale">
+                        {% blocktrans count n=s.stale %}{{ n }} on an older version{% plural %}{{ n }} on an older version{% endblocktrans %}
+                      </div>
+                    {% endif %}
+                  </td>
+                  <td>{{ s.total }}</td>
+                  <td>
+                    {% if s.obj.is_open %}
+                      <span class="pt-tag pt-tag--open">{% trans "Open" %}</span>
+                    {% else %}
+                      <span class="pt-tag pt-tag--shut">{% trans "Closed" %}</span>
+                    {% endif %}
+                  </td>
+                  <td style="text-align:right;padding-right:0">
+                    <a href="{% url 'study_editor' s.obj.pk %}" class="pt-edit">{% trans "Edit" %}</a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-sm text-gray-500">{% trans "No studies yet. Create one to start enrolling participants." %}</p>
+      {% endif %}
+    </div>
+
+    <script>
+      (function () {
+        var btn = document.getElementById('joinCopyBtn');
+        var field = document.getElementById('joinUrlField');
+        if (!btn || !field) { return; }
+        btn.addEventListener('click', function () {
+          var done = function () {
+            btn.classList.add('is-done');
+            setTimeout(function () { btn.classList.remove('is-done'); }, 1200);
+          };
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(field.value).then(done, function () {});
+          } else {
+            field.select();
+            try { document.execCommand('copy'); done(); } catch (e) {}
+          }
+        });
+      }());
+    </script>
+    {% endif %}
+  </section>
+
   {# ═════════ Privacy ═════════ #}
   <section class="settings-panel hidden" data-tab="privacy">
     <div class="card p-6">
@@ -951,7 +1248,7 @@ print(result)</code></pre>
   (function () {
     // Keep in step with the `tabs` list in views/settings_views.py: a tab
     // missing here is a sidebar entry that silently falls back to General.
-    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','api','privacy','export','maintenance'];
+    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','participants','api','privacy','export','maintenance'];
     const buttons = document.querySelectorAll('.stg-navitem');
     const panels  = document.querySelectorAll('.settings-panel');
 

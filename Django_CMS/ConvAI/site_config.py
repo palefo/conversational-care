@@ -81,6 +81,16 @@ _STR_KEYS = {
     "SENSEI_API_URL": "sensei_api_url",
     "SENSEI_FUNCTION_KEY": "sensei_function_key",
     "SENSEI_USER_ID_SECRET": "sensei_user_id_secret",
+    # Study enrolment (see participant_management.md).
+    "ENROLMENT_LANDING_TEXT": "enrolment_landing_text",
+}
+
+# Integer settings, resolved like the strings above but coerced. Kept separate
+# because a blank override has to fall through to the environment rather than
+# become 0 — which for a rate limit would mean "locked out on the first try".
+_INT_KEYS = {
+    "ENROLMENT_CODE_WORDS": "enrolment_code_words",
+    "ENROLMENT_CODE_ATTEMPT_LIMIT": "enrolment_code_attempt_limit",
 }
 
 _BOOL_KEYS = {
@@ -94,6 +104,9 @@ _BOOL_KEYS = {
     "MESSAGE_EXPORT_ENABLED": "message_export_enabled",
     "CONVERSATION_DOWNLOAD_ENABLED": "conversation_download_enabled",
     "CONVERSATION_PRIVACY_ENABLED": "conversation_privacy_enabled",
+    "STUDY_ENROLMENT_ENABLED": "study_enrolment_enabled",
+    "ENROLMENT_REQUIRE_DOB": "enrolment_require_dob",
+    "ENROLMENT_AUTO_APPROVE": "enrolment_auto_approve",
 }
 
 
@@ -138,6 +151,32 @@ def get_setting(key, default=None):
         if ov:
             return ov
     return _env(key, default)
+
+
+def get_int(key, default=0):
+    """Resolve an integer setting: DB override, then env, then settings, then default.
+
+    These live on the singleton as real integer fields with their own defaults, so
+    the DB is normally the source of truth; the env fallback only carries the value
+    when the DB cannot be read (during migrations, say). A non-positive or
+    unparseable value is treated as absent rather than honoured — a rate limit of
+    zero would lock everyone out on their first attempt.
+    """
+    field = _INT_KEYS.get(key)
+    if field:
+        ov = _override(field)
+        try:
+            if ov is not None and int(ov) > 0:
+                return int(ov)
+        except (TypeError, ValueError):
+            pass
+    raw = _env(key)
+    try:
+        if raw is not None and int(raw) > 0:
+            return int(raw)
+    except (TypeError, ValueError):
+        pass
+    return default
 
 
 def get_bool(key, default=False):
