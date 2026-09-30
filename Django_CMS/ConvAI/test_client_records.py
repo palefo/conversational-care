@@ -625,3 +625,46 @@ class OffLooksUntouchedTests(Caseload):
         body = self.client.get(reverse("patients")).content.decode()
         self.assertIn("v2 beta", body)
         self.assertIn("Ask about a client", body)
+
+
+class StaffOnlyAgentTests(Caseload):
+    """v2 answers staff only, so it is never offered for a client's conversations.
+
+    Otherwise it would sit in every agent picker whether or not it was switched
+    on — a change navigators could see on an installation that never opted in.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.v1 = Agent.objects.create(name="Link Worker", kind="native", native_key="link_worker")
+        self.v2 = Agent.objects.create(name="Link Worker v2 (beta)", kind="native",
+                                       native_key="link_worker_v2")
+
+    def test_it_is_not_among_the_agents_for_clients(self):
+        self.assertIn(self.v1, Agent.for_clients())
+        self.assertNotIn(self.v2, Agent.for_clients())
+
+    def test_no_client_picker_offers_it(self):
+        from ConvAI.forms import ClientForm, PatientForm
+
+        for form in (ClientForm(), ClientForm(is_admin=True), PatientForm()):
+            with self.subTest(form=type(form).__name__):
+                self.assertNotIn(self.v2, form.fields["agent"].queryset)
+                self.assertIn(self.v1, form.fields["agent"].queryset)
+
+        self.client.force_login(self.nav)
+        body = self.client.get(reverse("patient_detail", args=[self.ada.pk])).content.decode()
+        self.assertIn("Link Worker", body, "the page must list agents for this to mean anything")
+        self.assertNotIn("Link Worker v2", body)
+
+    def test_it_cannot_be_given_to_a_client_by_hand(self):
+        self.client.force_login(self.nav)
+        self.client.post(reverse("update_client_terms", args=[self.ada.pk]),
+                         {"agent": str(self.v2.pk)})
+        self.ada.refresh_from_db()
+        self.assertIsNone(self.ada.agent_id)
+
+        self.client.post(reverse("update_client_terms", args=[self.ada.pk]),
+                         {"agent": str(self.v1.pk)})
+        self.ada.refresh_from_db()
+        self.assertEqual(self.ada.agent_id, self.v1.pk, "an ordinary agent is still assignable")

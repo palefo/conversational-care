@@ -265,7 +265,7 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
         "api_enabled": getattr(settings, "ENABLE_API", True),
         "self_regs": SelfRegistration.objects.order_by("-created_at"),
         "selfreg": _selfreg_qr_context(request),
-        "agents": Agent.objects.all().order_by("name"),
+        "agents": Agent.for_clients().order_by("name"),
         "protocols": protocols,
         "general_form": _form("general"),
         "integrations_form": _form("integrations"),
@@ -443,7 +443,7 @@ def approve_self_registration(request, pk):
 
     # Optional Agent selection
     agent_id = request.POST.get("agent_id") or ""
-    agent = Agent.objects.filter(pk=agent_id).first() if agent_id else None
+    agent = Agent.for_clients().filter(pk=agent_id).first() if agent_id else None
 
     caregiver = Caregiver.objects.create(
         name=sr.name,

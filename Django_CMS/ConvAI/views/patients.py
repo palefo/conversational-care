@@ -610,7 +610,7 @@ def patient_detail(request, pk):
         'can_call': bool(call_default),
         'protocol_chips': protocol_chips,
         'client_since': timeline[-1]['ts'] if timeline else None,
-        'agents': Agent.objects.order_by('name'),
+        'agents': Agent.for_clients().order_by('name'),
         'SEND_CARE_PLAN' : get_bool("SEND_CARE_PLAN"),
         'active_page':'patients',
     })
@@ -894,7 +894,7 @@ def update_client_terms(request, pk):
 
     if 'agent' in request.POST:
         raw = (request.POST.get('agent') or '').strip()
-        patient.agent = Agent.objects.filter(pk=raw).first() if raw else None
+        patient.agent = Agent.for_clients().filter(pk=raw).first() if raw else None
 
     # A term written here joins the shared list, so the next person with the
     # same situation finds it instead of inventing a near-duplicate.

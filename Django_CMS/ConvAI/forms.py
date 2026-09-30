@@ -316,7 +316,7 @@ class GeneralConfigForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Offer the self-registration agent as a dropdown of existing agents.
-        agent_names = list(Agent.objects.order_by("name").values_list("name", flat=True))
+        agent_names = list(Agent.for_clients().order_by("name").values_list("name", flat=True))
         choices = [("", _("Use .env default"))] + [(n, n) for n in agent_names]
         current = self.instance.self_reg_agent_name
         if current and current not in agent_names:
@@ -524,6 +524,9 @@ class ClientForm(forms.ModelForm):
         self.fields["name"].required = True
         self.fields["lastname"].required = True
         self.fields["agent"].required = False
+        # Filtered, not reordered: the list reads exactly as it did, less any
+        # staff-only agent (Agent.STAFF_ONLY_NATIVE_KEYS).
+        self.fields["agent"].queryset = Agent.for_clients()
         # A new client starts on nothing. An empty panel asks which protocols
         # this person is on; a full one answers it wrongly, for everybody, which
         # is the state this replaces.
@@ -1262,7 +1265,7 @@ class StudyForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["default_agent"].queryset = Agent.objects.all().order_by("name")
+        self.fields["default_agent"].queryset = Agent.for_clients().order_by("name")
         self.fields["default_agent"].required = False
         self.fields["default_agent"].empty_label = _("No agent — participants will get no replies")
         # A locked study still shows its wording; it just cannot be rewritten.
@@ -1514,6 +1517,9 @@ class PatientForm(forms.ModelForm):
         self.fields["name"].required = True
         self.fields["lastname"].required = True
         self.fields["agent"].required = False
+        # Filtered, not reordered: the list reads exactly as it did, less any
+        # staff-only agent (Agent.STAFF_ONLY_NATIVE_KEYS).
+        self.fields["agent"].queryset = Agent.for_clients()
         # A new client starts on nothing. An empty panel asks which protocols
         # this person is on; a full one answers it wrongly, for everybody, which
         # is the state this replaces.

@@ -1007,6 +1007,19 @@ class Agent(models.Model):
         from .native_agents import tool_registry
         return [str(tool_registry.spec(s)["tab"]) for s in tool_registry.enabled_slugs(self)]
 
+    # Agents that answer staff only, and so are never offered for a client's
+    # conversations. Link Worker v2's tools refuse anybody who is not staff (see
+    # link_worker_v2.md), so assigning it to a client would give them an agent
+    # that can do nothing — and would put a beta in every agent picker whether
+    # or not it was switched on.
+    STAFF_ONLY_NATIVE_KEYS = ("link_worker_v2",)
+
+    @classmethod
+    def for_clients(cls):
+        """The agents that may be given a client (or a client-facing flow)."""
+        return cls.objects.exclude(kind=cls.Kind.NATIVE,
+                                   native_key__in=cls.STAFF_ONLY_NATIVE_KEYS)
+
     def __str__(self):
         # host:port only identifies a *remote* agent. Every other kind has none,
         # so the old unconditional form rendered "Loopback @ :None" in admin
