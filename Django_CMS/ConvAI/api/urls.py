@@ -10,6 +10,8 @@ from .views import (
     PatientDetailsAppendView, ConversationVisibilityView,
     ConversationSummaryView, RunView, RunSummaryView, RunVisibilityView,
     EnrolmentLookupView,
+    ClientOverviewView, UpcomingMeetingsView, ClientProtocolAnswersView,
+    ClientProtocolHistoryView, RecordSearchView,
 )
 
 urlpatterns = [
@@ -43,4 +45,16 @@ urlpatterns = [
     # Is this person enrolled in a study? 404s while STUDY_ENROLMENT_ENABLED is
     # off. Token-authenticated, and never returns the access code itself.
     path("api/v1/enrolments/", EnrolmentLookupView.as_view(), name="api_enrolments"),
+
+    # Client records: what staff may ask about their clients. The same service
+    # as Link Worker v2's tools, and the same access log. See link_worker_v2.md.
+    path("api/v1/patients/<int:patient_id>/overview/", ClientOverviewView.as_view(),
+         name="api_client_overview"),
+    path("api/v1/meetings/upcoming/", UpcomingMeetingsView.as_view(),
+         name="api_meetings_upcoming"),
+    path("api/v1/patients/<int:patient_id>/protocols/answers/",
+         ClientProtocolAnswersView.as_view(), name="api_client_protocol_answers"),
+    path("api/v1/patients/<int:patient_id>/protocols/<str:protocol>/history/",
+         ClientProtocolHistoryView.as_view(), name="api_client_protocol_history"),
+    path("api/v1/records/search/", RecordSearchView.as_view(), name="api_records_search"),
 ]

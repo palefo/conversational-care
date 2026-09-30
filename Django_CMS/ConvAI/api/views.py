@@ -1277,3 +1277,90 @@ class EnrolmentLookupView(APIView):
                 "at": latest.agreed_at.isoformat() if latest else None,
             },
         }, status=status.HTTP_200_OK)
+
+
+# ----------------------------------------------------------------------------
+# Client records — what staff may ask about their clients
+# ----------------------------------------------------------------------------
+# Thin views over ConvAI.client_records, the module Link Worker v2's tools call
+# too, so the API and the assistant share one permission rule, one privacy rule,
+# one access log and one answer shape. Personal-token auth: these act as the
+# person holding the token — a navigator reads their own clients, an admin
+# everyone. Every refusal is a 404, as in the rest of this API's newer
+# endpoints: a client you may not see reads exactly like one that does not exist.
+#
+# Behind the Link Worker v2 switch, like the assistant: an installation that has
+# not opted in does not gain a new way to read every client's record. While it
+# is off these 404 as if they did not exist. See link_worker_v2.md.
+
+class _ClientRecordsView(APIView):
+    authentication_classes = AUTH_CLASSES
+    permission_classes = [IsAuthenticated]
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        from django.http import Http404
+
+        from ..site_config import get_bool
+        if not get_bool("LINK_WORKER_V2_ENABLED"):
+            raise Http404
+
+    def _answer(self, fn, *args, **kwargs):
+        from .. import client_records as records
+        try:
+            return Response(fn(self.request.user, *args, via="api", **kwargs),
+                            status=status.HTTP_200_OK)
+        except records.NotVisible:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        except records.BadQuestion as exc:  # an unknown or ambiguous protocol, a short search
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ClientOverviewView(_ClientRecordsView):
+    """GET /api/v1/patients/<id>/overview/ — everything held about one client."""
+
+    def get(self, request, patient_id: int, *args, **kwargs):
+        from .. import client_records as records
+        return self._answer(records.overview, patient_id)
+
+
+class UpcomingMeetingsView(_ClientRecordsView):
+    """GET /api/v1/meetings/upcoming/?patient_id=&days=30 — one client or the caseload."""
+
+    def get(self, request, *args, **kwargs):
+        from .. import client_records as records
+        try:
+            days = int(request.query_params.get("days") or 30)
+        except ValueError:
+            return Response({"detail": "days must be a whole number."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return self._answer(records.upcoming_meetings,
+                            patient_id=request.query_params.get("patient_id") or None, days=days)
+
+
+class ClientProtocolAnswersView(_ClientRecordsView):
+    """GET /api/v1/patients/<id>/protocols/answers/?protocol= — latest answer per question."""
+
+    def get(self, request, patient_id: int, *args, **kwargs):
+        from .. import client_records as records
+        return self._answer(records.protocol_answers, patient_id,
+                            request.query_params.get("protocol") or None)
+
+
+class ClientProtocolHistoryView(_ClientRecordsView):
+    """GET /api/v1/patients/<id>/protocols/<protocol>/history/ — answers call by call.
+
+    ``protocol`` is a number or words from the title, as the assistant takes it.
+    """
+
+    def get(self, request, patient_id: int, protocol: str, *args, **kwargs):
+        from .. import client_records as records
+        return self._answer(records.protocol_history, patient_id, protocol)
+
+
+class RecordSearchView(_ClientRecordsView):
+    """GET /api/v1/records/search/?q= — a phrase across every visible client's record."""
+
+    def get(self, request, *args, **kwargs):
+        from .. import client_records as records
+        return self._answer(records.search_records, request.query_params.get("q") or "")

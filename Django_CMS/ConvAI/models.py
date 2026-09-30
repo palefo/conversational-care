@@ -1511,6 +1511,15 @@ class SiteConfiguration(models.Model):
     # records they signed stay exactly as they are. See participant_management.md.
     study_enrolment_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
 
+    # --- Link Worker v2 (beta) ---
+    # Which assistant answers in the staff chat bubble. Off (the default) keeps
+    # the original Link Worker, untouched. On hands the bubble to v2, which can
+    # also read a client's record — meetings, protocol answers and how they
+    # changed, alerts, notes, conversation summaries — within the same rules as
+    # the screens, and logs every record it reads (RecordAccess). See
+    # link_worker_v2.md.
+    link_worker_v2_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
     # How many words an access code is built from. Three (~250^3) is the default:
     # enough space that the rate limit below does the real work, short enough to
     # read down a phone line without losing your place.
@@ -2081,4 +2090,58 @@ class ConsentRecord(models.Model):
             raise ValidationError(
                 "ConsentRecord is append-only; record a new consent instead of editing one."
             )
+        super().save(*args, **kwargs)
+
+
+class RecordAccess(models.Model):
+    """One look at a client's record by an assistant or through the API.
+
+    Written by ``ConvAI.client_records`` — the single place the Link Worker v2
+    tools and the client-record endpoints read from — so neither can read a
+    record without leaving a row. It answers the question a health service is
+    asked about any assistant that can see everyone: *who looked at whose
+    record, when, and for what.*
+
+    **Append-only**, like ``ConsentRecord``: an access log that can be edited
+    records nothing. The labels are copied at the time, so a row still reads
+    sensibly after the account or the client it names has been deleted.
+    """
+
+    class Via(models.TextChoices):
+        AGENT = "agent", "Assistant"
+        API = "api", "API"
+
+    class Action(models.TextChoices):
+        FIND = "find", "Find clients"
+        OVERVIEW = "overview", "Client overview"
+        MEETINGS = "meetings", "Upcoming meetings"
+        ANSWERS = "answers", "Protocol answers"
+        HISTORY = "history", "Protocol history"
+        SEARCH = "search", "Record search"
+
+    at = models.DateTimeField(auto_now_add=True, db_index=True)
+    user = models.ForeignKey(ConvAIUser, on_delete=models.SET_NULL, null=True, blank=True,
+                             related_name="record_accesses")
+    user_label = models.CharField(max_length=150, blank=True)
+    # Null for a caseload-wide question that matched nobody.
+    patient = models.ForeignKey("Patient", on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name="record_accesses")
+    patient_label = models.CharField(max_length=200, blank=True)
+    action = models.CharField(max_length=16, choices=Action.choices)
+    via = models.CharField(max_length=8, choices=Via.choices)
+    # What was asked: a protocol, a search term, a date window. Never an answer.
+    detail = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ["-at"]
+        verbose_name = "Record access"
+        verbose_name_plural = "Record accesses"
+        indexes = [models.Index(fields=["patient", "-at"]), models.Index(fields=["user", "-at"])]
+
+    def __str__(self):
+        return f"{self.user_label} → {self.patient_label or '—'} ({self.action}, {self.at:%Y-%m-%d %H:%M})"
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValidationError("RecordAccess is append-only.")
         super().save(*args, **kwargs)

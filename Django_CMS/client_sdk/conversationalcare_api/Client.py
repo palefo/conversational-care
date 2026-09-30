@@ -134,6 +134,48 @@ class Client:
         )
         return self._json_or_raise(resp) or []
 
+    # -- client records ------------------------------------------------------
+    # What staff may ask about their clients. The same answers Link Worker v2
+    # gives, from the same service: a navigator's token reads their own clients,
+    # an admin's everyone, and every call is written to the platform's access
+    # log. A client you may not see comes back as ``None`` — exactly as one that
+    # does not exist. Protocols are named by number or by words in the title.
+
+    def _records_get(self, path: str, params: Optional[Dict[str, Any]] = None):
+        resp = self.session.get(self._url(path), params=params or None, timeout=self.timeout)
+        if resp.status_code == 404:
+            return None
+        return self._json_or_raise(resp)
+
+    def client_overview(self, patient_id: int) -> Optional[Dict[str, Any]]:
+        """Everything held about one client: contact, caregiver, details, meetings,
+        protocol progress, open alerts, conversation summaries and notes."""
+        return self._records_get(f"/api/v1/patients/{patient_id}/overview/")
+
+    def upcoming_meetings(self, patient_id: Optional[int] = None,
+                          days: int = 30) -> Optional[Dict[str, Any]]:
+        """Pending meetings in the next ``days`` days, for one client or your caseload."""
+        params: Dict[str, Any] = {"days": days}
+        if patient_id is not None:
+            params["patient_id"] = patient_id
+        return self._records_get("/api/v1/meetings/upcoming/", params)
+
+    def protocol_answers(self, patient_id: int,
+                         protocol: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """The latest answer to each protocol question, for one protocol or all."""
+        params = {"protocol": protocol} if protocol not in (None, "") else None
+        return self._records_get(f"/api/v1/patients/{patient_id}/protocols/answers/", params)
+
+    def protocol_history(self, patient_id: int, protocol) -> Optional[Dict[str, Any]]:
+        """One protocol's answers, call by call, oldest first."""
+        from urllib.parse import quote
+        return self._records_get(
+            f"/api/v1/patients/{patient_id}/protocols/{quote(str(protocol), safe='')}/history/")
+
+    def search_records(self, q: str) -> Dict[str, Any]:
+        """A word or phrase across every client record you may see."""
+        return self._records_get("/api/v1/records/search/", {"q": q}) or {}
+
     # -- conversations -------------------------------------------------------
     # The two endpoints an agent calls back about a conversation it is holding.
     # Both refuse with a 404 rather than a 403 when you may not touch the

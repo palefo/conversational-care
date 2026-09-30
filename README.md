@@ -58,6 +58,10 @@ Topic deep dives:
 - [Participant management](participant_management.md) — for deployments running a
   research study: pre-enrolling participants, three-word access codes, the public
   join page, and versioned append-only consent. Off by default.
+- [Link Worker v2 (beta)](link_worker_v2.md) — the chat-bubble assistant that
+  answers questions about clients (next meetings, protocol answers and how they
+  changed, everything on file), the matching REST endpoints and SDK methods, and
+  the access log behind both. Off by default.
 - [Agent tools & summaries](agent_tools.md) — the platform tools a prompt-based
   agent can be given from the agent form, the summary an agent writes for the
   client's link worker, and how a remote agent authenticates to write one.

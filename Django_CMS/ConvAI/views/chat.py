@@ -242,6 +242,23 @@ def send_chat_message(request):
                              'bot_message': str(_("Conversation ended. Send a message to start a new one.")),
                              'reset': True})
 
+    # Link Worker v2 (beta), where Settings -> Agents switches it on. It is
+    # told who is asking by staff_user_id, set here and nowhere a client's
+    # conversation could reach — and it is given no API token. See
+    # link_worker_v2.md.
+    if get_bool("LINK_WORKER_V2_ENABLED"):
+        v2 = Agent.objects.filter(kind=Agent.Kind.NATIVE, native_key='link_worker_v2').first()
+        if v2 is not None:
+            extra = {}
+            if is_navigator(request.user):
+                extra = {'staff_user_id': request.user.pk, 'is_admin': is_admin(request.user)}
+            bot_msg = generate_response_with_agent(
+                v2, request.user, user_msg, thread_id, extra_configurable=extra,
+            )
+            save_message(request.user.get_username(), user_msg, bot_msg, thread_id,
+                         account=request.user, sender_role=Message.SenderRole.STAFF)
+            return JsonResponse({'user_message': user_msg, 'bot_message': bot_msg})
+
     # The bubble always uses the built-in Link Worker agent.
     agent = Agent.objects.filter(kind=Agent.Kind.NATIVE, native_key='link_worker').first()
     if agent is None:

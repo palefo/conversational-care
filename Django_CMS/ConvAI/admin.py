@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import ConvAIUser, Message, CallLeg, CallRecording, Caregiver, Patient, Meeting, Protocol, Question, Answer, Agent, Conversation, SelfRegistration, Alert, RagDocument, Study, Enrolment, ConsentRecord
+from .models import ConvAIUser, Message, CallLeg, CallRecording, Caregiver, Patient, Meeting, Protocol, Question, Answer, Agent, Conversation, SelfRegistration, Alert, RagDocument, Study, Enrolment, ConsentRecord, RecordAccess
 from django.db.models import Q
 from django.utils.html import format_html, escape
 from django.utils.safestring import mark_safe
@@ -563,4 +563,29 @@ class ConsentRecordAdmin(_EnrolmentGatedAdmin):
 
     def has_delete_permission(self, request, obj=None):
         # Consent is evidence. Deleting it is not an administrative convenience.
+        return False
+
+
+@admin.register(RecordAccess)
+class RecordAccessAdmin(admin.ModelAdmin):
+    """Who read whose record through Link Worker v2 or the client-record API.
+
+    Look-only, like ConsentRecord: an access log anybody could edit or prune
+    would record nothing. See link_worker_v2.md.
+    """
+
+    list_display = ("at", "user_label", "patient_label", "action", "via", "detail")
+    list_filter = ("via", "action")
+    search_fields = ("user_label", "patient_label", "detail")
+    date_hierarchy = "at"
+    readonly_fields = ("at", "user", "user_label", "patient", "patient_label",
+                       "action", "via", "detail")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False

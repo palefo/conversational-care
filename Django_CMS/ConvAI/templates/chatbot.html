@@ -1,5 +1,6 @@
 {# templates/includes/chatbot.html #}
-{% load i18n %}
+{% load i18n custom_filters %}
+{% link_worker_v2_on as v2_on %}
 
 {% comment %}
   The launcher. Not `class="chatbot-bubble"` — that class is a *message* bubble
@@ -18,7 +19,7 @@
 <!-- chatbot window -->
 <div id="chatbot-window" class="chatbot-window hidden">
   <div class="chatbot-header">
-    <h3>{% trans "Virtual Assistant" %}</h3>
+    <h3>{% trans "Virtual Assistant" %}{% if v2_on %} <span class="chatbot-beta" title="{% trans 'Link Worker v2 (beta): can also answer questions about your clients' %}">{% trans "v2 beta" %}</span>{% endif %}</h3>
     <div class="chatbot-header-actions">
       <button id="chatbot-restart" class="text-white" title="{% trans 'End conversation' %}">
         <span class="material-icons-outlined">restart_alt</span>
@@ -35,9 +36,21 @@
       <span class="material-icons-outlined">send</span>
     </button>
   </div>
-  <div class="chatbot-hint">{% blocktrans %}Type a message, or <code>/quit</code> to end the conversation.{% endblocktrans %}</div>
+  {% if v2_on %}
+    <div class="chatbot-hint">{% blocktrans %}Ask about a client — their next meeting, what they reported, how a protocol changed — or <code>/quit</code> to end.{% endblocktrans %}</div>
+  {% else %}
+    <div class="chatbot-hint">{% blocktrans %}Type a message, or <code>/quit</code> to end the conversation.{% endblocktrans %}</div>
+  {% endif %}
 </div>
 
+{% if v2_on %}
+<style>
+  .chatbot-beta { display: inline-block; margin-left: .35rem; padding: .05rem .4rem;
+                  border-radius: 999px; background: rgba(255,255,255,.2);
+                  font-size: .62rem; font-weight: 600; letter-spacing: .02em;
+                  vertical-align: middle; }
+</style>
+{% endif %}
 <style>
   .chatbot-header-actions { display: inline-flex; align-items: center; gap: .25rem; }
   #chatbot-restart { opacity: .85; }

@@ -106,6 +106,27 @@ client.get_conversation_summary(conversation_id)
 These return `None` when the conversation is not yours, does not exist, or the
 feature is off — the API answers 404 to all three on purpose.
 
+### Asking about your clients
+
+The same questions Link Worker v2 answers in the chat bubble, from the same
+service. A navigator's token reads their own clients; an admin's, everyone.
+Every call is written to the platform's access log. These endpoints exist only
+where the platform has Link Worker v2 switched on (Settings → Agents).
+
+```python
+client.upcoming_meetings()                       # your caseload, next 30 days
+client.upcoming_meetings(patient_id=12, days=90)
+client.client_overview(12)                        # everything held, in summary
+client.protocol_answers(12)                       # latest answer to each question
+client.protocol_answers(12, protocol="iqcode")    # one protocol, by number or title words
+client.protocol_history(12, 3)                    # how protocol 3 changed, call by call
+client.search_records("falls")                    # which clients' records mention it
+```
+
+A client you may not see returns `None`, exactly like one that does not exist.
+Conversations appear as summaries only, and one the client hid from their link
+worker shows its summary and nothing else.
+
 ## Notes
 
 - The API must be enabled on the platform (`ENABLE_API`).
