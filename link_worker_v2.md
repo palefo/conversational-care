@@ -93,8 +93,11 @@ string value of the run config into run metadata, which is what tracing reads
 the chat bubble, and the admin-only Test chat on the Agents page — and it
 ignores `user_id`: in a client's own conversation that is the *client's*
 id, and a client whose id happened to match a navigator's would otherwise be
-answered as that navigator. If v2 is ever assigned to a client, its tools say it
-only answers staff.
+answered as that navigator. And v2 is never offered for a client in the first
+place: every picker that gives a client (or a client-facing flow) an agent
+lists `Agent.for_clients()`, which leaves out staff-only agents, and the views
+that save the choice check it too. Were it assigned anyway, its tools would say
+it only answers staff.
 
 **7. Structured questions, not retrieval over records.** The tools run ordinary
 queries; nothing about a client is embedded or indexed. Answers are as current
