@@ -257,6 +257,7 @@ The bundled native agents are seeded by a data migration
 |---------------|-------------|--------------|
 | `loopback`    | Loopback    | Uses LangGraph but replies with **exactly** what it received. A connectivity/plumbing test and the reference implementation for native agents. |
 | `link_worker` | Link Worker | The agent behind the **navigator chatbot bubble**. A `create_react_agent` that can search patients and schedule meetings. |
+| `link_worker_v2` | Link Worker v2 (beta) | Takes over the bubble when **Settings → Agents** says so (off by default). Also answers questions about clients — next meetings, protocol answers and how they changed, alerts, notes, conversation summaries — through `ConvAI/client_records.py`, within the screens' permission rules, logging every record it reads. See [link_worker_v2.md](link_worker_v2.md). |
 
 > **Link Worker is scaffolded.** The framework, dispatch, and persistence around
 > it are complete, but it returns a friendly "agent unavailable" message until the

@@ -344,7 +344,10 @@
         {% csrf_token %}
         <input type="hidden" name="section" value="agents">
 
-        <div class="stg-group-title" style="margin-top:0;">{% trans "Default model" %}</div>
+        <div class="stg-group-title" style="margin-top:0;">{% trans "Chat bubble assistant" %}</div>
+        {% include "settings/_field.html" with field=agents_form.link_worker_v2_enabled %}
+
+        <div class="stg-group-title">{% trans "Default model" %}</div>
         {% include "settings/_field.html" with field=agents_form.default_agent_model %}
 
         <div class="stg-group">

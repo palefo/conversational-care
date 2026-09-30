@@ -78,6 +78,12 @@ def brand_logo_url():
     return static(_cfg_brand_logo())
 
 @register.simple_tag
+def link_worker_v2_on():
+    """Whether the chat bubble runs Link Worker v2 (beta). See link_worker_v2.md."""
+    from ..site_config import get_bool
+    return get_bool("LINK_WORKER_V2_ENABLED")
+
+@register.simple_tag
 def brand_name():
     """Return brand display name (DB override, else settings/ENV)."""
     return _cfg_brand_name()

@@ -226,6 +226,18 @@ def agent_test(request, pk):
     })
 
 
+def _test_chat_context(agent, request):
+    """Run config for the test chat, where an agent needs to know who is asking.
+
+    Link Worker v2 answers staff only, from staff_user_id (see link_worker_v2.md).
+    The test chat is admin-only, so it can say who that is — and v2 then answers
+    exactly as it would in the chat bubble, reads logged like any other.
+    """
+    if agent.kind == Agent.Kind.NATIVE and agent.native_key == "link_worker_v2":
+        return {"staff_user_id": request.user.pk, "is_admin": is_admin(request.user)}
+    return None
+
+
 @login_required
 @admin_required
 @require_POST
@@ -245,7 +257,8 @@ def agent_test_send(request, pk):
     if user_msg.lower() in ('/quit', '/restart'):
         return JsonResponse({'user_message': user_msg,
                              'bot_message': str(_("Conversation ended.")), 'reset': True})
-    bot_msg = generate_response_with_agent(agent, request.user, user_msg, thread_id)
+    bot_msg = generate_response_with_agent(agent, request.user, user_msg, thread_id,
+                                           extra_configurable=_test_chat_context(agent, request))
     return JsonResponse({'user_message': user_msg, 'bot_message': bot_msg})
 
 
@@ -279,7 +292,8 @@ def agent_test_audio(request, pk):
                 fp.write(chunk)
 
         transcript = (transcribe_audio(in_path) or '').strip()
-        resp_text = generate_response_with_agent(agent, request.user, transcript, thread_id)
+        resp_text = generate_response_with_agent(agent, request.user, transcript, thread_id,
+                                                 extra_configurable=_test_chat_context(agent, request))
 
         # Best-effort TTS; fall back to text-only if it fails.
         response_audio = ''

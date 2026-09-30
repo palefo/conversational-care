@@ -1598,6 +1598,7 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
     class Meta:
         model = SiteConfiguration
         fields = [
+            "link_worker_v2_enabled",
             "default_agent_model",
             "anthropic_api_key", "google_api_key", "mistral_api_key", "deepseek_api_key",
             "agent_allowed_hosts",
@@ -1612,6 +1613,7 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "rag_embedding_model", "azure_embedding_deployment",
         ]
         labels = {
+            "link_worker_v2_enabled": _("Use Link Worker v2 (beta)"),
             "default_agent_model": _("Default agent model"),
             "anthropic_api_key": _("Anthropic API key"),
             "google_api_key": _("Google API key"),
@@ -1637,6 +1639,13 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "azure_embedding_deployment": _("Azure embedding deployment"),
         }
         help_texts = {
+            "link_worker_v2_enabled": _(
+                "Off by default: the chat bubble runs the original Link Worker, which finds "
+                "clients and books meetings. On, it runs v2, which can also answer questions "
+                "about a client's meetings, protocol answers and how they changed, alerts, "
+                "notes and conversation summaries — only for clients the person could open "
+                "on screen, and every record it reads is logged. The matching client-record "
+                "API endpoints exist only while this is on."),
             "default_agent_model": _("Used when an agent has no explicit model, e.g. "
                                      "'openai/gpt-4.1-mini'. Blank uses the .env default."),
             "use_azure": _("Route models to Azure instead of the public provider APIs."),
@@ -1663,6 +1672,7 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
                                                           "placeholder": "openai/gpt-4.1-mini"}),
             "agent_allowed_hosts": forms.Textarea(attrs={**_INPUT, "rows": 3}),
             "use_azure": forms.Select(attrs=_SELECT),
+            "link_worker_v2_enabled": forms.Select(attrs=_SELECT),
             "azure_openai_endpoint": forms.TextInput(attrs={**_INPUT, "placeholder": "https://<resource>.openai.azure.com/"}),
             "azure_openai_api_version": forms.TextInput(attrs={**_INPUT, "placeholder": "2024-12-01-preview"}),
             "azure_anthropic_endpoint": forms.TextInput(attrs=_INPUT),

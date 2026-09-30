@@ -105,6 +105,7 @@ _BOOL_KEYS = {
     "CONVERSATION_DOWNLOAD_ENABLED": "conversation_download_enabled",
     "CONVERSATION_PRIVACY_ENABLED": "conversation_privacy_enabled",
     "STUDY_ENROLMENT_ENABLED": "study_enrolment_enabled",
+    "LINK_WORKER_V2_ENABLED": "link_worker_v2_enabled",
     "ENROLMENT_REQUIRE_DOB": "enrolment_require_dob",
     "ENROLMENT_AUTO_APPROVE": "enrolment_auto_approve",
 }

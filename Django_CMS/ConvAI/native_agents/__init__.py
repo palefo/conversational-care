@@ -44,7 +44,7 @@ def _load_builders():
     (e.g. link_worker) must not break the registry for the others.
     """
     from importlib import import_module
-    for mod in ("loopback", "link_worker", "protocol_qa", "self_registration"):
+    for mod in ("loopback", "link_worker", "link_worker_v2", "protocol_qa", "self_registration"):
         try:
             import_module(f"{__name__}.{mod}")
         except Exception as exc:  # pragma: no cover - defensive
