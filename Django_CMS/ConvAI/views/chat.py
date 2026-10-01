@@ -117,6 +117,30 @@ def whatsapp_webhook(request):
     from ..message_attribution import normalise, resolve_inbound
 
     phone_e164 = normalise(from_num)
+
+    # A navigator's own phone sending a voice note, for the Link Worker on
+    # WhatsApp: answered by Link Worker v2, never looked up as a client. Their
+    # typed messages take the ordinary path below — process_received_message
+    # routes those. See ConvAI.staff_whatsapp.
+    if is_whatsapp and get_bool("WHATSAPP_AUDIO_ENABLED") and num_media == 1:
+        from .. import staff_whatsapp
+        staff_link = staff_whatsapp.voice_link(phone_e164)
+        content_t = request.POST.get("MediaContentType0", "")
+        if staff_link is not None and is_audio_content_type(content_t):
+            reply_text, out_name, msg = staff_whatsapp.voice_note_reply(
+                staff_link, request.POST.get("MediaUrl0", ""), content_t)
+            from xml.sax.saxutils import escape as _xml_escape
+            media = ""
+            if out_name and msg is not None:
+                token = build_signed_download_token(msg.id, "output", ttl_seconds=600)
+                media = "<Media>" + _xml_escape(request.build_absolute_uri(
+                    reverse("twilio_audio_download", args=[msg.id, "output"]) + f"?t={token}"
+                )) + "</Media>"
+            return HttpResponse(
+                f'<?xml version="1.0" encoding="UTF-8"?><Response><Message>'
+                f'<Body>{_xml_escape(reply_text)}</Body>{media}</Message></Response>',
+                content_type="text/xml")
+
     # The one lookup by number for this message; see ConvAI.message_attribution.
     inbound = resolve_inbound(phone_e164)
     patient = inbound.patient

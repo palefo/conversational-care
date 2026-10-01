@@ -50,6 +50,15 @@ def job_process_whatsapp_audio(
     from .message_attribution import normalise, resolve_inbound
 
     phone = normalise(from_number_raw)
+
+    # A navigator's own phone, linked for the Link Worker on WhatsApp: answered
+    # by Link Worker v2 and never looked up as a client. See ConvAI.staff_whatsapp.
+    from . import staff_whatsapp
+    link = staff_whatsapp.voice_link(phone)
+    if link is not None:
+        reply_text, out_name, msg = staff_whatsapp.voice_note_reply(link, media_url, content_type)
+        _send_staff_voice(phone, reply_text, out_name, msg, site_root)
+        return
     # The one lookup by number for this message; its answer is stamped onto the
     # Message below and never re-derived. See ConvAI.message_attribution.
     inbound = resolve_inbound(phone)
@@ -146,4 +155,24 @@ def job_process_whatsapp_audio(
             pass
 
     # Fallback to plain text if media send fails
+    send_whatsapp_text(phone, reply_text)
+
+
+def _send_staff_voice(phone, reply_text, out_name, msg, site_root) -> None:
+    """Send a Link Worker reply: the text, and the voice note when there is one."""
+    if out_name and msg is not None:
+        token = build_signed_download_token(msg.id, "output", ttl_seconds=600)
+        rel = reverse("twilio_audio_download", args=[msg.id, "output"]) + f"?t={token}"
+        from twilio.rest import Client as TwClient
+        account_sid = get_setting("TWILIO_ACCOUNT_SID")
+        auth_token = get_setting("TWILIO_AUTH_TOKEN")
+        platform_phone = get_platform_phone()
+        if account_sid and auth_token and platform_phone:
+            try:
+                TwClient(account_sid, auth_token).messages.create(
+                    from_=f"whatsapp:{platform_phone}", to=f"whatsapp:{phone}",
+                    body=reply_text, media_url=[f"{site_root}{rel}"])
+                return
+            except Exception:
+                pass
     send_whatsapp_text(phone, reply_text)

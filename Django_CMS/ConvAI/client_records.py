@@ -190,6 +190,10 @@ def resolve_protocol(ref):
     text = str(ref if ref is not None else "").strip()
     if not text:
         raise Ambiguous("Say which protocol: its number or words from its title.")
+    # "2. Weekly wellbeing" — the way these functions name a protocol — means 2.
+    leading = re.match(r"^(\d+)[.)]?\s", text)
+    if leading:
+        text = leading.group(1)
     if text.isdigit():
         p = Protocol.objects.filter(number=int(text)).first()
         if p is None:
@@ -593,3 +597,59 @@ def search_records(user, text: str, *, via: str) -> dict:
     _log(user, patients, RecordAccess.Action.SEARCH, via, needle)
     return {"query": needle, "clients_matched": len(patients), "total": total,
             "hits": hits, "truncated": total > len(hits)}
+
+
+# ----------------------------------------------------------------------------
+# For a visit: what to load, and loading it
+# ----------------------------------------------------------------------------
+# Used by the Link Worker on WhatsApp (link_worker_whatsapp.md), where the link
+# worker chooses one client to "load" and the assistant answers about that
+# client only. Today's meetings are the obvious choices; any of their own
+# clients can be loaded instead, to prepare for a later meeting or for any
+# other reason.
+
+def visit_suggestions(user, *, via: str, days_ahead: int = 7) -> dict:
+    """Today's meetings — earlier ones included — and the week's still to come."""
+    from datetime import datetime, time
+
+    from .models import Meeting, RecordAccess
+
+    tz = timezone.get_current_timezone()
+    today = timezone.localdate()
+    start = timezone.make_aware(datetime.combine(today, time.min), tz)
+    end = start + timedelta(days=1)
+    base = (Meeting.objects.filter(patient__in=visible_patients(user))
+            .exclude(status=Meeting.Status.CANCELLED)
+            .select_related("patient").prefetch_related("scheduled_protocols")
+            .order_by("scheduled_time"))
+    today_rows = list(base.filter(scheduled_time__gte=start, scheduled_time__lt=end)[:MAX_MEETINGS])
+    later_rows = list(base.filter(status=Meeting.Status.PENDING, scheduled_time__gte=end,
+                                  scheduled_time__lt=end + timedelta(days=days_ahead))
+                      [:MAX_MEETINGS])
+
+    def row(m):
+        return {**_meeting(m), "client": _client_ref(m.patient)}
+
+    revealed = {m.patient_id: m.patient for m in today_rows + later_rows}
+    _log(user, list(revealed.values()), RecordAccess.Action.MEETINGS, via,
+         f"visit suggestions, {days_ahead} days")
+    return {"today": [row(m) for m in today_rows],
+            "coming_up": [row(m) for m in later_rows]}
+
+
+def load_client(user, patient_id, *, via: str, reason: str = "") -> dict:
+    """Record that this person loaded one client, and say who they loaded.
+
+    Loading is a look at the record like any other, so it is logged; the reason,
+    where the link worker gave one, travels with it.
+    """
+    from .models import Meeting, RecordAccess
+
+    p = _patient(user, patient_id)
+    now = timezone.now()
+    next_meeting = (Meeting.objects.filter(patient=p, status=Meeting.Status.PENDING,
+                                           scheduled_time__gt=now)
+                    .order_by("scheduled_time").first())
+    _log(user, [p], RecordAccess.Action.LOAD, via, reason)
+    return {"client": _client_ref(p),
+            "next_meeting": _meeting(next_meeting) if next_meeting else None}

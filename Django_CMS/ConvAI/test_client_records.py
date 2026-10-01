@@ -193,6 +193,11 @@ class ProtocolTests(Caseload):
                         "the question reads as plain text, not Markdown")
         self.assertEqual(sleep["answer"], "Better: sleeping through four nights of seven.")
 
+    def test_a_protocol_can_be_named_the_way_the_answers_name_it(self):
+        """A model hands back "3. IQCODE …" because that is how it was shown it."""
+        out = records.protocol_history(self.nav, self.ada.pk, "3. IQCODE cognitive decline", via="agent")
+        self.assertEqual(out["protocol"], "3. IQCODE cognitive decline")
+
     def test_a_protocol_can_be_named_by_its_title(self):
         out = records.protocol_answers(self.nav, self.ada.pk, "iqcode", via="agent")
         self.assertEqual(out["protocols"][0]["protocol"], "3. IQCODE cognitive decline")

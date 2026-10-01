@@ -126,6 +126,80 @@
     </form>
   </div>
 
+  {% if whatsapp %}
+  {% comment %}Link Worker on WhatsApp. Only here while the feature is on and
+    this person is a navigator; see link_worker_whatsapp.md.{% endcomment %}
+  <div class="card p-6 mb-6" id="whatsapp">
+    <div class="flex items-start gap-3 mb-5">
+      <span class="prof-icon bg-emerald-50 text-emerald-600"><span class="material-icons-outlined">chat</span></span>
+      <div class="flex-1">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Link Worker on WhatsApp" %}</h2>
+          <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">{% trans "beta" %}</span>
+          {% if whatsapp.link.verified_at %}
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">{% trans "Linked" %}</span>
+          {% elif whatsapp.link %}
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{% trans "Waiting for your code" %}</span>
+          {% endif %}
+        </div>
+        <p class="text-sm text-gray-500">{% trans "Ask the assistant about a client from your phone — on the way to a visit, or at the door. Load one client at a time: today's meetings are suggested, and you can choose any of your clients. Text or voice notes." %}</p>
+      </div>
+    </div>
+
+    {% if whatsapp.code %}
+      <div class="mb-4 px-4 py-4 rounded-lg bg-emerald-50 border border-emerald-200 text-sm text-emerald-900" style="display:flex;gap:1.25rem;flex-wrap:wrap;align-items:center">
+        <div style="flex:1 1 16rem">
+          <p class="font-medium mb-1">{% trans "Send this from the phone you are linking:" %}</p>
+          <p style="font-family:ui-monospace,Menlo,monospace;font-size:1.5rem;letter-spacing:.08em;margin:.25rem 0 .5rem">LINK {{ whatsapp.code }}</p>
+          {% if whatsapp.platform_phone %}
+            <p class="mb-2">{% blocktrans with n=whatsapp.platform_phone %}to the service's WhatsApp number, {{ n }}. The code works for 15 minutes.{% endblocktrans %}</p>
+            <a href="{{ whatsapp.wa_url }}" class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1" target="_blank" rel="noopener">
+              <span class="material-icons-outlined text-base">send</span>{% trans "Open in WhatsApp" %}
+            </a>
+          {% else %}
+            <p>{% trans "The service's WhatsApp number is not set on this platform; ask an admin." %}</p>
+          {% endif %}
+        </div>
+        {% if whatsapp.qr_svg %}
+          <div style="text-align:center">
+            <div style="width:8.5rem;background:#fff;padding:.4rem;border-radius:.5rem">{{ whatsapp.qr_svg|safe }}</div>
+            <div class="text-xs text-emerald-800 mt-1">{% trans "Scan with your phone" %}</div>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if whatsapp.link.verified_at %}
+      <dl class="text-sm mb-4" style="display:grid;grid-template-columns:max-content 1fr;gap:.35rem 1rem">
+        <dt class="text-gray-500">{% trans "Phone" %}</dt><dd>{{ whatsapp.link.phone_number }}</dd>
+        <dt class="text-gray-500">{% trans "Linked" %}</dt><dd>{{ whatsapp.link.verified_at|date:"j M Y, H:i" }}</dd>
+        <dt class="text-gray-500">{% trans "Client loaded" %}</dt>
+        <dd>{% if whatsapp.link.loaded_patient %}{{ whatsapp.link.loaded_patient.name }} {{ whatsapp.link.loaded_patient.lastname }}{% else %}<span class="text-gray-400">{% trans "none" %}</span>{% endif %}</dd>
+      </dl>
+      <form method="post" action="{% url 'whatsapp_unlink' %}">
+        {% csrf_token %}
+        <button type="submit" class="button-secondary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+          <span class="material-icons-outlined text-base">link_off</span>{% trans "Unlink this phone" %}
+        </button>
+        <p class="text-xs text-gray-500 mt-2">{% trans "Do this straight away if your phone is lost. An admin can do it too." %}</p>
+      </form>
+    {% else %}
+      <form method="post" action="{% url 'whatsapp_link_start' %}" class="flex flex-wrap items-end gap-3">
+        {% csrf_token %}
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="waNumber">{% trans "Your mobile number" %}</label>
+          <input id="waNumber" name="phone_number" type="tel" required placeholder="+5511912345678"
+                 value="{% if whatsapp.link %}{{ whatsapp.link.phone_number }}{% else %}{{ whatsapp.default_number }}{% endif %}"
+                 class="px-3 py-2 border border-gray-300 rounded-lg text-sm" style="min-width:14rem">
+        </div>
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium">
+          {% if whatsapp.link %}{% trans "Get a new code" %}{% else %}{% trans "Get a code" %}{% endif %}
+        </button>
+      </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {# ── API token ── #}
   <div class="card p-6 mb-6">
     <div class="flex items-start gap-3 mb-5">

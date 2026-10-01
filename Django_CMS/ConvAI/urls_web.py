@@ -6,6 +6,7 @@ from django.contrib.auth.views import LogoutView
 from .views import (
     dashboard, patient_list, RoleBasedLoginView, pending_call, help_page, help_edit,
     profile, update_profile, update_language, whatsapp_webhook, update_twilio_phonecalls,
+    whatsapp_link_start, whatsapp_unlink,
     serve_protected_file, config, config_save, schedule_call,
     patient_detail, patient_conversation_detail, make_phone_call, start_client_call,
     complete_meeting,
@@ -80,6 +81,9 @@ urlpatterns = [
     path('profile/', navigator_required(profile), name='profile'),
     path('profile/update/', navigator_required(update_profile), name='update_profile'),
     path('profile/language/', navigator_required(update_language), name='update_language'),
+    # Link Worker on WhatsApp: link a navigator's phone (see link_worker_whatsapp.md).
+    path('profile/whatsapp/link/', navigator_required(whatsapp_link_start), name='whatsapp_link_start'),
+    path('profile/whatsapp/unlink/', navigator_required(whatsapp_unlink), name='whatsapp_unlink'),
     path('logout/', LogoutView.as_view(next_page='/'), name='logout'),
     # Password recovery. Django's flow, our templates and provider — see
     # ConvAI/views/account.py. The `reset/` paths keep Django's own shape so the

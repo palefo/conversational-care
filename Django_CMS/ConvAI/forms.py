@@ -1605,6 +1605,8 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
         model = SiteConfiguration
         fields = [
             "link_worker_v2_enabled",
+            "link_worker_whatsapp_enabled",
+            "link_worker_voice_pt_br",
             "default_agent_model",
             "anthropic_api_key", "google_api_key", "mistral_api_key", "deepseek_api_key",
             "agent_allowed_hosts",
@@ -1620,6 +1622,8 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
         ]
         labels = {
             "link_worker_v2_enabled": _("Use Link Worker v2 (beta)"),
+            "link_worker_whatsapp_enabled": _("Link workers can use it on WhatsApp"),
+            "link_worker_voice_pt_br": _("Voice for Brazilian Portuguese voice notes"),
             "default_agent_model": _("Default agent model"),
             "anthropic_api_key": _("Anthropic API key"),
             "google_api_key": _("Google API key"),
@@ -1652,6 +1656,15 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
                 "notes and conversation summaries — only for clients the person could open "
                 "on screen, and every record it reads is logged. The matching client-record "
                 "API endpoints exist only while this is on."),
+            "link_worker_whatsapp_enabled": _(
+                "Off by default, and only with v2 on. Navigators link their own phone on "
+                "their profile page, then message the service's WhatsApp number — text or "
+                "voice notes — about one client at a time, which they choose (today's "
+                "meetings are suggested). Admins use the web app. Every record read is "
+                "logged, marked WhatsApp."),
+            "link_worker_voice_pt_br": _(
+                "ElevenLabs voice ID for spoken replies when the link worker spoke "
+                "Portuguese. Blank uses the v2 agent's own voice (set on the Agents page)."),
             "default_agent_model": _("Used when an agent has no explicit model, e.g. "
                                      "'openai/gpt-4.1-mini'. Blank uses the .env default."),
             "use_azure": _("Route models to Azure instead of the public provider APIs."),
@@ -1679,6 +1692,8 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "agent_allowed_hosts": forms.Textarea(attrs={**_INPUT, "rows": 3}),
             "use_azure": forms.Select(attrs=_SELECT),
             "link_worker_v2_enabled": forms.Select(attrs=_SELECT),
+            "link_worker_whatsapp_enabled": forms.Select(attrs=_SELECT),
+            "link_worker_voice_pt_br": forms.TextInput(attrs={**_INPUT, "placeholder": "e.g. a Brazilian voice from the ElevenLabs Voice Library"}),
             "azure_openai_endpoint": forms.TextInput(attrs={**_INPUT, "placeholder": "https://<resource>.openai.azure.com/"}),
             "azure_openai_api_version": forms.TextInput(attrs={**_INPUT, "placeholder": "2024-12-01-preview"}),
             "azure_anthropic_endpoint": forms.TextInput(attrs=_INPUT),

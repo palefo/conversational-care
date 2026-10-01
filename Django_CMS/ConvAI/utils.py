@@ -793,6 +793,14 @@ def process_received_message(phone_number: str, raw_message: str, channel: str |
     phone = normalise(phone_number)
     text = raw_message.strip()
 
+    # 0) A navigator's own phone, linked for the Link Worker on WhatsApp. None —
+    # and nothing below changes — unless that feature is on and this is such a
+    # number. See ConvAI.staff_whatsapp.
+    from . import staff_whatsapp
+    staff_reply = staff_whatsapp.handle_text(phone, text, channel=channel)
+    if staff_reply is not None:
+        return staff_reply
+
     # 1) resolve the client this number writes about. The one place, with the
     # audio paths, that a number is used to decide whose a message is — the
     # answer is stamped onto the message and never re-derived. See

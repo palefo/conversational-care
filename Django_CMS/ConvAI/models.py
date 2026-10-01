@@ -1533,6 +1533,20 @@ class SiteConfiguration(models.Model):
     # link_worker_v2.md.
     link_worker_v2_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
 
+    # --- Link Worker on WhatsApp (beta) ---
+    # Lets a navigator ask Link Worker v2 from their own phone, over the
+    # service's WhatsApp number — at a client's door, say. Needs v2 on as well.
+    # Off by default; while off, WhatsApp behaves exactly as before. See
+    # link_worker_whatsapp.md.
+    link_worker_whatsapp_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # The ElevenLabs voice for a voice-note reply when the link worker spoke
+    # Portuguese. Blank uses the v2 agent's own voice.
+    link_worker_voice_pt_br = models.CharField(
+        max_length=40, blank=True, default="",
+        help_text="ElevenLabs voice ID used when a link worker's voice note is in Portuguese.",
+    )
+
     # How many words an access code is built from. Three (~250^3) is the default:
     # enough space that the rate limit below does the real work, short enough to
     # read down a phone line without losing your place.
@@ -2123,9 +2137,11 @@ class RecordAccess(models.Model):
     class Via(models.TextChoices):
         AGENT = "agent", "Assistant"
         API = "api", "API"
+        WHATSAPP = "whatsapp", "WhatsApp"
 
     class Action(models.TextChoices):
         FIND = "find", "Find clients"
+        LOAD = "load", "Load a client"
         OVERVIEW = "overview", "Client overview"
         MEETINGS = "meetings", "Upcoming meetings"
         ANSWERS = "answers", "Protocol answers"
@@ -2158,3 +2174,45 @@ class RecordAccess(models.Model):
         if self.pk is not None:
             raise ValidationError("RecordAccess is append-only.")
         super().save(*args, **kwargs)
+
+
+class StaffWhatsAppLink(models.Model):
+    """A navigator's phone, linked to the Link Worker assistant on WhatsApp.
+
+    Proven, not typed in: the navigator asks for a code on their profile page
+    and sends it from the phone itself. Until then ``verified_at`` is empty and
+    the number is nobody's.
+
+    Also holds the WhatsApp session: the conversation thread, and the one client
+    the link worker has **loaded** — the assistant answers about that client and
+    no other until they load a different one. The choice is the link worker's;
+    today's meetings are offered as the obvious ones. See
+    link_worker_whatsapp.md.
+    """
+
+    user = models.OneToOneField(ConvAIUser, on_delete=models.CASCADE,
+                                related_name="whatsapp_link")
+    phone_number = PhoneNumberField()
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    # The pending code, hashed: it is a credential while it lasts.
+    code_hash = models.CharField(max_length=128, blank=True, default="")
+    code_expires_at = models.DateTimeField(null=True, blank=True)
+    code_tries = models.PositiveSmallIntegerField(default=0)
+
+    # The session.
+    thread_id = models.CharField(max_length=36, blank=True, default="")
+    last_message_at = models.DateTimeField(null=True, blank=True)
+    loaded_patient = models.ForeignKey("Patient", on_delete=models.SET_NULL,
+                                       null=True, blank=True, related_name="+")
+    loaded_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Staff WhatsApp link"
+        verbose_name_plural = "Staff WhatsApp links"
+
+    def __str__(self):
+        state = "verified" if self.verified_at else "pending"
+        return f"{self.user.get_username()} · {self.phone_number} ({state})"

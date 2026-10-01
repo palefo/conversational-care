@@ -83,6 +83,8 @@ _STR_KEYS = {
     "SENSEI_USER_ID_SECRET": "sensei_user_id_secret",
     # Study enrolment (see participant_management.md).
     "ENROLMENT_LANDING_TEXT": "enrolment_landing_text",
+    # Link Worker on WhatsApp (see link_worker_whatsapp.md).
+    "LINK_WORKER_VOICE_PT_BR": "link_worker_voice_pt_br",
 }
 
 # Integer settings, resolved like the strings above but coerced. Kept separate
@@ -106,6 +108,7 @@ _BOOL_KEYS = {
     "CONVERSATION_PRIVACY_ENABLED": "conversation_privacy_enabled",
     "STUDY_ENROLMENT_ENABLED": "study_enrolment_enabled",
     "LINK_WORKER_V2_ENABLED": "link_worker_v2_enabled",
+    "LINK_WORKER_WHATSAPP_ENABLED": "link_worker_whatsapp_enabled",
     "ENROLMENT_REQUIRE_DOB": "enrolment_require_dob",
     "ENROLMENT_AUTO_APPROVE": "enrolment_auto_approve",
 }

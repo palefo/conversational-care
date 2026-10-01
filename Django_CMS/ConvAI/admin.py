@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import ConvAIUser, Message, CallLeg, CallRecording, Caregiver, Patient, Meeting, Protocol, Question, Answer, Agent, Conversation, SelfRegistration, Alert, RagDocument, Study, Enrolment, ConsentRecord, RecordAccess
+from .models import ConvAIUser, Message, CallLeg, CallRecording, Caregiver, Patient, Meeting, Protocol, Question, Answer, Agent, Conversation, SelfRegistration, Alert, RagDocument, Study, Enrolment, ConsentRecord, RecordAccess, StaffWhatsAppLink
 from django.db.models import Q
 from django.utils.html import format_html, escape
 from django.utils.safestring import mark_safe
@@ -588,4 +588,23 @@ class RecordAccessAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(StaffWhatsAppLink)
+class StaffWhatsAppLinkAdmin(admin.ModelAdmin):
+    """Navigators' phones linked to the Link Worker on WhatsApp.
+
+    Deleting a row unlinks the phone — what an admin does for a navigator who
+    has lost theirs. The code is only ever stored hashed. See
+    link_worker_whatsapp.md.
+    """
+
+    list_display = ("user", "phone_number", "verified_at", "loaded_patient", "last_message_at")
+    search_fields = ("user__username", "user__first_name", "user__last_name")
+    readonly_fields = ("user", "phone_number", "verified_at", "code_hash", "code_expires_at",
+                       "code_tries", "thread_id", "last_message_at", "loaded_patient",
+                       "loaded_at", "created_at")
+
+    def has_add_permission(self, request):
         return False

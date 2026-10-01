@@ -62,6 +62,9 @@ Topic deep dives:
   answers questions about clients (next meetings, protocol answers and how they
   changed, everything on file), the matching REST endpoints and SDK methods, and
   the access log behind both. Off by default.
+- [Link Worker on WhatsApp](link_worker_whatsapp.md) — navigators ask Link
+  Worker v2 from their own phone, by text or voice note, about one client they
+  load at a time (today's visits suggested). Off by default.
 - [Agent tools & summaries](agent_tools.md) — the platform tools a prompt-based
   agent can be given from the agent form, the summary an agent writes for the
   client's link worker, and how a remote agent authenticates to write one.

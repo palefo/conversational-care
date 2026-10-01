@@ -125,6 +125,11 @@ conversation out of the model's context.
 **11. Low temperature.** v2 runs at 0.2 (v1 at 1.0). It reports what a record
 says, and a model that paraphrases creatively misquotes a client.
 
+## On WhatsApp
+
+Navigators can also reach v2 from their own phone — one client at a time, which
+they load. See [link_worker_whatsapp.md](link_worker_whatsapp.md).
+
 ## Configuration
 
 | Setting | Default | What it does |

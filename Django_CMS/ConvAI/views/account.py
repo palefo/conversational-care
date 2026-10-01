@@ -9,6 +9,7 @@ from ..default_help import DEFAULT_HELP_MARKDOWN
 from ..site_config import brand_name
 
 __all__ = ['RoleBasedLoginView', '_issue_user_token', 'issue_api_token', 'profile',
+           'whatsapp_link_start', 'whatsapp_unlink',
            'help_page', 'help_edit', 'update_language', 'update_profile',
            'PasswordResetRequestView', 'PasswordResetSentView',
            'PasswordResetConfirmView', 'PasswordResetCompleteView']
@@ -90,7 +91,59 @@ def profile(request):
         "just_issued_token": just,  # None or the newly generated token
         "languages": settings.LANGUAGES,
         "role_label": _profile_role_label(request.user),
+        # None — and no card — unless the Link Worker on WhatsApp is on and
+        # this person may use it. See ConvAI.staff_whatsapp.
+        "whatsapp": _whatsapp_context(request),
     })
+
+
+def _whatsapp_context(request):
+    """The profile's Link Worker on WhatsApp card, or None when it has no place."""
+    from urllib.parse import quote
+
+    from .. import staff_whatsapp
+    from ..models import StaffWhatsAppLink
+    from .settings_views import _qr_svg
+
+    user = request.user
+    if not staff_whatsapp.enabled() or not staff_whatsapp.eligible(user):
+        return None
+    link = StaffWhatsAppLink.objects.filter(user=user).select_related("loaded_patient").first()
+    code = request.session.pop("whatsapp_link_code", None)
+    platform = (get_platform_phone() or "").strip()
+    ctx = {"link": link, "code": code, "platform_phone": platform,
+           "default_number": str(user.phone_number or "")}
+    if code and platform:
+        digits = "".join(ch for ch in platform if ch.isdigit())
+        ctx["wa_url"] = f"https://wa.me/{digits}?text={quote('LINK ' + code)}"
+        ctx["qr_svg"] = _qr_svg(ctx["wa_url"], "waLinkQr")
+    return ctx
+
+
+@login_required
+@require_POST
+def whatsapp_link_start(request):
+    """Issue a code for the navigator to send from the phone they are linking."""
+    from .. import staff_whatsapp
+
+    try:
+        code = staff_whatsapp.start_link(request.user, request.POST.get("phone_number", ""))
+    except staff_whatsapp.LinkError as exc:
+        messages.error(request, str(exc))
+        return redirect(f"{reverse('profile')}#whatsapp")
+    # Shown once, like an API token: it is a credential until it is used.
+    request.session["whatsapp_link_code"] = code
+    return redirect(f"{reverse('profile')}#whatsapp")
+
+
+@login_required
+@require_POST
+def whatsapp_unlink(request):
+    from .. import staff_whatsapp
+
+    staff_whatsapp.unlink(request.user)
+    messages.success(request, _("Your phone is no longer linked to the Link Worker on WhatsApp."))
+    return redirect(f"{reverse('profile')}#whatsapp")
 
 
 @login_required

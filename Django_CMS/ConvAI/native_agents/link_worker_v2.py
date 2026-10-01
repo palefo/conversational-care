@@ -107,6 +107,34 @@ def _protocol_list() -> str:
         return pool.submit(query).result()
 
 
+def run_records_tool(fn, *args, via: str, **kwargs) -> str:
+    """Run one client_records question as the member of staff this run is for.
+
+    Shared by the web assistant and its WhatsApp form, which differ in which
+    questions they may ask, not in how a question is answered.
+    """
+    from langchain_core.runnables.config import ensure_config
+
+    from .. import client_records as records
+
+    user = actor_from(ensure_config().get("configurable", {}) or {})
+    if user is None:
+        return NOT_SIGNED_IN
+    try:
+        return as_tool_output(fn(user, *args, via=via, **kwargs))
+    except records.NotVisible:
+        return ("NOT_VISIBLE — there is no client with that ID among the clients this "
+                "person can see. Use find_clients to get the right ID.")
+    except records.BadQuestion as exc:  # a question to put back to the person
+        return f"CANNOT_ANSWER — {exc}"
+    except Exception:
+        # Anything else is ours, not the question's: log it, and let the
+        # model say so rather than failing the whole turn.
+        logger.exception("Link Worker v2 tool %s failed", getattr(fn, "__name__", fn))
+        return ("CANNOT_ANSWER — the record could not be read just now. Say so, and "
+                "suggest trying again or opening the client's page.")
+
+
 @register("link_worker_v2")
 def build(checkpointer, model_name=None):
     """Build the Link Worker v2 react-agent graph."""
@@ -127,23 +155,7 @@ def build(checkpointer, model_name=None):
     from .. import client_records as records
 
     def answer(fn, *args, **kwargs) -> str:
-        """Run one records question as the signed-in member of staff."""
-        user = actor_from(ensure_config().get("configurable", {}) or {})
-        if user is None:
-            return NOT_SIGNED_IN
-        try:
-            return as_tool_output(fn(user, *args, via="agent", **kwargs))
-        except records.NotVisible:
-            return ("NOT_VISIBLE — there is no client with that ID among the clients this "
-                    "person can see. Use find_clients to get the right ID.")
-        except records.BadQuestion as exc:  # a question to put back to the person
-            return f"CANNOT_ANSWER — {exc}"
-        except Exception:
-            # Anything else is ours, not the question's: log it, and let the
-            # model say so rather than failing the whole turn.
-            logger.exception("Link Worker v2 tool %s failed", getattr(fn, "__name__", fn))
-            return ("CANNOT_ANSWER — the record could not be read just now. Say so, and "
-                    "suggest trying again or opening the client's page.")
+        return run_records_tool(fn, *args, via="agent", **kwargs)
 
     # Tools are synchronous on purpose: in this LangGraph version the run config
     # only reaches sync tools (ensure_config), and LangGraph runs them in a
@@ -261,3 +273,169 @@ def build(checkpointer, model_name=None):
         state_modifier=prompt,
         checkpointer=checkpointer,
     )
+
+
+# ----------------------------------------------------------------------------
+# The same assistant on WhatsApp (see ConvAI/staff_whatsapp.py)
+# ----------------------------------------------------------------------------
+# One client at a time, chosen by the link worker. The questions about a client
+# take no client id at all: they answer about the client the link worker has
+# loaded, which lives on their StaffWhatsAppLink row, not in the model's memory.
+# So the model cannot drift onto somebody else — it can only load a client, and
+# loading is logged. Caseload-wide search stays in the web app.
+
+WHATSAPP_PROMPT_PATH = os.path.join(os.path.dirname(__file__), "prompts",
+                                    "link_worker_whatsapp.prompt")
+NO_CLIENT_LOADED = ("NO_CLIENT_LOADED — no client is loaded. Ask which client to load; "
+                    "suggest_clients lists today's meetings and the week's.")
+
+
+def _whatsapp_link(user):
+    from ..models import StaffWhatsAppLink
+    return StaffWhatsAppLink.objects.filter(user=user, verified_at__isnull=False).first()
+
+
+def _loaded_id():
+    """The client the link worker in this run has loaded, or None."""
+    from langchain_core.runnables.config import ensure_config
+
+    user = actor_from(ensure_config().get("configurable", {}) or {})
+    link = _whatsapp_link(user) if user else None
+    return link.loaded_patient_id if link else None
+
+
+@register("link_worker_whatsapp")
+def build_whatsapp(checkpointer, model_name=None):
+    """Build the WhatsApp form of Link Worker v2."""
+    try:
+        from pydantic import BaseModel, Field
+        from langchain_core.messages import AnyMessage
+        from langchain_core.runnables import RunnableConfig
+        from langchain_core.runnables.config import ensure_config
+        from langchain_core.tools import tool
+        from langgraph.prebuilt import create_react_agent
+        from langgraph.prebuilt.chat_agent_executor import AgentState
+        from ..llm_factory import make_llm
+    except Exception as exc:  # missing LLM deps
+        raise RuntimeError(
+            "Link Worker on WhatsApp is not available (LangGraph/LLM dependencies missing)."
+        ) from exc
+
+    from django.utils import timezone
+
+    from .. import client_records as records
+
+    def about_loaded(fn, *args, **kwargs) -> str:
+        pid = _loaded_id()
+        if pid is None:
+            return NO_CLIENT_LOADED
+        return run_records_tool(fn, pid, *args, via="whatsapp", **kwargs)
+
+    @tool("suggest_clients")
+    def suggest_clients() -> str:
+        """Today's meetings (earlier ones included) and the next week's: the obvious
+        clients to load. The link worker may load any of their clients instead."""
+        return run_records_tool(records.visit_suggestions, via="whatsapp")
+
+    class FindInput(BaseModel):
+        query: str = Field("", description="Name, surname or phone of one of their clients.")
+
+    @tool("find_clients", args_schema=FindInput)
+    def find_clients(query: str = "") -> str:
+        """Find one of the link worker's clients by name or phone, to load them."""
+        return run_records_tool(records.find_clients, query, via="whatsapp")
+
+    class LoadInput(BaseModel):
+        client_id: int = Field(..., description="The client's ID, from suggest_clients or find_clients.")
+        reason: str = Field("", description="Why, in a few words, if the link worker said "
+                                            "(e.g. 'visit today', 'preparing Thursday's call').")
+
+    @tool("load_client", args_schema=LoadInput)
+    def load_client(client_id: int, reason: str = "") -> str:
+        """Load the client the link worker chose. Only when they have said which client —
+        never on your own initiative. Replaces any client loaded before."""
+        cfg = ensure_config().get("configurable", {}) or {}
+        user = actor_from(cfg)
+        link = _whatsapp_link(user) if user else None
+        if link is None:
+            return NOT_SIGNED_IN
+        out = run_records_tool(records.load_client, client_id, via="whatsapp", reason=reason)
+        if out.startswith("{"):
+            link.loaded_patient_id, link.loaded_at = client_id, timezone.now()
+            link.save(update_fields=["loaded_patient", "loaded_at"])
+            out = "LOADED — " + out
+        return out
+
+    @tool("client_overview")
+    def client_overview() -> str:
+        """Everything held about the loaded client: contact, caregiver, details, next and
+        recent meetings, protocol progress, open alerts, conversation summaries, notes."""
+        return about_loaded(records.overview)
+
+    class AnswersInput(BaseModel):
+        protocol: Optional[str] = Field(None, description="A protocol number or words from its "
+                                                          "title. Empty for every protocol.")
+
+    @tool("protocol_answers", args_schema=AnswersInput)
+    def protocol_answers(protocol: Optional[str] = None) -> str:
+        """What the loaded client reported in their protocols: the latest answer to each
+        question, with when it was given."""
+        return about_loaded(records.protocol_answers, protocol)
+
+    class HistoryInput(BaseModel):
+        protocol: str = Field(..., description="A protocol number or words from its title.")
+
+    @tool("protocol_history", args_schema=HistoryInput)
+    def protocol_history(protocol: str) -> str:
+        """How one protocol's answers changed for the loaded client, call by call."""
+        return about_loaded(records.protocol_history, protocol)
+
+    class ScheduleInput(BaseModel):
+        when: str = Field(..., description="Date and time, ISO 8601 preferred.")
+        type: Optional[int] = Field(None, description="0 Onboarding, 1 Protocol (default), "
+                                                      "2 Final, 3 Initial, 4 Follow-up.")
+        protocols: Optional[List[int]] = Field(None, description="Protocol numbers to cover.")
+
+    @tool("schedule_meeting", args_schema=ScheduleInput)
+    def schedule_meeting(when: str, type: Optional[int] = None,
+                         protocols: Optional[List[int]] = None) -> str:
+        """Book a meeting for the loaded client, once the link worker has confirmed the
+        time. The same checks as the calendar."""
+        user = actor_from(ensure_config().get("configurable", {}) or {})
+        if user is None:
+            return NOT_SIGNED_IN
+        pid = _loaded_id()
+        if pid is None:
+            return NO_CLIENT_LOADED
+        from dateutil import parser as dtparser
+        try:
+            scheduled = dtparser.parse(when)
+        except Exception:
+            return "CANNOT_ANSWER — that date/time could not be read; ask for e.g. 2026-10-15 15:30."
+        return _schedule_meeting(user, pid, scheduled, type, protocols)
+
+    tools = [suggest_clients, find_clients, load_client, client_overview,
+             protocol_answers, protocol_history, schedule_meeting]
+    with open(WHATSAPP_PROMPT_PATH, "r", encoding="utf-8") as f:
+        base_prompt = f.read().strip()
+
+    def prompt(state: "AgentState", config: "RunnableConfig") -> List["AnyMessage"]:
+        from django.conf import settings
+
+        cfg = _configurable(config) or (ensure_config().get("configurable", {}) or {})
+        sys = base_prompt
+        sys += f"\n\nNow: {timezone.localtime():%A %Y-%m-%d %H:%M} ({settings.TIME_ZONE})."
+        sys += f"\nProtocols on this platform: {_protocol_list()}."
+        if cfg.get("user_name"):
+            sys += f"\nYou are talking to {cfg['user_name']}, a link worker."
+        if cfg.get("reply_mode") == "voice":
+            sys += ("\nThis reply will be spoken back as a voice note. Write it to be heard: "
+                    "short sentences, no lists or symbols, no IDs, dates said naturally.")
+        if cfg.get("spoken_language"):
+            sys += f"\nThey spoke {cfg['spoken_language']}; reply in that language."
+        msgs = state["messages"][-RECENT_MSG_LIMIT:] if state.get("messages") else []
+        return [{"role": "system", "content": sys}] + msgs
+
+    model = make_llm(model_name, temperature=0.2)
+    return create_react_agent(model=model, tools=tools, state_modifier=prompt,
+                              checkpointer=checkpointer)
