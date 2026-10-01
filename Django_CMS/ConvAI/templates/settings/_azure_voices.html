@@ -1,0 +1,4 @@
+{% comment %} Suggestions for Azure voice fields (free text; any Azure voice name works). {% endcomment %}
+<datalist id="azure-voices">{% for name, label in voices %}
+  <option value="{{ name }}" label="{{ label }}">{{ label }}</option>{% endfor %}
+</datalist>

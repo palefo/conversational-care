@@ -65,6 +65,9 @@ Topic deep dives:
 - [Link Worker on WhatsApp](link_worker_whatsapp.md) — navigators ask Link
   Worker v2 from their own phone, by text or voice note, about one client they
   load at a time (today's visits suggested). Off by default.
+- [Text to speech](text_to_speech.md) — who speaks voice replies: ElevenLabs
+  (the default) or Azure AI Speech, each agent's voice for each, and setting up
+  an Azure Speech resource.
 - [Agent tools & summaries](agent_tools.md) — the platform tools a prompt-based
   agent can be given from the agent form, the summary an agent writes for the
   client's link worker, and how a remote agent authenticates to write one.

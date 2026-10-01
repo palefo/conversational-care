@@ -9,7 +9,7 @@ controlled** (so a leaked link does not expose private data).
 | Category | Produced by | Contains |
 | --- | --- | --- |
 | **Care plans** | Navigator uploads a PDF | Clinical care-plan documents |
-| **TTS audio** | ElevenLabs text-to-speech | Spoken agent replies (sent to users, incl. via Twilio) |
+| **TTS audio** | ElevenLabs or Azure AI Speech ([text_to_speech.md](text_to_speech.md)) | Spoken agent replies (sent to users, incl. via Twilio) |
 | **User voice notes** | Inbound WhatsApp / web audio | Audio messages recorded by caregivers/clients |
 | **Call recordings** | Downloaded from Twilio | Recordings of phone calls |
 | **RAG documents** | Admin uploads on an agent's Knowledge base page | Source documents a RAG-based agent searches |
@@ -26,7 +26,7 @@ into one directory per category:
 media/                    ← MEDIA_ROOT, a persistent Docker volume (media_data:/media)
 ├── branding/             public   — brand logo (login page)
 ├── care_plans/           private  — uploaded care-plan PDFs
-├── voice/                private  — ElevenLabs TTS + inbound user voice notes
+├── voice/                private  — TTS replies + inbound user voice notes
 ├── call_recordings/      private  — call recordings downloaded from Twilio
 └── rag_documents/<agent>/ private — documents uploaded to a RAG agent
 ```

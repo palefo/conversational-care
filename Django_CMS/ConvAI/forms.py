@@ -766,17 +766,40 @@ _DESCRIPTION_WIDGET = forms.Textarea(attrs={
 })
 
 
+# Every agent kind carries a voice per TTS provider; Settings → Agents → Text to
+# speech says which one is used. The Azure field suggests the region's voices
+# (<datalist id="azure-voices">, see ConvAI.tts.azure_voices) but takes any name.
+_VOICE_LABELS = {
+    "tts_voice_id": _("ElevenLabs voice ID"),
+    "azure_voice": _("Azure voice"),
+}
+_VOICE_HELP = {
+    "tts_voice_id": _("Used when ElevenLabs speaks the replies. Blank uses the default "
+                      "ElevenLabs voice."),
+    "azure_voice": _("Used when Azure AI Speech speaks the replies — start typing a "
+                     "language or name, e.g. 'Brazil' or 'Sonia'. Blank uses the default "
+                     "Azure voice in Settings → Agents."),
+}
+_AZURE_VOICE_INPUT = {**_INPUT, "list": "azure-voices", "autocomplete": "off",
+                      "placeholder": "en-GB-AdaMultilingualNeural"}
+_VOICE_WIDGETS = {
+    "tts_voice_id": forms.TextInput(attrs=_INPUT),
+    "azure_voice": forms.TextInput(attrs=_AZURE_VOICE_INPUT),
+}
+
+
 class AgentForm(forms.ModelForm):
     """App-level create/edit form for **remote** agents (LangGraph server)."""
     class Meta:
         model = Agent
         fields = [
             "name", "description", "langgraph_name", "host", "port", "allow_callbacks",
-            "classification_role", "abstract_instruction", "detectors", "tts_voice_id",
+            "classification_role", "abstract_instruction", "detectors", "tts_voice_id", "azure_voice",
         ]
         labels = {"description": _("Description"),
-                  "allow_callbacks": _("Allow callbacks")}
+                  "allow_callbacks": _("Allow callbacks"), **_VOICE_LABELS}
         help_texts = {
+            **_VOICE_HELP,
             "allow_callbacks": _(
                 "Give each run a token that lets this agent report the conversation's "
                 "summary and, if the client asks, hide it from their link worker — for "
@@ -796,7 +819,7 @@ class AgentForm(forms.ModelForm):
             "classification_role": forms.Textarea(attrs={**_INPUT, "rows": 4}),
             "abstract_instruction": forms.TextInput(attrs=_INPUT),
             "detectors": DetectorTableWidget(),
-            "tts_voice_id": forms.TextInput(attrs=_INPUT),
+            **_VOICE_WIDGETS,
         }
 
 
@@ -819,15 +842,17 @@ class PromptAgentForm(forms.ModelForm):
         fields = [
             "name", "description", "system_prompt", "model", "rag_enabled", "rag_top_k",
             "realtime_enabled",
-            "classification_role", "abstract_instruction", "detectors", "tts_voice_id",
+            "classification_role", "abstract_instruction", "detectors", "tts_voice_id", "azure_voice",
         ]
         labels = {
             "description": _("Description"),
             "realtime_enabled": _("Real-time voice agent"),
             "rag_enabled": _("Knowledge base (RAG)"),
             "rag_top_k": _("Extracts per search"),
+            **_VOICE_LABELS,
         }
         help_texts = {
+            **_VOICE_HELP,
             "realtime_enabled": _(
                 "Converse by live voice (GPT Realtime over Azure) instead of the "
                 "text chat. The model above is ignored; the Realtime deployment "
@@ -856,7 +881,7 @@ class PromptAgentForm(forms.ModelForm):
             "classification_role": forms.Textarea(attrs={**_INPUT, "rows": 4}),
             "abstract_instruction": forms.TextInput(attrs=_INPUT),
             "detectors": DetectorTableWidget(),
-            "tts_voice_id": forms.TextInput(attrs=_INPUT),
+            **_VOICE_WIDGETS,
         }
 
     # ── Platform tools ────────────────────────────────────────────────────
@@ -1011,12 +1036,13 @@ class NativeAgentForm(forms.ModelForm):
     """
     class Meta:
         model = Agent
-        fields = ["description", "model", "tts_voice_id"]
-        labels = {"description": _("Description")}
+        fields = ["description", "model", "tts_voice_id", "azure_voice"]
+        labels = {"description": _("Description"), **_VOICE_LABELS}
+        help_texts = _VOICE_HELP
         widgets = {
             "description": _DESCRIPTION_WIDGET,
             "model": forms.TextInput(attrs=_MODEL_INPUT),
-            "tts_voice_id": forms.TextInput(attrs=_INPUT),
+            **_VOICE_WIDGETS,
         }
 
 
@@ -1033,9 +1059,10 @@ class SenseiAgentForm(forms.ModelForm):
         model = Agent
         fields = [
             "name", "description",
-            "classification_role", "abstract_instruction", "detectors", "tts_voice_id",
+            "classification_role", "abstract_instruction", "detectors", "tts_voice_id", "azure_voice",
         ]
-        labels = {"description": _("Description")}
+        labels = {"description": _("Description"), **_VOICE_LABELS}
+        help_texts = _VOICE_HELP
         field_classes = {"detectors": DetectorsFormField}
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
@@ -1043,7 +1070,7 @@ class SenseiAgentForm(forms.ModelForm):
             "classification_role": forms.Textarea(attrs={**_INPUT, "rows": 4}),
             "abstract_instruction": forms.TextInput(attrs=_INPUT),
             "detectors": DetectorTableWidget(),
-            "tts_voice_id": forms.TextInput(attrs=_INPUT),
+            **_VOICE_WIDGETS,
         }
 
 
@@ -1598,7 +1625,7 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
     secret_fields = (
         "anthropic_api_key", "google_api_key", "mistral_api_key", "deepseek_api_key",
         "azure_openai_api_key", "azure_anthropic_api_key", "azure_mistral_api_key",
-        "azure_deepseek_api_key", "azure_realtime_api_key",
+        "azure_deepseek_api_key", "azure_realtime_api_key", "azure_speech_key",
     )
 
     class Meta:
@@ -1606,7 +1633,7 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
         fields = [
             "link_worker_v2_enabled",
             "link_worker_whatsapp_enabled",
-            "link_worker_voice_pt_br",
+            "link_worker_voice_pt_br", "link_worker_azure_voice_pt_br",
             "default_agent_model",
             "anthropic_api_key", "google_api_key", "mistral_api_key", "deepseek_api_key",
             "agent_allowed_hosts",
@@ -1619,11 +1646,17 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "azure_realtime_deployment", "azure_realtime_voice",
             "azure_realtime_webrtc_region",
             "rag_embedding_model", "azure_embedding_deployment",
+            "tts_provider", "azure_speech_key", "azure_speech_region", "azure_speech_voice",
         ]
         labels = {
             "link_worker_v2_enabled": _("Use Link Worker v2 (beta)"),
             "link_worker_whatsapp_enabled": _("Link workers can use it on WhatsApp"),
-            "link_worker_voice_pt_br": _("Voice for Brazilian Portuguese voice notes"),
+            "link_worker_voice_pt_br": _("Brazilian Portuguese voice (ElevenLabs)"),
+            "link_worker_azure_voice_pt_br": _("Brazilian Portuguese voice (Azure)"),
+            "tts_provider": _("Voice replies are spoken by"),
+            "azure_speech_key": _("Azure Speech key"),
+            "azure_speech_region": _("Azure Speech region"),
+            "azure_speech_voice": _("Default Azure voice"),
             "default_agent_model": _("Default agent model"),
             "anthropic_api_key": _("Anthropic API key"),
             "google_api_key": _("Google API key"),
@@ -1665,6 +1698,19 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "link_worker_voice_pt_br": _(
                 "ElevenLabs voice ID for spoken replies when the link worker spoke "
                 "Portuguese. Blank uses the v2 agent's own voice (set on the Agents page)."),
+            "link_worker_azure_voice_pt_br": _(
+                "The same, when Azure speaks the replies. Blank uses "
+                "pt-BR-FranciscaNeural."),
+            "tts_provider": _(
+                "Every spoken reply — clients' WhatsApp voice notes, the voice chat, agent "
+                "tests, link workers' voice notes. Each agent has a voice for each provider "
+                "on the Agents page. ElevenLabs' key is under Integrations."),
+            "azure_speech_region": _(
+                "The Speech resource's region, e.g. 'uksouth' (shown beside its key in the "
+                "Azure portal; pasting its endpoint also works)."),
+            "azure_speech_voice": _(
+                "For agents with no Azure voice of their own. Blank uses "
+                "en-GB-AdaMultilingualNeural, which speaks the reply's language."),
             "default_agent_model": _("Used when an agent has no explicit model, e.g. "
                                      "'openai/gpt-4.1-mini'. Blank uses the .env default."),
             "use_azure": _("Route models to Azure instead of the public provider APIs."),
@@ -1694,6 +1740,10 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "link_worker_v2_enabled": forms.Select(attrs=_SELECT),
             "link_worker_whatsapp_enabled": forms.Select(attrs=_SELECT),
             "link_worker_voice_pt_br": forms.TextInput(attrs={**_INPUT, "placeholder": "e.g. a Brazilian voice from the ElevenLabs Voice Library"}),
+            "link_worker_azure_voice_pt_br": forms.TextInput(attrs={**_AZURE_VOICE_INPUT, "placeholder": "pt-BR-FranciscaNeural"}),
+            "tts_provider": forms.Select(attrs=_SELECT),
+            "azure_speech_region": forms.TextInput(attrs={**_INPUT, "placeholder": "uksouth"}),
+            "azure_speech_voice": forms.TextInput(attrs=_AZURE_VOICE_INPUT),
             "azure_openai_endpoint": forms.TextInput(attrs={**_INPUT, "placeholder": "https://<resource>.openai.azure.com/"}),
             "azure_openai_api_version": forms.TextInput(attrs={**_INPUT, "placeholder": "2024-12-01-preview"}),
             "azure_anthropic_endpoint": forms.TextInput(attrs=_INPUT),

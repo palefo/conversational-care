@@ -349,6 +349,7 @@
         <div class="stg-grid2">
           {% include "settings/_field.html" with field=agents_form.link_worker_whatsapp_enabled %}
           {% include "settings/_field.html" with field=agents_form.link_worker_voice_pt_br %}
+          {% include "settings/_field.html" with field=agents_form.link_worker_azure_voice_pt_br %}
         </div>
 
         <div class="stg-group-title">{% trans "Default model" %}</div>
@@ -398,6 +399,17 @@
         </div>
 
         <div class="stg-group">
+          <div class="stg-group-title">{% trans "Text to speech (voice replies)" %}</div>
+          <p class="text-xs text-gray-500 mb-3">{% trans "Who speaks the replies to voice notes and the voice chat. Azure AI Speech needs a Speech resource: its key and region are under Keys and Endpoint in the Azure portal." %}</p>
+          {% include "settings/_field.html" with field=agents_form.tts_provider %}
+          <div class="stg-grid2">
+            {% include "settings/_field.html" with field=agents_form.azure_speech_key %}
+            {% include "settings/_field.html" with field=agents_form.azure_speech_region %}
+            {% include "settings/_field.html" with field=agents_form.azure_speech_voice %}
+          </div>
+        </div>
+
+        <div class="stg-group">
           <div class="stg-group-title">{% trans "Embeddings (RAG agents)" %}</div>
           <p class="text-xs text-gray-500 mb-3">{% trans "Used to index and search the documents uploaded to prompt-based agents with a knowledge base. The default is multilingual: a question in one language finds answers in documents written in another." %}</p>
           <div class="stg-grid2">
@@ -411,6 +423,7 @@
         </div>
       </form>
     </div>
+    {% azure_voice_datalist %}
     <datalist id="model-suggestions">
       <option value="openai/gpt-4.1-mini"></option>
       <option value="openai/gpt-4.1"></option>

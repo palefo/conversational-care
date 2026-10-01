@@ -30,7 +30,8 @@ installation; the fourth, **Sensei**, is behind a flag that is off by default.
 In the app UI (**Agents** page, admin only) agents are grouped by kind in tabs:
 **Prompt-based** and **Remote** are fully user-manageable (create / edit /
 delete); **Native** ship with the platform, so they can't be created or deleted,
-but admins **can edit** their description, model and TTS voice. **Sensei** only
+but admins **can edit** their description, model and TTS voice (one per
+provider — see [text_to_speech.md](text_to_speech.md)). **Sensei** only
 appears once the feature is switched on. Every agent has a **Test** button that
 opens the chat UI wired to just that agent (nothing is saved).
 

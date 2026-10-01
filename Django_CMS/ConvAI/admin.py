@@ -255,7 +255,7 @@ class AgentForm(forms.ModelForm):
         model = Agent
         fields = (
             "name", "kind", "native_key", "system_prompt",
-            "langgraph_name", "host", "port", "tts_voice_id",
+            "langgraph_name", "host", "port", "tts_voice_id", "azure_voice",
             "classification_role", "abstract_instruction",
             "detectors",
         )
@@ -268,7 +268,7 @@ class AgentAdmin(admin.ModelAdmin):
     list_filter = ("kind",)
     search_fields = ("name",)
     fieldsets = (
-        (None, {"fields": ("name", "kind", "native_key", "tts_voice_id")}),
+        (None, {"fields": ("name", "kind", "native_key", "tts_voice_id", "azure_voice")}),
         ("Prompt-based", {
             "description": "Only used when kind = Prompt-based.",
             "fields": ("system_prompt", "rag_enabled", "rag_top_k"),

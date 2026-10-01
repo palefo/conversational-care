@@ -334,7 +334,9 @@ precedence over `.env`.
 | `USE_AZURE` + `AZURE_*` endpoint/key vars | Route models through Azure instead of public APIs (*runtime*). |
 | `AGENT_ALLOWED_HOSTS` | SSRF allow-list of hosts remote agents may point at (*runtime*). |
 | `PROMPT_AGENT_TEMPERATURE` | Sampling temperature for prompt-based agents (default `0`). |
-| `ELEVENLABS_API_KEY` / `ELEVENLABS_VOICE_ID` | Text-to-speech for voice replies (*runtime*). |
+| `TTS_PROVIDER` | Who speaks voice replies: `elevenlabs` (default) or `azure` (*runtime*). See `text_to_speech.md`. |
+| `ELEVENLABS_API_KEY` / `ELEVENLABS_VOICE_ID` | ElevenLabs text-to-speech (*runtime*). |
+| `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` / `AZURE_SPEECH_VOICE` | Azure AI Speech text-to-speech (*runtime*). |
 
 ### Behaviour & storage
 

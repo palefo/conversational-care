@@ -112,12 +112,12 @@
         <span class="material-icons-outlined text-[13px]">sync_alt</span>{% trans "Callbacks" %}
       </span>
     {% endif %}
-    {% if a.tts_voice_id %}
-      <span class="agent-chip" title="{% trans 'Voice ID' %}">
+    {% with voice=a.active_tts_voice %}{% if voice %}
+      <span class="agent-chip" title="{% trans 'Voice for spoken replies' %}">
         <span class="material-icons-outlined text-[13px]">graphic_eq</span>
-        <span class="truncate">{{ a.tts_voice_id }}</span>
+        <span class="truncate">{{ voice }}</span>
       </span>
-    {% endif %}
+    {% endif %}{% endwith %}
   </div>
 
   {# ── actions ── #}

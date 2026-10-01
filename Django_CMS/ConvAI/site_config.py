@@ -24,6 +24,11 @@ _STR_KEYS = {
     "OPENAI_API_KEY": "openai_api_key",
     "ELEVENLABS_API_KEY": "elevenlabs_api_key",
     "ELEVENLABS_VOICE_ID": "elevenlabs_voice_id",
+    # Text to speech (see text_to_speech.md).
+    "TTS_PROVIDER": "tts_provider",
+    "AZURE_SPEECH_KEY": "azure_speech_key",
+    "AZURE_SPEECH_REGION": "azure_speech_region",
+    "AZURE_SPEECH_VOICE": "azure_speech_voice",
     "TWILIO_SMS_FROM": "twilio_sms_from",
     "SMS_TEMPLATE_START_INFECTION_SID": "sms_template_start_infection_sid",
     "SMS_TEMPLATE_START_INFECTION_TEXT": "sms_template_start_infection_text",
@@ -85,6 +90,7 @@ _STR_KEYS = {
     "ENROLMENT_LANDING_TEXT": "enrolment_landing_text",
     # Link Worker on WhatsApp (see link_worker_whatsapp.md).
     "LINK_WORKER_VOICE_PT_BR": "link_worker_voice_pt_br",
+    "LINK_WORKER_AZURE_VOICE_PT_BR": "link_worker_azure_voice_pt_br",
 }
 
 # Integer settings, resolved like the strings above but coerced. Kept separate

@@ -1000,6 +1000,19 @@ class Agent(models.Model):
     )
 
     tts_voice_id = models.CharField(max_length=40, blank=True, null=True)
+    # The same agent's voice when Azure AI Speech is the TTS provider, e.g.
+    # "pt-BR-FranciscaNeural". Kept apart from tts_voice_id because a voice name
+    # means nothing to the other provider. See text_to_speech.md.
+    azure_voice = models.CharField(
+        max_length=80, blank=True, default="",
+        help_text="Azure AI Speech voice name, used when Azure is the TTS provider.",
+    )
+
+    @property
+    def active_tts_voice(self) -> str:
+        """The voice set on this agent for the TTS provider in use, or ''."""
+        from .tts import agent_voice
+        return agent_voice(self)
 
     @property
     def tool_labels(self) -> list:
@@ -1402,6 +1415,19 @@ class SiteConfiguration(models.Model):
     elevenlabs_api_key = models.CharField(max_length=255, blank=True, default="")
     elevenlabs_voice_id = models.CharField(max_length=255, blank=True, default="")
 
+    # --- Text to speech (see text_to_speech.md) ---
+    # Who speaks every voice reply. Blank follows TTS_PROVIDER in .env, and
+    # ElevenLabs when that is unset too — so nothing changes until chosen.
+    TTS_PROVIDER_CHOICES = [
+        ("", "Use .env default"),
+        ("elevenlabs", "ElevenLabs"),
+        ("azure", "Azure AI Speech"),
+    ]
+    tts_provider = models.CharField(max_length=20, choices=TTS_PROVIDER_CHOICES, blank=True, default="")
+    azure_speech_key = models.CharField(max_length=255, blank=True, default="")
+    azure_speech_region = models.CharField(max_length=100, blank=True, default="")
+    azure_speech_voice = models.CharField(max_length=80, blank=True, default="")
+
     # --- Messaging templates (live) ---
     twilio_sms_from = models.CharField(max_length=20, blank=True, default="", validators=[_E164])
     sms_template_start_infection_sid = models.CharField(max_length=34, blank=True, default="", validators=[_HX_SID])
@@ -1545,6 +1571,12 @@ class SiteConfiguration(models.Model):
     link_worker_voice_pt_br = models.CharField(
         max_length=40, blank=True, default="",
         help_text="ElevenLabs voice ID used when a link worker's voice note is in Portuguese.",
+    )
+    # The same, when Azure AI Speech is the TTS provider. Blank uses
+    # pt-BR-FranciscaNeural.
+    link_worker_azure_voice_pt_br = models.CharField(
+        max_length=80, blank=True, default="",
+        help_text="Azure voice name used when a link worker's voice note is in Portuguese.",
     )
 
     # How many words an access code is built from. Three (~250^3) is the default:

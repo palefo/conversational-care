@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.db.models import Q
 
 from .models import Message, Patient
+from .tts import synthesize_speech
 from .utils import (
     process_received_message,
     download_twilio_media,
@@ -16,8 +17,6 @@ from .utils import (
     save_bytes,
     transcribe_audio,
     generate_response_langgraph,
-    synthesize_speech_elevenlabs,
-    resolve_tts_voice_id,
     build_signed_download_token,
     send_whatsapp_text,
     send_sms_text,
@@ -111,8 +110,7 @@ def job_process_whatsapp_audio(
 
     # TTS
     out_name = f"{timezone.now().strftime('%Y%m%d%H%M%S')}_wa_out.mp3"
-    voice_id = resolve_tts_voice_id(getattr(patient, "agent", None))
-    synthesize_speech_elevenlabs(reply_text, out_name, voice_id=voice_id)
+    synthesize_speech(reply_text, out_name, agent=getattr(patient, "agent", None))
 
     # Persist message. This path writes the row itself rather than going
     # through save_message, so it has to scrub a spoken/typed Sensei passcode

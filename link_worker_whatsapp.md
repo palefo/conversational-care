@@ -25,7 +25,8 @@ WhatsApp card.
    loaded client is also put down after four idle hours.
 
 Voice notes are answered with a voice note — in the **Brazilian Portuguese
-voice** when they spoke Portuguese — plus the text.
+voice** when they spoke Portuguese — plus the text. Who speaks is the platform's
+text-to-speech provider, ElevenLabs or Azure ([text_to_speech.md](text_to_speech.md)).
 
 ## Decisions
 
@@ -64,14 +65,17 @@ cannot be produced the text still goes back.
 |---|---|---|
 | `LINK_WORKER_WHATSAPP_ENABLED` | off | The switch. Needs `LINK_WORKER_V2_ENABLED` too. |
 | `LINK_WORKER_VOICE_PT_BR` | — | ElevenLabs voice ID for replies to Portuguese voice notes. Blank uses the v2 agent's voice. |
+| `LINK_WORKER_AZURE_VOICE_PT_BR` | `pt-BR-FranciscaNeural` | The same when Azure AI Speech speaks the replies. |
 
 Voice notes follow the platform's existing `WHATSAPP_AUDIO_ENABLED` switch, as
 clients' do. The service's number is `PLATFORM_PHONE`.
 
-**Choosing the Brazilian voice.** ElevenLabs → Voice Library → filter Language:
-Portuguese, Accent: Brazilian → *Add to my voices* → copy the Voice ID into
-Settings → Agents. The platform's speech model (`eleven_turbo_v2_5`) is
-multilingual.
+**Choosing the Brazilian voice.** Under Azure AI Speech (see
+[text_to_speech.md](text_to_speech.md)) a native one is used out of the box,
+`pt-BR-FranciscaNeural`; the Azure field suggests the other 17 as you type
+*Brazil*. Under ElevenLabs: Voice Library → filter Language: Portuguese,
+Accent: Brazilian → *Add to my voices* → copy the Voice ID into Settings →
+Agents.
 
 ## Where it lives
 
@@ -95,7 +99,7 @@ multilingual.
   Django admin → *Staff WhatsApp links*.
 * **WhatsApp's own rules apply.** Replies are free-form only within 24 hours of
   the link worker's last message; the assistant never writes first.
-* **Voice depends on ElevenLabs.** While the account is unpaid, replies arrive as
-  text only.
+* **Voice depends on the TTS provider.** If it cannot speak (an unpaid
+  ElevenLabs account, a wrong Azure key), replies arrive as text only.
 * **It reads, and books meetings.** Dictating a note back after a visit would be
   the first time it writes a record; left for a separate decision.

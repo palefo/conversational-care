@@ -116,3 +116,13 @@ def first_unit(value):
     whole message — the extra precision is noise on a row you are scanning.
     """
     return str(value).split(",")[0].strip()
+
+
+@register.inclusion_tag("settings/_azure_voices.html")
+def azure_voice_datalist():
+    """``<datalist id="azure-voices">``: suggestions for every Azure voice field.
+
+    The fields stay free text; this only saves looking names up. See ConvAI.tts.
+    """
+    from ..tts import azure_voices
+    return {"voices": azure_voices()}

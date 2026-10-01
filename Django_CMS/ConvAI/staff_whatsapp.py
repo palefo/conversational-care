@@ -288,13 +288,21 @@ def is_portuguese(language: str) -> bool:
 
 
 def voice_for(language: str) -> str:
-    """The voice for a spoken reply: the pt-BR one for Portuguese, else v2's own."""
-    from .utils import resolve_tts_voice_id
+    """The voice for a spoken reply: the pt-BR one for Portuguese, else v2's own.
 
-    pt_br = (get_setting("LINK_WORKER_VOICE_PT_BR") or "").strip()
-    if pt_br and is_portuguese(language):
-        return pt_br
-    return resolve_tts_voice_id(_v2_agent())
+    For whichever TTS provider is on. Azure has a native Brazilian voice to fall
+    back on; ElevenLabs has none we can name, so there it falls back to v2's.
+    """
+    from . import tts
+
+    if is_portuguese(language):
+        if tts.is_azure():
+            return ((get_setting("LINK_WORKER_AZURE_VOICE_PT_BR") or "").strip()
+                    or tts.DEFAULT_AZURE_VOICE_PT_BR)
+        pt_br = (get_setting("LINK_WORKER_VOICE_PT_BR") or "").strip()
+        if pt_br:
+            return pt_br
+    return tts.voice_for_agent(_v2_agent())
 
 
 def handle_voice(link, in_path: str, in_name: str):
@@ -305,7 +313,8 @@ def handle_voice(link, in_path: str, in_name: str):
     at a door with no answer at all is worse off than one reading it.
     """
     from .models import Message
-    from .utils import save_message, synthesize_speech_elevenlabs
+    from .tts import synthesize_speech
+    from .utils import save_message
 
     _touch(link)
     try:
@@ -331,7 +340,7 @@ def handle_voice(link, in_path: str, in_name: str):
     if spoken:
         name = f"{timezone.now():%Y%m%d%H%M%S}_staff_{link.user_id}_out.mp3"
         try:
-            synthesize_speech_elevenlabs(spoken, name, voice_id=voice_for(language))
+            synthesize_speech(spoken, name, voice=voice_for(language))
             out_name = name
         except Exception:
             logger.exception("Staff voice reply could not be synthesised; sending text only")

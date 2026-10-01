@@ -75,6 +75,11 @@ JPG or SVG (max 2&nbsp;MB), or point at a static path.</p>
 <p>The default model behind in-process agents, per-provider API keys, and
 optional Azure routing. Values set here override the server's
 <code>.env</code>, so you can switch models or providers without redeploying.</p>
+<p><strong>Text to speech</strong> chooses who speaks the replies to voice
+notes: ElevenLabs or Azure AI Speech. For Azure, paste the Speech resource's
+key and region from the Azure portal. Each agent then has a voice for each
+provider on its edit page; the Azure voice field suggests the available voices
+as you type a language or a name.</p>
 
 <h2 id="prompts">Prompts</h2>
 <p>The base prompts used to summarise meeting protocols and call transcripts.

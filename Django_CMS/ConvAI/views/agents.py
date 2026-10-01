@@ -298,7 +298,7 @@ def agent_test_audio(request, pk):
         # Best-effort TTS; fall back to text-only if it fails.
         response_audio = ''
         try:
-            synthesize_speech_elevenlabs(resp_text, out_name, voice_id=resolve_tts_voice_id(agent))
+            synthesize_speech(resp_text, out_name, agent=agent)
             with open(out_path, 'rb') as fp:
                 response_audio = "data:audio/mpeg;base64," + base64.b64encode(fp.read()).decode('ascii')
         except Exception:

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n custom_filters %}
 {% block title %}{% if agent %}{% trans "Edit agent" %}{% else %}{% trans "Add agent" %}{% endif %}{% endblock %}
 
 {% block content %}
@@ -145,6 +145,8 @@
     sync();
   })();
 </script>
+
+{% azure_voice_datalist %}
 
 {% comment %} Suggestions for the model field (free text; type any provider-prefixed id). {% endcomment %}
 <datalist id="model-suggestions">

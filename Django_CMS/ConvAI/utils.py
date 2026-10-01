@@ -1105,8 +1105,10 @@ def resolve_tts_voice_id(agent: Optional[Agent] = None, fallback: Optional[str] 
     Decide which ElevenLabs voice to use:
       1) agent.tts_voice_id (or agent.voice_id), if present
       2) 'fallback' param (if provided)
-      3) ELEVENLABS_VOICE_ID env var
+      3) ELEVENLABS_VOICE_ID (Settings, then env)
       4) DEFAULT_TTS_VOICE_ID constant
+
+    ElevenLabs only; ConvAI.tts.voice_for_agent picks for whichever provider is on.
     """
     if agent:
         vid = getattr(agent, "tts_voice_id", None) or getattr(agent, "voice_id", None)
@@ -1116,18 +1118,23 @@ def resolve_tts_voice_id(agent: Optional[Agent] = None, fallback: Optional[str] 
     if fallback and isinstance(fallback, str) and fallback.strip():
         return fallback.strip()
 
-    return DEFAULT_TTS_VOICE_ID
+    # The voice saved in Settings → Integrations, then .env, then the constant.
+    return (get_setting("ELEVENLABS_VOICE_ID") or "").strip() or DEFAULT_TTS_VOICE_ID
 
 
 def synthesize_speech_elevenlabs(text: str, filename: str, voice_id: Optional[str] = None) -> str:
     """
     Generate TTS with ElevenLabs into VOICE_RECORDINGS_DIR/filename.
     'voice_id' overrides any defaults/resolution.
+
+    Callers should use ConvAI.tts.synthesize_speech, which honours TTS_PROVIDER.
     """
     from elevenlabs import VoiceSettings, save
     from elevenlabs.client import ElevenLabs
 
-    elevenlabs_client = ElevenLabs()
+    # The key saved in Settings → Integrations wins over .env, as it says it does.
+    api_key = (get_setting("ELEVENLABS_API_KEY") or "").strip()
+    elevenlabs_client = ElevenLabs(api_key=api_key) if api_key else ElevenLabs()
 
     # basic cleanup to avoid artifacts
     cleaned_text = text.replace("*", "").replace("#", "")
@@ -1136,7 +1143,7 @@ def synthesize_speech_elevenlabs(text: str, filename: str, voice_id: Optional[st
     os.makedirs(outdir, exist_ok=True)
     output_path = os.path.join(outdir, filename)
 
-    vid = (voice_id or DEFAULT_TTS_VOICE_ID).strip()
+    vid = (voice_id or resolve_tts_voice_id()).strip()
 
     response = elevenlabs_client.text_to_speech.convert(
         voice_id=vid,

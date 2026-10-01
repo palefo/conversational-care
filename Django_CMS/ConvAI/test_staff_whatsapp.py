@@ -373,13 +373,14 @@ class VoiceTests(Base):
     def setUp(self):
         super().setUp()
         _on()
+        _config(tts_provider="elevenlabs")  # pinned: the container's .env must not decide
         self.link = self._linked()
 
     def _voice(self, language, tts_fails=False):
         with patch("ConvAI.staff_whatsapp.transcribe_with_language",
                    return_value=("Como a Maria está dormindo?", language)), \
              patch("ConvAI.native_agents.run_native", return_value="Está dormindo melhor.") as run, \
-             patch("ConvAI.utils.synthesize_speech_elevenlabs",
+             patch("ConvAI.tts.synthesize_speech",
                    side_effect=RuntimeError("payment required") if tts_fails else None) as tts:
             out = sw.handle_voice(self.link, "/tmp/in.ogg", "in.ogg")
         return out, run, tts
@@ -387,7 +388,7 @@ class VoiceTests(Base):
     def test_portuguese_gets_the_brazilian_voice(self):
         _config(link_worker_voice_pt_br="ptBrVoice")
         (reply, out_name, msg), run, tts = self._voice("portuguese")
-        self.assertEqual(tts.call_args.kwargs["voice_id"], "ptBrVoice")
+        self.assertEqual(tts.call_args.kwargs["voice"], "ptBrVoice")
         self.assertEqual(run.call_args.args[3]["reply_mode"], "voice")
         self.assertEqual(run.call_args.args[3]["spoken_language"], "portuguese")
         self.assertTrue(out_name.endswith(".mp3"))
@@ -396,11 +397,26 @@ class VoiceTests(Base):
     def test_other_languages_get_the_agents_voice(self):
         _config(link_worker_voice_pt_br="ptBrVoice")
         _out, _run, tts = self._voice("english")
-        self.assertEqual(tts.call_args.kwargs["voice_id"], "agentVoice")
+        self.assertEqual(tts.call_args.kwargs["voice"], "agentVoice")
 
     def test_no_brazilian_voice_set_uses_the_agents(self):
         _out, _run, tts = self._voice("portuguese")
-        self.assertEqual(tts.call_args.kwargs["voice_id"], "agentVoice")
+        self.assertEqual(tts.call_args.kwargs["voice"], "agentVoice")
+
+    def test_azure_portuguese_gets_a_native_brazilian_voice(self):
+        _config(tts_provider="azure", link_worker_voice_pt_br="ptBrVoice")
+        _out, _run, tts = self._voice("portuguese")
+        self.assertEqual(tts.call_args.kwargs["voice"], "pt-BR-FranciscaNeural")
+        _config(link_worker_azure_voice_pt_br="pt-BR-ThalitaMultilingualNeural")
+        _out, _run, tts = self._voice("portuguese")
+        self.assertEqual(tts.call_args.kwargs["voice"], "pt-BR-ThalitaMultilingualNeural")
+
+    def test_azure_other_languages_get_the_agents_azure_voice(self):
+        _config(tts_provider="azure")
+        self.v2.azure_voice = "en-GB-SoniaNeural"
+        self.v2.save()
+        _out, _run, tts = self._voice("english")
+        self.assertEqual(tts.call_args.kwargs["voice"], "en-GB-SoniaNeural")
 
     def test_if_the_voice_cannot_be_made_the_text_still_goes(self):
         with self.assertLogs("ConvAI.staff_whatsapp", level="ERROR"):

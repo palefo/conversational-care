@@ -184,8 +184,7 @@ def whatsapp_webhook(request):
                     )
 
                 out_name = f"{ts}_wa_out.mp3"
-                voice_id = resolve_tts_voice_id(getattr(patient, "agent", None))
-                synthesize_speech_elevenlabs(reply_text, out_name, voice_id=voice_id)
+                synthesize_speech(reply_text, out_name, agent=getattr(patient, "agent", None))
 
                 from ..message_attribution import create_message
                 msg = create_message(
@@ -478,12 +477,10 @@ def process_audio(request):
     thread_id = patient.current_thread_id
     resp_text = generate_response_langgraph(patient, transcript, thread_id)
 
-    # 4) ElevenLabs TTS
+    # 4) TTS, with whichever provider Settings names (ConvAI.tts)
     out_name = f"{ts}_out.mp3"
     out_path = os.path.join(VOICE_RECORDINGS_DIR, out_name)
-    # you already have synthesize_speech_elevenlabs utility
-    voice_id = resolve_tts_voice_id(getattr(patient, "agent", None))
-    synthesize_speech_elevenlabs(resp_text, out_name, voice_id=voice_id)
+    synthesize_speech(resp_text, out_name, agent=getattr(patient, "agent", None))
 
     # 5) persist both sides like the text path does: save_message also upserts
     # the Conversation and links it to the patient/agent, so voice turns show up
