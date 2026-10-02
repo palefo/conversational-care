@@ -163,6 +163,22 @@
     .dash-ic-alert { background: #fef2f2; color: #b91c1c; }
     .dash-ic-reg   { background: #f0f9ff; color: #0369a1; }
 
+    /* New registrations waiting for an admin: one line above the numbers. */
+    .dash-waiting {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+      padding: .875rem 1.25rem; border-radius: .75rem; text-decoration: none;
+      background: #f0f9ff; border: 1px solid #bae6fd;
+    }
+    .dash-waiting:hover { background: #e0f2fe; }
+    .dash-waiting:focus-visible { outline: 2px solid #0369a1; outline-offset: 2px; }
+    .dash-waiting-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+    .dash-waiting-title { font-weight: 600; color: #0c4a6e; }
+    .dash-waiting-sub { font-size: .8125rem; color: #475569; overflow: hidden;
+                        text-overflow: ellipsis; white-space: nowrap; }
+    .dash-waiting-go { display: inline-flex; align-items: center; gap: 4px;
+                       font-size: .875rem; font-weight: 600; color: #0369a1; white-space: nowrap; }
+    .dash-waiting-go .material-icons-outlined { font-size: 18px; }
+
     /* Rows inside a section container (dividers, not separate cards) */
     .dash-row {
       display: flex;
@@ -453,6 +469,27 @@
     </script>
   {% endif %}
 
+
+  {% if waiting_registrations %}
+  {% comment %}
+    People waiting to be let in — admins only, while self-registration is on
+    (views/dashboard.py). Also rows in Alerts to review below; this says it
+    once, at the top, because only an admin can approve them.
+  {% endcomment %}
+  <a class="dash-waiting" href="{{ waiting_registrations.url }}">
+    <span class="dash-ic dash-ic-reg"><span class="material-icons-outlined">how_to_reg</span></span>
+    <span class="dash-waiting-main">
+      <span class="dash-waiting-title">
+        {% blocktrans count n=waiting_registrations.count %}{{ n }} new registration waiting to be approved{% plural %}{{ n }} new registrations waiting to be approved{% endblocktrans %}
+      </span>
+      <span class="dash-waiting-sub">
+        {{ waiting_registrations.names|join:", " }}{% if waiting_registrations.more %} {% blocktrans with n=waiting_registrations.more %}and {{ n }} more{% endblocktrans %}{% endif %}
+        · <span title="{{ waiting_registrations.age_exact }}">{{ waiting_registrations.age }}</span>
+      </span>
+    </span>
+    <span class="dash-waiting-go">{% trans "Review" %}<span class="material-icons-outlined">arrow_forward</span></span>
+  </a>
+  {% endif %}
 
   {% comment %}
     A glance at the three numbers, above the lists rather than instead of them.

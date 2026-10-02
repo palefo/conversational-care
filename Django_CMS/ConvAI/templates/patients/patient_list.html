@@ -331,6 +331,15 @@
     font-size: 1rem;
   }
 
+  .pac-comm-kind {
+    font-size: 0.7rem;
+    color: #6b7280;
+    background: #f3f4f6;
+    border-radius: 9999px;
+    padding: 0.05rem 0.45rem;
+    margin-left: 0.15rem;
+  }
+
   .pac-clickable-row {
     cursor: pointer;
     transition: background-color 0.15s ease, opacity 0.15s ease;
@@ -947,9 +956,10 @@
           </div>
         </th>
 
-        <th class="px-6 py-3 pac-sortable" scope="col" id="th-last-call" onclick="pacSortTable('last_call_time')">
+        <th class="px-6 py-3 pac-sortable" scope="col" id="th-last-comm" onclick="pacSortTable('last_comm_time')"
+            title="{% trans 'The last call, meeting or chat message from the client or their caregiver' %}">
           <div class="pac-th-inner">
-            {% trans "Last call" %}
+            {% trans "Last communication" %}
             <span class="pac-sort-arrow">↕</span>
           </div>
         </th>
@@ -1057,6 +1067,18 @@ function pacCallCell(value, icon, cls) {
   return `<span class="pac-call-cell ${cls}"><span class="material-icons-outlined">${icon}</span>${pacEsc(value)}</span>`;
 }
 
+// Last communication: when, and by which channel — so a client who only ever
+// uses the chatbot reads as in touch, and you can tell it was a chat.
+const PAC_COMM_ICONS = { call: 'call', visit: 'event', chat: 'forum' };
+
+function pacCommCell(row) {
+  if (!row.last_comm_time) return `<span class="text-gray-400 italic">—</span>`;
+  const icon = PAC_COMM_ICONS[row.last_comm_kind] || 'history';
+  return `<span class="pac-call-cell text-gray-600" title="${pacEsc(row.last_comm_label || '')}">` +
+         `<span class="material-icons-outlined">${icon}</span>${pacEsc(row.last_comm_time)}` +
+         `<span class="pac-comm-kind">${pacEsc(row.last_comm_label || '')}</span></span>`;
+}
+
 function pacHasNextCall(row) {
   return row.next_call_time !== null &&
     row.next_call_time !== undefined &&
@@ -1125,7 +1147,7 @@ function pacRender() {
           </td>
 
           <td class="px-6 py-4 text-gray-700">
-            ${pacCallCell(r.last_call_time, 'history', 'text-gray-500')}
+            ${pacCommCell(r)}
           </td>
         </tr>
       `;
@@ -1185,9 +1207,14 @@ function pacGetFiltered() {
     });
   }
 
+  // Date columns sort on their ISO twin: the shown text is day-first
+  // (01/10/2026), which neither Date() nor a string comparison orders.
+  const PAC_SORT_KEYS = { next_call_time: 'next_call_iso', last_comm_time: 'last_comm_iso' };
+
   d.sort((a, b) => {
-    let av = a[PAC_STATE.sortCol];
-    let bv = b[PAC_STATE.sortCol];
+    const key = PAC_SORT_KEYS[PAC_STATE.sortCol] || PAC_STATE.sortCol;
+    let av = a[key];
+    let bv = b[key];
 
     const aEmpty = av === null || av === undefined || String(av).trim() === '';
     const bEmpty = bv === null || bv === undefined || String(bv).trim() === '';
@@ -1226,7 +1253,7 @@ function pacGetFiltered() {
       return PAC_STATE.sortDir === 'asc' ? cmp : -cmp;
     }
 
-    if (PAC_STATE.sortCol === 'last_call_time') {
+    if (PAC_STATE.sortCol === 'last_comm_time') {
       if (aEmpty && bEmpty) return 0;
       if (aEmpty) return 1;
       if (bEmpty) return -1;
@@ -1346,7 +1373,7 @@ function pacUpdateSortHeaders() {
     caregiver_name: 'th-caregiver',
     ...(PAC_IS_SUPERUSER ? { navigator_name: 'th-navigator' } : {}),
     next_call_time: 'th-next-call',
-    last_call_time: 'th-last-call',
+    last_comm_time: 'th-last-comm',
   };
 
   Object.entries(cols).forEach(([col, id]) => {

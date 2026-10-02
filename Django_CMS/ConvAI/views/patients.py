@@ -2,6 +2,7 @@ from ._base import *  # noqa: F401,F403
 from ._panel import panel_context, fold_recordings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max
+from django.db.models.functions import Coalesce
 from .. import conversation_privacy, conversation_summary
 from ..forms import ClientForm, PatientForm
 
@@ -137,6 +138,63 @@ def extract_study_id(details):
     return None
 
 
+# What the Last communication column calls each channel — the Communications
+# page's own vocabulary, so the two pages name the same thing the same way.
+COMM_LABELS = {
+    'call': _("Call"),
+    'visit': _("Meeting"),
+    'chat': _("Chat"),
+}
+
+
+def last_communication(patient, now=None):
+    """The last time this client was actually in touch, by any channel.
+
+    ``{'ts', 'kind'}`` with kind ``call``, ``visit`` or ``chat``, or None.
+
+    *Actually in touch* is the rule each source is held to. A call counts once it
+    connected (complete or interrupted) — not one that went unanswered, was
+    cancelled or is still only in the diary, which is what the old Last call
+    column showed and why a client nobody had reached for weeks could look
+    current. A chat counts when the client or their caregiver wrote in (or a
+    tester did, standing in for one); a reminder the platform sent on its own is
+    not them using the chatbot. A recording made outside any booked call — a
+    number dialled from a handset — is a call too.
+    """
+    now = now or timezone.now()
+    found = []
+
+    mt = (patient.meetings
+          .filter(status__in=(Meeting.Status.COMPLETED, Meeting.Status.INTERRUPTED))
+          .annotate(happened=Coalesce('ended_at', 'scheduled_time'))
+          .filter(happened__lte=now)
+          .order_by('-happened')
+          .only('modality', 'ended_at', 'scheduled_time')
+          .first())
+    if mt:
+        found.append((mt.happened, 'visit' if mt.modality == Meeting.Modality.IN_PERSON else 'call'))
+
+    nums = [str(n) for n in (patient.phone_number,
+                             patient.caregiver.phone_number if patient.caregiver else None) if n]
+    rec = CallRecording.for_patient(patient, nums).filter(start_time__lte=now).first()
+    if rec and rec.start_time:
+        found.append((rec.start_time, 'call'))
+
+    chat_ts = (Message.objects.filter(patient_message_q(patient), timestamp__lte=now)
+               .exclude(sender_role=Message.SenderRole.PLATFORM)
+               .exclude(user_message='')
+               .order_by('-timestamp')
+               .values_list('timestamp', flat=True)
+               .first())
+    if chat_ts:
+        found.append((chat_ts, 'chat'))
+
+    if not found:
+        return None
+    ts, kind = max(found, key=lambda f: f[0])
+    return {'ts': ts, 'kind': kind}
+
+
 @login_required
 def patient_list(request):
     now = timezone.now()
@@ -157,12 +215,7 @@ def patient_list(request):
              .first()
         )
 
-        last_call = (
-            p.meetings
-             .filter(scheduled_time__lte=now)
-             .order_by('-scheduled_time')
-             .first()
-        )
+        last_comm = last_communication(p, now)
 
         nav_name = (
             p.navigator.get_full_name().strip()
@@ -181,10 +234,14 @@ def patient_list(request):
             'navigator_name': nav_name,
 
             'next_call_time': timezone.localtime(next_call.scheduled_time).strftime('%d/%m/%Y %H:%M') if next_call else None,
+            # Sorted on, rather than the text above: "01/10/2026" is day-first,
+            # which neither Date() nor a string comparison orders correctly.
+            'next_call_iso': next_call.scheduled_time.isoformat() if next_call else None,
 
-            'last_call_time': timezone.localtime(last_call.scheduled_time).strftime('%d/%m/%Y %H:%M') if last_call else None,
-            'last_call_status': last_call.status if last_call else None,
-            'last_call_status_display': last_call.get_status_display() if last_call else None,
+            'last_comm_time': timezone.localtime(last_comm['ts']).strftime('%d/%m/%Y %H:%M') if last_comm else None,
+            'last_comm_iso': last_comm['ts'].isoformat() if last_comm else None,
+            'last_comm_kind': last_comm['kind'] if last_comm else None,
+            'last_comm_label': str(COMM_LABELS[last_comm['kind']]) if last_comm else None,
         })
 
     admin = is_admin(request.user)

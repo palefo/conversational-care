@@ -473,6 +473,11 @@ def alerts_since(request):
 
     Scope is the same rule the dashboard uses: your own alerts and the alerts
     of clients you navigate, unless you are an admin.
+
+    Admins also hear about people who signed up and are waiting to be approved,
+    on the same terms as the dashboard queue (self-registration on). They are
+    not alerts and have no panel, so they carry an ``href`` to the approval form
+    instead of a token.
     """
     qs = Alert.objects.exclude(status=Alert.AlertStatus.RESOLVED)
     if not is_admin(request.user):
@@ -497,6 +502,22 @@ def alerts_since(request):
     fresh = fresh[:_SINCE_MAX]
 
     out = []
+    if is_admin(request.user) and get_bool("SELF_REGISTRATION_ENABLED"):
+        regs = list(SelfRegistration.objects
+                    .filter(state=SelfRegistration.State.REGISTERED, created_at__gt=since)
+                    .order_by("-created_at")[: _SINCE_MAX + 1])
+        more += max(0, len(regs) - _SINCE_MAX)
+        href = f"{reverse('config')}?tab=registrations#registrations"
+        for r in regs[:_SINCE_MAX]:
+            who = f"{r.name} {r.lastname}".strip()
+            out.append({
+                "id": f"reg-{r.pk}",
+                "high": False,
+                "title": f"{_('New registration')} — {who}" if who else str(_("New registration")),
+                "body": str(_("Waiting to be approved.")),
+                "href": href,
+            })
+
     for a in fresh:
         who = f"{a.patient.name} {a.patient.lastname}".strip() if a.patient else ""
         high = a.priority == Alert.Priority.HIGH

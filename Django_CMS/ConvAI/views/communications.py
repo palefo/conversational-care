@@ -241,8 +241,11 @@ def communications(request):
         schedule_form = scoped_meeting_form(request, request.POST)
         if save_scheduled_meeting(schedule_form):
             messages.success(request, _("Meeting scheduled."))
-            return redirect(f"{request.path}?{request.GET.urlencode()}"
-                            if request.GET else request.path)
+            # Onto Coming up, where the meeting just booked now is: the page
+            # opens on Happened, which cannot show it.
+            rest = request.GET.copy()
+            rest['tab'] = 'up'
+            return redirect(f"{request.path}?{rest.urlencode()}")
 
     patients = Patient.objects.select_related('caregiver', 'navigator')
     if not is_admin(request.user):
@@ -306,7 +309,10 @@ def comms_list_context(request, events, for_patient=None):
         tab = None
     if tab is None and open_token:
         tab = 'up' if any(e['panel_token'] == open_token for e in upcoming) else 'past'
-    tab = tab or 'up'
+    # Happened by default: it is where a chat, an alert or a finished call
+    # turns up, so it is what you come to the page to read. Coming up is your
+    # own diary, one click away, and the Calendar shows it too.
+    tab = tab or 'past'
     chips = UP_CHIPS if tab == 'up' else PAST_CHIPS
     kind = request.GET.get('kind', 'all')
     if kind not in dict(chips):

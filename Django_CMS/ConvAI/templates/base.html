@@ -337,11 +337,16 @@
                      : d.alerts;
             show.forEach(function (a) {
               // Built here, not on the server: hanging ?item= off the current
-              // URL keeps whatever filter and sort you already had.
-              var u = new URL(location.href);
-              u.searchParams.set('item', a.token);
+              // URL keeps whatever filter and sort you already had. A sign-up
+              // has no panel, so it brings its own link to the approval form.
+              var href = a.href;
+              if (!href) {
+                var u = new URL(location.href);
+                u.searchParams.set('item', a.token);
+                href = u.pathname + u.search;
+              }
               window.toast(a.high ? 'high' : 'info', a.title, a.body,
-                           { sticky: !!a.high, href: u.pathname + u.search });
+                           { sticky: !!a.high, href: href });
             });
             // The badge still counts everything: a count you cannot trust is
             // worse than one you would rather not see.

@@ -399,6 +399,23 @@ def dashboard(request):
             "unread": False,
         }
 
+    # The same people, said once at the top of the page as well. In the queue a
+    # sign-up sits behind any High alert and among the rest, which is the right
+    # place to work it but an easy one to miss: nobody else can let them in, so
+    # an admin should not have to scroll to learn they are waiting.
+    waiting = None
+    if alert_counts["registrations"]:
+        newest = list(pending_regs.order_by("-created_at")[:3])
+        age, exact = _humanise_age(newest[0].created_at, now)
+        waiting = {
+            "count": alert_counts["registrations"],
+            "names": [f"{r.name} {r.lastname}".strip() for r in newest],
+            "more": max(0, alert_counts["registrations"] - len(newest)),
+            "age": age,
+            "age_exact": exact,
+            "url": f"{reverse('config')}?tab=registrations#registrations",
+        }
+
     registrations = pending_regs
     if query:
         registrations = registrations.filter(
@@ -493,6 +510,7 @@ def dashboard(request):
         'alerts_capped': alerts_capped,
         'alerts_per_page': ALERTS_PER_PAGE,
         'alert_counts': alert_counts,
+        'waiting_registrations': waiting,
         'high_topics': high_topics,
         'next_meeting': next_row,
         'greeting': greeting,
