@@ -30,6 +30,8 @@ class TheWordingMatchesThePlatform(SimpleTestCase):
     def test_privacy(self):
         from ConvAI.native_agents.privacy_tool import PRIVACY_PROMPT_SUFFIX
         self.assertEqual(langgraph_tools.PRIVACY_PROMPT, PRIVACY_PROMPT_SUFFIX)
+        from ConvAI.native_agents.privacy_tool import PRIVACY_PROMPT_STARTS_HIDDEN
+        self.assertEqual(langgraph_tools.PRIVACY_PROMPT_STARTS_HIDDEN, PRIVACY_PROMPT_STARTS_HIDDEN)
 
     def test_summary(self):
         from ConvAI.native_agents.summary_tool import SUMMARY_PROMPT_SUFFIX

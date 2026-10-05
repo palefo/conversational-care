@@ -31,7 +31,8 @@ What the tools are careful about, so each agent does not have to be:
 # naming ``RunnableConfig`` (imported inside build_cc_tools) cannot be resolved.
 from .run_client import ConversationalCareError, RunClient
 
-__all__ = ["build_cc_tools", "CC_PROMPT", "PRIVACY_PROMPT", "SUMMARY_PROMPT"]
+__all__ = ["build_cc_tools", "CC_PROMPT", "PRIVACY_PROMPT", "PRIVACY_PROMPT_STARTS_HIDDEN",
+           "SUMMARY_PROMPT"]
 
 # Mirrors ConvAI/native_agents/privacy_tool.py:PRIVACY_PROMPT_SUFFIX.
 PRIVACY_PROMPT = """
@@ -56,6 +57,28 @@ it, with `set_conversation_privacy`.
 - It covers this conversation only. A later conversation starts visible again.
 - They can change their mind either way at any point; use the same tool with
   `hidden` set to false.
+"""
+
+# Mirrors ConvAI/native_agents/privacy_tool.py:PRIVACY_PROMPT_STARTS_HIDDEN. For an
+# agent whose conversations start hidden ("Conversations start hidden" on the
+# platform's agent form): use it in place of PRIVACY_PROMPT.
+PRIVACY_PROMPT_STARTS_HIDDEN = """
+
+## Keeping a conversation private
+
+This conversation starts **hidden** from the person's link worker: they can see
+that it happened, when it was, how many messages it had and its **summary**, but
+not what was said. `set_conversation_privacy` changes that, only on the
+person's say-so.
+
+- If they are happy for their link worker to read it, set `hidden` to false. If
+  they change their mind, set it back to true.
+- If they ask what being hidden covers, tell them: their link worker still
+  reads a summary, so somebody who has to help them knows roughly what they
+  needed; a supervising administrator can still read it; and if anything in it
+  suggests they may be at risk of harming themselves, their link worker will be
+  able to read it, because somebody has to be able to help.
+- It covers this conversation only. A later conversation starts hidden again.
 """
 
 # Mirrors ConvAI/native_agents/summary_tool.py:SUMMARY_PROMPT_SUFFIX.

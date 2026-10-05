@@ -971,6 +971,17 @@ class Agent(models.Model):
                     "the agent report a summary and set the conversation's "
                     "visibility, for that one conversation only."),
     )
+    # A remote agent whose conversations are hidden from the link worker until
+    # the client agrees otherwise — RECO v2 asks, and unhides on a yes. Needs
+    # allow_callbacks, or nothing could ever unhide them. Prompt-based agents do
+    # not use this field: theirs start hidden whenever the Conversation privacy
+    # tool is on. See conversation_privacy.starts_hidden.
+    starts_hidden = models.BooleanField(
+        default=False,
+        help_text=_("Remote agents with callbacks: each conversation starts hidden "
+                    "from the client's link worker, and the agent unhides it if the "
+                    "client agrees."),
+    )
 
     # Who the LLM should imitate (role/persona)
     classification_role = models.TextField(
@@ -1007,6 +1018,12 @@ class Agent(models.Model):
         max_length=80, blank=True, default="",
         help_text="Azure AI Speech voice name, used when Azure is the TTS provider.",
     )
+
+    @property
+    def conversations_start_hidden(self) -> bool:
+        """Whether a new conversation with this agent starts hidden, here and now."""
+        from .conversation_privacy import starts_hidden
+        return starts_hidden(self)
 
     @property
     def active_tts_voice(self) -> str:
@@ -1267,6 +1284,18 @@ class Conversation(models.Model):
 
     def __str__(self):
         return f"{self.id}"
+
+    def save(self, *args, **kwargs):
+        # Hidden from the first write, for an agent whose conversations start
+        # hidden. Here rather than at each place a Conversation is created
+        # (there are several), and on creation only: from then on it is the
+        # client's answer, given through the agent, that decides.
+        if self._state.adding and self.agent_id and not self.hidden:
+            from .conversation_privacy import starts_hidden
+            if starts_hidden(self.agent):
+                self.hidden = True
+                self.hidden_at = self.hidden_at or timezone.now()
+        super().save(*args, **kwargs)
 
 
 class SelfRegistration(models.Model):

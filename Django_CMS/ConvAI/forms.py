@@ -794,10 +794,12 @@ class AgentForm(forms.ModelForm):
         model = Agent
         fields = [
             "name", "description", "langgraph_name", "host", "port", "allow_callbacks",
+            "starts_hidden",
             "classification_role", "abstract_instruction", "detectors", "tts_voice_id", "azure_voice",
         ]
         labels = {"description": _("Description"),
-                  "allow_callbacks": _("Allow callbacks"), **_VOICE_LABELS}
+                  "allow_callbacks": _("Allow callbacks"),
+                  "starts_hidden": _("Conversations start hidden"), **_VOICE_LABELS}
         help_texts = {
             **_VOICE_HELP,
             "allow_callbacks": _(
@@ -806,6 +808,12 @@ class AgentForm(forms.ModelForm):
                 "that one conversation only, for two hours. The agent finds it as "
                 "cc_run_token in its run config and sends it to /api/v1/run/. Leave off "
                 "for agents that never call back: they should not hold a credential."
+            ),
+            "starts_hidden": _(
+                "Each conversation is hidden from the client's link worker from its first "
+                "message, so it cannot be read while it is happening. The agent unhides it "
+                "if the client agrees (set_conversation_privacy with hidden false). Needs "
+                "Allow callbacks, and Conversation privacy switched on in Settings → Privacy."
             ),
         }
         field_classes = {"detectors": DetectorsFormField}
@@ -816,11 +824,22 @@ class AgentForm(forms.ModelForm):
             "host": forms.TextInput(attrs=_INPUT),
             "port": forms.NumberInput(attrs=_INPUT),
             "allow_callbacks": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "starts_hidden": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "classification_role": forms.Textarea(attrs={**_INPUT, "rows": 4}),
             "abstract_instruction": forms.TextInput(attrs=_INPUT),
             "detectors": DetectorTableWidget(),
             **_VOICE_WIDGETS,
         }
+
+    def clean(self):
+        cleaned = super().clean()
+        # Hidden with no way back: without callbacks the agent has no token to
+        # unhide a conversation with, so every one would stay hidden for good.
+        if cleaned.get("starts_hidden") and not cleaned.get("allow_callbacks"):
+            self.add_error("starts_hidden", _(
+                "Needs Allow callbacks: without it the agent could never unhide a "
+                "conversation."))
+        return cleaned
 
 
 # Free-text model input backed by a datalist of common suggestions (rendered in

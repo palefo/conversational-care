@@ -54,16 +54,18 @@ TOOLS = {
         # for, and splitting them would put a choice on the form that has one
         # sensible answer.
         "tools": ("get_conversation_privacy", "set_conversation_privacy"),
-        "description": _("Lets the agent hide this conversation from the client's link "
-                         "worker when the client asks, and check whether it is hidden. "
-                         "Requires Conversation privacy to be switched on in "
-                         "Settings → Privacy."),
+        "description": _("Conversations with this agent start hidden from the client's "
+                         "link worker; the agent unhides one if the client agrees, and can "
+                         "hide it again. Requires Conversation privacy to be switched on "
+                         "in Settings → Privacy."),
         "unavailable": _("Conversation privacy is switched off for this installation "
                          "(Settings → Privacy). The agent will not be given this tool "
                          "until it is switched on."),
         "available": _privacy_available,
         "builder": "ConvAI.native_agents.privacy_tool:build_privacy_tools",
-        "prompt": "ConvAI.native_agents.privacy_tool:PRIVACY_PROMPT_SUFFIX",
+        # Starts-hidden wording: a prompt agent with this tool on starts every
+        # conversation hidden (conversation_privacy.starts_hidden).
+        "prompt": "ConvAI.native_agents.privacy_tool:PRIVACY_PROMPT_STARTS_HIDDEN",
     },
     "report_summary": {
         "label": _("Report summary"),

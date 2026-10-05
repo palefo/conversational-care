@@ -162,6 +162,39 @@ answers is "when did they ask for this", and a conversation that was hidden and
 then opened again is better described by the fact that it once was than by
 having that erased.
 
+## Conversations that start hidden
+
+For an agent that can unhide a conversation, a new conversation is **hidden
+from its first message**, so a link worker cannot read it while it is still
+happening — before the client has been asked. That was possible before: a
+conversation was visible until the client asked to hide it, and a link worker
+could watch it unfold in the meantime.
+
+`conversation_privacy.starts_hidden(agent)` is the rule:
+
+| Agent | Starts hidden when |
+|---|---|
+| Prompt-based | the **Conversation privacy** tool is on |
+| Remote | **Conversations start hidden** is ticked *and* **Allow callbacks** is on (the form refuses the first without the second: without a token nothing could unhide it) |
+| Native, Sensei | never |
+
+and never while privacy is switched off for the installation — a flag nobody
+honours, set on every conversation, would hide all of them the day it was
+switched on.
+
+It is applied in `Conversation.save()`, **on creation only**, because a
+conversation is created in several places (the first turn of a prompt agent,
+the pre-run row for a remote agent with callbacks, the API). After that the
+client's answer decides: the agent unhides it on a yes (`set_conversation_privacy`
+with `hidden` false), and nothing hides it again behind their back. The
+self-harm floor and admins' view are unchanged. `hidden_at` on such a
+conversation is its creation time.
+
+A prompt agent with the tool is told so in its prompt
+(`PRIVACY_PROMPT_STARTS_HIDDEN`); RECO v2, the first remote agent to use it,
+asks the young person and unhides on a yes — see the agent collection's
+`reco_v2/README.md`.
+
 ## The agent tool
 
 `ConvAI/native_agents/privacy_tool.py` builds two sync LangGraph tools —
@@ -172,27 +205,31 @@ the model could get wrong, and hiding somebody else's exchange because a digit
 was hallucinated is not worth an argument that carries no information the
 runtime did not already have.
 
-`PRIVACY_PROMPT_SUFFIX` in that module is the wording the agent has to say
-before it acts: what the link worker still sees, that an admin can still read
-it, that a self-harm disclosure overrides it, and that it covers this
-conversation only.
+`PRIVACY_PROMPT_SUFFIX` in that module is the wording for an agent that hides
+on request: what the link worker still sees, that an admin can still read it,
+that a self-harm disclosure overrides it, and that it covers this conversation
+only. `PRIVACY_PROMPT_STARTS_HIDDEN` says the same for a conversation that
+starts hidden, and is what the agent form ships, since a prompt agent with the
+tool now always starts hidden. The SDK carries copies of both, checked by
+`ConvAI/test_sdk_run_tools.py`.
 
 Attached to a prompt-based agent by ticking **Conversation privacy** on the
-agent form, which also appends `PRIVACY_PROMPT_SUFFIX` to that agent's system
-prompt and turns it into a react agent. See `agent_tools.md`.
+agent form, which also appends the wording to that agent's system prompt and
+turns it into a react agent. See `agent_tools.md`.
 
 ## Data model
 
 | Field | What it holds |
 |---|---|
-| `Conversation.hidden` | The client's answer. Indexed, defaults False. |
+| `Conversation.hidden` | The client's answer. Indexed, defaults False — True from creation for an agent that starts hidden. |
+| `Agent.starts_hidden` | Remote agents: "Conversations start hidden". Migration `0095`. |
 | `Conversation.hidden_at` | When they last asked for it. |
 | `SiteConfiguration.conversation_privacy_enabled` | The installation switch, tri-state like every other. |
 
 Per conversation and nothing wider. The client is answering "this one", not
 signing a standing policy — and a thread rolls over after a couple of hours
-idle, so the next conversation starts visible and they are asked again if the
-agent offers it again. A client-level default would be a different feature, and
+idle, so the next conversation starts visible — or hidden, for an agent that
+starts hidden — and they are asked again if the agent offers it again. A client-level default would be a different feature, and
 a more dangerous one: a standing "hide everything" is a client whose link worker
 stops seeing their care.
 

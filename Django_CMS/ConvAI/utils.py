@@ -493,9 +493,68 @@ def generate_response_with_agent(agent,
             config={"configurable": configurable},
         )
         logger.debug("LangGraph result: %s", result)
-        return result["messages"][-1]["content"]
+        return remote_turn_reply(result["messages"]) or result["messages"][-1]["content"]
     except Exception:
         return "Sorry, something went wrong generating the response."
+
+
+def _message_text(content) -> str:
+    """The text of a message's content, whether a string or a list of blocks."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(b.get("text", "") if isinstance(b, dict) else str(b) for b in content)
+    return ""
+
+
+def remote_turn_reply(messages) -> str:
+    """Everything a remote agent said to the person this turn, as one reply.
+
+    A graph can answer one message with several AI messages: RECO v2 swaps its
+    [SUMMARY] token for the summary's texts and then asks whether it looks
+    right, all in one turn. Taking only the last message dropped the summary.
+    So: the AI messages with text that come after the person's message *and*
+    after the turn's last tool step, joined with blank lines. The tool-step
+    boundary is what keeps a supervisor-style graph to its final answer — the
+    sub-agent's draft and the hand-back message come before a tool message, and
+    are working, not reply. If nothing is left (an AI message that spoke and
+    called a tool in one go, then said nothing), the last AI text of the turn.
+    Empty when the turn produced no text at all, for the caller to fall back on.
+    """
+    def kind(m):
+        return (m.get("type") or m.get("role") or "") if isinstance(m, dict) else getattr(m, "type", "")
+
+    def field(m, name, default=None):
+        return m.get(name, default) if isinstance(m, dict) else getattr(m, name, default)
+
+    msgs = list(messages or [])
+    start = 0
+    for i, m in enumerate(msgs):
+        if kind(m) in ("human", "user"):
+            start = i + 1
+    turn = msgs[start:]
+    after_tools = 0
+    for i, m in enumerate(turn):
+        if kind(m) == "tool":
+            after_tools = i + 1
+
+    def texts(seq):
+        out = []
+        for m in seq:
+            if kind(m) not in ("ai", "assistant") or field(m, "tool_calls"):
+                continue
+            text = _message_text(field(m, "content", "")).strip()
+            if text:
+                out.append(text)
+        return out
+
+    found = texts(turn[after_tools:])
+    if not found:
+        spoken = [_message_text(field(m, "content", "")).strip() for m in turn
+                  if kind(m) in ("ai", "assistant")]
+        spoken = [t for t in spoken if t]
+        found = spoken[-1:]
+    return "\n\n".join(found)
 
 
 def save_message(phone: str, user_message: str, response_message: str, thread_id: str,
@@ -1486,6 +1545,9 @@ def _invoke_langgraph_for_agent(agent: Agent, user_message: str, thread_id: str,
         result = rg.invoke({"messages": msgs}, config=cfg)
         msgs_out = result.get("messages") if isinstance(result, dict) else None
         if isinstance(msgs_out, list) and msgs_out:
+            joined = remote_turn_reply(msgs_out)
+            if joined:
+                return joined
             last = msgs_out[-1]
             if isinstance(last, dict):
                 content = last.get("content")

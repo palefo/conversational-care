@@ -44,13 +44,35 @@ from .utils_conversation_classification import SAFETY_LABEL
 
 __all__ = [
     "enabled", "safety_override", "is_withheld",
-    "withheld_ids", "set_hidden",
+    "withheld_ids", "set_hidden", "starts_hidden",
 ]
 
 
 def enabled() -> bool:
     """Whether this installation lets clients hide a conversation. Off by default."""
     return get_bool("CONVERSATION_PRIVACY_ENABLED", False)
+
+
+def starts_hidden(agent) -> bool:
+    """Whether a new conversation with ``agent`` is hidden from its first message.
+
+    For an agent that can unhide it, so that the link worker cannot read a
+    conversation while it is still happening — before the client has been asked.
+    A prompt-based agent qualifies by having the Conversation privacy tool on; a
+    remote one by its own "Conversations start hidden" setting, and only with
+    callbacks on, without which nothing could ever unhide it. Never while the
+    installation has privacy switched off: a hidden flag nobody honours, set on
+    every conversation, would hide all of them the day it is switched on.
+    """
+    if agent is None or not enabled():
+        return False
+    kind = getattr(agent, "kind", "")
+    if kind == "prompt":
+        from .native_agents.tool_registry import enabled_slugs
+        return "conversation_privacy" in enabled_slugs(agent)
+    if kind == "remote":
+        return bool(getattr(agent, "starts_hidden", False) and getattr(agent, "allow_callbacks", False))
+    return False
 
 
 def safety_override(conversation) -> bool:

@@ -216,10 +216,22 @@ if the SDK's copy drifts from it (`ConvAI/test_sdk_run_tools.py`). An agent that
 nests graphs must pass `config` to the sub-graph explicitly, or the token does not
 reach it.
 
-RECO B is wired this way in the agent collection, with one addition of its own:
-it asks the young person, separately from offering them their own summary,
-whether a short summary may be shared with the team, and calls `report_summary`
-only on a yes.
+RECO v2 (`reco_v2/` in the agent collection) is wired this way, with
+**Conversations start hidden** on: it asks the young person whether their link
+worker may read the conversation and unhides it only on a yes to that question
+— checked in code, not just the prompt — and reports a two-line note
+(`report_summary`) whatever they answer. An agent whose conversations start
+hidden uses `PRIVACY_PROMPT_STARTS_HIDDEN` in place of `PRIVACY_PROMPT`.
+
+### A turn of several messages
+
+A graph may answer one message with several AI messages — RECO v2 swaps its
+`[SUMMARY]` token for the summary's texts and then asks whether it looks right,
+in one turn. The platform used to forward only the last one.
+`utils.remote_turn_reply` now joins, with blank lines, every AI text after the
+person's message and after the turn's last tool step: the tool-step boundary
+keeps a supervisor-style graph to its final answer, whose drafts and hand-backs
+come before a tool message.
 
 ## Who may act on a conversation (people)
 

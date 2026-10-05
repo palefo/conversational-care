@@ -51,6 +51,12 @@ the Django admin). Requests are restricted to allow-listed hosts (SSRF guard in
 Use a remote agent when the logic lives in a deployed LangGraph app you manage
 outside this repo.
 
+**Allow callbacks** gives each run a token to report a summary and set the
+conversation's privacy ([agent_tools.md](agent_tools.md)); **Conversations start
+hidden** makes every conversation hidden from the link worker until the agent
+unhides it on the client's say-so ([conversation_privacy.md](conversation_privacy.md)).
+When one turn produces several AI messages, the reply is all of them, joined.
+
 ### Prompt-based agents (`kind = "prompt"`)
 
 A **custom, configurable** kind: admins create instances in the app, each storing
