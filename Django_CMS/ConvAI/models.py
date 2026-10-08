@@ -1500,6 +1500,11 @@ class SiteConfiguration(models.Model):
     # --- Agent models / LLM providers (live) ---
     # Default model for in-process agents when an Agent has no explicit model.
     default_agent_model = models.CharField(max_length=200, blank=True, default="")
+    # The model behind every automatic summary and safety review — conversation
+    # classification, meeting and call-transcript summaries — whatever model the
+    # agents themselves chat with. Blank keeps the old resolution (the agent's
+    # model, then the default above). See agents.md, "Classification and alerts".
+    summary_model = models.CharField(max_length=200, blank=True, default="")
     # Provider API keys (secrets). Blank falls back to the environment.
     anthropic_api_key = models.CharField(max_length=255, blank=True, default="")
     google_api_key = models.CharField(max_length=255, blank=True, default="")

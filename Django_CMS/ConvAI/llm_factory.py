@@ -50,6 +50,16 @@ def default_model() -> str:
     return _s("DEFAULT_AGENT_MODEL") or _s("OPENAI_MODEL") or "gpt-4.1-mini"
 
 
+def summary_model() -> str:
+    """The model for automatic summaries and safety reviews, or "" for none set.
+
+    Separate from the chat models on purpose: what summarises and screens a
+    conversation should not change because an agent was moved to another model,
+    and the other way round.
+    """
+    return _s("SUMMARY_MODEL")
+
+
 def _use_azure() -> bool:
     return get_bool("USE_AZURE", False)
 

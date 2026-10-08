@@ -238,8 +238,11 @@ def classify_conversation_with_llm(
     # the agent's configured model (blank → platform default), instead of always
     # calling OpenAI directly. Falls back to this module's DEFAULT_MODEL only when
     # neither the agent nor the platform default is set.
-    from .llm_factory import make_llm, default_model
-    model_name = (getattr(agent, "model", "") or "").strip() or default_model() or DEFAULT_MODEL
+    # The Summary model in Settings → Agents comes first, so one model reviews
+    # every conversation whatever each agent chats with.
+    from .llm_factory import make_llm, default_model, summary_model
+    model_name = (summary_model() or (getattr(agent, "model", "") or "").strip()
+                  or default_model() or DEFAULT_MODEL)
     llm = make_llm(model_name, temperature=TEMPERATURE)
 
     prompt = _build_prompt(agent, transcript)

@@ -23,10 +23,10 @@ logger = logging.getLogger(__name__)
 
 
 def _run_llm(system_prompt: str, user_text: str) -> str:
-    """Invoke the configured default chat model with a system + user message."""
-    from .llm_factory import make_llm  # local import avoids import-time cycles
+    """Invoke the Summary model (or, if unset, the default) with a system + user message."""
+    from .llm_factory import make_llm, summary_model  # local import avoids import-time cycles
 
-    llm = make_llm(None, temperature=0.2)
+    llm = make_llm(summary_model() or None, temperature=0.2)
     resp = llm.invoke([("system", system_prompt), ("human", user_text)])
     content = getattr(resp, "content", None)
     if content is None:

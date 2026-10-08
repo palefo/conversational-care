@@ -1653,7 +1653,7 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "link_worker_v2_enabled",
             "link_worker_whatsapp_enabled",
             "link_worker_voice_pt_br", "link_worker_azure_voice_pt_br",
-            "default_agent_model",
+            "default_agent_model", "summary_model",
             "anthropic_api_key", "google_api_key", "mistral_api_key", "deepseek_api_key",
             "agent_allowed_hosts",
             "use_azure",
@@ -1677,6 +1677,7 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "azure_speech_region": _("Azure Speech region"),
             "azure_speech_voice": _("Default Azure voice"),
             "default_agent_model": _("Default agent model"),
+            "summary_model": _("Summary model"),
             "anthropic_api_key": _("Anthropic API key"),
             "google_api_key": _("Google API key"),
             "mistral_api_key": _("Mistral API key"),
@@ -1732,6 +1733,12 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
                 "en-GB-AdaMultilingualNeural, which speaks the reply's language."),
             "default_agent_model": _("Used when an agent has no explicit model, e.g. "
                                      "'openai/gpt-4.1-mini'. Blank uses the .env default."),
+            "summary_model": _("Writes every automatic summary and runs the safety review: "
+                               "conversations, meetings and call transcripts, whatever model "
+                               "the agents chat with. Blank uses each agent's model, then the "
+                               "default above. Under Azure, its deployment's content filter "
+                               "must let self-harm through at Medium (block at High only), or "
+                               "those conversations are never reviewed."),
             "use_azure": _("Route models to Azure instead of the public provider APIs."),
             "azure_deepseek_endpoint": _("Blank reuses the Azure Mistral endpoint/key."),
             "azure_realtime_endpoint": _("Blank reuses the Azure OpenAI endpoint/key."),
@@ -1754,6 +1761,8 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
         widgets = {
             "default_agent_model": forms.TextInput(attrs={**_INPUT, "list": "model-suggestions",
                                                           "placeholder": "openai/gpt-4.1-mini"}),
+            "summary_model": forms.TextInput(attrs={**_INPUT, "list": "model-suggestions",
+                                                    "placeholder": "openai/gpt-5.4-mini"}),
             "agent_allowed_hosts": forms.Textarea(attrs={**_INPUT, "rows": 3}),
             "use_azure": forms.Select(attrs=_SELECT),
             "link_worker_v2_enabled": forms.Select(attrs=_SELECT),

@@ -458,6 +458,23 @@ The same floor is what a client's conversation-privacy request cannot reach: a
 conversation that tripped it stays readable by the navigator. See
 [conversation_privacy.md](conversation_privacy.md).
 
+### Which model reviews
+
+The **Summary model** (Settings → Agents, or `SUMMARY_MODEL` in `.env`) writes
+every automatic summary and runs the review above: conversations, and also
+meeting and call-transcript summaries (`ConvAI/summarization.py`). It is
+separate from the chat models on purpose, so moving an agent to another model
+does not change how its conversations are screened. Blank keeps the older
+order: the agent's own model, then `DEFAULT_AGENT_MODEL`.
+
+Under Azure, the deployment's **content filter** decides what the reviewer may
+read. A filter that blocks self-harm at Medium refuses exactly the
+conversations the safety floor exists for. A refused review is left
+unanalysed, so the next message or the Settings batch tries again, and is
+logged as a content-filter block with the category. So give the Summary
+model's deployment a filter that blocks self-harm at High only, on both input
+and output.
+
 ### When classification runs
 
 `process_message_for_patient` hands each inbound turn to

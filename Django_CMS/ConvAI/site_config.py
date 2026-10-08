@@ -42,6 +42,7 @@ _STR_KEYS = {
     "TRANSCRIPT_MOMENTS_PROMPT": "transcript_moments_prompt",
     # Agent models / LLM providers.
     "DEFAULT_AGENT_MODEL": "default_agent_model",
+    "SUMMARY_MODEL": "summary_model",
     "ANTHROPIC_API_KEY": "anthropic_api_key",
     "GOOGLE_API_KEY": "google_api_key",
     "MISTRAL_API_KEY": "mistral_api_key",

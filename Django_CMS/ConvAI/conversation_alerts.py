@@ -167,8 +167,18 @@ def review_conversation(conversation_id, *, raise_alerts: bool = True) -> dict:
 
     try:
         verdict = classify_conversation_with_llm(rows, agent=agent)
-    except Exception:
-        logger.exception("Classification failed for conversation %s", conv_id)
+    except Exception as exc:
+        blocked = content_filter_block(exc)
+        if blocked is not None:
+            # The provider refused to read it. Left unreviewed, like any other
+            # failure, so the next message or the Settings batch tries again —
+            # but said plainly, because a self-harm block means the conversation
+            # most worth screening was the one that was not.
+            logger.warning("Conversation %s not reviewed: the model provider's content "
+                           "filter blocked it (%s). Left unreviewed; check the Summary "
+                           "model's content filter.", conv_id, blocked or "category not given")
+        else:
+            logger.exception("Classification failed for conversation %s", conv_id)
         return result
 
     fired = verdict.get("detectors") or {}
@@ -216,6 +226,21 @@ def review_conversation(conversation_id, *, raise_alerts: bool = True) -> dict:
                              label, conv_id)
 
     return result
+
+
+def content_filter_block(exc):
+    """The categories a provider's content filter blocked, or None if it was not that.
+
+    Azure refuses in two ways: a 400 on the input, which names the categories,
+    and an empty answer on the output, which does not ("" here).
+    """
+    text = str(exc)
+    if not any(m in text for m in ("content_filter", "content filter", "content management policy")):
+        return None
+    body = getattr(exc, "body", None) or {}
+    inner = (body.get("innererror") or {}) if isinstance(body, dict) else {}
+    result = inner.get("content_filter_result") or {}
+    return ", ".join(sorted(k for k, v in result.items() if isinstance(v, dict) and v.get("filtered")))
 
 
 def review_conversation_async(conversation_id) -> None:

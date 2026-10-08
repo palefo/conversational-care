@@ -353,7 +353,10 @@
         </div>
 
         <div class="stg-group-title">{% trans "Default model" %}</div>
-        {% include "settings/_field.html" with field=agents_form.default_agent_model %}
+        <div class="stg-grid2">
+          {% include "settings/_field.html" with field=agents_form.default_agent_model %}
+          {% include "settings/_field.html" with field=agents_form.summary_model %}
+        </div>
 
         <div class="stg-group">
           <div class="stg-group-title">{% trans "Provider API keys" %}</div>
