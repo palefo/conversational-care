@@ -344,6 +344,7 @@ precedence over `.env`.
 | --- | --- |
 | `HIDE_MEETING_STEPS` | Hide the step checklist on calls (*runtime*). |
 | `ENABLE_AUTOMATIONS` | Enable automation features (*runtime*). |
+| `PHONE_CALLS_ENABLED` | Phone calls (*runtime*, default on). Off: no Call buttons, new meetings default to in person, and the call endpoints refuse, so the platform cannot ring anyone. Calls already made stay readable. For installations that only meet people in person (or online). |
 | `SELF_REGISTRATION_ENABLED` / `SELF_REG_AGENT_NAME` | WhatsApp self-registration (see [§9](#9-agents)) (*runtime*). |
 | `MESSAGE_EXPORT_ENABLED` | Let admins download every stored message as CSV from **Settings → Export**; off by default (see [message_export.md](../message_export.md)) (*runtime*). |
 | `CONVERSATION_DOWNLOAD_ENABLED` | Let navigators download a single conversation of their own clients as CSV from the panel's Conversation tab; off by default (see [message_export.md](../message_export.md)) (*runtime*). |

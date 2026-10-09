@@ -390,6 +390,11 @@ themselves — see the autosave note in the script below.
           {% endif %}
         {% elif panel_item.in_person %}
           <button type="button" class="dp-btn dp-btn-pri" data-dpdialog="dpEdit">{% trans "Edit meeting" %}</button>
+        {% elif panel_item.calls_off %}
+          <button type="button" class="dp-btn" disabled
+                  title="{% trans 'Phone calls are switched off on this installation.' %}">
+            {% trans "Phone calls are off" %}
+          </button>
         {% elif panel_item.can_call %}
           {% comment %}
             The label sits in a span so dialling can replace the words without

@@ -5,6 +5,7 @@ from django.db.models import Max
 from django.db.models.functions import Coalesce
 from .. import conversation_privacy, conversation_summary
 from ..forms import ClientForm, PatientForm
+from ..site_config import phone_calls_enabled
 
 __all__ = ['build_patient_events', 'save_client_note', 'update_client_terms', 'toggle_patient_chatbot', 'raise_alert', 'create_client', 'download_care_plan', 'edit_care_plan', 'edit_patient', 'edit_patient_details', 'extract_study_id', 'patient_list', 'patient_conversation_detail', 'patient_detail', 'view_care_plan']
 
@@ -667,6 +668,8 @@ def patient_detail(request, pk):
         # to the page that fixes it, so it is better said by the dialog — where
         # that link can be pressed — than by a button that has gone grey.
         'can_call': bool(call_default),
+        # Switched off in Settings → General: no Call button and no dialog.
+        'calls_on': phone_calls_enabled(),
         'protocol_chips': protocol_chips,
         'client_since': timeline[-1]['ts'] if timeline else None,
         'agents': Agent.for_clients().order_by('name'),

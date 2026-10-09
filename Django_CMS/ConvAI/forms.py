@@ -83,6 +83,18 @@ class MeetingForm(forms.ModelForm):
             if current != Meeting.Modality.ONLINE and not extensions.online_available():
                 modality.choices = [(v, l) for v, l in modality.choices
                                     if v != Meeting.Modality.ONLINE]
+            # Same for phone calls where they are switched off: not offered
+            # unless this meeting already is one, and a new meeting starts in
+            # person instead of on a call nobody can place.
+            from .site_config import phone_calls_enabled
+            if not phone_calls_enabled():
+                if current != Meeting.Modality.PHONE:
+                    modality.choices = [(v, l) for v, l in modality.choices
+                                        if v != Meeting.Modality.PHONE]
+                # self.initial already holds the model's PHONE default for a new
+                # meeting, which is no longer a choice.
+                if not self.instance.pk and self.initial.get('modality') in (None, Meeting.Modality.PHONE):
+                    self.initial['modality'] = Meeting.default_modality()
 
     def protocol_owners(self):
         """{protocol id: [client id, …]} over the clients this form can pick.
@@ -333,6 +345,7 @@ class GeneralConfigForm(forms.ModelForm):
         fields = [
             "hide_meeting_steps", "enable_automations", "self_registration_enabled",
             "self_reg_agent_name", "send_care_plan", "whatsapp_audio_enabled",
+            "phone_calls_enabled",
         ]
         labels = {
             "hide_meeting_steps": _("Hide meeting steps"),
@@ -341,6 +354,11 @@ class GeneralConfigForm(forms.ModelForm):
             "self_reg_agent_name": _("Self-registration agent"),
             "send_care_plan": _("Send care plan"),
             "whatsapp_audio_enabled": _("Enable WhatsApp audio"),
+            "phone_calls_enabled": _("Phone calls"),
+        }
+        help_texts = {
+            "phone_calls_enabled": _("Off: no call can be placed from the platform, and new "
+                                     "meetings are in person. Calls already made stay readable."),
         }
         widgets = {
             "hide_meeting_steps": forms.Select(attrs=_SELECT),
@@ -348,6 +366,7 @@ class GeneralConfigForm(forms.ModelForm):
             "self_registration_enabled": forms.Select(attrs=_SELECT),
             "send_care_plan": forms.Select(attrs=_SELECT),
             "whatsapp_audio_enabled": forms.Select(attrs=_SELECT),
+            "phone_calls_enabled": forms.Select(attrs=_SELECT),
         }
 
     def __init__(self, *args, **kwargs):

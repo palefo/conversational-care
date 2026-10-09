@@ -624,6 +624,7 @@ class MeetingCreateView(APIView):
         meeting = Meeting(
             patient=patient,
             scheduled_time=v["scheduled_time"],
+            modality=Meeting.default_modality(),
         )
         if "type" in v:
             meeting.type = v["type"]

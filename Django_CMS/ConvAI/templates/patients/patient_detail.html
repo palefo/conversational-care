@@ -50,6 +50,7 @@
         is left to the dialog, which can carry the link to the profile page that
         fixes it.
       {% endcomment %}
+      {% if calls_on %}
       {% if can_call %}
         <button type="button" class="pd-btn pd-btn-pri" id="pdCall"
                 data-url="{% url 'start_client_call' patient.pk %}">
@@ -60,6 +61,20 @@
                 title="{% trans 'Neither this client nor their caregiver has a phone number on file.' %}">
           <span class="material-icons-outlined">call</span>{% trans "Call" %}
         </button>
+      {% endif %}
+      {% else %}
+        {% comment %}
+          Phone calls are switched off here (Settings → General), so there is no
+          Call button and no call dialog. Where online meetings are on, the
+          dialog's "Start an online meeting instead" becomes the button itself.
+        {% endcomment %}
+        {% online_meetings_on as online_on %}
+        {% if online_on %}
+          <button type="button" class="pd-btn pd-btn-pri" id="pdOnlineNow"
+                  data-url="{% url 'meetings:start_now' patient.pk %}">
+            <span class="material-icons-outlined">videocam</span>{% trans "Online meeting" %}
+          </button>
+        {% endif %}
       {% endif %}
     </div>
   </header>
@@ -73,6 +88,7 @@
     will hold — the recording lands on it, the protocols hang off it, and it
     will ask for an outcome afterwards.
   {% endcomment %}
+  {% if calls_on %}
   <dialog class="dp-dialog pd-calldlg" id="pdCallDlg">
     <form method="dialog">
       <h3>{% trans "Start a call" %}</h3>
@@ -125,6 +141,7 @@
       </div>
     </form>
   </dialog>
+  {% endif %}
 
 
   <!-- Tabs: the record splits into who they are, and what has happened with them. -->

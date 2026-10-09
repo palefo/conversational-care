@@ -744,6 +744,18 @@ class Meeting(models.Model):
             who = self.patient.caregiver if self.patient_id else None
         return who if (who and who.phone_number) else None
 
+    @classmethod
+    def default_modality(cls):
+        """What a new meeting is when nobody chose: a phone call, unless calls are off.
+
+        The field's own default stays PHONE so existing rows and migrations keep
+        their meaning; the places that create meetings (the form, the API, the
+        Link Worker tool) ask this instead, so an installation without calls
+        does not book one by default.
+        """
+        from .site_config import phone_calls_enabled
+        return cls.Modality.PHONE if phone_calls_enabled() else cls.Modality.IN_PERSON
+
     @property
     def kind(self):
         """``'call'``, ``'visit'`` or ``'online'`` — how lists and the panel say it.
@@ -1495,6 +1507,9 @@ class SiteConfiguration(models.Model):
     self_reg_agent_name = models.CharField(max_length=255, blank=True, default="")
     send_care_plan = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
     whatsapp_audio_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+    # Off on an installation that only meets people (in person or online):
+    # nothing offers a call, and the call endpoints refuse. See phone_calls_enabled().
+    phone_calls_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
 
     # --- Integrations (secrets, live) ---
     twilio_account_sid = models.CharField(max_length=255, blank=True, default="")

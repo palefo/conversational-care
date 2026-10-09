@@ -5,6 +5,7 @@ from django.db import transaction
 
 from ._panel import panel_context
 from .. import extensions
+from ..site_config import phone_calls_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,18 @@ def _call_error(message, status, fix_href=None, fix_label=None):
     return JsonResponse(payload, status=status)
 
 
+def _calls_off():
+    """The refusal for an installation with phone calls switched off, or None.
+
+    Checked before anything else in both entry points — before a meeting is
+    looked up or created — and again in _place_call, the one place a call is
+    actually placed, so no future caller can get round it.
+    """
+    if phone_calls_enabled():
+        return None
+    return _call_error(_("Phone calls are switched off on this installation."), 403)
+
+
 def _record_call_legs(meeting, conference, user):
     """Write down which Twilio call is which side of this meeting's conference.
 
@@ -170,6 +183,10 @@ def _place_call(request, meeting):
     from; everything from here down is identical, and has to stay identical —
     an unscheduled call that skipped _record_call_legs would lose its recording.
     """
+    off = _calls_off()
+    if off is not None:
+        return off
+
     recipient = meeting.dial_recipient
     if recipient is None:
         # Named, rather than "no caregiver": with two people to choose between,
@@ -233,6 +250,10 @@ def make_phone_call(request, meeting_id):
     """
     Inicia una conferencia telefónica para la reunión indicada.
     """
+    off = _calls_off()
+    if off is not None:
+        return off
+
     meeting = get_object_or_404(
         Meeting.objects.select_related('patient__caregiver', 'patient__navigator'),
         pk=meeting_id
@@ -265,6 +286,10 @@ def start_client_call(request, patient_id):
     booked call as made — and if this was a different conversation, that is a
     call that now looks done and will not be made.
     """
+    off = _calls_off()
+    if off is not None:
+        return off
+
     patient = get_object_or_404(
         Patient.objects.select_related('caregiver', 'navigator'), pk=patient_id
     )

@@ -22,6 +22,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max, Min
 from django.utils.translation import gettext_lazy
 from .. import conversation_privacy, conversation_summary, extensions, message_export
+from ..site_config import phone_calls_enabled
 
 __all__ = ['resolve_panel_item', 'panel_context', 'panel_fragment']
 
@@ -1082,7 +1083,11 @@ def _meeting_panel(request, pk):
 
         # Start call bridges the navigator's own phone to whoever this call is
         # with, so both numbers have to exist before the button means anything.
-        'can_call': bool(not in_person and recipient and request.user.phone_number),
+        'can_call': bool(not in_person and recipient and request.user.phone_number
+                         and phone_calls_enabled()),
+        # A phone meeting on an installation with calls switched off: the panel
+        # says so, rather than blaming a missing number.
+        'calls_off': bool(meeting.modality == Meeting.Modality.PHONE and not phone_calls_enabled()),
         # Who the dialling label and the app-wide call bar name. Empty when
         # there is nobody to ring, which is also when there is no button.
         'dial_who': str(recipient) if recipient else '',
@@ -1176,13 +1181,18 @@ def modality_choices(meeting=None):
 
     Online is only offered while online meetings are available — or when it is
     already this meeting's modality, so editing an existing online meeting with
-    the feature off does not silently turn it into a phone call.
+    the feature off does not silently turn it into a phone call. Phone calls
+    follow the same rule where they are switched off (Settings → General).
     """
     current = getattr(meeting, 'modality', None)
+    calls_on = phone_calls_enabled()
     return [(v, l) for v, l in Meeting.Modality.choices
-            if v != Meeting.Modality.ONLINE
-            or current == Meeting.Modality.ONLINE
-            or extensions.online_available()]
+            if (v != Meeting.Modality.ONLINE
+                or current == Meeting.Modality.ONLINE
+                or extensions.online_available())
+            and (v != Meeting.Modality.PHONE
+                 or current == Meeting.Modality.PHONE
+                 or calls_on)]
 
 
 def _stamp(seconds):

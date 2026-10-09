@@ -150,7 +150,8 @@ def _schedule_meeting(user, patient_id: int, scheduled_dt: datetime,
         return ("There's already a meeting within ±59 minutes of that time. "
                 "Please pick a slot at least an hour apart.")
 
-    meeting = Meeting(patient=patient, scheduled_time=scheduled_dt)
+    meeting = Meeting(patient=patient, scheduled_time=scheduled_dt,
+                      modality=Meeting.default_modality())
     if type is not None:
         meeting.type = type
     meeting.save()

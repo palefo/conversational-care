@@ -108,6 +108,7 @@ _BOOL_KEYS = {
     "SELF_REGISTRATION_ENABLED": "self_registration_enabled",
     "SEND_CARE_PLAN": "send_care_plan",
     "WHATSAPP_AUDIO_ENABLED": "whatsapp_audio_enabled",
+    "PHONE_CALLS_ENABLED": "phone_calls_enabled",
     "USE_AZURE": "use_azure",
     "SENSEI_ENABLED": "sensei_enabled",
     "MESSAGE_EXPORT_ENABLED": "message_export_enabled",
@@ -201,6 +202,17 @@ def get_bool(key, default=False):
     if raw is None:
         return default
     return str(raw).strip().lower() in _TRUTHY
+
+
+def phone_calls_enabled() -> bool:
+    """Can this installation place phone calls? On unless switched off.
+
+    Settings → General, or PHONE_CALLS_ENABLED in .env. Off, nothing offers a
+    call, new meetings default to in person, and the call endpoints refuse —
+    so a navigator cannot ring a client from a platform that was never meant
+    to. Calls already made, and their recordings, stay readable.
+    """
+    return get_bool("PHONE_CALLS_ENABLED", default=True)
 
 
 def brand_name():
