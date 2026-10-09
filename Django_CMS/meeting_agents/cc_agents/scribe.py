@@ -221,8 +221,17 @@ async def entrypoint(ctx: JobContext):
     except RunGone:
         await api.close()
         return
+    try:
+        scribe = Scribe(ctx, api, cfg["recording_dir"])
+    except OSError as exc:
+        # Say why, instead of joining and vanishing: the room shows "Not
+        # recording" with this reason, and the platform stops re-sending us.
+        logger.error("Cannot record into %s: %s", cfg["recording_dir"], exc)
+        await api.status("failed", error=f"The recorder cannot write its files: {exc}")
+        await api.close()
+        ctx.shutdown("cannot record")
+        return
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-    scribe = Scribe(ctx, api, cfg["recording_dir"])
     ctx.room.on("track_subscribed", scribe.on_subscribed)
     ctx.room.on("track_unsubscribed", scribe.on_unsubscribed)
     for p in ctx.room.remote_participants.values():

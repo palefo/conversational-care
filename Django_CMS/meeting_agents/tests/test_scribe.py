@@ -84,3 +84,46 @@ def test_stop_does_not_interrupt_a_file_being_handed_in(tmp_path):
         return handed_in
 
     assert asyncio.run(go()) == ["inv-ana"]
+
+
+def test_unwritable_folder_is_reported_not_swallowed(tmp_path):
+    """Production regression: the media folder belonged to root, the recorder
+    joined, crashed on Permission denied, and nobody was told."""
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o500)
+
+    calls = {}
+
+    class API:
+        async def run_config(self):
+            return {"recording_dir": str(locked / "meetings" / "abc"), "room": "r"}
+
+        async def status(self, state="", **kw):
+            calls["status"] = (state, kw.get("error", ""))
+
+        async def close(self):
+            calls["closed"] = True
+
+    class Ctx:
+        job = SimpleNamespace(metadata="{}")
+        connected = False
+
+        async def connect(self, **kw):
+            Ctx.connected = True
+
+        def shutdown(self, reason=""):
+            calls["shutdown"] = reason
+
+    import cc_agents.scribe as sc
+    orig = sc.PlatformAPI.from_metadata
+    sc.PlatformAPI.from_metadata = staticmethod(lambda raw: (API(), {}))
+    try:
+        asyncio.run(sc.entrypoint(Ctx()))
+    finally:
+        sc.PlatformAPI.from_metadata = orig
+        locked.chmod(0o700)
+    assert calls["status"][0] == "failed"
+    assert "cannot write" in calls["status"][1]
+    assert calls.get("closed") and "shutdown" in calls
+    assert not Ctx.connected            # never joined the room just to vanish

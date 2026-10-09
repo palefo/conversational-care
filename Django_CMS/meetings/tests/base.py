@@ -1,5 +1,6 @@
 """Shared fixtures for the meetings tests. LiveKit is never contacted: every
 server call goes through livekit_api._twirp, which the tests patch."""
+import os
 from datetime import timedelta
 from unittest import mock
 
@@ -44,6 +45,13 @@ class MeetingsTestCase(TestCase):
     def setUp(self):
         cache.clear()
         self.addCleanup(cache.clear)
+        # The app reads its connection settings from the environment before
+        # Django settings, and urls.py loads .env into the environment. On a
+        # server with online meetings configured, the real keys would win over
+        # override_settings — so the test values go into the environment too.
+        env = mock.patch.dict(os.environ, {k: v for k, v in LK.items() if isinstance(v, str)})
+        env.start()
+        self.addCleanup(env.stop)
         s = MeetingsSettings.load()
         s.enabled = "1"
         s.save()

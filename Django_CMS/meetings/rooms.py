@@ -371,7 +371,8 @@ def state_for(session, *, for_staff: bool) -> dict:
     AgentRun.objects.filter(session=session, state=AgentRun.State.DISPATCHED,
                             created_at__lt=cutoff, last_status_at__isnull=True).update(
         state=AgentRun.State.FAILED, ended_at=timezone.now(),
-        error=_("No agent worker picked this up. Check that the meeting agents are running."))
+        error=_("The agent did not start: no agent worker took it, or it failed while starting. "
+                "Check that the meeting agents are running, and their logs."))
     if (session.recording_state == MeetingSession.Recording.STARTING
             and not AgentRun.objects.filter(session=session, role=AgentRun.Role.SCRIBE,
                                             state__in=AgentRun.LIVE_STATES).exists()):
