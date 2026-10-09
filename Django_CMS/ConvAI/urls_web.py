@@ -34,7 +34,7 @@ from .views import (
     alerts_since,
     twilio_audio_download, send_care_plan_whatsapp, twilio_careplan_download,
     start_protocol_automation, dismiss_sms_offer, communications, panel_fragment,
-    summarize_meeting_view, transcribe_recording_view, edit_overview,
+    summarize_meeting_view, transcribe_recording_view, transcription_status, edit_overview,
     download_client_sdk, export_messages, download_conversation,
     # Study enrolment (participant management). Every one of these 404s unless
     # STUDY_ENROLMENT_ENABLED is on; the check is in the view.
@@ -127,6 +127,7 @@ urlpatterns = [
     path('meetings/<int:meeting_id>/send_whatsapp/', navigator_required(send_meeting_reminder_view), name='send_whatsapp_reminder'),
     path('meetings/<int:meeting_id>/summarize/', navigator_required(summarize_meeting_view), name='summarize_meeting'),
     path('recordings/<str:sid>/transcribe/', navigator_required(transcribe_recording_view), name='transcribe_recording'),
+    path('recordings/<str:sid>/transcription/', navigator_required(transcription_status), name='transcription_status'),
     path('summaries/<str:kind>/<str:pk>/edit/', navigator_required(edit_overview), name='edit_overview'),
     path('client-sdk/download/', download_client_sdk, name='download_client_sdk'),
     path('chat/send/', navigator_required(send_chat_message), name='send_chat_message'),

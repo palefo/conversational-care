@@ -10,8 +10,10 @@ WORKDIR /app
 # Install system dependencies:
 #  - gettext: required by manage.py compilemessages
 #  - curl: used to fetch the Tailwind standalone CLI
+#  - ffmpeg: splits recordings longer than Whisper's 25 MB limit, and mixes an
+#    online meeting's per-speaker tracks into one file (background jobs)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends gettext curl \
+    && apt-get install -y --no-install-recommends gettext curl ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Install the Tailwind CSS standalone CLI (no Node required). The binary bundles

@@ -1,7 +1,7 @@
 {% extends "email/_base.html" %}{% load i18n %}
 {% block body %}
   <h1 style="margin:0 0 12px 0;font-size:20px;line-height:28px;font-weight:600;color:#2f3131;">
-    {% if in_person %}{% trans "Reminder: your upcoming meeting" %}{% else %}{% trans "Reminder: your upcoming call" %}{% endif %}
+    {% if in_person %}{% trans "Reminder: your upcoming meeting" %}{% elif online %}{% trans "Reminder: your online meeting" %}{% else %}{% trans "Reminder: your upcoming call" %}{% endif %}
   </h1>
   <p style="margin:0 0 16px 0;">
     {% if recipient_name %}{% blocktrans %}Hello {{ recipient_name }},{% endblocktrans %}{% else %}{% trans "Hello," %}{% endif %}
@@ -23,7 +23,16 @@
     </tr>
     {% endif %}
   </table>
-  <p style="margin:16px 0 0 0;">
-    {% if in_person %}{% trans "Please arrive a few minutes early." %}{% else %}{% trans "Please be available to take the call at that time." %}{% endif %}
+  {% if online and join_url %}
+  <p style="margin:20px 0 8px 0;">
+    <a href="{{ join_url }}" style="display:inline-block;background:#006877;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:10px;">{% trans "Join the meeting" %}</a>
   </p>
+  <p style="margin:0 0 0 0;font-size:13px;color:#767777;">
+    {% trans "The link opens in your web browser — there is nothing to install. It works from a few minutes before the start time." %}
+  </p>
+  {% else %}
+  <p style="margin:16px 0 0 0;">
+    {% if in_person %}{% trans "Please arrive a few minutes early." %}{% elif online %}{% trans "You will receive the link to join shortly before the meeting." %}{% else %}{% trans "Please be available to take the call at that time." %}{% endif %}
+  </p>
+  {% endif %}
 {% endblock %}

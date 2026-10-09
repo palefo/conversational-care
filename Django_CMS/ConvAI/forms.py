@@ -72,6 +72,18 @@ class MeetingForm(forms.ModelForm):
             field.required = False
             field.queryset = ProtocolRecord.objects.order_by('number')
 
+        # Online is offered only while online meetings are available — or when
+        # it is already this meeting's modality, so editing one with the feature
+        # switched off cannot quietly turn it into a phone call. Validation
+        # follows the choices, so it cannot be booked by posting the value.
+        from . import extensions
+        modality = self.fields.get('modality')
+        if modality is not None:
+            current = getattr(self.instance, 'modality', None) if self.instance.pk else None
+            if current != Meeting.Modality.ONLINE and not extensions.online_available():
+                modality.choices = [(v, l) for v, l in modality.choices
+                                    if v != Meeting.Modality.ONLINE]
+
     def protocol_owners(self):
         """{protocol id: [client id, …]} over the clients this form can pick.
 
@@ -214,41 +226,66 @@ class ProtocolAnswerForm(forms.Form):
             )
 
     def save(self):
+        """Write the answers that were posted, without trampling newer ones.
+
+        Two rules, both about answers changing while a form is open — which is
+        routine now that answers arrive by text and by voice during a call:
+
+        * **Only posted fields are touched.** A field missing from the POST is
+          left alone. This used to walk every field and delete the answer for
+          any that arrived blank, so a form that did not carry a field — or a
+          panel rendered before an answer came in — erased it.
+        * **Compare-and-set when the client says what it started from.** With
+          ``base_q_<id>`` posted, the answer is written only if what is stored
+          still equals that base. If someone (or something) changed it in the
+          meantime, nothing is written and the field is reported back in
+          ``self.conflicts`` with the current value, for the person to choose.
+
+        Returns the list of field names written.
         """
-        Creates / updates / deletes Answer rows so that
-        only non-empty answers remain.
-        """
+        self.conflicts = []
+        written = []
+        posted = getattr(self, "data", {}) or {}
         for field_name, value in self.cleaned_data.items():
+            if posted and field_name not in posted:
+                continue
             q_id = int(field_name.split("_")[1])
-            value = value.strip()
+            value = (value or "").strip()
 
-            try:
-                ans = Answer.objects.get(
-                    meeting=self.meeting, question_id=q_id
-                )
-            except Answer.DoesNotExist:
-                ans = None
+            ans = Answer.objects.filter(meeting=self.meeting, question_id=q_id).first()
+            current = (ans.response if ans else "").strip()
 
+            base_key = f"base_{field_name}"
+            if posted and base_key in posted:
+                base = (posted.get(base_key) or "").strip()
+                if current != base and current != value:
+                    self.conflicts.append({
+                        "field": field_name,
+                        "current": current,
+                        "source": ans.source if ans else "",
+                    })
+                    continue
+
+            if value == current:
+                continue
             if value:
                 if ans:
                     # A navigator editing an answer makes it theirs, so the
-                    # "came back by text" tint goes with the change. Only an
-                    # untouched reply should still read as the caregiver's.
-                    changed = ans.response != value
+                    # "came back by text/voice" tint goes with the change.
                     ans.response = value
-                    if changed:
-                        ans.by_text = False
-                    ans.save(update_fields=["response", "by_text"])
+                    ans.by_text = False
+                    ans.source = Answer.Source.NAVIGATOR
+                    ans.save(update_fields=["response", "by_text", "source"])
                 else:
                     Answer.objects.create(
-                        meeting=self.meeting,
-                        question_id=q_id,
-                        response=value
+                        meeting=self.meeting, question_id=q_id, response=value,
+                        source=Answer.Source.NAVIGATOR,
                     )
-            else:
-                # user cleared text → delete stored answer
-                if ans:
-                    ans.delete()
+            elif ans:
+                # Cleared on purpose: this field was posted, empty.
+                ans.delete()
+            written.append(field_name)
+        return written
 
 
 # --------------------------------------------------------------------------

@@ -16,6 +16,7 @@ from ._base import *  # noqa: F401,F403
 from ._panel import panel_context
 from .patients import build_patient_events
 from .calls import scoped_meeting_form, save_scheduled_meeting
+from .. import extensions
 
 from django.utils.timesince import timesince
 from django.utils.translation import ngettext
@@ -56,6 +57,8 @@ def _kind_of(event):
     both are Meeting rows.
     """
     if event['kind'] == 'meeting':
+        if event.get('online'):
+            return 'online'
         return 'visit' if event.get('in_person') else 'call'
     if event['kind'] == 'conversation':
         return 'chat'
@@ -120,13 +123,15 @@ def _row(event, now):
         'is_late': False, 'cancelled': False,
     }
 
-    if kind in ('call', 'visit'):
+    if kind in ('call', 'visit', 'online'):
         # A call nobody booked has no protocol to be named after, and naming it
         # after its type printed "Protocol" over a row that covered none.
         row['line2'] = event['protocol'] or (
             _("Unscheduled call") if event.get('unscheduled') else event['meeting_type'])
         if kind == 'visit':
             row['detail'] = event['location'] or _("Location not set")
+        elif kind == 'online':
+            row['detail'] = _("with %s") % (caregiver or patient.name)
         elif event.get('dial_who') or caregiver:
             # Whoever the call actually rang. It was always the caregiver until
             # the client page could ring the client instead.
@@ -154,6 +159,7 @@ def _row(event, now):
             if not event.get('outcome_missing'):
                 row['sub'] = (
                     _("In-person meeting") if kind == 'visit'
+                    else _("Online meeting") if kind == 'online'
                     else _("Unscheduled call") if event.get('unscheduled')
                     else _("Scheduled call"))
         else:
@@ -314,6 +320,10 @@ def comms_list_context(request, events, for_patient=None):
     # own diary, one click away, and the Calendar shows it too.
     tab = tab or 'past'
     chips = UP_CHIPS if tab == 'up' else PAST_CHIPS
+    # Online meetings get a chip only where the app is part of the deployment,
+    # so an installation without it sees exactly the list it always did.
+    if extensions.online_installed():
+        chips = chips[:3] + (('online', _("Online")),) + chips[3:]
     kind = request.GET.get('kind', 'all')
     if kind not in dict(chips):
         kind = 'all'

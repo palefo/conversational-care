@@ -382,6 +382,30 @@ on; see `async_replies.md`.
 
 Tests: `ConvAI/test_sensei.py`.
 
+### Meeting voice agents (online meetings)
+
+Separate from the four kinds above, and only present where the optional
+`meetings` app is installed and switched on (see
+[online_meetings.md](online_meetings.md)). Two roles join an online meeting as
+participants:
+
+- **Voice interviewer** — built in. Works through one protocol with one person
+  by voice, saving each answer as it is given (`Answer.source = voice`, through
+  the same `_save_answer` the WhatsApp `protocol_qa` automation uses). Its
+  spoken-style prompt is `meetings/prompts/protocol_interviewer_voice.prompt`.
+- **Meeting assistant** — push-to-talk for the navigator; everyone in the
+  meeting hears the answer. Uses the **prompt-based agent** chosen in
+  Settings → Online meetings: its `system_prompt`, and its knowledge base if it
+  is RAG-based.
+
+Both run in the separate `meeting_agents` image (LiveKit Agents) on **Azure
+OpenAI Realtime**, using the settings in Settings → Agents. They **coexist with
+`realtime_enabled`** rather than replacing it: a realtime prompt agent still
+talks straight from the browser to Azure on its test page and the tester chat,
+and `PromptAgentForm` still refuses realtime + RAG there, because a
+browser-direct session cannot run tools. A meeting agent runs server-side, so it
+can.
+
 ## Choosing the model
 
 In-process agents (native + prompt-based) pick their LLM through one shared
@@ -542,6 +566,8 @@ See [agent_tools.md](agent_tools.md).
 - **Navigator chatbot bubble** (`send_chat_message`) always uses the built-in
   **Link Worker** native agent and keys the conversation by a normalized UUID
   derived from the `conversation_id`.
+- **Online meetings** (optional `meetings` app) use the voice interviewer and the
+  meeting assistant above, not the patient's `.agent`.
 
 ## Adding a new native agent
 

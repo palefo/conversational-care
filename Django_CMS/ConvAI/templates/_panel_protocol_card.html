@@ -169,8 +169,8 @@
                 <button type="button" class="dpc-carried-edit" data-uncarry>{% trans "Update" %}</button>
               </div>
             {% else %}
-              <textarea class="dpc-ta{% if q.by_text %} dpc-ta-bytext{% endif %}" name="{{ q.field }}" rows="3"
-                        {% if q.by_text %}title="{% trans 'Came back by text' %}"{% endif %}
+              <textarea class="dpc-ta{% if q.by_text %} dpc-ta-bytext{% elif q.by_voice %} dpc-ta-byvoice{% endif %}" name="{{ q.field }}" rows="3"
+                        {% if q.by_text %}title="{% trans 'Came back by text' %}"{% elif q.by_voice %}title="{% trans 'Captured by the voice interviewer' %}"{% endif %}
                         placeholder="{% trans 'Type what they said' %}">{{ q.answer }}</textarea>
             {% endif %}
           {% else %}

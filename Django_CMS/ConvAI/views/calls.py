@@ -4,6 +4,7 @@ import logging
 from django.db import transaction
 
 from ._panel import panel_context
+from .. import extensions
 
 logger = logging.getLogger(__name__)
 
@@ -356,6 +357,10 @@ def complete_meeting(request, meeting_id):
         meeting.executed_protocols.set(Protocol.objects.filter(pk__in=ids))
     else:
         meeting.executed_protocols.clear()
+    # An online meeting's room (if one is open) closes when the outcome is
+    # recorded; the meetings app listens for this.
+    extensions.meeting_completed.send(sender=Meeting, meeting=meeting,
+                                      status=new_status, by=request.user)
     messages.success(request, _("Meeting status updated."))
     return _back_to(request, 'dashboard')
 
@@ -567,6 +572,12 @@ def calendar_create_meeting(request):
     return redirect(back)
 
 
+# What an edit can change that an add-on may need to react to: an online
+# meeting's link follows its time, and is withdrawn if the meeting moves to
+# another client or stops being online.
+_WATCHED_FIELDS = ("scheduled_time", "patient_id", "modality")
+
+
 @login_required
 def edit_meeting(request, meeting_id):
     """
@@ -594,6 +605,10 @@ def edit_meeting(request, meeting_id):
     # form about one thing, and sending someone to a page of their own for it
     # lost the list, the calendar and the panel they were working in.
     if request.method == 'POST':
+        # Snapshotted before validation: a ModelForm writes the posted values
+        # onto its instance inside is_valid(), so reading them afterwards would
+        # compare the new values with themselves.
+        before = {f: getattr(meeting, f) for f in _WATCHED_FIELDS}
         form = MeetingForm(request.POST, instance=meeting)
         # Si no es staff, limitar pacientes al CTN (igual que en schedule_call)
         if not is_admin(request.user):
@@ -604,6 +619,10 @@ def edit_meeting(request, meeting_id):
             meeting.navigator = request.user
             meeting.save()
             form.save_m2m()
+            changed = {f for f in _WATCHED_FIELDS if getattr(meeting, f) != before[f]}
+            if changed:
+                extensions.meeting_changed.send(sender=Meeting, meeting=meeting,
+                                                changed=changed, by=request.user)
             messages.success(request, _("Meeting rescheduled successfully."))
         else:
             # The dialog is gone by the time this lands, so the errors have to
@@ -687,6 +706,7 @@ def cancel_meeting(request, meeting_id):
             meeting.cancel_reason = ""
             meeting.cancelled_at = None
             meeting.save(update_fields=["status", "cancel_reason", "cancelled_at"])
+            extensions.meeting_reinstated.send(sender=Meeting, meeting=meeting, by=request.user)
             messages.success(request, _("The call is back on the schedule."))
         return _back_to(request, 'communications')
 
@@ -700,5 +720,6 @@ def cancel_meeting(request, meeting_id):
     meeting.cancel_reason = (request.POST.get("reason") or "").strip()[:200]
     meeting.cancelled_at = timezone.now()
     meeting.save(update_fields=["status", "cancel_reason", "cancelled_at"])
+    extensions.meeting_cancelled.send(sender=Meeting, meeting=meeting, by=request.user)
     messages.success(request, _("Call cancelled. It stays in the history."))
     return _back_to(request, 'communications')

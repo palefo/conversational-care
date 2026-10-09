@@ -2451,6 +2451,7 @@ dialog[open]::backdrop { animation: dlg-scrim .2s ease both; }
   .cm-ic .material-icons-outlined { font-size: 1rem; }
   .cm-ic-call { background: #eff6ff; color: #1d4ed8; }
   .cm-ic-visit { background: #fff7ed; color: #c2410c; }
+  .cm-ic-online { background: #f5f3ff; color: #6d28d9; }
   .cm-ic-chat { background: #f0fdf4; color: #15803d; }
   .cm-ic-alert { background: #fef2f2; color: #b91c1c; }
   .cm-ic-other { background: #f5f3ff; color: #6d28d9; }
@@ -3036,3 +3037,53 @@ dialog[open]::backdrop { animation: dlg-scrim .2s ease both; }
 .send-button:disabled:active {
   transform: none;
 }
+
+/* ───────── Background job status (transcription) ─────────
+   A queued or running job, or one that failed, shown beside the thing it is
+   working on. Quiet by design: the navigator can carry on, so it reads as a
+   status line rather than an alert. */
+.dp-job {
+  display: flex; gap: .625rem; align-items: flex-start;
+  margin: 0 0 .75rem; padding: .625rem .75rem;
+  border: 1px solid #bae6fd; background: var(--brand-light, #f0f9ff);
+  border-radius: .5rem; font-size: .71875rem; line-height: 1.5; color: #334155;
+}
+.dp-job b { display: block; font-weight: 600; color: #0c4a6e; }
+.dp-job span:not(.dp-job-spin):not(.dp-job-ic) { display: block; color: #475569; }
+.dp-job-ic { font-size: 1.125rem; line-height: 1.2; color: #0369a1; }
+.dp-job-stuck { border-color: #fde68a; background: #fffbeb; }
+.dp-job-stuck b { color: #92400e; }
+.dp-job-stuck .dp-job-ic { color: #b45309; }
+.dp-job-failed { border-color: #fecaca; background: #fef2f2; }
+.dp-job-failed b { color: #991b1b; }
+.dp-job-failed .dp-job-ic { color: #dc2626; }
+.dp-job-spin {
+  flex: none; width: 1rem; height: 1rem; margin-top: .125rem;
+  border-radius: 50%; border: 2px solid #bae6fd; border-top-color: #0369a1;
+  animation: dp-job-spin .9s linear infinite;
+}
+@keyframes dp-job-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .dp-job-spin { animation-duration: 2.4s; }
+}
+
+/* Captured by the voice interviewer in an online meeting — the same idea as
+   the by-text tint, in violet so the two provenances read apart at a glance. */
+.dpc-ta-byvoice { background: #f5f3ff; border-color: #ddd6fe; }
+
+/* An answer that changed underneath the person editing it. Nothing was
+   overwritten; they choose. */
+.dpc-ta-conflict { border-color: #f59e0b !important; box-shadow: 0 0 0 2px #fef3c7; }
+.dpc-conflict {
+  margin-top: .375rem; padding: .5rem .625rem; border-radius: .375rem;
+  background: #fffbeb; border: 1px solid #fde68a; font-size: .6875rem; color: #78350f;
+  line-height: 1.5;
+}
+.dpc-conflict p { margin: 0 0 .25rem; }
+.dpc-conflict-acts { display: flex; gap: .75rem; }
+
+/* Online-meeting transcripts name their speakers; the AI's turns are set
+   apart so nobody mistakes the assistant's words for a person's. */
+.dp-tr-us .dp-tr-who { color: #0369a1; }
+.dp-tr-ai .dp-tr-who { color: #6d28d9; }
+.dp-tr-ai p { color: #4c1d95; font-style: italic; }

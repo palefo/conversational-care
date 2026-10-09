@@ -33,6 +33,31 @@ services:
     env_file:
       - .env  # Tell compose to load environment variables from a .env file
 
+  # Background jobs: transcribing recordings, mixing online meetings down, and
+  # the periodic housekeeping (see background_jobs.md). Same image and code as
+  # `web`; it never serves HTTP. Set JOBS_RUNNER=thread and remove this service
+  # to run jobs inside the web process instead.
+  worker:
+    build: .
+    command: ["python", "manage.py", "run_jobs", "--concurrency", "2"]
+    volumes:
+      - .:/app
+      - media_data:/media
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      # The worker builds no CSS; skip the entrypoint's Tailwind step noise.
+      - PYTHONUNBUFFERED=1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    # A hard kill mid-job is safe (the job is re-queued once its heartbeat goes
+    # quiet), but a graceful stop lets a running transcription finish.
+    stop_grace_period: 60s
+    mem_limit: 768m
+
 volumes:
   postgres_data:
   media_data:

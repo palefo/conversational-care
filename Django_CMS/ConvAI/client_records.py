@@ -459,6 +459,7 @@ def protocol_answers(user, patient_id, protocol=None, *, via: str) -> dict:
             "answer": a.response,
             "answered": _when(a.meeting.happened_at),
             "by_text": a.by_text,
+            "by_voice": a.source == "voice",
             "_order": q.order,
         })
     protocols = []

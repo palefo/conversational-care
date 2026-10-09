@@ -1,0 +1,27 @@
+{% extends "meetings/_public_base.html" %}
+{% load i18n %}
+{% block lang %}{% endblock %}
+{% block content %}
+{% comment %}
+  What a link opens to. Deliberately a page with a button rather than the
+  meeting itself: email scanners follow every link in a message, and a link
+  that did something on GET would be "used" by the scanner first. The POST
+  binds this browser to the invite and moves on to a URL without the token.
+{% endcomment %}
+<div class="lb-simple">
+  <div class="lb-icon"><span class="mi">{% if early %}event{% else %}videocam{% endif %}</span></div>
+  {% if early %}
+    <h1>{% blocktrans with n=invite.display_name %}Hello {{ n }} — it's a little early{% endblocktrans %}</h1>
+    <p>{% blocktrans with h=host d=when|date:"l j F" t=when|date:"H:i" %}Your online meeting with {{ h }} is on {{ d }} at {{ t }}. This link starts working shortly before then.{% endblocktrans %}</p>
+    <a class="lb-btn-secondary" href="{{ ics_url }}"><span class="mi">event_available</span>{% trans "Add to my calendar" %}</a>
+  {% else %}
+    <h1>{% blocktrans with n=invite.display_name %}Hello {{ n }}{% endblocktrans %}</h1>
+    <p>{% blocktrans with h=host d=when|date:"l j F" t=when|date:"H:i" %}This is your online meeting with {{ h }}, on {{ d }} at {{ t }}. You can check your microphone before going in.{% endblocktrans %}</p>
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="lb-join" style="width:100%"><span class="mi">arrow_forward</span>{% trans "Continue" %}</button>
+    </form>
+    <p class="lb-help">{% trans "Nothing to install. Works on phones, tablets and computers." %}</p>
+  {% endif %}
+</div>
+{% endblock %}

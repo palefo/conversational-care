@@ -126,3 +126,15 @@ def azure_voice_datalist():
     """
     from ..tts import azure_voices
     return {"voices": azure_voices()}
+
+
+@register.simple_tag
+def online_meetings_on():
+    """Whether online meetings can be started right now (ConvAI.extensions).
+
+    For a core template to offer an online-meeting action only where the
+    optional app is installed and switched on; anything inside the guarded
+    block — a `{% url 'meetings:…' %}` included — is never rendered otherwise.
+    """
+    from ConvAI import extensions
+    return extensions.online_available()

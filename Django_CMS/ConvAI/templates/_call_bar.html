@@ -112,7 +112,9 @@
       bar.classList.remove('callbar-out');
 
       var found = findCall();
-      if (!found) return hide();
+      if (!found) return online && showOnline() || hide();
+      goEl.onclick = null;
+      goEl.textContent = '{% trans "Back to call" %}';
       var s = found.state;
       whoEl.textContent = s.who || '';
       whoEl.hidden = !s.who;
@@ -142,6 +144,55 @@
         tick = setInterval(draw, 1000);
       }
       bar.hidden = false;
+    }
+
+    // ── Online meetings ─────────────────────────────────────────────────
+    // An online meeting runs in a window of its own (meetings/staff_room), so
+    // nothing in this page knows it is happening — the room window says so on
+    // a BroadcastChannel every few seconds, and the bar shows it with a way
+    // back to that window. Heard nothing for 15 s: the window is gone.
+    var online = null;
+    function showOnline() {
+      if (!online || Date.now() - online.heard > 15000) { online = null; return false; }
+      clearInterval(tick);
+      bar.classList.remove('callbar-dialling');
+      labEl.textContent = '{% trans "In an online meeting" %}';
+      whoEl.textContent = online.title || '';
+      whoEl.hidden = !online.title;
+      timeEl.hidden = false;
+      var since = online.since ? new Date(online.since).getTime() : Date.now();
+      var draw = function () {
+        if (Date.now() - online.heard > 15000) { online = null; return show(); }
+        timeEl.textContent = mmss(Math.max(0, Math.round((Date.now() - since) / 1000)));
+      };
+      draw();
+      tick = setInterval(draw, 1000);
+      goEl.textContent = '{% trans "Back to meeting" %}';
+      goEl.href = online.room;
+      goEl.onclick = function (e) {
+        // Focus the existing window (same name) rather than opening another.
+        e.preventDefault();
+        var w = window.open(online.room, 'cc-meeting-' + online.id);
+        if (w) { try { w.focus(); } catch (er) {} }
+      };
+      bar.hidden = false;
+      return true;
+    }
+    if ('BroadcastChannel' in window) {
+      var chan = new BroadcastChannel('cc-live');
+      chan.onmessage = function (ev) {
+        var d = ev.data || {};
+        if (d.type !== 'cc-meeting') return;
+        if (d.live) {
+          var fresh = !online;
+          online = { id: d.id, title: d.title, since: d.since, room: d.room, heard: Date.now() };
+          if (fresh || bar.hidden) show();
+        } else if (online && online.id === d.id) {
+          online = null; show();
+        }
+      };
+      // A meeting window already open answers this straight away.
+      try { chan.postMessage({ type: 'cc-meeting-ping' }); } catch (e) {}
     }
 
     // Closing the panel removes it from the DOM without a page load, so the

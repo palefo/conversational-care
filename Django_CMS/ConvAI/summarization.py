@@ -112,15 +112,22 @@ def recognition_hint(recording) -> str:
 
     from .models import Patient
 
-    nums = {str(recording.to_number or ""), str(recording.from_number or "")}
-    nums.discard("")
-    if not nums:
-        return ""
-
-    patient = (Patient.objects
-               .filter(Q(phone_number__in=nums) | Q(caregiver__phone_number__in=nums))
-               .select_related("caregiver", "navigator")
-               .first())
+    # The recording's own client first — every online recording has one, and
+    # attributed phone recordings do too. Matching numbers is the fallback for
+    # rows from before recordings knew whose they were.
+    patient = None
+    if getattr(recording, "patient_id", None):
+        patient = (Patient.objects.filter(pk=recording.patient_id)
+                   .select_related("caregiver", "navigator").first())
+    if patient is None:
+        nums = {str(recording.to_number or ""), str(recording.from_number or "")}
+        nums.discard("")
+        if not nums:
+            return ""
+        patient = (Patient.objects
+                   .filter(Q(phone_number__in=nums) | Q(caregiver__phone_number__in=nums))
+                   .select_related("caregiver", "navigator")
+                   .first())
     if not patient:
         return ""
 
@@ -140,15 +147,34 @@ def recognition_hint(recording) -> str:
 
 def transcribe_recording(recording) -> str:
     """Transcribe a call recording's audio with Whisper and persist it."""
-    from .utils import transcribe_audio  # local import avoids import-time cycles
+    from .models import CallRecording
+    from .utils import transcribe_audio, transcribe_tracks  # avoids import-time cycles
+
+    # An online meeting keeps one clean track per speaker, which beats any
+    # attempt to pull voices apart from the mix. Twilio is never asked about a
+    # recording it did not make.
+    tracks = [t for t in (recording.tracks or [])
+              if t.get("path") and os.path.exists(t["path"])]
+    if recording.source == CallRecording.Source.ONLINE and tracks:
+        transcript, segments = transcribe_tracks(
+            [(t.get("speaker"), t["path"], t.get("offset_s") or 0.0) for t in tracks],
+            prompt=recognition_hint(recording) or None)
+        transcript = (transcript or "").strip()
+        recording.transcript = transcript
+        recording.transcript_segments = segments
+        recording.transcribed_at = timezone.now()
+        recording.save(update_fields=["transcript", "transcript_segments", "transcribed_at"])
+        return transcript
 
     path = recording.filename
     if not path or not os.path.exists(path):
         raise FileNotFoundError("Recording audio file not found on disk.")
     # The sid lets transcribe_audio reach the WAV twin of this mp3, which is
     # the only rendering that still has the two parties on separate channels.
+    is_twilio = recording.source == CallRecording.Source.TWILIO
     transcript, segments = transcribe_audio(
-        path, with_segments=True, recording_sid=recording.recording_sid,
+        path, with_segments=True,
+        recording_sid=recording.recording_sid if is_twilio else None,
         prompt=recognition_hint(recording) or None)
     transcript = (transcript or "").strip()
     recording.transcript = transcript
@@ -215,6 +241,48 @@ def extract_moments(recording) -> list:
     recording.transcript_moments = moments
     recording.save(update_fields=["transcript_moments"])
     return moments
+
+
+def queue_transcription(recording, *, by=None):
+    """Queue transcribe → summarise → key moments for ``recording``.
+
+    Returns the Job. Asking twice while one is queued or running returns the
+    same job rather than paying Whisper twice for the same audio.
+    """
+    from .jobs import enqueue
+
+    return enqueue(
+        "transcribe_recording", {"recording_id": recording.pk},
+        ref=f"callrecording:{recording.pk}",
+        dedupe_key=f"transcribe:{recording.pk}",
+        created_by=by,
+    )
+
+
+def transcription_state(recording):
+    """What the panel should say about this recording's transcription job.
+
+    ``None`` when no job was ever queued for it (older recordings transcribed
+    in the request, or never). Otherwise a dict the templates can read.
+    """
+    from .jobs import latest_for, worker_seen
+
+    if recording is None or not getattr(recording, "pk", None):
+        return None
+    job = latest_for(f"callrecording:{recording.pk}", "transcribe_recording")
+    if job is None:
+        return None
+    live = job.is_live
+    return {
+        "job": job,
+        "status": job.status,
+        "live": live,
+        "failed": job.status == job.Status.FAILED,
+        "error": (job.last_error or "").split("\n\n", 1)[0][:300],
+        "retrying": live and job.attempts > 0 and job.status == job.Status.QUEUED,
+        # Queued with nobody to run it: say so instead of spinning forever.
+        "no_worker": live and not worker_seen(),
+    }
 
 
 def transcribe_and_summarize_recording(recording):

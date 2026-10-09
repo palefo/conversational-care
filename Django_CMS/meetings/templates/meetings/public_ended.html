@@ -1,0 +1,19 @@
+{% extends "meetings/_public_base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Meeting ended" %}{% endblock %}
+{% block content %}
+<div class="lb-simple">
+  <div class="lb-icon"><span class="mi">check_circle</span></div>
+  {% if reason == "duplicate" %}
+    <h1>{% trans "You joined from somewhere else" %}</h1>
+    <p>{% trans "The meeting is continuing on your other device or window, so this one was closed." %}</p>
+  {% elif reason == "left" %}
+    <h1>{% trans "You left the meeting" %}</h1>
+    <p>{% trans "If you left by mistake, you can go back in while the meeting is still running." %}</p>
+    <a class="lb-btn-secondary" href="{% url 'meetings:lobby' %}"><span class="mi">login</span>{% trans "Go back in" %}</a>
+  {% else %}
+    <h1>{% trans "Thank you" %}</h1>
+    <p>{% if host %}{% blocktrans with h=host %}The meeting with {{ h }} has ended. You can close this page.{% endblocktrans %}{% else %}{% trans "The meeting has ended. You can close this page." %}{% endif %}</p>
+  {% endif %}
+</div>
+{% endblock %}

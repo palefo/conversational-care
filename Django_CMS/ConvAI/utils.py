@@ -1099,6 +1099,12 @@ def reminder_recipient_missing(meeting):
         if not meeting_reminder_recipient(meeting)[0]:
             return "no-email"
         return ""
+    # The WhatsApp reminder is a pre-approved template about a *call*, and it
+    # cannot carry a link. An online meeting's link goes out from the meeting's
+    # own "Send link" instead (the meetings app), so this channel does not
+    # apply to it.
+    if meeting.modality == meeting.Modality.ONLINE:
+        return "online"
     caregiver = getattr(meeting.patient, "caregiver", None)
     if not (caregiver and caregiver.phone_number):
         return "no-phone"
@@ -1122,6 +1128,10 @@ def send_meeting_reminder(meeting):
     if reminder_channel() == "email":
         send_meeting_reminder_email(meeting)
         return "email"
+    if meeting.modality == meeting.Modality.ONLINE:
+        # See reminder_recipient_missing: the WhatsApp template is about a call
+        # and cannot carry the link. Send the link from the meeting instead.
+        raise ValueError("Online meetings are reminded by sending their link.")
     send_whatsapp_reminder(meeting)
     return "whatsapp"
 
@@ -1227,6 +1237,12 @@ def _openai_client():
     return OpenAI(api_key=api_key) if api_key else OpenAI()
 
 
+# Whisper's upload limit is 25 MB. Anything over this is cut into windows first.
+WHISPER_MAX_BYTES = 24 * 1024 * 1024
+WHISPER_WINDOW_S = 600       # ten minutes a window
+WHISPER_OVERLAP_S = 2        # so a word on a cut is heard whole by one window
+
+
 def _whisper(file_path, client=None, prompt=None):
     """Whisper, asked for its segments instead of only the flat text.
 
@@ -1234,8 +1250,22 @@ def _whisper(file_path, client=None, prompt=None):
     and an end. Asking for plain text and throwing the timings away is what left
     the panel unable to run a timestamp down the side of the transcript or jump
     the player to a line.
+
+    Files over Whisper's upload limit are transcribed in windows and stitched
+    back together (see _whisper_chunked) rather than rejected — a dual-channel
+    call over about 26 minutes is past the limit on each channel alone.
     """
     client = client or _openai_client()
+    try:
+        size = os.path.getsize(file_path)
+    except OSError:
+        size = 0
+    if size > WHISPER_MAX_BYTES:
+        return _whisper_chunked(file_path, client, prompt=prompt)
+    return _whisper_once(file_path, client, prompt=prompt)
+
+
+def _whisper_once(file_path, client, prompt=None):
     with open(file_path, "rb") as audio_file:
         result = client.audio.transcriptions.create(
             model="whisper-1",
@@ -1251,18 +1281,27 @@ def _whisper(file_path, client=None, prompt=None):
         )
     text = (getattr(result, "text", "") or "").strip()
     segments = []
+    # Whisper hallucinates on silence — "Thank you for watching" over a
+    # minute of nothing — and a per-speaker track in a meeting is mostly
+    # silence. Each segment says how sure it is that there was speech at all;
+    # one that is both probably-not-speech and low-confidence is dropped,
+    # along with the words inside it.
+    dropped = []
     for seg in (getattr(result, "segments", None) or []):
         # The SDK hands back objects on some versions and dicts on others.
         get = seg.get if isinstance(seg, dict) else lambda k, d=None: getattr(seg, k, d)
         body = (get("text", "") or "").strip()
         if not body:
             continue
-        segments.append({
-            "start": round(float(get("start", 0.0) or 0.0), 2),
-            "end": round(float(get("end", 0.0) or 0.0), 2),
-            "text": body,
-            "speaker": None,
-        })
+        start = round(float(get("start", 0.0) or 0.0), 2)
+        end = round(float(get("end", 0.0) or 0.0), 2)
+        no_speech = get("no_speech_prob", None)
+        logprob = get("avg_logprob", None)
+        if (no_speech is not None and logprob is not None
+                and float(no_speech) > 0.6 and float(logprob) < -1.0):
+            dropped.append((start, end))
+            continue
+        segments.append({"start": start, "end": end, "text": body, "speaker": None})
 
     words = []
     for w in (getattr(result, "words", None) or []):
@@ -1270,13 +1309,94 @@ def _whisper(file_path, client=None, prompt=None):
         token = (get("word", "") or "").strip()
         if not token:
             continue
-        words.append({
-            "start": round(float(get("start", 0.0) or 0.0), 2),
-            "end": round(float(get("end", 0.0) or 0.0), 2),
-            "word": token,
-        })
+        ws = round(float(get("start", 0.0) or 0.0), 2)
+        we = round(float(get("end", 0.0) or 0.0), 2)
+        if any(a <= ws < b for a, b in dropped):
+            continue
+        words.append({"start": ws, "end": we, "word": token})
 
+    if dropped:
+        text = " ".join(seg["text"] for seg in segments).strip()
     return text, segments, words
+
+
+def _media_duration(file_path):
+    """Seconds of audio in ``file_path``, via ffprobe, or None."""
+    import shutil
+    import subprocess
+
+    if not shutil.which("ffprobe"):
+        return None
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", file_path],
+            capture_output=True, text=True, timeout=60, check=True,
+        ).stdout.strip()
+        return float(out) if out else None
+    except (subprocess.SubprocessError, ValueError, OSError):
+        return None
+
+
+def _whisper_chunked(file_path, client, prompt=None):
+    """Transcribe a file too big for one Whisper call, window by window.
+
+    Each window starts ``WHISPER_OVERLAP_S`` early so a word cut by the
+    boundary is heard whole once; the words a window repeats from the one
+    before it are dropped by time. Timings are shifted back onto the original
+    file's clock, so the result is indistinguishable from one long call.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("ffmpeg"):
+        raise RuntimeError(
+            "This recording is larger than Whisper's 25 MB limit and ffmpeg is "
+            "not installed to split it.")
+    duration = _media_duration(file_path)
+    if not duration:
+        raise RuntimeError("Could not read the recording's length to split it.")
+
+    all_text, all_segments, all_words = [], [], []
+    tmpdir = tempfile.mkdtemp(prefix="whisper-")
+    try:
+        start = 0.0
+        index = 0
+        while start < duration:
+            lead = WHISPER_OVERLAP_S if index else 0
+            offset = max(0.0, start - lead)
+            length = WHISPER_WINDOW_S + lead
+            chunk = os.path.join(tmpdir, f"w{index:03d}.mp3")
+            subprocess.run(
+                ["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", f"{offset:.3f}",
+                 "-t", f"{length:.3f}", "-i", file_path, "-ac", "1", "-ar", "16000",
+                 "-b:a", "48k", chunk],
+                check=True, timeout=600,
+            )
+            _text, segs, words = _whisper_once(chunk, client, prompt=prompt)
+            # Keep only what belongs to this window, not the overlap it re-heard.
+            for seg in segs:
+                seg["start"] = round(seg["start"] + offset, 2)
+                seg["end"] = round(seg["end"] + offset, 2)
+                if seg["start"] >= start or not index:
+                    all_segments.append(seg)
+            for w in words:
+                w["start"] = round(w["start"] + offset, 2)
+                w["end"] = round(w["end"] + offset, 2)
+                if w["start"] >= start or not index:
+                    all_words.append(w)
+            start += WHISPER_WINDOW_S
+            index += 1
+            try:
+                os.remove(chunk)
+            except OSError:
+                pass
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+    all_text = " ".join(s["text"] for s in all_segments).strip()
+    return all_text, all_segments, all_words
 
 
 def _join_word(text, word):
@@ -1471,6 +1591,43 @@ def _transcribe_channels(file_path, channels, client, with_segments, prompt=None
         text = "\n".join(s["text"] for s in segments)
 
     return (text, segments) if with_segments else text
+
+def transcribe_tracks(tracks, *, prompt=None, client=None):
+    """Transcribe several single-speaker tracks into one interleaved transcript.
+
+    ``tracks`` is a list of ``(speaker, path, offset_s)``: who is on the track,
+    where the file is, and how many seconds into the conversation it starts.
+    A meeting records each participant separately (and each again after a
+    reconnect), so this is the general form of what _transcribe_channels does
+    for a two-channel phone call — and, unlike it, it never deletes its inputs.
+
+    Returns ``(text, segments)`` with ``speaker`` set on every segment to the
+    value given for its track, in the order the words were spoken.
+    """
+    client = client or _openai_client()
+    per_speaker, merged = [], []
+    for speaker, path, offset in tracks:
+        if not path or not os.path.exists(path):
+            continue
+        offset = float(offset or 0.0)
+        _text, segs, words = _whisper(path, client, prompt=prompt)
+        for seg in segs:
+            seg["start"] = round(seg["start"] + offset, 2)
+            seg["end"] = round(seg["end"] + offset, 2)
+            seg["speaker"] = speaker
+        for w in words:
+            w["start"] = round(w["start"] + offset, 2)
+            w["end"] = round(w["end"] + offset, 2)
+        merged.extend(segs)
+        per_speaker.append((speaker, words))
+
+    segments = _turns_from_words(per_speaker)
+    if not segments:
+        merged.sort(key=lambda seg: seg["start"])
+        segments = merged
+    text = "\n".join(seg["text"] for seg in segments)
+    return text, segments
+
 
 ## Self registration logic ##
 

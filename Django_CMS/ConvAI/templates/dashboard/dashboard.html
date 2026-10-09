@@ -671,7 +671,7 @@
               same colours Communications uses.
             {% endcomment %}
             <span class="dash-ic dash-ic-{{ it.kind }}">
-              <span class="material-icons-outlined">{% if it.in_person %}event{% else %}call{% endif %}</span>
+              <span class="material-icons-outlined">{% if it.in_person %}event{% elif it.online %}videocam{% else %}call{% endif %}</span>
             </span>
             <div class="dash-row-main">
               <div class="dash-row-l1"><span class="dash-row-name">{{ it.name }}</span></div>
@@ -721,7 +721,7 @@
               same colours Communications uses.
             {% endcomment %}
             <span class="dash-ic dash-ic-{{ it.kind }}">
-              <span class="material-icons-outlined">{% if it.in_person %}event{% else %}call{% endif %}</span>
+              <span class="material-icons-outlined">{% if it.in_person %}event{% elif it.online %}videocam{% else %}call{% endif %}</span>
             </span>
             <div class="dash-row-main">
               <div class="dash-row-l1"><span class="dash-row-name">{{ it.name }}</span></div>

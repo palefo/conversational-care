@@ -15,13 +15,17 @@ is, how much history they have, when you last spoke) so triage from a queue
 never happens blind. On the client timeline that strip is redundant, so it is
 dropped — same component, one less row.
 """
+import logging
+
 from ._base import *  # noqa: F401,F403
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max, Min
 from django.utils.translation import gettext_lazy
-from .. import conversation_privacy, conversation_summary, message_export
+from .. import conversation_privacy, conversation_summary, extensions, message_export
 
 __all__ = ['resolve_panel_item', 'panel_context', 'panel_fragment']
+
+logger = logging.getLogger(__name__)
 
 
 # How many Message rows a conversation pane will render. High enough that a
@@ -166,6 +170,7 @@ def _patient_phones(patient):
 PANEL_TYPE_ICON = {
     'call': 'call',
     'visit': 'event',
+    'online': 'videocam',
     'chat': 'forum',
     'alert': 'notification_important',
     'other': 'graphic_eq',
@@ -756,6 +761,7 @@ def _meeting_protocols(meeting):
         answers[a.question_id] = {
             'text': a.response,
             'by_text': a.by_text,
+            'by_voice': a.source == Answer.Source.VOICE,
             'mine': a.meeting_id == meeting.pk,
             'when': a.meeting.happened_at,
         }
@@ -799,6 +805,8 @@ def _protocol_card(p, answers, rounds, is_scheduled):
             'prompt_md': q.prompt_md,
             'answer': text,
             'by_text': answer.get('by_text', False) and (mine or not repeatable),
+            # Captured by the voice interviewer in an online meeting.
+            'by_voice': answer.get('by_voice', False) and (mine or not repeatable),
             # False when the answer was given on an earlier call: shown as a
             # record rather than a field, so saving this call cannot quietly
             # copy someone else's call into it. Always True on a repeatable
@@ -824,6 +832,7 @@ def _protocol_card(p, answers, rounds, is_scheduled):
 
     return {
         'by_text_count': sum(1 for q in questions if q['by_text'] and q['answer']),
+        'by_voice_count': sum(1 for q in questions if q['by_voice'] and q['answer']),
         'carried_count': carried,
         'number': p.number,
         'title': p.title,
@@ -897,6 +906,12 @@ def _meeting_panel(request, pk):
     protocols = protocols_session + protocols_other
     is_pending = meeting.status == Meeting.Status.PENDING
     in_person = meeting.modality == Meeting.Modality.IN_PERSON
+    online = meeting.modality == Meeting.Modality.ONLINE
+    kind = meeting.kind
+    # What the online-meetings app adds (invite state, join actions). Empty
+    # when the app is off or absent — the panel then shows the meeting as a
+    # record with no way to start it, which is the truth.
+    online_extras = extensions.panel_extras(request, meeting) if online else {}
 
     # The recording belongs to this meeting rather than sitting beside it in the
     # list, so the panel is where it is played. Worked out by the same fold the
@@ -927,7 +942,22 @@ def _meeting_panel(request, pk):
     rings_client = meeting.dial_target == Meeting.DialTarget.CLIENT
     recipient = meeting.dial_recipient
 
-    if in_person:
+    if online:
+        # Nobody is dialled here either: the client joins from a link. Who it
+        # is with comes from the invite when the meetings app is on; otherwise
+        # the caregiver, as for a visit.
+        guest = online_extras.get('invitee_name') or (str(caregiver) if caregiver
+                                                      else meeting.patient.name)
+        to = {
+            'icon': 'videocam',
+            'warn': False,
+            'lead': _("Online with"),
+            'who': guest,
+            'role': online_extras.get('invitee_role') or _caregiver_role(caregiver),
+            'phone': '',
+            'note': online_extras.get('link_note') or _("Joins from a link — no number needed"),
+        }
+    elif in_person:
         # Nobody is dialled, so this is not a recipient — it is who the meeting
         # was arranged with, which is the same person the reminder goes to. Left
         # unsaid entirely when there is no caregiver: nothing records who turns
@@ -977,8 +1007,8 @@ def _meeting_panel(request, pk):
 
     return {
         'kind': 'meeting',
-        'type': 'visit' if in_person else 'call',
-        'type_icon': PANEL_TYPE_ICON['visit' if in_person else 'call'],
+        'type': kind,
+        'type_icon': PANEL_TYPE_ICON[kind],
         'to': to,
         'tag_class': ('todo' if is_pending else {
             Meeting.Status.COMPLETED: 'done',
@@ -988,9 +1018,12 @@ def _meeting_panel(request, pk):
         }.get(meeting.status, 'int')),
         'is_cancelled': meeting.status == Meeting.Status.CANCELLED,
         'cancel_url': reverse('cancel_meeting', args=[meeting.pk]),
-        'tag_label': (_("To do") if is_pending else meeting.get_status_display()),
+        'tag_label': (_("To do") if is_pending
+                      else _("Didn't join") if online and meeting.status == Meeting.Status.NOT_ANSWERED
+                      else meeting.get_status_display()),
         'kicker': (
-            (_("In-person meeting") if is_pending else _("Meeting ended")) if in_person
+            (_("Online meeting") if is_pending else _("Meeting ended")) if online
+            else (_("In-person meeting") if is_pending else _("Meeting ended")) if in_person
             # "Scheduled call" is the one thing an unscheduled one is not, and
             # the distinction is worth keeping after it has ended too: a call
             # nobody booked is a different account of the day than one that was.
@@ -1001,7 +1034,8 @@ def _meeting_panel(request, pk):
         # for a call placed to the client, which is the wrong name on the one
         # line the panel leads with.
         'title': (
-            ((_("Meeting with %s") % caregiver) if in_person and caregiver
+            (_("Online meeting with %s") % to['who']) if online
+            else ((_("Meeting with %s") % caregiver) if in_person and caregiver
              else (_("Call with %s") % recipient) if not in_person and recipient
              else (_("Meeting with %s") % caregiver) if caregiver
              else meeting.get_type_display())
@@ -1011,6 +1045,10 @@ def _meeting_panel(request, pk):
         'meeting': meeting,
         'is_pending': is_pending,
         'in_person': in_person,
+        'is_online': online,
+        # Everything the meetings app wants the panel to show for this meeting
+        # (join / copy link / send link / live state); see extensions.py.
+        'online': online_extras,
         'location': meeting.location,
 
         # An in-person meeting has somewhere to be, not a number to ring, so
@@ -1031,6 +1069,9 @@ def _meeting_panel(request, pk):
         # Both were only reachable from a page nothing links to any more.
         'transcribe_url': (reverse('transcribe_recording', args=[recording.recording_sid])
                            if recording else ''),
+        # The transcription job, when one was queued: the panel shows it
+        # running, failed with a retry, or that no worker is picking it up.
+        'transcription': _transcription_state(recording),
         'summarize_url': reverse('summarize_meeting', args=[meeting.pk]),
         'overview_heading': _("Overview"),
         'overview': meeting.protocol_summary,
@@ -1073,7 +1114,9 @@ def _meeting_panel(request, pk):
         'outcome_missing': meeting.retries > 0 and meeting.status == Meeting.Status.PENDING,
         'outcomes': [
             (Meeting.Status.COMPLETED, Meeting.Status.COMPLETED.label, 'done'),
-            (Meeting.Status.NOT_ANSWERED, Meeting.Status.NOT_ANSWERED.label, 'miss'),
+            # "Not answered" is a phone word; nobody answers a link.
+            (Meeting.Status.NOT_ANSWERED,
+             _("Didn't join") if online else Meeting.Status.NOT_ANSWERED.label, 'miss'),
             (Meeting.Status.INTERRUPTED, Meeting.Status.INTERRUPTED.label, 'part'),
         ],
         # What the call is booked to cover, in one line, for the sentence that
@@ -1105,7 +1148,7 @@ def _meeting_panel(request, pk):
         # shape, and a localtime value so it does not shift by the tz offset.
         'scheduled_local': timezone.localtime(meeting.scheduled_time).strftime("%Y-%m-%dT%H:%M"),
         'edit_url': reverse('edit_meeting', args=[meeting.pk]),
-        'modality_choices': Meeting.Modality.choices,
+        'modality_choices': modality_choices(meeting),
         'type_choices': Meeting.MeetingType.choices,
         'completed_status': Meeting.Status.COMPLETED,
         # Answers and notes stay editable after the call ends. A call is often
@@ -1123,8 +1166,23 @@ def _meeting_panel(request, pk):
         # Key moments and the segmented transcript belong to the recording
         # attached to this meeting, if there is one.
         'moments': _stamped(recording.transcript_moments) if recording else [],
-        'segments': _readable_transcript(recording.transcript_segments) if recording else [],
+        'segments': (_readable_transcript(recording.transcript_segments, recording.speakers)
+                     if recording else []),
     }
+
+
+def modality_choices(meeting=None):
+    """The ways a meeting can happen, as offered when booking or editing one.
+
+    Online is only offered while online meetings are available — or when it is
+    already this meeting's modality, so editing an existing online meeting with
+    the feature off does not silently turn it into a phone call.
+    """
+    current = getattr(meeting, 'modality', None)
+    return [(v, l) for v, l in Meeting.Modality.choices
+            if v != Meeting.Modality.ONLINE
+            or current == Meeting.Modality.ONLINE
+            or extensions.online_available()]
 
 
 def _stamp(seconds):
@@ -1152,7 +1210,7 @@ TRANSCRIPT_HARD_CHARS = 900
 _SENTENCE_END = ('.', '!', '?', '…', '。', '！', '？', '."', ".'", '?"', '!"')
 
 
-def _readable_transcript(rows):
+def _readable_transcript(rows, speakers=None):
     """Whisper's time windows, rejoined into something a person can read.
 
     Whisper returns fixed-length windows, not sentences, so a segment routinely
@@ -1192,7 +1250,37 @@ def _readable_transcript(rows):
 
         blocks.append({'text': text, 'start': start, 'end': end, 'speaker': speaker})
 
-    return [dict(b, stamp=_stamp(b['start'])) for b in blocks]
+    return [dict(b, stamp=_stamp(b['start']), **_speaker_name(b['speaker'], speakers))
+            for b in blocks]
+
+
+# Roles an online meeting's speakers carry, and the style each turn takes. The
+# client side reads as "them" — the same tint a phone call's speaker 2 had.
+_SPEAKER_ROLE_CLASS = {
+    'navigator': 'dp-tr-us', 'staff': 'dp-tr-us',
+    'caregiver': 'dp-tr-them', 'client': 'dp-tr-them', 'guest': 'dp-tr-them',
+    'assistant': 'dp-tr-ai',
+}
+
+
+def _speaker_name(speaker, speakers):
+    """Label and style for one transcript turn.
+
+    Online recordings name their speakers (CallRecording.speakers); a phone
+    call's two channels have only numbers, which keep their old labels.
+    """
+    if speaker is None:
+        return {'speaker_label': '', 'speaker_class': ''}
+    info = (speakers or {}).get(str(speaker)) or {}
+    if info:
+        return {
+            'speaker_label': info.get('label') or _("Speaker %s") % speaker,
+            'speaker_class': _SPEAKER_ROLE_CLASS.get(info.get('role') or '', ''),
+        }
+    return {
+        'speaker_label': _("Speaker 1") if speaker == 1 else _("Speaker 2"),
+        'speaker_class': 'dp-tr-them' if speaker == 2 else '',
+    }
 
 
 def _notes_for(**parent):
@@ -1274,7 +1362,7 @@ def _recording_panel(request, pk):
         ] or [
             {'text': _("Called %s") % rec.to_number, 'stamp': f"{mins}:{secs:02d}"},
         ],
-        'segments': _readable_transcript(rec.transcript_segments),
+        'segments': _readable_transcript(rec.transcript_segments, rec.speakers),
         'notes_list': _notes_for(recording=rec),
         'note_parent': 'recording',
         'note_parent_id': rec.recording_sid,
@@ -1282,7 +1370,20 @@ def _recording_panel(request, pk):
         'recording': rec,
         'audio_url': reverse('serve_protected_file', args=[rec.recording_sid]),
         'transcribe_url': reverse('transcribe_recording', args=[rec.recording_sid]),
+        'transcription': _transcription_state(rec),
     }
+
+
+def _transcription_state(recording):
+    """The recording's transcription job, for the panel; never raises."""
+    if recording is None:
+        return None
+    try:
+        from ..summarization import transcription_state
+        return transcription_state(recording)
+    except Exception:  # a status line is not worth a broken panel
+        logger.exception("Could not read transcription state for %s", recording.pk)
+        return None
 
 
 def _chat_panel(request, ident):

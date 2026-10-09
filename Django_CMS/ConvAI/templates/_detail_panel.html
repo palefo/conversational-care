@@ -225,7 +225,7 @@ themselves — see the autosave note in the script below.
     {% endcomment %}
     {% if panel_item.can_edit_answers %}
       <textarea class="dpc-ta dpc-notes" id="dpNoteNew" rows="4"
-                placeholder="{% if panel_item.in_person %}{% trans 'Write a note about this meeting' %}{% else %}{% trans 'Write a note about this call' %}{% endif %}"></textarea>
+                placeholder="{% if panel_item.in_person or panel_item.is_online %}{% trans 'Write a note about this meeting' %}{% else %}{% trans 'Write a note about this call' %}{% endif %}"></textarea>
       <div class="dp-notebar">
         <span class="dpc-saved" id="dpNoteState" hidden></span>
         <button type="button" class="dp-btn dp-btn-pri" id="dpNoteSave">{% trans "Save note" %}</button>
@@ -286,7 +286,7 @@ themselves — see the autosave note in the script below.
     {% else %}
       <p class="dp-blank">
         <b>{% trans "No summary yet." %}</b>
-        {% if panel_item.in_person %}{% trans "One can be written once the meeting is done." %}
+        {% if panel_item.in_person or panel_item.is_online %}{% trans "One can be written once the meeting is done." %}
         {% else %}{% trans "One can be written once the call is done." %}{% endif %}
       </p>
     {% endif %}
@@ -295,6 +295,8 @@ themselves — see the autosave note in the script below.
   {% if not panel_item.in_person %}
     <div data-dppane="transcript" hidden>
       {% if panel_item.recording %}
+        {% url 'transcription_status' panel_item.recording.recording_sid as tr_poll %}
+        {% include "_panel_transcription.html" with st=panel_item.transcription poll_url=tr_poll %}
         {% if panel_item.segments %}
           {% comment %}
             Segments, so a timestamp can run down the left and each line can be
@@ -308,10 +310,10 @@ themselves — see the autosave note in the script below.
           </div>
           <div class="dp-tr" id="dpTranscript">
             {% for seg in panel_item.segments %}
-              <div class="dp-tr-turn{% if seg.speaker == 2 %} dp-tr-them{% endif %}">
+              <div class="dp-tr-turn{% if seg.speaker_class %} {{ seg.speaker_class }}{% endif %}">
                 <button type="button" class="dp-tr-at" data-dpseek="{{ seg.start }}">{{ seg.stamp }}</button>
-                {% if seg.speaker %}
-                  <span class="dp-tr-who">{% if seg.speaker == 1 %}{% trans "Speaker 1" %}{% else %}{% trans "Speaker 2" %}{% endif %}</span>
+                {% if seg.speaker_label %}
+                  <span class="dp-tr-who">{{ seg.speaker_label }}</span>
                 {% endif %}
                 <p>{{ seg.text }}</p>
               </div>
@@ -334,6 +336,7 @@ themselves — see the autosave note in the script below.
           belongs beside the recording it acts on, not in the footer with the
           actions that end the call.
         {% endcomment %}
+        {% if not panel_item.transcription.live %}
         <form method="post" action="{{ panel_item.transcribe_url }}" class="dp-inline-form">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -342,10 +345,12 @@ themselves — see the autosave note in the script below.
             {% else %}{% trans "Transcribe this recording" %}{% endif %}
           </button>
         </form>
+        {% endif %}
       {% elif panel_item.is_pending %}
         <p class="dp-blank">
           <b>{% trans "No recording yet." %}</b>
-          {% trans "The call has not been made. Once it has, the recording and its transcript appear here." %}
+          {% if panel_item.is_online %}{% trans "The meeting has not happened yet. Once it has, the recording and its transcript appear here." %}
+          {% else %}{% trans "The call has not been made. Once it has, the recording and its transcript appear here." %}{% endif %}
         </p>
       {% else %}
         <p class="dp-blank">
@@ -368,7 +373,22 @@ themselves — see the autosave note in the script below.
     {% if panel_item.is_pending %}
       {# Before / during: the same slot, green then red. #}
       <div class="dp-acts" id="dpcIdle">
-        {% if panel_item.in_person %}
+        {% if panel_item.is_online %}
+          {% comment %}
+            The meetings app owns these actions (join, copy and send the link)
+            and hands the panel its own partial. With the app off or absent the
+            meeting is still a record — it can be rescheduled, cancelled and
+            closed — it just cannot be started from here.
+          {% endcomment %}
+          {% if panel_item.online.footer_template %}
+            {% include panel_item.online.footer_template %}
+          {% else %}
+            <button type="button" class="dp-btn" disabled
+                    title="{% trans 'Online meetings are switched off on this installation.' %}">
+              {% trans "Online meetings are off" %}
+            </button>
+          {% endif %}
+        {% elif panel_item.in_person %}
           <button type="button" class="dp-btn dp-btn-pri" data-dpdialog="dpEdit">{% trans "Edit meeting" %}</button>
         {% elif panel_item.can_call %}
           {% comment %}
@@ -423,7 +443,7 @@ themselves — see the autosave note in the script below.
         {% endcomment %}
         <div class="dp-acts-row">
           <button type="button" class="dp-btn dp-btn-danger" data-dpdialog="dpCancel">
-            {% trans "Cancel this call" %}
+            {% if panel_item.is_online %}{% trans "Cancel this meeting" %}{% else %}{% trans "Cancel this call" %}{% endif %}
           </button>
         </div>
       </div>
@@ -443,7 +463,7 @@ themselves — see the autosave note in the script below.
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}">
           <input type="hidden" name="patient" value="{{ panel_item.patient.pk }}">
-          <h3>{% if panel_item.in_person %}{% trans "Edit this meeting" %}{% else %}{% trans "Reschedule this call" %}{% endif %}</h3>
+          <h3>{% if panel_item.in_person %}{% trans "Edit this meeting" %}{% elif panel_item.is_online %}{% trans "Reschedule this meeting" %}{% else %}{% trans "Reschedule this call" %}{% endif %}</h3>
           <p class="dp-dialog-sub">
             {% blocktrans with c=panel_item.patient %}For {{ c }}. Everyone keeps the same appointment; only the details change.{% endblocktrans %}
           </p>
@@ -1013,6 +1033,8 @@ whatever you opened, and neither moves when the body scrolls.
 
   {% if panel_item.kind == 'recording' %}
     <div data-dppane="transcript" hidden>
+      {% url 'transcription_status' panel_item.recording.recording_sid as tr_poll %}
+      {% include "_panel_transcription.html" with st=panel_item.transcription poll_url=tr_poll %}
       {% if panel_item.recording.transcript %}
         <div class="dp-transcript">{{ panel_item.recording.transcript }}</div>
       {% else %}
@@ -1165,8 +1187,9 @@ whatever you opened, and neither moves when the body scrolls.
       <form method="post" action="{{ panel_item.transcribe_url }}" class="dp-form">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ request.get_full_path }}">
-        <button type="submit" class="dp-btn dp-btn-pri">
-          {% if panel_item.recording.transcribed_at %}{% trans "Transcribe again" %}{% else %}{% trans "Transcribe" %}{% endif %}
+        <button type="submit" class="dp-btn dp-btn-pri"{% if panel_item.transcription.live %} disabled{% endif %}>
+          {% if panel_item.transcription.live %}{% trans "Transcribing…" %}
+          {% elif panel_item.recording.transcribed_at %}{% trans "Transcribe again" %}{% else %}{% trans "Transcribe" %}{% endif %}
         </button>
       </form>
 
@@ -1431,9 +1454,12 @@ whatever you opened, and neither moves when the body scrolls.
     });
 
     // ── Autosave ──────────────────────────────────────────────────────────
-    // ProtocolAnswerForm.save() walks every field of the protocol and deletes
-    // the Answer row for any that arrives blank. So a save MUST post the whole
-    // protocol form — sending only the edited field would wipe the rest.
+    // A save posts only the fields that were edited, each with the value it
+    // was edited *from* (base_q_<id>). The server writes a field only if that
+    // base is still what is stored, so an answer that arrived meanwhile — by
+    // text, or from the voice interviewer in an online meeting — is never
+    // overwritten or erased by a panel opened before it came in. A field that
+    // did change underneath comes back as a conflict for the person to settle.
     var saved = document.getElementById('dpcSaved');
     var count = document.getElementById('dpcCount');
 
@@ -1562,9 +1588,45 @@ whatever you opened, and neither moves when the body scrolls.
         syncCard(card);
       });
 
+      function conflictNote(t, current) {
+        var old = t.parentNode.querySelector('.dpc-conflict');
+        if (old) old.remove();
+        t.classList.add('dpc-ta-conflict');
+        var box = document.createElement('div');
+        box.className = 'dpc-conflict';
+        box.setAttribute('role', 'alert');
+        var msg = document.createElement('p');
+        msg.textContent = current
+          ? '{% trans "This answer changed while you were editing. It now reads:" %} “' + current + '”'
+          : '{% trans "This answer was cleared while you were editing." %}';
+        var acts = document.createElement('div');
+        acts.className = 'dpc-conflict-acts';
+        var keep = document.createElement('button');
+        keep.type = 'button'; keep.className = 'dpc-lnk';
+        keep.textContent = '{% trans "Keep mine" %}';
+        var theirs = document.createElement('button');
+        theirs.type = 'button'; theirs.className = 'dpc-lnk';
+        theirs.textContent = '{% trans "Use the new one" %}';
+        acts.appendChild(keep); acts.appendChild(theirs);
+        box.appendChild(msg); box.appendChild(acts);
+        t.insertAdjacentElement('afterend', box);
+        function settle() { box.remove(); t.classList.remove('dpc-ta-conflict'); syncCard(card); }
+        // Keeping yours means saving it over what is there now: rebase on it.
+        keep.addEventListener('click', function () { t.dataset.saved = current; settle(); button.click(); });
+        theirs.addEventListener('click', function () { t.value = current; t.dataset.saved = current; settle(); recount(); });
+      }
+
       button.addEventListener('click', function () {
         var pending = {};
-        card.querySelectorAll('.dpc-ta').forEach(function (t, i) { pending[i] = t.value.trim(); });
+        var body = new FormData();
+        body.append('csrfmiddlewaretoken', CSRF);
+        card.querySelectorAll('.dpc-ta').forEach(function (t, i) {
+          pending[i] = t.value.trim();
+          if (!t.name || t.disabled) return;
+          if (pending[i] === (t.dataset.saved || '')) return;   // untouched: not sent
+          body.append(t.name, pending[i]);
+          body.append('base_' + t.name, t.dataset.saved || '');
+        });
         button.disabled = true;
         button.textContent = '{% trans "Saving…" %}';
         if (line) { line.hidden = false; line.className = 'dpc-saved dpc-saving'; line.textContent = '{% trans "saving…" %}'; }
@@ -1577,10 +1639,19 @@ whatever you opened, and neither moves when the body scrolls.
           credentials: 'same-origin',
           redirect: 'follow',
           headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
-          body: new FormData(form)
+          body: body
         }).then(function (r) {
           if (!r.ok) throw new Error('save failed');
+          var ct = r.headers.get('content-type') || '';
+          return ct.indexOf('json') >= 0 ? r.json() : {};
+        }).then(function (d) {
+          var conflicts = {};
+          ((d && d.conflicts) || []).forEach(function (c) { conflicts[c.field] = c; });
           card.querySelectorAll('.dpc-ta').forEach(function (t, i) {
+            if (t.name && conflicts[t.name]) {
+              conflictNote(t, conflicts[t.name].current || '');
+              return;
+            }
             t.dataset.saved = pending[i];
             t.classList.remove('dpc-ta-dirty');
           });

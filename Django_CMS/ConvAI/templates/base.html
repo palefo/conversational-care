@@ -855,6 +855,13 @@
         return f;
       }
 
+      // Re-render the open panel in place — used by a panel part that has been
+      // waiting on the server (a transcription finishing) to show the result.
+      window.dpReload = function () {
+        if (!panelEl() || !new URL(location.href).searchParams.get('item')) return;
+        load(location.search, function () {});
+      };
+
       function load(search, onFail) {
         var token = {};
         inflight = token;

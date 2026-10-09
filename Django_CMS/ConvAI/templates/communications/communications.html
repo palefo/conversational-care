@@ -146,8 +146,9 @@
     var place = modal.querySelector('[data-location]');
     function sync() {
       if (!modality || !place) return;
-      var opt = modality.options[modality.selectedIndex];
-      place.hidden = !(opt && /1/.test(modality.value));
+      // Meeting.Modality.IN_PERSON. An exact match — a pattern would also
+      // match any later value with a 1 in it.
+      place.hidden = String(modality.value) !== '1';
     }
     if (modality) { modality.addEventListener('change', sync); sync(); }
 

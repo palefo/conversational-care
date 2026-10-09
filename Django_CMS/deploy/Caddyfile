@@ -1,0 +1,26 @@
+# TLS edge for online meetings (docker-compose.meetings.yml, profile `edge`).
+# Browsers only allow the microphone on HTTPS pages, so a meeting reached from
+# outside this machine needs real certificates. Caddy fetches and renews them.
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+	# Only branding is public under /media/; everything else is served by
+	# ownership-checked views (see file_storage.md).
+	@private_media path /media/*
+	handle @private_media {
+		@branding path /media/branding/*
+		handle @branding {
+			reverse_proxy web:8000
+		}
+		respond 404
+	}
+	reverse_proxy web:8000 {
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
+
+{$LIVEKIT_DOMAIN} {
+	# LiveKit's signalling WebSocket. Media itself goes direct to UDP 7882
+	# (or TCP 7881), which a TLS proxy cannot and need not carry.
+	reverse_proxy livekit:7880
+}

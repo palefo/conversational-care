@@ -78,6 +78,10 @@ under load.
 
 ## Other background work
 
+Work that must survive restarts and be retried — transcribing recordings,
+mixing online meetings down — runs on the database job queue instead, worked by
+the `worker` service. See [background_jobs.md](background_jobs.md).
+
 [`ConvAI/async_reply.py`](Django_CMS/ConvAI/async_reply.py) exposes a second
 pool, used by RAG-based agents to read, chunk and embed uploaded documents
 (`submit_ingest`, sized by `RAG_WORKERS`). The pools are deliberately separate:

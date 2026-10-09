@@ -28,11 +28,14 @@ Before building the containers, you need to configure the Django project to work
     docker-compose build
     ```
 4.  **Start the services:**
-    This command starts the `db` and `web` containers. The `web` service will execute the `CMD` from the `Dockerfile`, which is `python manage.py runserver 0.0.0.0:8000`.
+    This command starts the `db`, `web` and `worker` containers. The `web` service will execute the `CMD` from the `Dockerfile`, which is `python manage.py runserver 0.0.0.0:8000`; `worker` runs the background job queue (transcription and online-meeting mixdown — see [background_jobs.md](background_jobs.md)).
     ```bash
     docker-compose up
     ```
     (You can add `-d` to run them in the background).
+
+    Online meetings are optional and off by default; their media server and agents
+    are a separate compose file and profile. See [online_meetings.md](online_meetings.md).
 
 ### Setup the Database (First-Time Only)
 

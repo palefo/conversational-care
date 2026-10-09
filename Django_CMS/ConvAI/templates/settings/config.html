@@ -1219,6 +1219,16 @@ print(result)</code></pre>
   </section>
 
   {# ═════════ Maintenance ═════════ #}
+  {% comment %}
+    Tabs from optional apps (online meetings, …). Each panel is the app's own
+    template; the core only places it. See ConvAI/extensions.py.
+  {% endcomment %}
+  {% for ext in extension_panels %}
+    <section class="settings-panel hidden" data-tab="{{ ext.id }}">
+      {% include ext.template with ctx=ext.ctx %}
+    </section>
+  {% endfor %}
+
   <section class="settings-panel hidden" data-tab="maintenance">
     <div class="card p-6 mb-6">
       <div class="flex items-start gap-3">
@@ -1271,7 +1281,7 @@ print(result)</code></pre>
   (function () {
     // Keep in step with the `tabs` list in views/settings_views.py: a tab
     // missing here is a sidebar entry that silently falls back to General.
-    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','participants','api','privacy','export','maintenance'];
+    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','participants','api','privacy','export','maintenance'{% for ext in extension_panels %},'{{ ext.id|escapejs }}'{% endfor %}];
     const buttons = document.querySelectorAll('.stg-navitem');
     const panels  = document.querySelectorAll('.settings-panel');
 

@@ -22,6 +22,7 @@ Django's own mail goes down the same path: ``EMAIL_BACKEND`` points at
 ``django.core.mail`` deep inside ``django.contrib.auth`` — is carried by
 whichever provider is configured without knowing anything about it.
 """
+import base64
 import logging
 from email.utils import formataddr, parseaddr
 
@@ -191,6 +192,22 @@ def _azure_payload(message):
     reply_to = _recipients(getattr(message, "reply_to", None))
     if reply_to:
         payload["replyTo"] = reply_to
+    # Attachments travel base64-encoded. Django keeps them as (name, content,
+    # mimetype) tuples; anything else (a MIMEBase part) is not something this
+    # platform sends, and is skipped rather than half-converted.
+    files = []
+    for item in getattr(message, "attachments", None) or ():
+        if not isinstance(item, tuple) or len(item) != 3:
+            continue
+        name, content, mimetype = item
+        raw = content.encode("utf-8") if isinstance(content, str) else bytes(content)
+        files.append({
+            "name": name or "attachment",
+            "contentType": mimetype or "application/octet-stream",
+            "contentInBase64": base64.b64encode(raw).decode("ascii"),
+        })
+    if files:
+        payload["attachments"] = files
     return payload
 
 
@@ -284,12 +301,14 @@ class PlatformEmailBackend(BaseEmailBackend):
 
 # ── Sending ─────────────────────────────────────────────────────────────────
 
-def send_email(subject, to, *, html="", text="", reply_to=None, fail_silently=False):
+def send_email(subject, to, *, html="", text="", reply_to=None, fail_silently=False,
+               attachments=None):
     """Send one message through the configured provider.
 
-    ``to`` may be a single address or a list. Returns True when the provider
-    accepted it. Raises :class:`EmailConfigurationError` — or whatever the
-    provider raised — unless ``fail_silently``.
+    ``to`` may be a single address or a list. ``attachments`` is a list of
+    ``(filename, content, mimetype)``. Returns True when the provider accepted
+    it. Raises :class:`EmailConfigurationError` — or whatever the provider
+    raised — unless ``fail_silently``.
     """
     recipients = [to] if isinstance(to, str) else list(to)
     recipients = [a.strip() for a in recipients if a and a.strip()]
@@ -306,6 +325,8 @@ def send_email(subject, to, *, html="", text="", reply_to=None, fail_silently=Fa
     )
     if html:
         message.attach_alternative(html, "text/html")
+    for name, content, mimetype in attachments or ():
+        message.attach(name, content, mimetype)
     return bool(message.send(fail_silently=fail_silently))
 
 
@@ -402,16 +423,22 @@ def send_meeting_reminder_email(meeting):
 
     local_time = timezone.localtime(meeting.scheduled_time)
     in_person = meeting.modality == meeting.Modality.IN_PERSON
+    online = meeting.modality == meeting.Modality.ONLINE
+    # An online meeting's join link, when the meetings app is on to make one.
+    from . import extensions
+    extras = extensions.reminder_extras(meeting) if online else {}
     text, html = render_email("meeting_reminder", {
         "patient": meeting.patient,
         "recipient_name": display_name,
         "date": local_time.strftime("%d/%m/%Y"),
         "time": local_time.strftime("%H:%M"),
         "in_person": in_person,
+        "online": online,
+        "join_url": extras.get("join_url", ""),
         "location": meeting.location if in_person else "",
     })
     subject = _("Reminder: %(kind)s on %(date)s at %(time)s") % {
-        "kind": _("meeting") if in_person else _("call"),
+        "kind": _("meeting") if (in_person or online) else _("call"),
         "date": local_time.strftime("%d/%m/%Y"),
         "time": local_time.strftime("%H:%M"),
     }

@@ -1,0 +1,104 @@
+{% extends "meetings/_public_base.html" %}
+{% load i18n static custom_filters %}
+{% block content %}
+{% comment %}
+  The client's lobby, and — once they are let in — their room, on the same
+  page: moving to another URL would mean asking for the microphone twice,
+  which on a phone is one more chance to tap "Don't allow".
+{% endcomment %}
+<div class="lb-card" id="lbCard">
+  <div>
+    <div class="lb-preview" id="lbPreview">
+      <video id="lbVideo" autoplay muted playsinline hidden></video>
+      <div class="rm-avatar" id="lbAvatar"></div>
+      <div class="lb-preview-note" id="lbCamNote">{% trans "Your camera is off" %}</div>
+      <div class="lb-controls">
+        <button type="button" class="rm-btn" id="lbMic" aria-pressed="true" aria-label="{% trans 'Microphone' %}"><span class="mi">mic</span></button>
+        <button type="button" class="rm-btn is-off" id="lbCam" aria-pressed="false" aria-label="{% trans 'Camera' %}"><span class="mi">videocam_off</span></button>
+      </div>
+    </div>
+    <div class="lb-meter" aria-hidden="true">
+      <span class="mi" style="font-size:18px;color:#006877">graphic_eq</span>
+      <div class="rm-meter"><i id="lbMeter"></i></div>
+      <button type="button" class="lb-btn-secondary" id="lbTest" style="height:34px;padding:0 12px;font-size:12.5px"><span class="mi" style="font-size:16px">volume_up</span>{% trans "Test sound" %}</button>
+    </div>
+    <div class="lb-devices">
+      <label><span class="sr-only">{% trans "Microphone" %}</span><select id="lbMicSel" aria-label="{% trans 'Microphone' %}"></select></label>
+      <label><span class="sr-only">{% trans "Camera" %}</span><select id="lbCamSel" aria-label="{% trans 'Camera' %}"></select></label>
+    </div>
+  </div>
+
+  <div class="lb-side">
+    <div id="lbReady">
+      <p class="lb-hello">{% blocktrans with n=invite.display_name %}Hello {{ n }}{% endblocktrans %}</p>
+      <h1>{% blocktrans with h=host %}Your meeting with {{ h }}{% endblocktrans %}</h1>
+      <p class="lb-when"><span class="mi">event</span>{{ when|date:"l j F" }} · {{ when|date:"H:i" }}</p>
+      {% if recording %}
+        <div class="lb-notice" role="note">
+          <span class="mi">mic</span>
+          <div>{% trans "The sound of this meeting is recorded, so your care team can keep an accurate note of what was said. Video is never recorded. An AI assistant may join to help with questions; you will always see when it is there." %}</div>
+        </div>
+      {% else %}
+        <div class="lb-notice" role="note">
+          <span class="mi">lock</span>
+          <div>{% trans "This meeting is private between you and your care team. An AI assistant may join to help with questions; you will always see when it is there." %}</div>
+        </div>
+      {% endif %}
+      <div class="lb-alert" id="lbErr" role="alert" hidden></div>
+      <button type="button" class="lb-join" id="lbJoin"><span class="mi">login</span><span id="lbJoinLbl">{% trans "Join the meeting" %}</span></button>
+      <p class="lb-help">{% trans "Check the green bar moves when you speak. Using headphones avoids echo." %}</p>
+    </div>
+
+    <div class="lb-wait" id="lbWait" hidden aria-live="polite">
+      <span class="lb-wait-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <h2 id="lbWaitTitle"></h2>
+      <p id="lbWaitText"></p>
+      <button type="button" class="lb-btn-secondary" id="lbAgain" hidden><span class="mi">refresh</span><span id="lbAgainLbl"></span></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block after %}
+{# The room, shown in place of the lobby once they are let in. #}
+<div class="rm" id="rm" hidden>
+  <header class="rm-top">
+    <div class="rm-brand">
+      <img class="rm-logo" src="{% brand_logo_url %}" alt="{{ brand }}">
+      <div class="rm-title">
+        <b>{% blocktrans with h=host %}Meeting with {{ h }}{% endblocktrans %}</b>
+        <span>{{ brand }}</span>
+      </div>
+    </div>
+    <div class="rm-spacer"></div>
+    <span class="rm-chip rm-rec" id="rmRec" hidden data-state="on">{% trans "Recording" %}</span>
+    <span class="rm-chip rm-hide-sm"><span class="mi">schedule</span><span class="rm-clock" id="rmClock">0:00</span></span>
+  </header>
+  <div class="rm-body" style="grid-template-columns:1fr">
+    <main class="rm-main">
+      <div class="rm-banner" id="rmBanner" role="status" hidden><span class="rm-spin"></span><span id="rmBannerText"></span></div>
+      <div class="rm-stage" id="rmStage"></div>
+      <div class="rm-dock" role="toolbar" aria-label="{% trans 'Meeting controls' %}">
+        <button type="button" class="rm-btn" id="rmMic" aria-pressed="true"><span class="mi">mic</span><span class="rm-lbl">{% trans "Mute" %}</span></button>
+        <button type="button" class="rm-btn" id="rmCam" aria-pressed="false"><span class="mi">videocam_off</span><span class="rm-lbl">{% trans "Camera" %}</span></button>
+        <button type="button" class="rm-btn rm-btn-danger" id="rmLeave"><span class="mi">call_end</span><span class="rm-lbl">{% trans "Leave" %}</span></button>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="rm-overlay" id="rmAudio" hidden>
+  <div class="rm-card" style="text-align:center">
+    <h2>{% trans "Turn on sound" %}</h2>
+    <p>{% trans "Your browser needs a tap before it can play the meeting's sound." %}</p>
+    <button type="button" class="rm-btn rm-btn-accent rm-big" id="rmAudioBtn"><span class="mi">volume_up</span>{% trans "Turn on sound" %}</button>
+  </div>
+</div>
+<div class="rm-toasts" id="rmToasts" aria-live="polite"></div>
+
+{{ boot|json_script:"lb-boot" }}
+{{ i18n|json_script:"lb-i18n" }}
+<script>window.CC_CSRF = "{{ csrf_token }}";</script>
+<script src="{% static 'meetings/vendor/livekit-client.umd.js' %}"></script>
+<script src="{% static 'meetings/room-core.js' %}"></script>
+<script src="{% static 'meetings/lobby.js' %}"></script>
+{% endblock %}

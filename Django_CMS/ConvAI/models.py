@@ -162,13 +162,35 @@ class CallRecording(models.Model):
         DYAD = 0, _("Client side")
         CTN = 1, _("Navigator side")
 
+    class Source(models.IntegerChoices):
+        """Where the audio came from.
+
+        TWILIO recordings can be re-fetched from Twilio (the WAV twin with the
+        channels intact); ONLINE ones are mixed down from a browser meeting's
+        per-participant tracks, listed in ``tracks``. Transcription branches on
+        this rather than asking Twilio about a recording it never made.
+        """
+        TWILIO = 0, _("Phone (Twilio)")
+        ONLINE = 1, _("Online meeting")
+
     recording_sid = models.CharField(max_length=100)
-    from_number = models.CharField(max_length=100)
-    to_number = models.CharField(max_length=100)
+    from_number = models.CharField(max_length=100, blank=True, default="")
+    to_number = models.CharField(max_length=100, blank=True, default="")
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     duration = models.IntegerField()
-    filename = models.CharField(max_length=100, null=True)
+    # An absolute path; 100 characters did not fit a meeting's nested folder.
+    filename = models.CharField(max_length=255, null=True)
+    source = models.SmallIntegerField(choices=Source.choices, default=Source.TWILIO)
+    # Who the transcript's speakers are: {"1": {"label": "Ana", "role":
+    # "caregiver"}, ...}. Empty for phone calls, whose two channels have no
+    # names attached — the panel falls back to "Speaker 1/2" for those.
+    speakers = models.JSONField(blank=True, default=dict)
+    # The per-speaker audio a mixdown was built from: [{"speaker": 1, "path":
+    # ".../ana-0.ogg", "offset_s": 12.4}, ...]. Kept on the recording, not only
+    # on the meeting app's own rows, so "Transcribe again" still works if that
+    # app is later removed.
+    tracks = models.JSONField(blank=True, default=list)
 
     # Whose recording this is, and which call it came from.
     #
@@ -543,6 +565,10 @@ class Meeting(models.Model):
         """
         PHONE = 0, _("Phone call")
         IN_PERSON = 1, _("In person")
+        # In the browser: a link instead of a number, provided by the optional
+        # `meetings` app (see online_meetings.md). The value stays valid with
+        # the app switched off or removed, so the rows keep reading.
+        ONLINE = 2, _("Online meeting")
 
     class Protocol(models.IntegerChoices):
         """Legacy. Frozen — do not add to it, do not offer it to anyone.
@@ -708,13 +734,33 @@ class Meeting(models.Model):
         answer as "this call cannot be placed", which is what the callers do
         with it.
         """
-        if self.modality == Meeting.Modality.IN_PERSON:
+        # Only a phone call rings anybody. This used to test for IN_PERSON
+        # alone, which would have had an online meeting place a Twilio call.
+        if self.modality != Meeting.Modality.PHONE:
             return None
         if self.dial_target == Meeting.DialTarget.CLIENT:
             who = self.patient
         else:
             who = self.patient.caregiver if self.patient_id else None
         return who if (who and who.phone_number) else None
+
+    @property
+    def kind(self):
+        """``'call'``, ``'visit'`` or ``'online'`` — how lists and the panel say it.
+
+        Every surface used to branch on ``modality == IN_PERSON`` as a yes/no,
+        which a third modality silently turns into "call". Asking this instead
+        keeps the vocabulary in one place.
+        """
+        if self.modality == Meeting.Modality.IN_PERSON:
+            return "visit"
+        if self.modality == Meeting.Modality.ONLINE:
+            return "online"
+        return "call"
+
+    @property
+    def is_online(self):
+        return self.modality == Meeting.Modality.ONLINE
 
     @property
     def panel_token(self):
@@ -839,6 +885,20 @@ class Answer(models.Model):
         default=False,
         help_text="True when the protocol_qa automation captured this from a message",
     )
+
+    class Source(models.TextChoices):
+        """Whose words these are, which by_text could only answer for text.
+
+        A voice interviewer in an online meeting is a third way an answer
+        arrives, and "came back by text" is wrong for it. ``by_text`` is kept,
+        and written alongside, for one release so nothing reading it breaks.
+        """
+        NAVIGATOR = "navigator", _("Navigator")
+        TEXT = "text", _("By text")
+        VOICE = "voice", _("By voice")
+
+    source = models.CharField(max_length=12, choices=Source.choices,
+                              default=Source.NAVIGATOR)
     meeting  = models.ForeignKey(
         "Meeting", related_name="answers", on_delete=models.CASCADE
     )
@@ -2282,3 +2342,88 @@ class StaffWhatsAppLink(models.Model):
     def __str__(self):
         state = "verified" if self.verified_at else "pending"
         return f"{self.user.get_username()} · {self.phone_number} ({state})"
+
+
+class Job(models.Model):
+    """One unit of background work, queued in the database.
+
+    The in-process pools in ``async_reply`` are right for work that is short
+    and can be lost — a WhatsApp reply. Transcribing an hour of audio is
+    neither, and it used to run inside the request that asked for it, holding a
+    browser and a web thread for minutes. A row here is the work's state, so it
+    survives the process that was running it, can be retried by a person, and is
+    picked up by whichever worker is free. See ``ConvAI.jobs`` and
+    background_jobs.md.
+    """
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", _("Queued")
+        RUNNING = "running", _("Running")
+        DONE = "done", _("Done")
+        FAILED = "failed", _("Failed")
+        CANCELLED = "cancelled", _("Cancelled")
+
+    kind = models.CharField(max_length=64, db_index=True)
+    payload = models.JSONField(default=dict, blank=True)
+    # What the job is about, as "<label>:<pk>", so a page can ask "is anything
+    # running for this recording?" without knowing the payload's shape.
+    ref = models.CharField(max_length=96, blank=True, default="", db_index=True)
+    # Two requests to transcribe the same recording are one piece of work. The
+    # key is unique only while a job is live (see Meta), so the same work can be
+    # queued again once the last attempt has finished.
+    dedupe_key = models.CharField(max_length=128, null=True, blank=True)
+
+    status = models.CharField(max_length=16, choices=Status.choices,
+                              default=Status.QUEUED)
+    priority = models.SmallIntegerField(default=0)
+    run_after = models.DateTimeField(default=timezone.now)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    max_attempts = models.PositiveSmallIntegerField(default=3)
+
+    locked_by = models.CharField(max_length=128, blank=True, default="")
+    locked_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    last_error = models.TextField(blank=True, default="")
+    result = models.JSONField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(ConvAIUser, null=True, blank=True,
+                                   on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        indexes = [models.Index(fields=["status", "run_after", "priority"])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["dedupe_key"],
+                condition=Q(status__in=["queued", "running"]),
+                name="job_live_dedupe_key",
+            ),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.kind} #{self.pk} ({self.status})"
+
+    @property
+    def is_live(self) -> bool:
+        return self.status in (self.Status.QUEUED, self.Status.RUNNING)
+
+
+class JobWorker(models.Model):
+    """A ``run_jobs`` process, as last heard from.
+
+    Nothing reads this to schedule work — claiming is done on the Job rows. It
+    exists so a page can say "nobody is working the queue" instead of showing a
+    transcription as queued forever when the worker container is not running.
+    """
+
+    name = models.CharField(max_length=128, unique=True)
+    started_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+    kinds = models.CharField(max_length=255, blank=True, default="")
+
+    def __str__(self):
+        return self.name

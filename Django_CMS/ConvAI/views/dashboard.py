@@ -284,8 +284,9 @@ def dashboard(request):
             "status_code": m.status,
             # A call and a visit are different jobs, so the row says which —
             # same vocabulary the Communications page filters on.
-            "kind": "visit" if m.modality == Meeting.Modality.IN_PERSON else "call",
+            "kind": m.kind,
             "in_person": m.modality == Meeting.Modality.IN_PERSON,
+            "online": m.modality == Meeting.Modality.ONLINE,
             "location": m.location,
         }
         if answered is not None:

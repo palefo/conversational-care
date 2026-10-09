@@ -28,6 +28,8 @@ media/                    ← MEDIA_ROOT, a persistent Docker volume (media_data
 ├── care_plans/           private  — uploaded care-plan PDFs
 ├── voice/                private  — TTS replies + inbound user voice notes
 ├── call_recordings/      private  — call recordings downloaded from Twilio
+│   └── meetings/<session>/ private — online meetings: one Ogg/Opus file per
+│                                     speaker, plus mix.mp3 (see online_meetings.md)
 └── rag_documents/<agent>/ private — documents uploaded to a RAG agent
 ```
 

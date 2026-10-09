@@ -392,10 +392,9 @@
     var mod = m.querySelector('[name="modality"]');
     var where = document.getElementById('calModalWhere');
     if (!mod || !where) return;
-    var sync = function () {
-      var label = (mod.options[mod.selectedIndex] || {}).text || '';
-      where.hidden = !/person/i.test(label);
-    };
+    // By value, not by label: the label is translated ("Presencial" never
+    // matched /person/), the value is Meeting.Modality.IN_PERSON.
+    var sync = function () { where.hidden = String(mod.value) !== '1'; };
     mod.addEventListener('change', sync);
     sync();
   })();

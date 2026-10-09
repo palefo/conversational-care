@@ -88,6 +88,7 @@
           <span class="material-icons-outlined">
             {% if r.kind == 'call' %}call
             {% elif r.kind == 'visit' %}event
+            {% elif r.kind == 'online' %}videocam
             {% elif r.kind == 'chat' %}forum
             {% elif r.kind == 'alert' %}notification_important
             {% else %}graphic_eq{% endif %}

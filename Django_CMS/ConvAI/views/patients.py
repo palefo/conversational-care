@@ -143,6 +143,7 @@ def extract_study_id(details):
 COMM_LABELS = {
     'call': _("Call"),
     'visit': _("Meeting"),
+    'online': _("Online meeting"),
     'chat': _("Chat"),
 }
 
@@ -172,7 +173,7 @@ def last_communication(patient, now=None):
           .only('modality', 'ended_at', 'scheduled_time')
           .first())
     if mt:
-        found.append((mt.happened, 'visit' if mt.modality == Meeting.Modality.IN_PERSON else 'call'))
+        found.append((mt.happened, mt.kind))
 
     nums = [str(n) for n in (patient.phone_number,
                              patient.caregiver.phone_number if patient.caregiver else None) if n]
@@ -467,6 +468,7 @@ def build_patient_events(patient, protocol_numbers=None):
             'modality': mt.modality,
             'modality_label': mt.get_modality_display(),
             'in_person': mt.modality == Meeting.Modality.IN_PERSON,
+            'online': mt.modality == Meeting.Modality.ONLINE,
             # Placed on the spot rather than booked, and who it rang. The list
             # calls every pending call a "Scheduled call", which is the one
             # thing an unscheduled one is not — and names the caregiver on every

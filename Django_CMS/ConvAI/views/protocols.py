@@ -26,7 +26,14 @@ def protocol_view(request, meeting_id, protocol_num):
         form = ProtocolAnswerForm(meeting=meeting, protocol=protocol,
                                   data=request.POST)
         if form.is_valid():
-            form.save()
+            written = form.save()
+            # The panel saves over fetch and needs to know what did not land.
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({
+                    "ok": True,
+                    "written": written,
+                    "conflicts": form.conflicts,
+                })
             url = reverse(
                 "protocol_view",
                 kwargs={"meeting_id": meeting.id, "protocol_num": protocol.number}
@@ -225,6 +232,15 @@ def protocol_delete(request, protocol_num):
     return redirect(f"{reverse('config')}?tab=protocols#protocols")
 
 
+def _back_to_protocol(request, meeting, protocol):
+    """Back to where an automation action was pressed, else the protocol page."""
+    nxt = request.POST.get("next")
+    if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()},
+                                               require_https=request.is_secure()):
+        return redirect(nxt)
+    return redirect("protocol_view", meeting_id=meeting.id, protocol_num=protocol.number)
+
+
 @require_POST
 @login_required
 def start_protocol_automation(request, meeting_id, protocol_num):
@@ -238,6 +254,16 @@ def start_protocol_automation(request, meeting_id, protocol_num):
         return HttpResponseForbidden(_("Automations are disabled."))
     if not _may_edit(request.user, meeting):
         return HttpResponseForbidden(_("You do not have permission to do this."))
+
+    # A voice interview running in this meeting's online room is already
+    # collecting these answers. Two agents asking the same questions over two
+    # channels would only race each other to the same fields.
+    from .. import extensions
+    live = extensions.live_state(meeting) or {}
+    if live.get("interview_running"):
+        messages.error(request, _("The voice interviewer is collecting answers in this "
+                                  "meeting's online room. Stop it there first."))
+        return _back_to_protocol(request, meeting, protocol)
 
     # Which way to send. WhatsApp unless the navigator has answered the offer
     # made after a WhatsApp failure — see the failure branch below.

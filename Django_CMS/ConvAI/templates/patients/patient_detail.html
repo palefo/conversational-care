@@ -101,6 +101,21 @@
       {% endcomment %}
       <p class="dpc-dialerr" id="pdCallErr" role="alert" hidden></p>
 
+      {% online_meetings_on as online_on %}
+      {% if online_on %}
+        {% comment %}
+          The online counterpart of an unscheduled call: a meeting opened now,
+          in a window of its own, with a link to send. The window is opened on
+          the click itself so a popup blocker lets it through, then pointed at
+          the room once the meeting exists.
+        {% endcomment %}
+        <button type="button" class="dp-btn pd-online-now" id="pdOnlineNow"
+                data-url="{% url 'meetings:start_now' patient.pk %}" style="width:100%;margin-top:.5rem">
+          <span class="material-icons-outlined" style="font-size:16px" aria-hidden="true">videocam</span>
+          {% trans "Start an online meeting instead" %}
+        </button>
+      {% endif %}
+
       <div class="dp-dialog-f">
         <button type="submit" class="dp-btn" value="cancel">{% trans "Cancel" %}</button>
         <button type="button" class="dp-btn dpc-go" id="pdCallGo">
@@ -505,6 +520,24 @@
     // written around that: one press only, the reason shown when it fails, and
     // the live call handed straight to the panel that knows how to work it.
     (function () {
+      var onlineNow = document.getElementById('pdOnlineNow');
+      if (onlineNow) onlineNow.addEventListener('click', function () {
+        var win = window.open('about:blank', '_blank', 'popup=yes,width=1280,height=820');
+        onlineNow.disabled = true;
+        fetch(onlineNow.dataset.url, {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function (r) { return r.json(); }).then(function (d) {
+          if (!d.ok) throw new Error();
+          if (win) { win.name = 'cc-meeting-' + d.meeting; win.location = d.room_url; }
+          location.href = '?item=' + d.item + '#comms';
+        }).catch(function () {
+          if (win) win.close();
+          onlineNow.disabled = false;
+          if (window.toast) window.toast('{% trans "The online meeting could not be started." %}');
+        });
+      });
+
       var open = document.getElementById('pdCall');
       var dlg  = document.getElementById('pdCallDlg');
       if (!open || !dlg || !dlg.showModal) return;

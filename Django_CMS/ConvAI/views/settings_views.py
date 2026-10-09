@@ -1,9 +1,13 @@
+import logging
+
 from ._base import *  # noqa: F401,F403
-from .. import conversation_privacy, message_export
+from .. import conversation_privacy, extensions, message_export
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 
 __all__ = ['_build_config_context', 'approve_self_registration', 'config', 'config_save', 'download_client_sdk', 'run_conversation_classification', 'send_test_email_view', 'update_twilio_phonecalls']
+
+logger = logging.getLogger(__name__)
 
 
 def download_client_sdk(request):
@@ -234,9 +238,22 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
 
     participants = _participants_context(request)
 
+    # Tabs contributed by optional apps (see ConvAI/extensions.py). Each brings
+    # its own template and context; the core only lists and places them.
+    ext_tabs = extensions.settings_tabs()
+    extension_panels = []
+    for tab in ext_tabs:
+        try:
+            ctx = tab["context"](request, forms_override.get(tab["id"]))
+        except Exception:
+            logger.exception("Settings tab %s failed to build", tab.get("id"))
+            continue
+        extension_panels.append({"id": tab["id"], "template": tab["template"], "ctx": ctx})
+
     return {
         "active_page": "admin",
         "active_tab": active_tab,
+        "extension_panels": extension_panels,
         # (id, label, material-icon) for the settings sidebar.
         "tabs": [
             ("general", _("General"), "tune"),
@@ -256,6 +273,7 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
             ("api", _("API client"), "terminal"),
             ("privacy", _("Privacy"), "lock"),
             ("export", _("Export"), "download"),
+            *[(t["id"], t["label"], t["icon"]) for t in ext_tabs],
             ("maintenance", _("Maintenance"), "build"),
         ],
         # Absolute URLs for the API-client instructions (wget / base_url).
@@ -339,7 +357,18 @@ def config_save(request):
     section = request.POST.get("section", "general")
     form_cls = _CONFIG_FORMS.get(section)
     if not form_cls:
-        return redirect("config")
+        # A tab an optional app contributed: it binds and saves its own form.
+        tab = next((t for t in extensions.settings_tabs() if t["id"] == section), None)
+        if tab is None:
+            return redirect("config")
+        form = tab["bind"](request)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Settings saved."))
+            return redirect(f"{reverse('config')}?tab={section}#{section}")
+        messages.error(request, _("Please correct the errors below."))
+        ctx = _build_config_context(request, forms_override={section: form}, active_tab=section)
+        return render(request, "settings/config.html", ctx)
 
     form = form_cls(request.POST, request.FILES, instance=SiteConfiguration.load())
     if form.is_valid():

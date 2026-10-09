@@ -174,6 +174,28 @@ WHATSAPP_WORKERS = max(1, int(os.getenv("WHATSAPP_WORKERS", "2") or "2"))
 # waiting on the embeddings API, and each thread holds a DB connection.
 RAG_WORKERS = max(1, int(os.getenv("RAG_WORKERS", "2") or "2"))
 
+# --- Background job queue (see background_jobs.md) ---
+# Long work that must survive the request — transcribing a recording, mixing a
+# meeting down — is a Job row worked by the `worker` compose service
+# (`manage.py run_jobs`). JOBS_RUNNER=thread runs jobs inside the web process
+# instead, for an installation that does not want the extra container.
+JOBS_RUNNER = (os.getenv("JOBS_RUNNER", "worker") or "worker").strip().lower()
+# Run each job inline, inside enqueue(). For tests and local debugging only.
+JOBS_EAGER = os.getenv("JOBS_EAGER", "0").strip().lower() in ("1", "true", "yes", "on")
+
+# --- Online meetings (optional app; see online_meetings.md) ---
+# Installed unless MEETINGS_APP=0. Installed is not the same as on: the feature
+# is switched on in Settings → Online meetings (or ONLINE_MEETINGS_ENABLED) and
+# is off by default. Leaving the app out entirely removes its tables from use,
+# its URLs and its Settings tab; the core never imports it.
+MEETINGS_APP = os.getenv("MEETINGS_APP", "1").strip().lower() not in ("0", "false", "no", "off")
+if MEETINGS_APP:
+    INSTALLED_APPS += ["meetings"]
+    # The agent workers and LiveKit's webhooks reach this app over the compose
+    # network as http://web:8000, so that host name has to be accepted.
+    if "web" not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS = ALLOWED_HOSTS + ["web"]
+
 
 # --- Outbound email (see email.md) ---
 # One backend for everything: it picks Azure Communication Services or SMTP at

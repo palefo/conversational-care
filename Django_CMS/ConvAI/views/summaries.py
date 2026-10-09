@@ -1,10 +1,12 @@
 from ._base import *  # noqa: F401,F403
 from ..summarization import (
+    queue_transcription as _queue_transcription,
     summarize_meeting as _summarize_meeting,
-    transcribe_and_summarize_recording as _transcribe_and_summarize,
+    transcription_state as _transcription_state,
 )
 
-__all__ = ['summarize_meeting_view', 'transcribe_recording_view', 'edit_overview']
+__all__ = ['summarize_meeting_view', 'transcribe_recording_view', 'transcription_status',
+           'edit_overview']
 
 
 def _patient_for_recording(rec):
@@ -61,15 +63,46 @@ def transcribe_recording_view(request, sid):
         if not rec.owner_patients().filter(navigator=request.user).exists():
             return HttpResponseForbidden(_("You cannot transcribe this recording."))
 
+    # Queued, not run here. Whisper on a long call takes minutes, and doing it
+    # inside the request held the navigator's page — and a web thread — for all
+    # of them, then lost the work if either gave up. The panel shows the job's
+    # progress and offers a retry if it fails. See background_jobs.md.
     try:
-        _transcribe_and_summarize(rec)
-        messages.success(request, _("Recording transcribed and summarized."))
-    except Exception as exc:  # Whisper/LLM/config errors shouldn't 500 the page
-        messages.error(request, _("Could not transcribe the recording: %(err)s") % {"err": exc})
+        job = _queue_transcription(rec, by=request.user)
+    except Exception as exc:  # the database refusing is the only way this fails
+        messages.error(request, _("Could not queue the transcription: %(err)s") % {"err": exc})
+    else:
+        if job.status == job.Status.DONE:
+            messages.success(request, _("Recording transcribed and summarized."))
+        elif job.status == job.Status.FAILED:
+            messages.error(request, _("Could not transcribe the recording: %(err)s")
+                           % {"err": (job.last_error or "").split("\n\n", 1)[0]})
+        else:
+            messages.success(request, _("Transcription started. It usually takes a minute or "
+                                        "two; you can carry on working."))
 
     fallback = (redirect("patient_detail", pk=patient.pk) if patient
                 else redirect(request.META.get("HTTP_REFERER") or "patients"))
     return _back(request, fallback)
+
+
+@login_required
+@require_GET
+def transcription_status(request, sid):
+    """The state of a recording's transcription job, for the panel to poll."""
+    rec = get_object_or_404(CallRecording, recording_sid=sid)
+    if not is_admin(request.user):
+        if not rec.owner_patients().filter(navigator=request.user).exists():
+            return HttpResponseForbidden()
+    st = _transcription_state(rec)
+    if st is None:
+        return JsonResponse({"status": "none", "transcribed": bool(rec.transcribed_at)})
+    return JsonResponse({
+        "status": st["status"],
+        "live": st["live"],
+        "no_worker": st["no_worker"],
+        "transcribed": bool(rec.transcribed_at),
+    })
 
 
 # ─────────────────────────── editing an overview ──────────────────────────
