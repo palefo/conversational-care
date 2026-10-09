@@ -32,10 +32,99 @@
         {% endif %}
       </div>
     </div>
-    <button type="button" class="pd-btn pd-hd-edit" id="pdEdit">
-      <span class="material-icons-outlined">edit</span>{% trans "Edit details" %}
-    </button>
+    <div class="pd-hd-acts">
+      <button type="button" class="pd-btn pd-hd-edit" id="pdEdit">
+        <span class="material-icons-outlined">edit</span>{% trans "Edit details" %}
+      </button>
+      {% comment %}
+        Ringing someone without an appointment for it.
+
+        Calling used to be reachable only from a booked call, which meant the
+        one page that is entirely about a person had no way to reach them. The
+        button places a real call to a real phone, so it opens the picker rather
+        than dialling on the press: with two people it could ring, a single
+        press would be guessing which.
+
+        Disabled only when neither of them has a number — there is nothing to
+        ring, and no dialog would help. A missing number of the navigator's own
+        is left to the dialog, which can carry the link to the profile page that
+        fixes it.
+      {% endcomment %}
+      {% if can_call %}
+        <button type="button" class="pd-btn pd-btn-pri" id="pdCall"
+                data-url="{% url 'start_client_call' patient.pk %}">
+          <span class="material-icons-outlined">call</span>{% trans "Call" %}
+        </button>
+      {% else %}
+        <button type="button" class="pd-btn" disabled
+                title="{% trans 'Neither this client nor their caregiver has a phone number on file.' %}">
+          <span class="material-icons-outlined">call</span>{% trans "Call" %}
+        </button>
+      {% endif %}
+    </div>
   </header>
+
+  {% comment %}
+    Who to ring. Both people are listed whether or not they can be rung, so the
+    one without a number reads as a missing number rather than as an absence.
+
+    The sentence says what the call becomes, because that is the part that is
+    not obvious: this is not a note about a call, it is a Meeting the platform
+    will hold — the recording lands on it, the protocols hang off it, and it
+    will ask for an outcome afterwards.
+  {% endcomment %}
+  <dialog class="dp-dialog pd-calldlg" id="pdCallDlg">
+    <form method="dialog">
+      <h3>{% trans "Start a call" %}</h3>
+      <p class="dp-dialog-sub">{% trans "This call will be recorded as unscheduled in Communications." %}</p>
+
+      <div class="pd-callwho" role="radiogroup" aria-label="{% trans 'Who to call' %}">
+        {% for o in call_options %}
+          <label class="pd-callopt{% if not o.phone %} is-off{% endif %}">
+            <input type="radio" name="to" value="{{ o.value }}"
+                   {% if o.value == call_default %}checked{% endif %}
+                   {% if not o.phone %}disabled{% endif %}>
+            <span class="pd-callopt-t">
+              <span class="pd-callopt-n">{{ o.name }} <span>· {{ o.role }}</span></span>
+              <span class="pd-callopt-p">
+                {% if o.phone %}{{ o.phone }}{% else %}{% trans "No number on file" %}{% endif %}
+              </span>
+            </span>
+          </label>
+        {% endfor %}
+      </div>
+
+      {% comment %}
+        The refusal the endpoint sends back, in the dialog that asked for it —
+        including its link, which is the whole point of it: "your own number is
+        not set" is a minute's work if you are told where to go.
+      {% endcomment %}
+      <p class="dpc-dialerr" id="pdCallErr" role="alert" hidden></p>
+
+      {% online_meetings_on as online_on %}
+      {% if online_on %}
+        {% comment %}
+          The online counterpart of an unscheduled call: a meeting opened now,
+          in a window of its own, with a link to send. The window is opened on
+          the click itself so a popup blocker lets it through, then pointed at
+          the room once the meeting exists.
+        {% endcomment %}
+        <button type="button" class="dp-btn pd-online-now" id="pdOnlineNow"
+                data-url="{% url 'meetings:start_now' patient.pk %}" style="width:100%;margin-top:.5rem">
+          <span class="material-icons-outlined" style="font-size:16px" aria-hidden="true">videocam</span>
+          {% trans "Start an online meeting instead" %}
+        </button>
+      {% endif %}
+
+      <div class="dp-dialog-f">
+        <button type="submit" class="dp-btn" value="cancel">{% trans "Cancel" %}</button>
+        <button type="button" class="dp-btn dpc-go" id="pdCallGo">
+          <span class="dpc-go-dot" aria-hidden="true"></span>
+          <span class="dpc-go-t">{% trans "Call" %}</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
 
 
   <!-- Tabs: the record splits into who they are, and what has happened with them. -->
@@ -87,9 +176,17 @@
         </dd>
       </div>
 
-      {% if patient.caregiver.phone_number %}
-        <div><dt>{% trans "Caregiver phone" %}</dt><dd>{{ patient.caregiver.phone_number }}</dd></div>
-      {% endif %}
+      {% comment %}
+        The client's own number was the one fact about them the profile did not
+        show, while the caregiver's sat right below it. Both are editable on the
+        edit form; neither was much use there if you could not see the current
+        value without opening it.
+      {% endcomment %}
+      <div><dt>{% trans "Phone" %}</dt>
+        <dd>{% if patient.phone_number %}{{ patient.phone_number }}{% else %}<i>{% trans "Not recorded" %}</i>{% endif %}</dd></div>
+
+      <div><dt>{% trans "Caregiver phone" %}</dt>
+        <dd>{% if patient.caregiver.phone_number %}{{ patient.caregiver.phone_number }}{% elif patient.caregiver %}<i>{% trans "Not recorded" %}</i>{% else %}&mdash;{% endif %}</dd></div>
       {% comment %}
         Patient.navigator is null=True / SET_NULL, so it really can be absent.
         The fallback has to be a conditional: a chained lookup used as a filter
@@ -150,6 +247,41 @@
       </div>
     </div>
 
+    {% comment %}
+      The client's programme, edited where it is read. It decides what their
+      call panel shows, so it belongs beside the rest of what is true about
+      them rather than behind the edit form — a decision kept on its own page
+      is a decision nobody revisits.
+
+      The marker below travels with the block: unticked boxes are not submitted,
+      so without it "every protocol off" and "this form had no protocols
+      section" would arrive at the endpoint looking identical.
+    {% endcomment %}
+    <div class="pd-terms">
+      <p class="pd-terms-h">{% trans "Protocols they work through" %}</p>
+      {% if protocol_chips %}
+        <input type="hidden" name="protocols_present" value="1">
+        <div class="pd-chips">
+          {% for p in protocol_chips %}
+            <label class="pd-chip {% if p.on %}on{% endif %}">
+              <input type="checkbox" name="protocols" value="{{ p.pk }}" {% if p.on %}checked{% endif %}>
+              <span class="material-icons-outlined">check</span>{{ p.number }}. {{ p.title }}
+            </label>
+          {% endfor %}
+        </div>
+        <p class="pd-terms-note" data-edit hidden>
+          {% trans "Only these appear in this client's call panel. Unticking one never deletes answers already recorded." %}
+        </p>
+      {% else %}
+        <p class="pd-none">
+          {% trans "No protocols exist yet." %}
+          {% if request.user.is_staff %}
+            <a href="{% url 'config' %}?tab=protocols#protocols">{% trans "Create one first." %}</a>
+          {% endif %}
+        </p>
+      {% endif %}
+    </div>
+
     <div class="pd-bg">
       <p class="pd-bg-h">{% trans "Background" %}</p>
       <div data-view>
@@ -168,6 +300,78 @@
       <button type="submit" class="pd-btn pd-btn-pri">{% trans "Save" %}</button>
     </div>
   </form>
+
+  {% comment %}
+    Study enrolment, for a client who came in through one. It lives here rather
+    than on a separate participants page because this person *is* the
+    participant — one Patient row — and their link worker should not have to go
+    somewhere else to see what they consented to.
+
+    Absent entirely for a client who was not enrolled through a study, and while
+    the feature is off.
+  {% endcomment %}
+  {% if enrolment %}
+    <div class="pd-sec">
+      <p class="pd-sect">{% trans "Study" %}</p>
+      <div class="pd-box">
+        <dl class="pd-dl" style="display:block">
+          <div>
+            <dt>{% trans "Study" %}</dt>
+            <dd>{{ enrolment.study.display_name }}</dd>
+          </div>
+          <div>
+            <dt>{% trans "Status" %}</dt>
+            <dd>{{ enrolment.get_status_display }}</dd>
+          </div>
+          <div>
+            <dt>{% trans "Access code" %}</dt>
+            <dd><code>{{ enrolment.access_code }}</code></dd>
+          </div>
+          {% if enrolment.claimed_at %}
+            <div>
+              <dt>{% trans "Joined" %}</dt>
+              <dd>{{ enrolment.claimed_at|date:"j M Y" }}</dd>
+            </div>
+          {% endif %}
+        </dl>
+
+        {% if not enrolment.consent_is_current and enrolment.latest_consent %}
+          <p class="pd-warn" style="margin-top:.6rem;color:#92400e">
+            {% blocktrans with had=enrolment.latest_consent.consent_version now=enrolment.study.consent_version %}Consented to version {{ had }}; the study is now on {{ now }}. They will be asked again on their next visit.{% endblocktrans %}
+          </p>
+        {% endif %}
+
+        {% if enrolment.consents.all %}
+          <p class="pd-sect" style="margin-top:.9rem">{% trans "Consent" %}</p>
+          {% for c in enrolment.consents.all %}
+            <div style="border:1px solid #e2e8f0;border-radius:.5rem;padding:.7rem .85rem;margin-bottom:.5rem">
+              <div style="display:flex;justify-content:space-between;gap:1rem;font-size:.82rem">
+                <strong>{% trans "Version" %} {{ c.consent_version }}</strong>
+                <span style="color:#64748b">{{ c.agreed_at|date:"j M Y, H:i" }}</span>
+              </div>
+              <ul style="margin:.45rem 0 0;padding:0;list-style:none">
+                {% for key, agreed in c.items.items %}
+                  <li style="display:flex;gap:.45rem;padding:.15rem 0;font-size:.78rem;line-height:1.45;color:#475569">
+                    <span style="font-weight:700;color:{% if agreed %}#15803d{% else %}#b91c1c{% endif %}">
+                      {% if agreed %}&check;{% else %}&times;{% endif %}
+                    </span>
+                    <span>{{ c.items_text|get_item:key|default:key }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p style="font-size:.82rem;color:#64748b;margin-top:.6rem">
+            {% trans "No consent recorded." %}
+          </p>
+        {% endif %}
+
+        <a href="{% url 'participant_detail' enrolment.pk %}"
+           style="font-size:.8rem">{% trans "Manage enrolment" %} &rarr;</a>
+      </div>
+    </div>
+  {% endif %}
 
   {% if protocols_executed %}
     <div class="pd-sec">
@@ -311,6 +515,115 @@
       });
     }
 
+    // ── Call this client now ──────────────────────────────────────────────
+    // The press places a real call to a real phone, so everything here is
+    // written around that: one press only, the reason shown when it fails, and
+    // the live call handed straight to the panel that knows how to work it.
+    (function () {
+      var onlineNow = document.getElementById('pdOnlineNow');
+      if (onlineNow) onlineNow.addEventListener('click', function () {
+        var win = window.open('about:blank', '_blank', 'popup=yes,width=1280,height=820');
+        onlineNow.disabled = true;
+        fetch(onlineNow.dataset.url, {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function (r) { return r.json(); }).then(function (d) {
+          if (!d.ok) throw new Error();
+          if (win) { win.name = 'cc-meeting-' + d.meeting; win.location = d.room_url; }
+          location.href = '?item=' + d.item + '#comms';
+        }).catch(function () {
+          if (win) win.close();
+          onlineNow.disabled = false;
+          if (window.toast) window.toast('{% trans "The online meeting could not be started." %}');
+        });
+      });
+
+      var open = document.getElementById('pdCall');
+      var dlg  = document.getElementById('pdCallDlg');
+      if (!open || !dlg || !dlg.showModal) return;
+      var go   = document.getElementById('pdCallGo');
+      var err  = document.getElementById('pdCallErr');
+      var busy = false;
+
+      open.addEventListener('click', function () {
+        if (err) err.hidden = true;
+        dlg.showModal();
+      });
+
+      function fail(msg, fix) {
+        if (err) {
+          err.hidden = false;
+          err.textContent = msg || '{% trans "Could not start the call." %}';
+          // The link is the actionable half of two of the three refusals — a
+          // number missing from the profile is a minute's work once you are
+          // told which page to go to.
+          if (fix && fix.href) {
+            var a = document.createElement('a');
+            a.className = 'dpc-dialerr-a';
+            a.href = fix.href;
+            a.textContent = fix.label;
+            err.appendChild(document.createTextNode(' '));
+            err.appendChild(a);
+          }
+        }
+        if (window.toast) {
+          window.toast('err', '{% trans "Call not placed" %}',
+                       msg || '{% trans "Could not start the call." %}',
+                       { life: 12000, href: fix ? fix.href : '', action: fix ? fix.label : '' });
+        }
+      }
+
+      function dialling(on) {
+        busy = on;
+        go.disabled = on;
+        go.classList.toggle('is-dialling', on);
+        go.querySelector('.dpc-go-t').textContent =
+          on ? '{% trans "Calling…" %}' : '{% trans "Call" %}';
+      }
+
+      go.addEventListener('click', function () {
+        if (busy) return;
+        var picked = dlg.querySelector('input[name=to]:checked');
+        if (!picked) return fail('{% trans "Choose who to call first." %}');
+        if (err) err.hidden = true;
+        dialling(true);
+
+        var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+        fetch(open.dataset.url, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrf ? csrf.value : '',
+            'Accept': 'application/json'
+          },
+          body: 'to=' + encodeURIComponent(picked.value)
+        }).then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (d) {
+            if (!r.ok) throw d;
+            return d;
+          });
+        }).then(function (d) {
+          // The call is out. Hand it to the panel the way the panel hands it to
+          // itself — sessionStorage under the meeting's own key — so the
+          // stopwatch, the app-wide bar and End call all find it already
+          // running when the page it is on comes back.
+          var mid = String(d.item || '').replace('meeting-', '');
+          try {
+            sessionStorage.setItem('dpCall:' + mid, JSON.stringify({
+              started: Date.now(), attempt: 1, who: d.who || ''
+            }));
+          } catch (e) {}
+          var url = new URL(window.location.href);
+          url.searchParams.set('item', d.item);
+          window.location = url.pathname + url.search;
+        }, function (d) {
+          dialling(false);
+          fail((d || {}).error, (d || {}).fix);
+        });
+      });
+    })();
+
     // ── Handover note ─────────────────────────────────────────────────────
     var form = document.getElementById('pdNoteForm');
     var ta = document.getElementById('pdNote');
@@ -377,7 +690,18 @@
       });
       ['details', 'comms'].forEach(function (t) {
         var panel = document.getElementById('pd-panel-' + t);
-        if (panel) panel.hidden = (t !== name);
+        if (!panel) return;
+        var on = (t === name);
+        panel.hidden = !on;
+        if (!on) return;
+        // The tab strip does not move, so neither does the box — what changed
+        // is what is in it. Removed and re-added so switching back and forth
+        // plays each time rather than only the first; the reflow read between
+        // them is what restarts the animation.
+        panel.classList.remove('ui-arrive');
+        void panel.offsetWidth;
+        panel.classList.add('ui-arrive');
+        setTimeout(function () { panel.classList.remove('ui-arrive'); }, 260);
       });
     }
 
@@ -388,9 +712,13 @@
       });
     });
 
-    // Arriving with a panel open means you came from the timeline (or a deep
-    // link into it), so show that tab rather than dropping you on Details.
-    if (location.hash === '#comms' || /[?&]item=/.test(location.search)) show('comms');
+    // Arriving with anything the Communications tab owns means you were in it
+    // and the page reloaded — switching to Happened, running a search, picking
+    // a chip, turning a page. Every one of those is a GET that drops the
+    // fragment, and landing back on Details after clicking a tab inside
+    // Communications reads as the app losing your place.
+    var COMMS_PARAMS = /[?&](item|tab|q|kind|when|page)=/;
+    if (location.hash === '#comms' || COMMS_PARAMS.test(location.search)) show('comms');
   })();
 </script>
 <style>@keyframes spin { to { transform: rotate(360deg); } }</style>

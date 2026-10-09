@@ -1,4 +1,4 @@
-"""Self-contained background execution for Twilio (WhatsApp/SMS) replies.
+"""Self-contained background execution for work that must not block a request.
 
 Twilio expects the inbound webhook to return within a few seconds, but crafting
 a reply can take much longer (LLM calls, audio transcription, text-to-speech).
@@ -7,8 +7,19 @@ in-process thread pool: the webhook returns an empty TwiML immediately and the
 reply is delivered afterwards via the Twilio REST API.
 
 This replaces the previous Redis + django-rq setup. No external broker or extra
-process is required — everything runs inside the Django worker. The pool size is
-controlled by the ``WHATSAPP_WORKERS`` setting (see ``settings_app.py``).
+process is required — everything runs inside the Django worker.
+
+Two **separate** pools, because the two kinds of work have opposite shapes.
+Replies are short and latency-critical; ingesting a RAG document reads a whole
+PDF and then embeds it batch by batch, which can hold a thread for minutes. On
+one shared pool a couple of large uploads would sit in front of every waiting
+WhatsApp reply. Sizes come from ``WHATSAPP_WORKERS`` and ``RAG_WORKERS``
+(see ``settings_app.py``).
+
+Note that these pools live *inside each web process*. Work survives the browser
+(the point of the exercise) but not the process, so anything queued here needs
+its state in the database and a way to be picked up again — which is what
+``ConvAI.rag.ingest`` does with its heartbeat and claim.
 """
 from __future__ import annotations
 
@@ -22,25 +33,31 @@ from django.db import close_old_connections
 
 logger = logging.getLogger(__name__)
 
-_executor: ThreadPoolExecutor | None = None
+# name -> (executor, settings key, default workers, thread prefix, label)
+_POOLS: dict[str, ThreadPoolExecutor] = {}
+_POOL_SPECS = {
+    "reply": ("WHATSAPP_WORKERS", 2, "wa-reply", "WhatsApp/SMS reply"),
+    "ingest": ("RAG_WORKERS", 2, "rag-ingest", "document ingestion"),
+}
 _lock = threading.Lock()
 
 
-def _get_executor() -> ThreadPoolExecutor:
-    """Lazily build (once) the shared reply thread pool."""
-    global _executor
-    if _executor is None:
+def _get_executor(pool: str = "reply") -> ThreadPoolExecutor:
+    """Lazily build (once) the named background thread pool."""
+    executor = _POOLS.get(pool)
+    if executor is None:
         with _lock:
-            if _executor is None:
-                workers = max(1, int(getattr(settings, "WHATSAPP_WORKERS", 2) or 2))
-                _executor = ThreadPoolExecutor(
-                    max_workers=workers,
-                    thread_name_prefix="wa-reply",
-                )
-                # Don't block interpreter shutdown on in-flight replies.
-                atexit.register(_executor.shutdown, wait=False)
-                logger.info("Started WhatsApp/SMS reply pool with %d worker(s)", workers)
-    return _executor
+            executor = _POOLS.get(pool)
+            if executor is None:
+                key, default, prefix, label = _POOL_SPECS[pool]
+                workers = max(1, int(getattr(settings, key, default) or default))
+                executor = ThreadPoolExecutor(max_workers=workers,
+                                              thread_name_prefix=prefix)
+                # Don't block interpreter shutdown on in-flight jobs.
+                atexit.register(executor.shutdown, wait=False)
+                _POOLS[pool] = executor
+                logger.info("Started %s pool with %d worker(s)", label, workers)
+    return executor
 
 
 def _run(func, args, kwargs) -> None:
@@ -54,11 +71,16 @@ def _run(func, args, kwargs) -> None:
     try:
         func(*args, **kwargs)
     except Exception:  # never let a background failure crash the pool thread
-        logger.exception("Async WhatsApp/SMS reply job failed")
+        logger.exception("Background job %r failed", getattr(func, "__name__", func))
     finally:
         close_old_connections()
 
 
 def submit(func, *args, **kwargs):
-    """Schedule ``func(*args, **kwargs)`` to run on the background reply pool."""
-    return _get_executor().submit(_run, func, args, kwargs)
+    """Schedule ``func(*args, **kwargs)`` on the reply pool (short, latency-critical)."""
+    return _get_executor("reply").submit(_run, func, args, kwargs)
+
+
+def submit_ingest(func, *args, **kwargs):
+    """Schedule ``func(*args, **kwargs)`` on the ingestion pool (long-running)."""
+    return _get_executor("ingest").submit(_run, func, args, kwargs)

@@ -21,7 +21,7 @@ Example
         patient_id=10,
         scheduled_time_iso="2026-08-01T15:30:00Z",
         type=1,                 # 0 Onboarding, 1 Regular, 2 Final, 3 Initial
-        scheduled_protocol=2,   # optional protocol number
+        scheduled_protocols=[2, 3],   # optional protocol numbers
     )
     if result.get("ok"):
         print("Scheduled meeting", result["meeting"]["id"])
@@ -97,9 +97,15 @@ class Client:
         patient_id: int,
         scheduled_time_iso: str,
         type: Optional[int] = None,
+        scheduled_protocols: Optional[List[int]] = None,
         scheduled_protocol: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Schedule a meeting for a client.
+
+        ``scheduled_protocols`` is a list of protocol *numbers* the call should
+        cover. ``scheduled_protocol`` is the single-value spelling this method
+        shipped with; it still works and means a list of one. A number with no
+        protocol behind it is rejected with a 400 rather than stored.
 
         Returns ``{"ok": True, "meeting": {...}}`` on success, or
         ``{"ok": False, "detail": "..."}`` if it was rejected (e.g. a
@@ -111,6 +117,8 @@ class Client:
         }
         if type is not None:
             payload["type"] = type
+        if scheduled_protocols:
+            payload["scheduled_protocols"] = list(scheduled_protocols)
         if scheduled_protocol is not None:
             payload["scheduled_protocol"] = scheduled_protocol
         resp = self.session.post(self._url("/api/v1/meetings/"), json=payload, timeout=self.timeout)
@@ -125,3 +133,148 @@ class Client:
             self._url(f"/api/v1/patients/{patient_id}/meetings/"), timeout=self.timeout
         )
         return self._json_or_raise(resp) or []
+
+    # -- client records ------------------------------------------------------
+    # What staff may ask about their clients. The same answers Link Worker v2
+    # gives, from the same service: a navigator's token reads their own clients,
+    # an admin's everyone, and every call is written to the platform's access
+    # log. A client you may not see comes back as ``None`` — exactly as one that
+    # does not exist. Protocols are named by number or by words in the title.
+
+    def _records_get(self, path: str, params: Optional[Dict[str, Any]] = None):
+        resp = self.session.get(self._url(path), params=params or None, timeout=self.timeout)
+        if resp.status_code == 404:
+            return None
+        return self._json_or_raise(resp)
+
+    def client_overview(self, patient_id: int) -> Optional[Dict[str, Any]]:
+        """Everything held about one client: contact, caregiver, details, meetings,
+        protocol progress, open alerts, conversation summaries and notes."""
+        return self._records_get(f"/api/v1/patients/{patient_id}/overview/")
+
+    def upcoming_meetings(self, patient_id: Optional[int] = None,
+                          days: int = 30) -> Optional[Dict[str, Any]]:
+        """Pending meetings in the next ``days`` days, for one client or your caseload."""
+        params: Dict[str, Any] = {"days": days}
+        if patient_id is not None:
+            params["patient_id"] = patient_id
+        return self._records_get("/api/v1/meetings/upcoming/", params)
+
+    def protocol_answers(self, patient_id: int,
+                         protocol: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """The latest answer to each protocol question, for one protocol or all."""
+        params = {"protocol": protocol} if protocol not in (None, "") else None
+        return self._records_get(f"/api/v1/patients/{patient_id}/protocols/answers/", params)
+
+    def protocol_history(self, patient_id: int, protocol) -> Optional[Dict[str, Any]]:
+        """One protocol's answers, call by call, oldest first."""
+        from urllib.parse import quote
+        return self._records_get(
+            f"/api/v1/patients/{patient_id}/protocols/{quote(str(protocol), safe='')}/history/")
+
+    def search_records(self, q: str) -> Dict[str, Any]:
+        """A word or phrase across every client record you may see."""
+        return self._records_get("/api/v1/records/search/", {"q": q}) or {}
+
+    # -- conversations -------------------------------------------------------
+    # The two endpoints an agent calls back about a conversation it is holding.
+    # Both refuse with a 404 rather than a 403 when you may not touch the
+    # conversation — a caller who has no business with it should not learn from
+    # the status code whether it exists — so ``None`` here means "not yours, not
+    # there, or the feature is switched off", and the three are deliberately
+    # indistinguishable.
+    #
+    # Who may call them: the account that holds the conversation, the tester
+    # account standing in for the client, or an admin. A navigator deliberately
+    # cannot set visibility — it is the client's own answer about their own
+    # privacy, and a link worker setting it on their behalf would make it worth
+    # nothing.
+
+    def get_conversation_visibility(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """Whether this conversation's content is hidden from the client's link worker.
+
+        Returns ``{conversation_id, hidden, hidden_at, message_count}``, or
+        ``None`` if the conversation is not yours to read (see the note above).
+        """
+        resp = self.session.get(
+            self._url(f"/api/v1/conversations/{conversation_id}/visibility/"),
+            timeout=self.timeout,
+        )
+        if resp.status_code == 404:
+            return None
+        return self._json_or_raise(resp)
+
+    def set_conversation_visibility(self, conversation_id: str,
+                                    hidden: bool) -> Optional[Dict[str, Any]]:
+        """Hide this conversation from the client's link worker, or unhide it.
+
+        Only ever on the client's own say-so, and only after telling them what it
+        means: their link worker still sees that the conversation happened, when
+        it was and how many messages it had, and still reads the summary — what
+        they lose is the messages, the topic and the review. A supervising
+        administrator can still read all of it, and a conversation suggesting the
+        person may be at risk of harming themselves stays readable whatever they
+        asked, because somebody has to be able to help.
+
+        Idempotent: the response describes the state the conversation is now in
+        rather than what changed, so asking twice is not an error.
+
+        ``message_count`` comes back so you can tell the client exactly what
+        their link worker is left with, in the same breath as confirming it.
+        """
+        resp = self.session.post(
+            self._url(f"/api/v1/conversations/{conversation_id}/visibility/"),
+            json={"hidden": bool(hidden)}, timeout=self.timeout,
+        )
+        if resp.status_code == 404:
+            return None
+        return self._json_or_raise(resp)
+
+    def get_conversation_summary(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """The summary the client's link worker reads for this conversation.
+
+        Returns ``{conversation_id, summary, source, agent_summary,
+        agent_summary_at, hidden}``, or ``None`` if the conversation is not yours
+        to read. ``source`` is ``"agent"`` or ``"classifier"`` — or ``""`` when
+        nothing has summarised it yet — so you can tell whether your own report
+        is the one on screen.
+        """
+        resp = self.session.get(
+            self._url(f"/api/v1/conversations/{conversation_id}/summary/"),
+            timeout=self.timeout,
+        )
+        if resp.status_code == 404:
+            return None
+        return self._json_or_raise(resp)
+
+    def report_conversation_summary(self, conversation_id: str,
+                                    summary: str) -> Optional[Dict[str, Any]]:
+        """Record what this conversation was about, for the client's link worker.
+
+        Write it for the link worker, who was not there and will read it to pick
+        up where you left off — not for the person you were talking to. What they
+        wanted, what you told them, what is still open.
+
+        Preferred over the platform's own automatic summary, and shown even when
+        the conversation is hidden: on a hidden conversation this is the *only*
+        thing the link worker gets, so it must be something the client would
+        expect them to read.
+
+        Each call replaces the last, so the text should stand on its own. An
+        empty summary is rejected with a 400 rather than erasing one somebody may
+        already have read.
+        """
+        resp = self.session.post(
+            self._url(f"/api/v1/conversations/{conversation_id}/summary/"),
+            json={"summary": summary}, timeout=self.timeout,
+        )
+        if resp.status_code == 404:
+            return None
+        return self._json_or_raise(resp)
+
+
+
+# The run-token client lives in its own module so a remote agent can vendor just
+# run_client.py + langgraph_tools.py without this file. Re-exported here so
+# ``from conversationalcare_api import RunClient`` keeps working.
+from .run_client import RunClient  # noqa: E402,F401

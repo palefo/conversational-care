@@ -1,11 +1,18 @@
 from ._base import *  # noqa: F401,F403
+from django.contrib.auth import views as auth_views
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.http import HttpResponseRedirect
+from django.urls import reverse_lazy
 from ..forms import HelpContentForm
 from ..default_help import DEFAULT_HELP_MARKDOWN
+from ..site_config import brand_name
 
 __all__ = ['RoleBasedLoginView', '_issue_user_token', 'issue_api_token', 'profile',
-           'help_page', 'help_edit', 'update_language', 'update_profile']
+           'whatsapp_link_start', 'whatsapp_unlink',
+           'help_page', 'help_edit', 'update_language', 'update_profile',
+           'PasswordResetRequestView', 'PasswordResetSentView',
+           'PasswordResetConfirmView', 'PasswordResetCompleteView']
 
 
 def _profile_role_label(user):
@@ -84,7 +91,59 @@ def profile(request):
         "just_issued_token": just,  # None or the newly generated token
         "languages": settings.LANGUAGES,
         "role_label": _profile_role_label(request.user),
+        # None — and no card — unless the Link Worker on WhatsApp is on and
+        # this person may use it. See ConvAI.staff_whatsapp.
+        "whatsapp": _whatsapp_context(request),
     })
+
+
+def _whatsapp_context(request):
+    """The profile's Link Worker on WhatsApp card, or None when it has no place."""
+    from urllib.parse import quote
+
+    from .. import staff_whatsapp
+    from ..models import StaffWhatsAppLink
+    from .settings_views import _qr_svg
+
+    user = request.user
+    if not staff_whatsapp.enabled() or not staff_whatsapp.eligible(user):
+        return None
+    link = StaffWhatsAppLink.objects.filter(user=user).select_related("loaded_patient").first()
+    code = request.session.pop("whatsapp_link_code", None)
+    platform = (get_platform_phone() or "").strip()
+    ctx = {"link": link, "code": code, "platform_phone": platform,
+           "default_number": str(user.phone_number or "")}
+    if code and platform:
+        digits = "".join(ch for ch in platform if ch.isdigit())
+        ctx["wa_url"] = f"https://wa.me/{digits}?text={quote('LINK ' + code)}"
+        ctx["qr_svg"] = _qr_svg(ctx["wa_url"], "waLinkQr")
+    return ctx
+
+
+@login_required
+@require_POST
+def whatsapp_link_start(request):
+    """Issue a code for the navigator to send from the phone they are linking."""
+    from .. import staff_whatsapp
+
+    try:
+        code = staff_whatsapp.start_link(request.user, request.POST.get("phone_number", ""))
+    except staff_whatsapp.LinkError as exc:
+        messages.error(request, str(exc))
+        return redirect(f"{reverse('profile')}#whatsapp")
+    # Shown once, like an API token: it is a credential until it is used.
+    request.session["whatsapp_link_code"] = code
+    return redirect(f"{reverse('profile')}#whatsapp")
+
+
+@login_required
+@require_POST
+def whatsapp_unlink(request):
+    from .. import staff_whatsapp
+
+    staff_whatsapp.unlink(request.user)
+    messages.success(request, _("Your phone is no longer linked to the Link Worker on WhatsApp."))
+    return redirect(f"{reverse('profile')}#whatsapp")
 
 
 @login_required
@@ -178,3 +237,52 @@ class RoleBasedLoginView(LoginView):
         return super().get_success_url()
 
 
+
+
+# ── Password recovery ───────────────────────────────────────────────────────
+# Django's own views do the work; these subclasses only fix the two things a
+# stock install gets wrong here — the templates, and the host the link points
+# at. The mail itself goes out through ConvAI.mailer.PlatformEmailBackend, so it
+# travels over whichever provider Settings → Email selects.
+
+class PasswordResetRequestView(auth_views.PasswordResetView):
+    """Ask for the address, send the link."""
+    template_name = "registration/password_reset_form.html"
+    email_template_name = "registration/password_reset_email.txt"
+    html_email_template_name = "registration/password_reset_email.html"
+    subject_template_name = "registration/password_reset_subject.txt"
+    success_url = reverse_lazy("password_reset_done")
+
+    def form_valid(self, form):
+        # django.contrib.sites is installed and SITE_ID is 1, so the stock view
+        # builds the link against whatever that row says — "example.com" on an
+        # install nobody edited it on, which produces a mail whose only link is
+        # dead. The host the request actually arrived on is the one the person
+        # reading the mail can click, and ALLOWED_HOSTS has already vetted it.
+        form.save(
+            domain_override=self.request.get_host(),
+            use_https=self.request.is_secure(),
+            token_generator=self.token_generator,
+            from_email=self.from_email,
+            email_template_name=self.email_template_name,
+            html_email_template_name=self.html_email_template_name,
+            subject_template_name=self.subject_template_name,
+            extra_email_context={"brand_name": brand_name()},
+            request=self.request,
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class PasswordResetSentView(auth_views.PasswordResetDoneView):
+    """"We sent it" — worded so it does not reveal whether the address exists."""
+    template_name = "registration/password_reset_done.html"
+
+
+class PasswordResetConfirmView(auth_views.PasswordResetConfirmView):
+    """The link's destination: choose the new password."""
+    template_name = "registration/password_reset_confirm.html"
+    success_url = reverse_lazy("password_reset_complete")
+
+
+class PasswordResetCompleteView(auth_views.PasswordResetCompleteView):
+    template_name = "registration/password_reset_complete.html"

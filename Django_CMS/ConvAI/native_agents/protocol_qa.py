@@ -77,9 +77,13 @@ def _fetch_questions(protocol_num: int, meeting_id: int) -> dict:
     }
 
 
-def _save_answer(protocol_num: int, meeting_id: int, question_id: int, response: str) -> dict:
+def _save_answer(protocol_num: int, meeting_id: int, question_id: int, response: str,
+                 source: str = "text") -> dict:
     """Upsert a single answer; an empty response deletes it. Mirrors
-    ``ProtocolAnswerForm.save`` semantics."""
+    ``ProtocolAnswerForm.save`` semantics.
+
+    ``source`` is ``"text"`` for the WhatsApp/SMS automation and ``"voice"``
+    for the interviewer in an online meeting, which reuses this function."""
     from ..models import Answer, Question
 
     question = Question.objects.filter(
@@ -106,12 +110,18 @@ def _save_answer(protocol_num: int, meeting_id: int, question_id: int, response:
     ans = Answer.objects.filter(meeting_id=meeting_id, question_id=question_id).first()
 
     if response:
+        # Written by the automation, so it is marked as having come back by text.
+        # A navigator editing it afterwards clears the mark — see protocol_view.
+        by_text = source == "text"
         if ans:
             ans.response = response
-            ans.save(update_fields=["response"])
+            ans.by_text = by_text
+            ans.source = source
+            ans.save(update_fields=["response", "by_text", "source"])
         else:
             Answer.objects.create(
-                meeting_id=meeting_id, question_id=question_id, response=response
+                meeting_id=meeting_id, question_id=question_id,
+                response=response, by_text=by_text, source=source,
             )
         return {"ok": True, "question_id": question_id, "saved": True}
 

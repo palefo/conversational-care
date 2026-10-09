@@ -111,6 +111,15 @@ the item exists.
 A chat item is a *patient plus a day*, not a single row — hence the
 `chat-<patient_pk>-<iso_date>` form.
 
+The panel can also be fetched on its own: `GET /panel/?item=<token>` renders
+just the fragment (`views/_panel.py::panel_fragment`), which is what `base.html`
+swaps in when a row is opened, so the list beside it is never rebuilt to change
+which row is highlighted. The item is permission-checked there exactly as on a
+full page load, and a token that resolves to nothing answers **204** — a stale
+link is a panel with nothing in it, not an error — at which point the front end
+closes the panel. Every row keeps a real `href`, so a modified click, a failed
+fetch or no scripting at all falls through to ordinary navigation.
+
 Every kind shares one frame: a pinned header, a pinned tab strip, a scrolling
 body, and a pinned footer holding the actions. Actions either settle the item
 in place or open a `<dialog>`; nothing navigates away.
@@ -156,7 +165,10 @@ All are `navigator_required` and ownership-checked.
 | Route | Name | Purpose |
 | --- | --- | --- |
 | `POST /meetings/<id>/cancel/` | `cancel_meeting` | cancel a scheduled call, or reinstate with `reinstate=1` |
-| `POST /meetings/<id>/notes/` | `save_meeting_notes` | autosaved free-text notes, answers JSON |
+| `GET /panel/` | `panel_fragment` | the detail panel on its own, for `?item=` swaps; 204 when nothing resolves |
+| `POST /notes/<kind>/<pk>/add/` | `add_note` | write a note on a meeting, recording, alert or conversation |
+| `POST /notes/<pk>/edit/` | `edit_note` | change a note's body |
+| `POST /notes/<pk>/delete/` | `delete_note` | remove a note; the panel offers Undo before it fires |
 | `POST /patients/<pk>/chatbot/` | `toggle_patient_chatbot` | agent on/off per client, with reason + audit fields |
 | `POST /patients/<pk>/raise-alert/` | `raise_alert` | human-raised alert (`data.raised_by_human=True`) |
 | `POST /patients/<pk>/note/` | `save_client_note` | client-page notes |
@@ -169,7 +181,7 @@ All are `navigator_required` and ownership-checked.
 
 | Model | Added |
 | --- | --- |
-| `Meeting` | `notes`, `notes_updated_at`; `modality` (PHONE/IN_PERSON) + `location`; `CANCELLED` status with `cancel_reason`, `cancelled_at` |
+| `Meeting` | `notes`, `notes_updated_at` (both **removed again in 0072** — see below); `modality` (PHONE/IN_PERSON) + `location`; `CANCELLED` status with `cancel_reason`, `cancelled_at` |
 | `Caregiver` | `relationship`, `involvement` |
 | `ContactTerm` | new model, 5 standard terms seeded; stored on `Patient.contact_terms` as a slug list |
 | `SeenMark` | new model — per-user read marks, keyed by panel token (no FK: a chat item is a patient+day) |
@@ -180,6 +192,26 @@ The agent off-switch is **per client**, not per alert, and it genuinely gates
 replies: `process_message_for_patient` in `utils.py` returns early. Both inbound
 paths funnel through it. The caregiver's message is still recorded; what stops
 is the answer.
+
+### Model changes (migrations 0066–0072)
+
+| Model | Change |
+| --- | --- |
+| `Note` | **new model** — one written note, with an author and created/updated times. The parent is an explicit nullable FK per kind (meeting / recording / alert / conversation) rather than a generic relation: more columns, but the queries stay simple and permission follows the parent's client. Replaces `Meeting.notes` and `alert.data['internal_note']`, which were single strings with no author, overwritten on every save |
+| `CallRecording` | `transcript_segments`, `transcript_moments` — Whisper is called with `verbose_json` so the timings survive, and each key moment names a *segment index* rather than writing its own timestamp, so a moment the model invents has nothing to attach to and is dropped instead of pointing at silence |
+| `Meeting` | `ended_at`, with a `happened_at` property falling back to `cancelled_at` then `scheduled_time`. Before this, completed calls sorted by their *scheduled* time, so "Happened" could contain future dates. `notes` / `notes_updated_at` **dropped** |
+| `Answer` | `by_text` — the answer came back from the caregiver via the protocol automation rather than being typed by a navigator. Cleared when a human edits the answer |
+| `SiteConfiguration` | `transcript_moments_prompt` — editable in Settings → Prompts, blank falls back to `default_prompts.DEFAULT_TRANSCRIPT_MOMENTS_PROMPT` |
+
+Four of these move data and are **not cleanly reversible** — run them against a
+copy of production first:
+
+| Migration | What it moves |
+| --- | --- |
+| `0067_meeting_notes_to_note_rows` | the old `Meeting.notes` blob into `Note` rows |
+| `0068_alert_internal_note_to_note_rows` | `alert.data['internal_note']` into `Note` rows |
+| `0071_backfill_ended_at` | stamps `ended_at` on past-tense meetings still dated in the future |
+| `0072_retire_legacy_note_fields` | carries `alert.data['note_log']` (a rolling list nothing ever displayed, and the one place holding notes `0068` did not cover) into `Note` rows, then drops the four dead alert keys and the two `Meeting` note columns |
 
 ### Environment sensitivities
 
@@ -276,6 +308,7 @@ precedence over `.env`.
 | `DB_ENGINE` `DB_NAME` `DB_USER` `DB_PASSWORD` `DB_HOST` `DB_PORT` | Standard connection settings; `DB_HOST=db` targets the bundled container. |
 | `DB_SSLMODE` | `disable` locally, `require` for managed Postgres. |
 | `POSTGRES_PUBLISH_PORT` | Host port publishing the bundled DB (compose only). |
+| `WEB_PUBLISH_PORT` | Host port publishing the app (compose only, default `8000`). Set it when the host already has something on 8000 — e.g. a second copy of this project. |
 
 ### Twilio / messaging
 
@@ -301,7 +334,9 @@ precedence over `.env`.
 | `USE_AZURE` + `AZURE_*` endpoint/key vars | Route models through Azure instead of public APIs (*runtime*). |
 | `AGENT_ALLOWED_HOSTS` | SSRF allow-list of hosts remote agents may point at (*runtime*). |
 | `PROMPT_AGENT_TEMPERATURE` | Sampling temperature for prompt-based agents (default `0`). |
-| `ELEVENLABS_API_KEY` / `ELEVENLABS_VOICE_ID` | Text-to-speech for voice replies (*runtime*). |
+| `TTS_PROVIDER` | Who speaks voice replies: `elevenlabs` (default) or `azure` (*runtime*). See `text_to_speech.md`. |
+| `ELEVENLABS_API_KEY` / `ELEVENLABS_VOICE_ID` | ElevenLabs text-to-speech (*runtime*). |
+| `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` / `AZURE_SPEECH_VOICE` | Azure AI Speech text-to-speech (*runtime*). |
 
 ### Behaviour & storage
 
@@ -310,6 +345,8 @@ precedence over `.env`.
 | `HIDE_MEETING_STEPS` | Hide the step checklist on calls (*runtime*). |
 | `ENABLE_AUTOMATIONS` | Enable automation features (*runtime*). |
 | `SELF_REGISTRATION_ENABLED` / `SELF_REG_AGENT_NAME` | WhatsApp self-registration (see [§9](#9-agents)) (*runtime*). |
+| `MESSAGE_EXPORT_ENABLED` | Let admins download every stored message as CSV from **Settings → Export**; off by default (see [message_export.md](../message_export.md)) (*runtime*). |
+| `CONVERSATION_DOWNLOAD_ENABLED` | Let navigators download a single conversation of their own clients as CSV from the panel's Conversation tab; off by default (see [message_export.md](../message_export.md)) (*runtime*). |
 | `VOICE_RECORDINGS_DIR` / `CALL_RECORDINGS_DIR` | Override media dirs (default: under `MEDIA_ROOT`). |
 | `DOWNLOAD_TOKEN_KEY` | Dedicated key signing single-use media tokens; random per-process if unset. |
 | `SECURE_HSTS_SECONDS` | HSTS max-age (default 1 year). |
@@ -362,7 +399,14 @@ Full detail in [agents.md](../agents.md). Summary:
 - Bundled native agents: **Loopback** (echo/connectivity reference),
   **Link Worker** (the navigator chatbot bubble; scaffolded), the
   **Protocol Q&A** agent, and the **Self Registration** agent that answers the
-  WhatsApp QR flow (Settings → Registrations).
+  WhatsApp and SMS QR flows (Settings → Self registration). It is told which
+  channel the person wrote in on (`configurable["channel"]`, also sent to a
+  remote registration agent), and the registration records it in
+  `details["channel"]`.
+- **`Agent.description`** — one line on what the agent does, shown on its card
+  on the Agents page and editable for every kind. Native agents are seeded with
+  one (migration `0082`); a blank description falls back to the card's old
+  technical subtitle.
 - **Model selection** is per agent (`Agent.model`, e.g.
   `anthropic/claude-sonnet-4-6`), built by the shared factory
   `llm_factory.make_llm()`; provider inferred from the prefix, keys resolved
@@ -370,8 +414,9 @@ Full detail in [agents.md](../agents.md). Summary:
 
 To add a native agent: create a module in `ConvAI/native_agents/` whose
 builder returns a compiled graph, decorate with `@register("your_key")`, keep
-optional imports inside the builder, and seed an `Agent` row with a data
-migration.
+optional imports inside the builder, and seed an `Agent` row — with a
+`description`, since that is all the Agents page can say about it — using a
+data migration.
 
 ## 10. Messaging: Twilio webhook & async replies
 
@@ -383,6 +428,69 @@ immediately and hands the work to a **self-contained in-process thread pool**
 (`WHATSAPP_WORKERS` threads; no Redis or broker). The worker then pushes the
 reply out through the Twilio REST API. Design, sizing guidance and operational
 notes: [async_replies.md](../async_replies.md).
+
+### Outbound calls and their recordings (migrations 0078–0079)
+
+A call from the panel is a **conference of two legs**: one out to the navigator
+(`CTN`, their own number from their profile) and one out to the client side
+(`Dyad`, the caregiver's number). Both are placed by `make_phone_conference`
+and both are recorded, dual-channel.
+
+Twilio names each leg with a Call SID the moment it is placed. That SID is
+written into a **`CallLeg`** row alongside the meeting, the client and which
+side it is, and `get_recordings_from_twilio` joins the audio back to it on
+`call_sid` when it arrives — minutes or hours later — filling `meeting`,
+`patient` and `leg` on the `CallRecording`.
+
+| Model | Change |
+| --- | --- |
+| `CallLeg` | **new model** — one outbound call placed for one meeting: `call_sid` (unique), `meeting`, `patient`, `leg`, `to_number`, `conference_name`, who placed it and when. A record of a call *placed*, not of a recording that exists: an unanswered leg simply never gets one |
+| `CallRecording` | `meeting`, `patient`, `leg`, `call_sid` — all nullable. Before this the model had no relation to anything and every surface re-derived ownership by matching `from_number`/`to_number` against `[patient.phone_number, caregiver.phone_number]`. A phone number is not an identity: one number can belong to two clients (a caregiver who looks after one and is themself another), which drew the same call on both timelines, and the navigator's own leg carries a *staff* number, which was filed against whichever client shared it |
+
+Reading it back, in `CallRecording.for_patient` and used by
+`build_patient_events`, `_context_strip` and the meeting panel: a recording that
+names its client is that client's and nobody else's; one that names nobody
+falls back to the old number matching; and the navigator's leg is left out of
+client-facing lists either way. The same two-step applies to the fold onto a
+meeting — an exact `meeting_id` first, then the ±90 minute
+`RECORDING_MATCH_WINDOW` walk for anything without one.
+
+That fold lives in **`views/_panel.fold_recordings`**, and both the timeline
+row and the panel it opens read it rather than each working it out. While they
+did work it out separately they disagreed: the row claimed the nearest free
+call, the panel took the earliest recording in the window and knew nothing
+about what another call had already claimed, so one recording could be a loose
+row and a call's recording at the same time. That is what made the timeline
+look like it listed every call twice.
+
+A call holds **every** recording it produced, not one. A number that rings out
+and is redialled leaves a few seconds of ringing tone behind on each attempt,
+and keeping one of those and orphaning the rest is what filled the list with
+loose `Call recording` rows that had a perfectly good call to sit under. The
+list is ordered longest-first — the conversation, not the attempts that failed
+to reach it — so the row names the longest and counts the rest, and the panel
+plays the longest with the others folded under it. A guess still prefers a call
+with nothing on it before joining one that is already spoken for, so two calls
+an hour apart do not both collapse onto whichever is marginally nearer.
+
+Recordings that match no call at all keep their own row. That row is the only
+route to `_recording_panel`, so dropping it would make the audio unreachable
+rather than tidy; it is labelled *Recording with no call* so it does not read
+as a duplicate of the call above it.
+
+`0081_backfill_recording_owners` gives the existing rows an owner where one can
+be established: a number matching exactly one client is written down, a number
+matching two is **left alone** for the fallback rather than guessed at, and a
+number belonging to a member of staff and to no client is marked as the
+navigator's leg. It attaches at most one recording per meeting. It is a no-op
+in reverse — there is no record of which rows it filled in, so clearing them
+would also clear anything a real call has written since.
+
+`get_recordings_from_twilio` also stopped short-circuiting on
+`date_updated <= max(end_time)`. That high-water mark only moved forward, so a
+recording Twilio finished assembling *late* was behind the mark on the first
+sync that saw it and was skipped permanently — which is why some recordings
+never appeared. It now asks which recording SIDs are already stored.
 
 ## 11. File storage & media security
 
@@ -501,6 +609,11 @@ Before going to production:
       consider `ASYNC_WHATSAPP_REPLY=1`.
 - [ ] Decide whether the REST API should be exposed (`ENABLE_API`).
 - [ ] Set up database backups ([database.md](../database.md)).
+- [ ] Confirm `collectstatic` picked up `ConvAI/static/app/fonts/`. The DM Sans
+      and Material Icons faces are served from the app, not from Google — if
+      those three `.woff2` files are missing, **every icon renders as its
+      ligature text** (literally the words `home`, `settings`, `save`), which
+      looks like a CSS failure but is a static-files one.
 
 ## 15. Development workflow
 

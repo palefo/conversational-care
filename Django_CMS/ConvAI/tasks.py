@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.db.models import Q
 
 from .models import Message, Patient
+from .tts import synthesize_speech
 from .utils import (
     process_received_message,
     download_twilio_media,
@@ -16,8 +17,6 @@ from .utils import (
     save_bytes,
     transcribe_audio,
     generate_response_langgraph,
-    synthesize_speech_elevenlabs,
-    resolve_tts_voice_id,
     build_signed_download_token,
     send_whatsapp_text,
     send_sms_text,
@@ -31,7 +30,7 @@ def job_reply_text(channel: str, from_number_raw: str, body_text: str) -> None:
     body_text: incoming text (already merged with any media note)
     """
     phone = from_number_raw.replace("whatsapp:", "").strip()
-    reply = process_received_message(phone, body_text)
+    reply = process_received_message(phone, body_text, channel=channel)
     if channel == "whatsapp":
         send_whatsapp_text(phone, reply)
     else:
@@ -47,13 +46,22 @@ def job_process_whatsapp_audio(
     """
     Download WA audio, transcribe, call agent, TTS, persist, and reply (text+audio).
     """
-    phone = from_number_raw.replace("whatsapp:", "").strip()
-    patient = (
-        Patient.objects
-        .filter(Q(phone_number=phone) | Q(caregiver__phone_number=phone))
-        .select_related("agent")
-        .first()
-    )
+    from .message_attribution import normalise, resolve_inbound
+
+    phone = normalise(from_number_raw)
+
+    # A navigator's own phone, linked for the Link Worker on WhatsApp: answered
+    # by Link Worker v2 and never looked up as a client. See ConvAI.staff_whatsapp.
+    from . import staff_whatsapp
+    link = staff_whatsapp.voice_link(phone)
+    if link is not None:
+        reply_text, out_name, msg = staff_whatsapp.voice_note_reply(link, media_url, content_type)
+        _send_staff_voice(phone, reply_text, out_name, msg, site_root)
+        return
+    # The one lookup by number for this message; its answer is stamped onto the
+    # Message below and never re-derived. See ConvAI.message_attribution.
+    inbound = resolve_inbound(phone)
+    patient = inbound.patient
 
     # Download audio if possible
     try:
@@ -79,7 +87,7 @@ def job_process_whatsapp_audio(
     # If no patient, just process as plain text using whatever transcript we got
     if not patient:
         body = (f"<number of attached files: 1> {body_text} {transcript}").strip() if transcript else (body_text or "")
-        reply = process_received_message(phone, body)
+        reply = process_received_message(phone, body, channel="whatsapp")
         send_whatsapp_text(phone, reply)
         return
 
@@ -102,17 +110,22 @@ def job_process_whatsapp_audio(
 
     # TTS
     out_name = f"{timezone.now().strftime('%Y%m%d%H%M%S')}_wa_out.mp3"
-    voice_id = resolve_tts_voice_id(getattr(patient, "agent", None))
-    synthesize_speech_elevenlabs(reply_text, out_name, voice_id=voice_id)
+    synthesize_speech(reply_text, out_name, agent=getattr(patient, "agent", None))
 
-    # Persist message
-    msg = Message.objects.create(
+    # Persist message. This path writes the row itself rather than going
+    # through save_message, so it has to scrub a spoken/typed Sensei passcode
+    # on its own — see ConvAI.sensei.redact.
+    from .sensei import redact as _redact_credentials
+    from .message_attribution import create_message
+    msg = create_message(
         user=phone,
         conversation_id=thread_id,
-        user_message=transcript or (body_text or ""),
+        user_message=_redact_credentials(transcript or (body_text or "")),
         response_message=reply_text,
         input_audio_file=in_name or "",
         response_audio_file=out_name,
+        patient=patient,
+        sender_role=inbound.role,
     )
 
     # Signed URL for Twilio to fetch the audio (via your download view)
@@ -140,4 +153,24 @@ def job_process_whatsapp_audio(
             pass
 
     # Fallback to plain text if media send fails
+    send_whatsapp_text(phone, reply_text)
+
+
+def _send_staff_voice(phone, reply_text, out_name, msg, site_root) -> None:
+    """Send a Link Worker reply: the text, and the voice note when there is one."""
+    if out_name and msg is not None:
+        token = build_signed_download_token(msg.id, "output", ttl_seconds=600)
+        rel = reverse("twilio_audio_download", args=[msg.id, "output"]) + f"?t={token}"
+        from twilio.rest import Client as TwClient
+        account_sid = get_setting("TWILIO_ACCOUNT_SID")
+        auth_token = get_setting("TWILIO_AUTH_TOKEN")
+        platform_phone = get_platform_phone()
+        if account_sid and auth_token and platform_phone:
+            try:
+                TwClient(account_sid, auth_token).messages.create(
+                    from_=f"whatsapp:{platform_phone}", to=f"whatsapp:{phone}",
+                    body=reply_text, media_url=[f"{site_root}{rel}"])
+                return
+            except Exception:
+                pass
     send_whatsapp_text(phone, reply_text)

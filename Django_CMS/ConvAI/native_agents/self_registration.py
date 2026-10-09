@@ -1,6 +1,6 @@
 """Self-registration native agent.
 
-Greets people who message the service from an *unknown* WhatsApp number, collects
+Greets people who message the service from an *unknown* WhatsApp or SMS number, collects
 their first name, last name and phone number, and files a ``SelfRegistration`` row
 (state ``REGISTERED``) for an admin to approve later.
 
@@ -8,7 +8,9 @@ Unlike the other native agents this one runs **without a Patient**: it is invoke
 by ``utils._handle_self_registration_flow`` for inbound messages whose sender does
 not match any patient/caregiver. The caller's phone number is passed through
 ``config["configurable"]["phone_number"]`` on every turn and surfaced to the model
-as system context, so the number rarely has to be typed by hand.
+as system context, so the number rarely has to be typed by hand. So is the
+``channel`` it arrived on (``"whatsapp"`` or ``"sms"``), which is also kept on the
+registration so whoever approves it knows how the person wrote in.
 
 Like ``protocol_qa`` it is an in-process ``create_react_agent`` with a single
 **synchronous** tool (safe for Django ORM: LangGraph runs sync tools in a worker
@@ -57,7 +59,10 @@ def valid_e164(phone: str) -> bool:
 # ----------------------------
 # ORM helper (sync; runs in LangGraph's worker thread)
 # ----------------------------
-def _create_self_registration(name: str, lastname: str, phone: str) -> dict:
+CHANNEL_NAMES = {"whatsapp": "WhatsApp", "sms": "SMS"}
+
+
+def _create_self_registration(name: str, lastname: str, phone: str, channel: str | None = None) -> dict:
     """Create (or reuse) a pending self-registration for this phone number."""
     from ..models import SelfRegistration
 
@@ -83,9 +88,28 @@ def _create_self_registration(name: str, lastname: str, phone: str) -> dict:
         lastname=lastname,
         phone_number=phone,
         state=SelfRegistration.State.REGISTERED,
-        details={"source": "self-registration-agent"},
+        details={"source": "self-registration-agent",
+                 **({"channel": channel} if channel in CHANNEL_NAMES else {})},
     )
     return {"ok": True, "already_registered": False, "id": sr.id}
+
+
+def _enrolment_enabled() -> bool:
+    """Whether this installation runs studies (see participant_management.md)."""
+    from ..site_config import get_bool
+    return get_bool("STUDY_ENROLMENT_ENABLED")
+
+
+def _link_access_code(code: str, phone: str) -> dict:
+    """Match a study access code and remember the number it came from.
+
+    A match means a clinician already enrolled this person, so there is nothing
+    to file for approval. It stops short of admitting them: a code sent over
+    WhatsApp is not consent, and the join page is where consent is taken.
+    """
+    from ..enrolment import link_phone_to_enrolment
+
+    return link_phone_to_enrolment(code, phone)
 
 
 @register("self_registration")
@@ -114,11 +138,31 @@ def build(checkpointer, model_name=None):
         number. If the phone number is already known from the system context, pass
         that value. Returns {ok, already_registered}."""
         try:
-            return _create_self_registration(name, lastname, phone_number)
+            return _create_self_registration(name, lastname, phone_number,
+                                             channel=_ctx().get("channel"))
         except Exception as e:  # pragma: no cover - defensive
             return {"ok": False, "error": f"Could not submit registration: {e}"}
 
+    @tool("check_access_code")
+    def check_access_code(code: str) -> dict:
+        """Check an access code the person says they were given for a study.
+
+        Only useful where the service runs a study. Returns {ok, name, study,
+        needs_consent} when the code matches somebody who has not claimed it yet,
+        and {ok: False} otherwise. A match means they are already enrolled, so do
+        NOT also submit a registration request for them. {ok: False, reason:
+        "locked"} means too many wrong codes from this number: stop asking for
+        one and tell them to contact the person who gave it to them."""
+        try:
+            return _link_access_code(code, _ctx().get("phone_number") or "")
+        except Exception as e:  # pragma: no cover - defensive
+            return {"ok": False, "error": f"Could not check that code: {e}"}
+
+    # The code tool is only offered where a study is actually being run. An agent
+    # that cannot do anything useful with a code should not be asking for one.
     tools = [submit_self_registration]
+    if _enrolment_enabled():
+        tools.append(check_access_code)
     system_prompt = _load_system_prompt()
 
     def prompt(state: "AgentState", config: "RunnableConfig") -> list["AnyMessage"]:
@@ -133,12 +177,34 @@ def build(checkpointer, model_name=None):
             sys += f"\nYou are registering people for {brand}."
         if language:
             sys += f"\nThe platform language is '{language}'. Start in this language."
+        # Where a study is running, an access code short-circuits the whole
+        # registration: the person is already enrolled and only needs to consent.
+        join_url = cfg.get("join_url")
+        if join_url:
+            sys += (
+                "\nThis service also runs a research study. Some people writing in "
+                "have already been enrolled by a clinician and given a three-word "
+                "access code (like 'maple-crane-frost'). Early on, ask once whether "
+                "they were given such a code. If they give you one, call "
+                "`check_access_code`. If it matches, greet them by the name it "
+                "returns, tell them they are already enrolled, and send them to "
+                f"{join_url} to read the information sheet and give consent — then "
+                "stop; do NOT collect their details or submit a registration. "
+                "If it does not match, or they have no code, carry on with the "
+                "normal registration below without dwelling on it."
+            )
+
+        channel = CHANNEL_NAMES.get(cfg.get("channel"), "WhatsApp")
+        sys += f"\nThe person is writing to the service by {channel}."
+        if channel == "SMS":
+            sys += (" Keep every reply to one or two short sentences: each text message "
+                    "costs them, and long ones arrive split into pieces.")
         if phone_number:
-            sys += (f"\nThe person is writing from WhatsApp number {phone_number}. "
+            sys += (f"\nThey are writing from {channel} number {phone_number}. "
                     "Use this as the default phone number to register — just confirm "
                     "it with them; do not ask them to type it unless they want a different one.")
         else:
-            sys += "\nTheir WhatsApp number is not available, so you must ask for it."
+            sys += f"\nTheir {channel} number is not available, so you must ask for it."
 
         msgs = state["messages"][-RECENT_MSG_LIMIT:] if state.get("messages") else []
         return [{"role": "system", "content": sys}] + msgs

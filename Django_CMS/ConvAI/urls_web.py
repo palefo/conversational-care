@@ -6,29 +6,43 @@ from django.contrib.auth.views import LogoutView
 from .views import (
     dashboard, patient_list, RoleBasedLoginView, pending_call, help_page, help_edit,
     profile, update_profile, update_language, whatsapp_webhook, update_twilio_phonecalls,
+    whatsapp_link_start, whatsapp_unlink,
     serve_protected_file, config, config_save, schedule_call,
-    patient_detail, patient_conversation_detail, make_phone_call, complete_meeting,
+    patient_detail, patient_conversation_detail, make_phone_call, start_client_call,
+    complete_meeting,
     cancel_meeting,
     calendar_view, calendar_create_meeting, create_user, user_list, create_client,
     create_test_user, test_user_result, edit_user, edit_patient,
+    add_note, edit_note, delete_note,
     agent_list, agent_form, agent_delete, agent_test, agent_test_send, agent_test_audio,
     agent_realtime_session, external_realtime_session,
+    agent_knowledge, agent_knowledge_upload, agent_knowledge_status,
+    agent_knowledge_toggle, agent_knowledge_delete, agent_knowledge_retry,
     edit_patient_details, edit_care_plan, view_care_plan,
     save_client_note, update_client_terms,
     toggle_patient_chatbot, raise_alert,
     hide_next_call,
-    download_care_plan, edit_meeting, send_whatsapp_reminder_view,
-    save_meeting_notes,
+    download_care_plan, edit_meeting, send_meeting_reminder_view,
     send_chat_message, protocol_view, protocol_editor,
     protocol_editor_save, protocol_create, protocol_delete, message_feedback,
     create_chat_link, external_chat, send_external_message, serve_audio_file,
     external_audio, process_audio, conversation_feedback, run_conversation_classification,
     issue_api_token, approve_self_registration, alert_detail, act_alert, send_alert_sms,
+    send_test_email_view,
+    PasswordResetRequestView, PasswordResetSentView,
+    PasswordResetConfirmView, PasswordResetCompleteView,
     alerts_since,
     twilio_audio_download, send_care_plan_whatsapp, twilio_careplan_download,
-    start_protocol_automation, communications,
-    summarize_meeting_view, transcribe_recording_view,
-    download_client_sdk,
+    start_protocol_automation, dismiss_sms_offer, communications, panel_fragment,
+    summarize_meeting_view, transcribe_recording_view, transcription_status, edit_overview,
+    download_client_sdk, export_messages, download_conversation,
+    # Study enrolment (participant management). Every one of these 404s unless
+    # STUDY_ENROLMENT_ENABLED is on; the check is in the view.
+    participant_enrol, participant_generate_code,
+    participant_detail, participant_status, participant_withdraw, participant_approve,
+    study_create, study_editor, study_editor_save, study_delete,
+    enrolment_landing, enrolment_claim, enrolment_consent, enrolment_done,
+    enrolment_resume,
 )
 from .utils import navigator_required, patient_tester_required
 
@@ -51,6 +65,15 @@ urlpatterns = [
     path('agents/<int:pk>/test/send/', agent_test_send, name='agent_test_send'),
     path('agents/<int:pk>/test/audio/', agent_test_audio, name='agent_test_audio'),
     path('agents/<int:pk>/test/realtime-session/', agent_realtime_session, name='agent_realtime_session'),
+    # Knowledge base for RAG-based prompt agents. Upload is one file per
+    # request so each gets its own progress bar; everything else is polled
+    # from the DB, so a reload picks up jobs already running.
+    path('agents/<int:pk>/knowledge/', agent_knowledge, name='agent_knowledge'),
+    path('agents/<int:pk>/knowledge/upload/', agent_knowledge_upload, name='agent_knowledge_upload'),
+    path('agents/<int:pk>/knowledge/status/', agent_knowledge_status, name='agent_knowledge_status'),
+    path('agents/<int:pk>/knowledge/<int:doc_id>/toggle/', agent_knowledge_toggle, name='agent_knowledge_toggle'),
+    path('agents/<int:pk>/knowledge/<int:doc_id>/delete/', agent_knowledge_delete, name='agent_knowledge_delete'),
+    path('agents/<int:pk>/knowledge/<int:doc_id>/retry/', agent_knowledge_retry, name='agent_knowledge_retry'),
     path('login/', RoleBasedLoginView.as_view(), name='login'),
     path('calls/<str:call_id>', navigator_required(pending_call), name='pending_call'),
     path('help/', navigator_required(help_page), name='help'),
@@ -58,7 +81,17 @@ urlpatterns = [
     path('profile/', navigator_required(profile), name='profile'),
     path('profile/update/', navigator_required(update_profile), name='update_profile'),
     path('profile/language/', navigator_required(update_language), name='update_language'),
+    # Link Worker on WhatsApp: link a navigator's phone (see link_worker_whatsapp.md).
+    path('profile/whatsapp/link/', navigator_required(whatsapp_link_start), name='whatsapp_link_start'),
+    path('profile/whatsapp/unlink/', navigator_required(whatsapp_unlink), name='whatsapp_unlink'),
     path('logout/', LogoutView.as_view(next_page='/'), name='logout'),
+    # Password recovery. Django's flow, our templates and provider — see
+    # ConvAI/views/account.py. The `reset/` paths keep Django's own shape so the
+    # links in older emails, if any are still in flight, resolve.
+    path('password-reset/', PasswordResetRequestView.as_view(), name='password_reset'),
+    path('password-reset/sent/', PasswordResetSentView.as_view(), name='password_reset_done'),
+    path('reset/<uidb64>/<token>/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    path('reset/done/', PasswordResetCompleteView.as_view(), name='password_reset_complete'),
     # Inbound Twilio webhook: path is configurable via TWILIO_WEBHOOK_PATH.
     path(getattr(settings, 'TWILIO_WEBHOOK_PATH', 'webhooks/whatsapp'), whatsapp_webhook, name='whatsapp_webhook'),
     path('app/update_twilio', update_twilio_phonecalls, name='update_twilio'),
@@ -69,9 +102,9 @@ urlpatterns = [
     path('patients/<int:pk>/', navigator_required(patient_detail), name='patient_detail'),
     path('patients/<int:pk>/conversations/<str:day>/', navigator_required(patient_conversation_detail), name='patient_conversation_detail'),
     path('meetings/<int:meeting_id>/call/', navigator_required(make_phone_call), name='make_phone_call'),
+    path('patients/<int:patient_id>/call/', navigator_required(start_client_call), name='start_client_call'),
     path('meetings/<int:meeting_id>/complete/', navigator_required(complete_meeting), name='complete_meeting'),
     path('meetings/<int:meeting_id>/cancel/', navigator_required(cancel_meeting), name='cancel_meeting'),
-    path('meetings/<int:meeting_id>/notes/', navigator_required(save_meeting_notes), name='save_meeting_notes'),
     path('calendar/', navigator_required(calendar_view), name='calendar'),
     path('calendar/create/', navigator_required(calendar_create_meeting), name='calendar_create_meeting'),
     path('patients/<int:pk>/edit_details/', navigator_required(edit_patient_details), name='edit_patient_details'),
@@ -79,13 +112,23 @@ urlpatterns = [
     path('patients/<int:pk>/terms/', navigator_required(update_client_terms), name='update_client_terms'),
     path('patients/<int:pk>/chatbot/', navigator_required(toggle_patient_chatbot), name='toggle_patient_chatbot'),
     path('patients/<int:pk>/raise-alert/', navigator_required(raise_alert), name='raise_alert'),
+
+    # Notes on a call, meeting, alert or conversation. One set of endpoints for
+    # all four; the kind in the path says which parent the note hangs off.
+    path('notes/<str:kind>/<str:pk>/add/', navigator_required(add_note), name='add_note'),
+    path('notes/<int:pk>/edit/', navigator_required(edit_note), name='edit_note'),
+    path('notes/<int:pk>/delete/', navigator_required(delete_note), name='delete_note'),
     path('patients/<int:pk>/care_plan/edit/', navigator_required(edit_care_plan), name="edit_care_plan"),
     path('patients/<int:pk>/care_plan/view/', navigator_required(view_care_plan), name="view_care_plan"),
     path('patients/<int:pk>/care_plan/download/', navigator_required(download_care_plan), name='download_care_plan'),
     path('meetings/<int:meeting_id>/edit/', navigator_required(edit_meeting), name='edit_meeting'),
-    path('meetings/<int:meeting_id>/send_whatsapp/', navigator_required(send_whatsapp_reminder_view), name='send_whatsapp_reminder'),
+    path('meetings/<int:meeting_id>/send_reminder/', navigator_required(send_meeting_reminder_view), name='send_meeting_reminder'),
+    # Old name for the same endpoint, from when WhatsApp was the only channel.
+    path('meetings/<int:meeting_id>/send_whatsapp/', navigator_required(send_meeting_reminder_view), name='send_whatsapp_reminder'),
     path('meetings/<int:meeting_id>/summarize/', navigator_required(summarize_meeting_view), name='summarize_meeting'),
     path('recordings/<str:sid>/transcribe/', navigator_required(transcribe_recording_view), name='transcribe_recording'),
+    path('recordings/<str:sid>/transcription/', navigator_required(transcription_status), name='transcription_status'),
+    path('summaries/<str:kind>/<str:pk>/edit/', navigator_required(edit_overview), name='edit_overview'),
     path('client-sdk/download/', download_client_sdk, name='download_client_sdk'),
     path('chat/send/', navigator_required(send_chat_message), name='send_chat_message'),
     path("meeting/<int:meeting_id>/protocol/<int:protocol_num>/", navigator_required(protocol_view), name="protocol_view"),
@@ -105,10 +148,23 @@ urlpatterns = [
     path("chat/external/audio/process/", process_audio, name="process_audio"),
     path("conversations/<str:conversation_id>/feedback/", navigator_required(conversation_feedback), name="conversation_feedback"),
     path("config/run-classification/", run_conversation_classification, name="run_conversation_classification"),
+    path("config/send-test-email/", send_test_email_view, name="send_test_email"),
+    # Admin-only and 404 unless MESSAGE_EXPORT_ENABLED is on; both checked in
+    # the view. See message_export.md.
+    path("app/export/messages.csv", export_messages, name="export_messages"),
+    # One conversation from the panel. 404 unless CONVERSATION_DOWNLOAD_ENABLED
+    # is on and the client is yours; both checked in the view.
+    path("app/export/clients/<int:patient_pk>/conversations/<str:conversation_id>.csv",
+         download_conversation, name="download_conversation"),
     path("profile/token/issue/", issue_api_token, name="issue_api_token"),
     path('self-registrations/<int:pk>/approve/', approve_self_registration, name='approve_self_registration'),
     # Polled by the notification component in base.html.
     path("alerts/since/", alerts_since, name="alerts_since"),
+    # The detail panel on its own, fetched by base.html when a row is opened so
+    # the list beside it is not thrown away and rebuilt. Same guard as every
+    # page that hosts a panel; the item itself is permission-checked again in
+    # resolve_panel_item, as it is on a full page load.
+    path("panel/", navigator_required(panel_fragment), name="panel_fragment"),
     path("alerts/<int:pk>/", alert_detail, name="alert_detail"),
     path("alerts/<int:pk>/act/", act_alert, name="act_alert"),
     path("alerts/<int:alert_id>/send-infection-sms/", send_alert_sms, name="send_alert_sms"),
@@ -116,5 +172,35 @@ urlpatterns = [
     path("patients/<int:pk>/send-care-plan/", send_care_plan_whatsapp, name="send_care_plan_whatsapp"),
     path("twilio/documents/careplan_<int:pk>.pdf/", twilio_careplan_download, name="twilio_careplan_download"),
     path("meetings/<int:meeting_id>/protocol/<int:protocol_num>/automation/start/", start_protocol_automation, name="start_protocol_automation"),
+    path("protocol/automation/sms-offer/dismiss/", dismiss_sms_offer, name="dismiss_sms_offer"),
     path("communications/", navigator_required(communications), name="communications"),
+
+    # --- Study enrolment: staff side -----------------------------------------
+    # No list route: enrolling and the not-yet-arrived queue live on the Clients
+    # page, and a consented participant is a client. Role gates as elsewhere; the
+    # feature switch is checked inside each view, so a switched-off installation
+    # 404s rather than redirecting to a login.
+    path('participants/enrol/', navigator_required(participant_enrol), name='participant_enrol'),
+    path('participants/generate-code/', navigator_required(participant_generate_code),
+         name='participant_generate_code'),
+    path('participants/<int:pk>/', navigator_required(participant_detail), name='participant_detail'),
+    path('participants/<int:pk>/status/', navigator_required(participant_status),
+         name='participant_status'),
+    path('participants/<int:pk>/withdraw/', navigator_required(participant_withdraw),
+         name='participant_withdraw'),
+    path('participants/<int:pk>/approve/', participant_approve, name='participant_approve'),
+    path('studies/create/', study_create, name='study_create'),
+    path('studies/<int:pk>/editor/', study_editor, name='study_editor'),
+    path('studies/<int:pk>/editor/save/', study_editor_save, name='study_editor_save'),
+    path('studies/<int:pk>/delete/', study_delete, name='study_delete'),
+
+    # --- Study enrolment: the public flow ------------------------------------
+    # The only unauthenticated pages in the platform. No role gate by design;
+    # the feature switch and the attempt limiter are what guard them. See
+    # participant_management.md.
+    path('join/', enrolment_landing, name='enrolment_landing'),
+    path('join/claim/', enrolment_claim, name='enrolment_claim'),
+    path('join/consent/', enrolment_consent, name='enrolment_consent'),
+    path('join/done/', enrolment_done, name='enrolment_done'),
+    path('join/resume/', enrolment_resume, name='enrolment_resume'),
 ]

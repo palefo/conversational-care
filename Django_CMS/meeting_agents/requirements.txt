@@ -1,0 +1,11 @@
+# The meeting agents' own image (see Dockerfile). Kept apart from the web app's
+# requirements on purpose: livekit-agents needs a far newer `openai` and
+# `websockets` than the web image pins, and the web image must not grow by the
+# size of an audio stack it does not use.
+livekit-agents==1.8.5
+livekit-plugins-openai==1.8.5
+aiohttp>=3.10,<4
+# PyAV and numpy arrive with livekit-agents; pinned here so a rebuild cannot
+# drift the recorder's encoder underneath it.
+av==19.0.1
+numpy>=2.0,<3

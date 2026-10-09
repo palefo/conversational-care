@@ -167,6 +167,28 @@
   /* Symmetric spacer so the call button stays centred next to the mute button. */
   .rtc-spacer { width: 56px; height: 56px; visibility: hidden; }
 
+  /* ---------- Reduced motion ----------
+     The orb is a 150px object that ripples on a 3.2s loop and scales with the
+     caller's own voice — the largest continuously moving thing in the product,
+     on a page a client holds at arm's length. Everything geometric stops here.
+
+     What survives is deliberate. Live still reads as live without any of it:
+     the idle orb is desaturated (`filter` above) and the live one is not, the
+     state line names it in words, and the timer counts. And the amplitude ring
+     is kept as a soft-edged glow rather than removed — it is the only thing
+     that answers "can you hear me?", and a shadow spreading is a far gentler
+     equivalent than a 150px disc pulsing in and out. */
+  @media (prefers-reduced-motion: reduce) {
+    .rtc-page.is-live .rtc-orb::before,
+    .rtc-page.is-live .rtc-orb::after { animation: none; opacity: 0; }
+    .rtc-page.is-live .rtc-orb-core { animation: none; }
+    .rtc-orb-core { transform: none; }
+    .rtc-page.is-connecting .rtc-call .material-icons-round { animation: none; }
+    .rtc-btn { transition: none; }
+    .rtc-btn:hover, .rtc-btn:active { transform: none; }
+    .rtc-dot { transition: none; }
+  }
+
   @media (max-width: 768px) {
     .rtc-page { max-width: 100%; box-shadow: none; }
     .rtc-orb { width: 165px; height: 165px; }
@@ -280,7 +302,10 @@
     phase = p;
     page.classList.toggle('is-live', p === 'live');
     page.classList.toggle('is-connecting', p === 'connecting');
-    callIcon.textContent = p === 'idle' ? 'call' : (p === 'connecting' ? 'progress_activity' : 'call_end');
+    // `autorenew`, not `progress_activity`: the latter is a Material Symbols
+    // glyph and the app's icon font is classic Material Icons, which renders a
+    // name it does not have as that name, in words.
+    callIcon.textContent = p === 'idle' ? 'call' : (p === 'connecting' ? 'autorenew' : 'call_end');
     callBtn.title = p === 'idle' ? T.titleStart : T.titleStop;
     muteBtn.disabled = p !== 'live';
     subEl.textContent = p === 'live' ? T.live : T.voiceAgent;

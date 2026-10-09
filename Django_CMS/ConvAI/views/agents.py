@@ -1,5 +1,5 @@
 from ._base import *  # noqa: F401,F403
-from ..forms import AgentForm, PromptAgentForm, NativeAgentForm
+from ..forms import AgentForm, PromptAgentForm, NativeAgentForm, SenseiAgentForm
 import logging
 
 from ..realtime import (mint_realtime_session, realtime_configured,
@@ -17,26 +17,63 @@ _KIND_FORMS = {
     Agent.Kind.REMOTE: AgentForm,
     Agent.Kind.PROMPT: PromptAgentForm,
     Agent.Kind.NATIVE: NativeAgentForm,
+    Agent.Kind.SENSEI: SenseiAgentForm,
 }
 _KIND_LABELS = {
     Agent.Kind.REMOTE: _("remote agent"),
     Agent.Kind.PROMPT: _("prompt-based agent"),
     Agent.Kind.NATIVE: _("native agent"),
+    Agent.Kind.SENSEI: _("Sensei agent"),
 }
 # Kinds that admins may create from scratch (native agents are seeded, not created).
-_CREATABLE_KINDS = {Agent.Kind.REMOTE, Agent.Kind.PROMPT}
+_CREATABLE_KINDS = {Agent.Kind.REMOTE, Agent.Kind.PROMPT, Agent.Kind.SENSEI}
+
+
+def _kind_available(kind) -> bool:
+    """Whether ``kind`` may be created on this installation.
+
+    Sensei is behind a flag that is off by default (Settings -> Sensei). Only
+    *creation* is gated: an agent created while the flag was on stays editable
+    after it is turned off, so flipping the switch off and on again does not
+    cost an admin the configuration they wrote.
+    """
+    if kind == Agent.Kind.SENSEI:
+        from .. import sensei
+        return sensei.enabled()
+    return True
 
 
 @login_required
 @admin_required
 def agent_list(request):
-    """Admin-only listing of agents, grouped by kind."""
-    agents = Agent.objects.order_by('name')
+    """Admin-only listing of agents, grouped by kind (and prompt subtype)."""
+    from ..models import RagDocument
+    from .. import sensei
+    # The document count is annotated rather than read per card, which would be
+    # a query per RAG agent. Only ready *and* enabled documents count: that is
+    # what the agent can actually search.
+    agents = Agent.objects.annotate(
+        active_document_count=Count(
+            'rag_documents',
+            filter=Q(rag_documents__enabled=True,
+                     rag_documents__status=RagDocument.Status.READY),
+        ),
+    ).order_by('name')
+    prompt_agents = [a for a in agents if a.kind == Agent.Kind.PROMPT]
+    sensei_agents = [a for a in agents if a.kind == Agent.Kind.SENSEI]
     return render(request, 'agents/agent_list.html', {
         'active_page': 'agents',
         'native_agents': [a for a in agents if a.kind == Agent.Kind.NATIVE],
-        'prompt_agents': [a for a in agents if a.kind == Agent.Kind.PROMPT],
+        'prompt_agents': prompt_agents,
+        'plain_prompt_agents': [a for a in prompt_agents if not a.rag_enabled],
+        'rag_agents': [a for a in prompt_agents if a.rag_enabled],
         'remote_agents': [a for a in agents if a.kind == Agent.Kind.REMOTE],
+        'sensei_agents': sensei_agents,
+        # The tab is hidden entirely on installations that do not use Sensei —
+        # unless some already exist, in which case hiding it would strand them
+        # with no way to reach the rows.
+        'show_sensei': sensei.enabled() or bool(sensei_agents),
+        'sensei_enabled': sensei.enabled(),
     })
 
 
@@ -57,6 +94,10 @@ def agent_form(request, pk=None, kind=None):
     if agent is None and kind not in _CREATABLE_KINDS:
         messages.error(request, _("That agent kind cannot be created here."))
         return redirect('agents')
+    if agent is None and not _kind_available(kind):
+        messages.error(request, _("Sensei agents are not enabled on this "
+                                  "installation. Turn Sensei on in Settings first."))
+        return redirect('agents')
 
     FormClass = _KIND_FORMS[kind]
     if request.method == 'POST':
@@ -69,11 +110,26 @@ def agent_form(request, pk=None, kind=None):
             messages.success(request, _("Agent saved.") if agent else _("Agent created."))
             return redirect('agents')
     else:
-        form = FormClass(instance=agent)
+        # "New RAG agent" links here with ?rag=1, so the subtype the admin
+        # picked on the previous page arrives pre-selected.
+        initial = {}
+        if agent is None and kind == Agent.Kind.PROMPT and request.GET.get('rag') == '1':
+            initial['rag_enabled'] = True
+        form = FormClass(instance=agent, initial=initial)
     # Classification fields are advanced/optional; the form template tucks them
     # into a collapsible section when the form has them.
     classification_fields = ['classification_role', 'abstract_instruction', 'detectors']
     show_classification = any(f in form.fields for f in classification_fields)
+
+    # The prompt and the per-tool prompts are drawn together as one tabbed
+    # editor, so they are lifted out of the template's generic field loop. The
+    # names are collected from the form rather than hard-coded: which tools
+    # exist is the registry's business (see native_agents/tool_registry.py).
+    tool_specs = getattr(form, 'tool_specs', [])
+    prompt_fields = ['system_prompt'] if 'system_prompt' in form.fields else []
+    if tool_specs:
+        prompt_fields.append('tool_slugs')
+        prompt_fields += [f'{form.TOOL_PROMPT_PREFIX}{t["slug"]}' for t in tool_specs]
     return render(request, 'agents/agent_form.html', {
         'active_page': 'agents',
         'form': form,
@@ -82,6 +138,13 @@ def agent_form(request, pk=None, kind=None):
         'kind_label': _KIND_LABELS[kind],
         'classification_fields': classification_fields,
         'show_classification': show_classification,
+        # The tabbed prompt editor: the agent's own prompt, plus a tab per tool
+        # whose wording it may override, plus a preview of the two concatenated.
+        'tool_specs': tool_specs,
+        'prompt_fields': prompt_fields,
+        # Documents hang off a saved agent, so the link only makes sense once
+        # there is one to hang them off.
+        'show_knowledge_link': bool(agent and agent.kind == Agent.Kind.PROMPT),
     })
 
 
@@ -94,7 +157,18 @@ def agent_delete(request, pk):
     if agent.kind == Agent.Kind.NATIVE:
         messages.error(request, _("Native agents cannot be deleted."))
         return redirect('agents')
+    # Deleting the agent cascades to its knowledge-base rows, but the uploaded
+    # files sit on the media volume and the cascade never reaches them. Collect
+    # them before the delete, while the rows still point at them.
+    stored_files = [d.file for d in agent.rag_documents.all()]
     agent.delete()
+    for stored_file in stored_files:
+        try:
+            stored_file.delete(save=False)
+        except Exception:  # pragma: no cover - a leftover file is not fatal
+            logger.warning("Could not delete a knowledge-base file for agent %s", pk)
+    from ..rag.retrieve import invalidate
+    invalidate(pk)
     messages.success(request, _("Agent deleted."))
     return redirect('agents')
 
@@ -152,6 +226,18 @@ def agent_test(request, pk):
     })
 
 
+def _test_chat_context(agent, request):
+    """Run config for the test chat, where an agent needs to know who is asking.
+
+    Link Worker v2 answers staff only, from staff_user_id (see link_worker_v2.md).
+    The test chat is admin-only, so it can say who that is — and v2 then answers
+    exactly as it would in the chat bubble, reads logged like any other.
+    """
+    if agent.kind == Agent.Kind.NATIVE and agent.native_key == "link_worker_v2":
+        return {"staff_user_id": request.user.pk, "is_admin": is_admin(request.user)}
+    return None
+
+
 @login_required
 @admin_required
 @require_POST
@@ -171,7 +257,8 @@ def agent_test_send(request, pk):
     if user_msg.lower() in ('/quit', '/restart'):
         return JsonResponse({'user_message': user_msg,
                              'bot_message': str(_("Conversation ended.")), 'reset': True})
-    bot_msg = generate_response_with_agent(agent, request.user, user_msg, thread_id)
+    bot_msg = generate_response_with_agent(agent, request.user, user_msg, thread_id,
+                                           extra_configurable=_test_chat_context(agent, request))
     return JsonResponse({'user_message': user_msg, 'bot_message': bot_msg})
 
 
@@ -205,12 +292,13 @@ def agent_test_audio(request, pk):
                 fp.write(chunk)
 
         transcript = (transcribe_audio(in_path) or '').strip()
-        resp_text = generate_response_with_agent(agent, request.user, transcript, thread_id)
+        resp_text = generate_response_with_agent(agent, request.user, transcript, thread_id,
+                                                 extra_configurable=_test_chat_context(agent, request))
 
         # Best-effort TTS; fall back to text-only if it fails.
         response_audio = ''
         try:
-            synthesize_speech_elevenlabs(resp_text, out_name, voice_id=resolve_tts_voice_id(agent))
+            synthesize_speech(resp_text, out_name, agent=agent)
             with open(out_path, 'rb') as fp:
                 response_audio = "data:audio/mpeg;base64," + base64.b64encode(fp.read()).decode('ascii')
         except Exception:

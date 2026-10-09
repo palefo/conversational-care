@@ -1,0 +1,83 @@
+{% load i18n %}
+{% comment %}
+  Settings → Online meetings. Contributed by the meetings app through
+  ConvAI.extensions; `ctx` is meetings.settings_tab._context. Visible to admins
+  whether the feature is on or off — the switch has to be somewhere to be
+  turned on.
+{% endcomment %}
+<div class="card p-6">
+  <div class="flex items-start gap-3 mb-5">
+    <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">videocam</span>
+    <div>
+      <h2 class="text-lg font-semibold text-gray-800">{% trans "Online meetings" %}</h2>
+      <p class="text-sm text-gray-500">{% trans "Meetings in the browser between a navigator and a client or caregiver, with a link instead of a phone number. Audio can be recorded and is transcribed in the background; an AI interviewer can work through a protocol by voice while you listen." %}</p>
+    </div>
+  </div>
+
+  {% with st=ctx.status %}
+    {% if not st.enabled %}
+      <div class="px-4 py-3 mb-5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm flex items-start gap-2">
+        <span class="material-icons-outlined text-base">toggle_off</span>
+        <div>{% trans "Online meetings are off. While off, nobody can book or join one; meetings booked earlier stay readable, and a meeting already in progress is allowed to finish." %}</div>
+      </div>
+    {% elif st.missing %}
+      <div class="px-4 py-3 mb-5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-sm flex items-start gap-2">
+        <span class="material-icons-outlined text-base">warning_amber</span>
+        <div>
+          {% trans "Online meetings are on, but no meeting server is connected. Set these in the server's .env and restart:" %}
+          <code class="text-xs">{{ st.missing|join:", " }}</code>.
+          {% trans "See online_meetings.md for running the bundled LiveKit server." %}
+        </div>
+      </div>
+    {% elif st.reachable is False %}
+      <div class="px-4 py-3 mb-5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-sm flex items-start gap-2">
+        <span class="material-icons-outlined text-base">cloud_off</span>
+        <div>{% blocktrans with u=st.livekit_url %}The meeting server at {{ u }} could not be reached, or refused this server's key. Check that it is running (docker compose --profile meetings up) and that LIVEKIT_API_KEY and LIVEKIT_API_SECRET match its configuration.{% endblocktrans %}</div>
+      </div>
+    {% else %}
+      <div class="px-4 py-3 mb-5 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm flex items-start gap-2">
+        <span class="material-icons-outlined text-base">check_circle</span>
+        <div>
+          {% blocktrans with u=st.livekit_url n=ctx.live_rooms %}Online meetings are on and connected to {{ u }}. Meetings running now: {{ n }}.{% endblocktrans %}
+          {% if st.agents_missing %}<br>{% trans "Recording and the AI agents are not available: MEETINGS_SERVICE_KEY is not set." %}{% endif %}
+          {% if not ctx.worker_seen %}<br>{% trans "No background worker is running, so recordings will not be mixed down or transcribed until one is started." %}{% endif %}
+        </div>
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <form method="post" action="{% url 'config_save' %}">
+    {% csrf_token %}
+    <input type="hidden" name="section" value="meetings">
+    {% include "settings/_field.html" with field=ctx.form.enabled %}
+
+    <div class="stg-group">
+      <div class="stg-group-title">{% trans "In the meeting" %}</div>
+      {% include "settings/_field.html" with field=ctx.form.record_by_default %}
+      {% include "settings/_field.html" with field=ctx.form.auto_admit %}
+      {% include "settings/_field.html" with field=ctx.form.assistant_agent %}
+      {% include "settings/_field.html" with field=ctx.form.interviewer_voice %}
+    </div>
+
+    <div class="stg-group">
+      <div class="stg-group-title">{% trans "Links" %}</div>
+      {% include "settings/_field.html" with field=ctx.form.link_early_minutes %}
+      {% include "settings/_field.html" with field=ctx.form.link_late_hours %}
+    </div>
+
+    <div class="stg-group">
+      <div class="stg-group-title">{% trans "Capacity" %}</div>
+      {% include "settings/_field.html" with field=ctx.form.max_live_rooms %}
+      {% include "settings/_field.html" with field=ctx.form.max_minutes %}
+    </div>
+
+    <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+  </form>
+</div>
+
+<div class="card p-6 mt-6">
+  <h3 class="font-semibold text-gray-800 mb-2">{% trans "What runs where" %}</h3>
+  <p class="text-sm text-gray-500 mb-3">{% trans "The meeting server and the AI agents only run when they are started, so an installation that does not use online meetings pays nothing for them." %}</p>
+  <pre class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs overflow-x-auto"><code>docker compose -f docker-compose.yml -f docker-compose.meetings.yml --profile meetings up -d</code></pre>
+  <p class="text-xs text-gray-500 mt-2">{% trans "Connection settings live in .env because the web app, the meeting server and the agents must all share them: LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET and MEETINGS_SERVICE_KEY." %}</p>
+</div>

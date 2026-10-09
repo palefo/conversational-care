@@ -52,13 +52,73 @@ class ConvAIUser(AbstractUser):
         help_text=_("Preferred interface language; blank uses the system default."),
     )
 
+    # Which study's participants this person works with. Blank means all of them,
+    # which is the right default: a platform with one study, or none, should not
+    # make anybody choose. Set it and the enrolment panel on Clients narrows to
+    # that arm — useful where two studies share an installation and their teams
+    # should not be reading each other's cohort. Never a permission on its own: it narrows
+    # what an already-authorised member of staff sees, and admins ignore it.
+    study = models.ForeignKey(
+        'Study',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="staff",
+        help_text=_("Limit this user to one study's participants. Blank sees all studies."),
+    )
+
 
 
 
 class Message(models.Model):
+    """One exchange: what came in (``user_message``) and what went out.
+
+    **Who a message belongs to is decided once, when it is written, and never
+    re-derived.** ``patient`` and ``account`` are that decision; see
+    ConvAI.message_attribution and message_attribution.md.
+
+    ``user`` is the raw address the message arrived from or was sent to — a
+    phone number, an email, a username. It is kept as history and must not be
+    used to work out whose message this is: numbers change hands, and a client
+    who gets a new number keeps their past messages only because ``patient``
+    was fixed when those messages arrived. Rows written before migration 0089
+    may still have no owner, and those alone fall back to matching ``user``.
+    """
+
+    class SenderRole(models.TextChoices):
+        # Who wrote the inbound side. Outbound-only rows (reminders, alert SMS,
+        # care plans) have nobody writing in and are PLATFORM.
+        CLIENT = "client", _("Client")
+        CAREGIVER = "caregiver", _("Caregiver")
+        STAFF = "staff", _("Staff")          # a navigator or admin, through a login
+        TESTER = "tester", _("Tester")       # a tester login standing in for a client
+        API = "api", _("API account")        # an SDK / integration account
+        PROSPECT = "prospect", _("Prospective client")  # self-registration, not a client yet
+        PLATFORM = "platform", _("Platform") # outbound only; nobody wrote in
+        UNKNOWN = "", _("Unknown")           # legacy rows the backfill could not place
+
     conversation_id = models.CharField(max_length=300)
     user = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+
+    # The client file this message belongs to, fixed at receipt. SET_NULL so a
+    # deleted client does not take the audit trail of what was said with them.
+    patient = models.ForeignKey(
+        "Patient", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="messages", db_index=True,
+        help_text="Client this message belongs to, fixed when it was written.",
+    )
+    # The login it came through, when it came through one: the Link Worker
+    # bubble (a navigator), /api/v1/messages/ (an SDK account), the tester chat
+    # (a tester account, alongside the client it stands in for).
+    account = models.ForeignKey(
+        "ConvAIUser", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="messages", db_index=True,
+        help_text="Login this message came through, if any.",
+    )
+    sender_role = models.CharField(
+        max_length=16, choices=SenderRole.choices, blank=True, default="",
+        help_text="Who wrote the inbound side, decided when the message arrived.",
+    )
     user_message = models.TextField()
 
     response_message = models.TextField()
@@ -83,24 +143,179 @@ class Message(models.Model):
         ordering = ["timestamp"]
         indexes = [
             models.Index(fields=["conversation_id", "user", "timestamp"]),
+            # The client timeline and the day panel both ask "this client's
+            # messages on this day", which is this index exactly.
+            models.Index(fields=["patient", "timestamp"], name="message_patient_ts_idx"),
         ]
 
     def __str__(self):
         return f"[{self.timestamp}] {self.user} → {self.conversation_id}"
 
 class CallRecording(models.Model):
+    class Leg(models.IntegerChoices):
+        """Which side of a conference this is a recording of.
+
+        A conference is two calls, not one — see make_phone_conference. One
+        goes out to the client side and one to the navigator's own phone, and
+        both are recorded. Only the first is a record of the client.
+        """
+        DYAD = 0, _("Client side")
+        CTN = 1, _("Navigator side")
+
+    class Source(models.IntegerChoices):
+        """Where the audio came from.
+
+        TWILIO recordings can be re-fetched from Twilio (the WAV twin with the
+        channels intact); ONLINE ones are mixed down from a browser meeting's
+        per-participant tracks, listed in ``tracks``. Transcription branches on
+        this rather than asking Twilio about a recording it never made.
+        """
+        TWILIO = 0, _("Phone (Twilio)")
+        ONLINE = 1, _("Online meeting")
+
     recording_sid = models.CharField(max_length=100)
-    from_number = models.CharField(max_length=100)
-    to_number = models.CharField(max_length=100)
+    from_number = models.CharField(max_length=100, blank=True, default="")
+    to_number = models.CharField(max_length=100, blank=True, default="")
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     duration = models.IntegerField()
-    filename = models.CharField(max_length=100, null=True)
+    # An absolute path; 100 characters did not fit a meeting's nested folder.
+    filename = models.CharField(max_length=255, null=True)
+    source = models.SmallIntegerField(choices=Source.choices, default=Source.TWILIO)
+    # Who the transcript's speakers are: {"1": {"label": "Ana", "role":
+    # "caregiver"}, ...}. Empty for phone calls, whose two channels have no
+    # names attached — the panel falls back to "Speaker 1/2" for those.
+    speakers = models.JSONField(blank=True, default=dict)
+    # The per-speaker audio a mixdown was built from: [{"speaker": 1, "path":
+    # ".../ana-0.ogg", "offset_s": 12.4}, ...]. Kept on the recording, not only
+    # on the meeting app's own rows, so "Transcribe again" still works if that
+    # app is later removed.
+    tracks = models.JSONField(blank=True, default=list)
+
+    # Whose recording this is, and which call it came from.
+    #
+    # The two phone numbers above used to be the only answer to both questions,
+    # and a phone number is not an identity. It cannot say *which* client: one
+    # number can belong to two of them — a caregiver who looks after one client
+    # and is themself another, or a shared household line — and the same call
+    # was then drawn on both timelines. It cannot even say whether a client is
+    # involved at all: the navigator's own leg of a conference has a staff
+    # number on it, and matching on numbers filed it against whichever client
+    # happened to share that number.
+    #
+    # None of this ever had to be inferred. Twilio hands back a Call SID for
+    # each leg at the moment it is placed, when the meeting and the client are
+    # both in hand; see CallLeg, which is where that is written down, and
+    # get_recordings_from_twilio, which joins the audio back to it on call_sid.
+    #
+    # All four stay nullable. Recordings made before any of this exists have
+    # none of it and must keep rendering, so every surface falls back to
+    # matching numbers for rows where `patient` is null.
+    meeting = models.ForeignKey(
+        'Meeting', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="recordings",
+        help_text=_("The call this recording came from, where it is known."),
+    )
+    patient = models.ForeignKey(
+        'Patient', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="recordings",
+        help_text=_("Whose recording this is. Kept alongside the meeting rather "
+                    "than read through it, so a call placed outside a meeting "
+                    "still has an owner."),
+    )
+    leg = models.SmallIntegerField(
+        choices=Leg.choices, null=True, blank=True,
+        help_text=_("Which side of the conference this recording is of."),
+    )
+    call_sid = models.CharField(
+        max_length=64, blank=True, default="", db_index=True,
+        help_text=_("Twilio's Call SID — the join back to the leg that was placed."),
+    )
 
     # Whisper transcription + LLM post-processed summary (filled on demand).
     transcript = models.TextField(blank=True, default="", help_text="Whisper transcription of the call audio")
     transcript_summary = models.TextField(blank=True, default="", help_text="LLM summary of the transcript")
     transcribed_at = models.DateTimeField(null=True, blank=True)
+    # Whisper returns every segment with a start and an end; the plain text
+    # above threw them away. Kept as [{"start": 12.4, "end": 18.1, "text": "…",
+    # "speaker": 1|2|null}] so the panel can run a timestamp down the side and
+    # jump the player to a line. `speaker` is only filled when the recording
+    # has two channels to tell the parties apart — see utils.transcribe_audio.
+    transcript_segments = models.JSONField(blank=True, default=list,
+                                           help_text="Whisper segments: start, end, text, speaker")
+    # Moments worth jumping to, each anchored to a segment rather than to a
+    # timestamp the model wrote itself, so a moment cannot point at audio that
+    # is not there. [{"text": "…", "segment": 4, "start": 132.0}]
+    transcript_moments = models.JSONField(blank=True, default=list,
+                                          help_text="Key moments, each anchored to a segment")
+
+    @property
+    def is_navigator_leg(self):
+        """True when this is a recording of the navigator's own phone.
+
+        Their leg is close to a duplicate of the client's — that one is
+        dual-channel and already carries both sides of the conference — and it
+        is never a record of contact with the client, so client-facing lists
+        leave it out.
+        """
+        return self.leg == self.Leg.CTN
+
+    def owner_patients(self):
+        """Every client this recording could belong to.
+
+        Exactly one where the recording names one. Where it does not, this is
+        the old rule — match the numbers — and it can legitimately return more
+        than one client, which is the whole problem the relation above exists to
+        stop. Callers that need a single answer use resolve_patient; callers
+        deciding whether someone may reach the audio use this, because a legacy
+        recording on a shared number belongs, as far as anything can tell, to
+        every client on that number.
+        """
+        if self.patient_id:
+            return Patient.objects.filter(pk=self.patient_id)
+        nums = {str(self.to_number or ""), str(self.from_number or "")}
+        nums.discard("")
+        if not nums:
+            return Patient.objects.none()
+        return Patient.objects.filter(
+            Q(phone_number__in=nums) | Q(caregiver__phone_number__in=nums)
+        )
+
+    def resolve_patient(self):
+        """The one client this recording belongs to, or None.
+
+        Prefers what the call wrote down when it was placed. Falls back to
+        matching numbers only for rows that have nothing written down, where it
+        picks the first of possibly several — a guess, kept because a legacy
+        recording nobody can reach is worse than one filed under the wrong name.
+        """
+        if self.patient_id:
+            return self.patient
+        return self.owner_patients().select_related("caregiver", "navigator").first()
+
+    @classmethod
+    def for_patient(cls, patient, numbers=()):
+        """This client's recordings, newest first.
+
+        Two rules rather than one. A recording that names its client is that
+        client's and nobody else's — that is what the relation is for, and a
+        number it happens to share with someone else no longer drags it onto
+        their timeline. A recording that names nobody falls back to matching
+        `numbers`, which is how rows made before the relation existed still find
+        their way home.
+
+        The navigator's own leg is left out of both. It is filed under the call
+        it belongs to and reachable from there, but it is a recording of staff
+        and was never this client's contact history.
+        """
+        cond = Q(patient=patient)
+        nums = [n for n in (numbers or ()) if n]
+        if nums:
+            cond |= Q(patient__isnull=True, to_number__in=nums)
+        return (cls.objects
+                .filter(cond)
+                .exclude(leg=cls.Leg.CTN)
+                .order_by('-start_time'))
 
 
 class Caregiver(models.Model):
@@ -114,6 +329,10 @@ class Caregiver(models.Model):
     name = models.TextField()
     lastname = models.TextField()
     phone_number = PhoneNumberField(blank=True, null=True)
+    # Where an email reminder goes when REMINDER_CHANNEL is 'email'. The
+    # caregiver is tried first and the client second, because the caregiver is
+    # who the call is actually arranged with.
+    email = models.EmailField(blank=True, default="")
     relationship = models.CharField(
         max_length=60, blank=True,
         help_text="How they are related to the client — daughter, neighbour, paid carer",
@@ -158,6 +377,8 @@ class Patient(models.Model):
     name = models.TextField()
     lastname = models.TextField()
     phone_number = PhoneNumberField(blank=True, null=True)
+    # Fallback recipient for email reminders when the caregiver has no address.
+    email = models.EmailField(blank=True, default="")
     caregiver = models.ForeignKey(
         Caregiver,
         on_delete=models.SET_NULL,
@@ -185,6 +406,20 @@ class Patient(models.Model):
         blank=True,
         null=True,
         help_text="Sube aquí el Plan de Cuidado en PDF (máx. 5 MB)."
+    )
+
+    # The protocols this person actually works through — their programme.
+    #
+    # The panel used to list every protocol in the platform for every client,
+    # because existing was the only thing that put one on screen. Which
+    # protocols apply to someone is a decision about them, so it is recorded
+    # against them. Empty on a new client on purpose: an empty panel asks the
+    # question, a full one answers it wrongly.
+    protocols = models.ManyToManyField(
+        'Protocol',
+        blank=True,
+        related_name='patients',
+        help_text="Protocols this client works through. Shown in their call panel.",
     )
 
     agent = models.ForeignKey(
@@ -314,6 +549,11 @@ class Meeting(models.Model):
 
     cancel_reason = models.CharField(max_length=200, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    # When someone recorded how the call went. Distinct from scheduled_time,
+    # which is when it was meant to happen: a call recorded late — or early,
+    # from a diary entry days ahead — would otherwise sit in Happened under a
+    # date it did not happen on, sometimes one still in the future.
+    ended_at = models.DateTimeField(null=True, blank=True)
 
     class Modality(models.IntegerChoices):
         """How the meeting happens.
@@ -325,8 +565,23 @@ class Meeting(models.Model):
         """
         PHONE = 0, _("Phone call")
         IN_PERSON = 1, _("In person")
+        # In the browser: a link instead of a number, provided by the optional
+        # `meetings` app (see online_meetings.md). The value stays valid with
+        # the app switched off or removed, so the rows keep reading.
+        ONLINE = 2, _("Online meeting")
 
     class Protocol(models.IntegerChoices):
+        """Legacy. Frozen — do not add to it, do not offer it to anyone.
+
+        These labels are placeholders that were never the names of any real
+        protocol: a picker built from them offered eight protocols nobody had
+        created and could never offer an eleventh that someone had. What a call
+        covers now lives in `scheduled_protocols` / `executed_protocols`, which
+        point at actual Protocol records.
+
+        Kept only so the two integer columns below still validate while they
+        wait to be dropped.
+        """
         PROTOCOL_1  = 1, _("1. Protocol 1")
         PROTOCOL_2  = 2, _("2. Protocol 2")
         PROTOCOL_3  = 3, _("3. Protocol 3")
@@ -338,10 +593,40 @@ class Meeting(models.Model):
         FINAL_CALL  = 9, _("9. Final call")
         SEGUIMIENTO = 10, _("10. Follow-up")
 
+    class DialTarget(models.IntegerChoices):
+        """Whose phone this call rings on the client side.
+
+        Every call the platform had ever placed went to the caregiver — see
+        make_phone_call — so CAREGIVER is 0 and every row written before this
+        keeps meaning exactly what it did. CLIENT is new: a client with a phone
+        of their own could not be reached at all, and "we rang Manuel himself"
+        is a fact about the call worth keeping rather than one to be guessed
+        back out of a phone number afterwards.
+        """
+        CAREGIVER = 0, _("Caregiver")
+        CLIENT = 1, _("Client")
+
     modality = models.IntegerField(
         choices=Modality.choices,
         default=Modality.PHONE,
         help_text="Phone call or in-person meeting",
+    )
+    dial_target = models.IntegerField(
+        choices=DialTarget.choices,
+        default=DialTarget.CAREGIVER,
+        help_text="Which of the client's two numbers the bridge rings",
+    )
+    # A call placed from the client page rather than one that was booked.
+    #
+    # It is a Meeting like any other, because that is what makes it a call the
+    # platform can hold: the recording is attributed through it, it carries the
+    # protocols and the notes, and it is closed with an outcome like the rest.
+    # What this flag says is only that nobody arranged it beforehand — so the
+    # lists can stop calling it a "Scheduled call", which is the one thing it
+    # is not.
+    unscheduled = models.BooleanField(
+        default=False,
+        help_text="Placed on the spot rather than booked in advance",
     )
     location = models.CharField(
         max_length=200,
@@ -349,17 +634,39 @@ class Meeting(models.Model):
         help_text="Where an in-person meeting takes place",
     )
 
+    # What this call covers, and what it turned out to cover.
+    #
+    # Both were a single integer against the placeholder list above, so a call
+    # that worked through the session note and the IQCODE had to claim it did
+    # one of them. They are relations now, and they point at protocols that
+    # exist.
+    scheduled_protocols = models.ManyToManyField(
+        'Protocol',
+        blank=True,
+        related_name='scheduled_meetings',
+        help_text="Protocols this call is booked to address.",
+    )
+    executed_protocols = models.ManyToManyField(
+        'Protocol',
+        blank=True,
+        related_name='executed_meetings',
+        help_text="Protocols actually covered, recorded when the call is closed.",
+    )
+
+    # Legacy, read once by migration 0077 and never written again. They are the
+    # single-protocol version of the two relations above and are scheduled for
+    # removal; nothing should read them.
     scheduled_protocol = models.IntegerField(
         choices=Protocol.choices,
         null=True,
         blank=True,
-        help_text="Protocolo programado (1–8) o llamada final (9)"
+        help_text="Deprecated — superseded by scheduled_protocols.",
     )
     executed_protocol = models.IntegerField(
         choices=Protocol.choices,
         null=True,
         blank=True,
-        help_text="Protocolo ejecutado (1–8) o llamada final (9)"
+        help_text="Deprecated — superseded by executed_protocols.",
     )
 
     scheduled_time = models.DateTimeField()
@@ -398,11 +705,62 @@ class Meeting(models.Model):
     protocol_summary = models.TextField(blank=True, default="", help_text="LLM summary of this meeting's protocol answers")
     protocol_summarized_at = models.DateTimeField(null=True, blank=True)
 
-    # Free-text notes taken during the call. Deliberately separate from the
-    # protocol answers: not everything worth recording belongs to a question,
-    # and protocol_summary above is written by the LLM, not by a person.
-    notes = models.TextField(blank=True, default="", help_text="Navigator's own notes for this call")
-    notes_updated_at = models.DateTimeField(null=True, blank=True)
+    # Free-text notes are Note rows (see the Note model), not a field here. The
+    # single overwritten blob that used to live at Meeting.notes was migrated
+    # away in 0067 and the columns dropped in 0072.
+
+    @property
+    def happened_at(self):
+        """When this meeting actually became a past event.
+
+        Lists of what has happened order and date themselves by this. The panel
+        still shows scheduled_time, because when it was meant to be is a
+        different fact and worth keeping.
+        """
+        return self.ended_at or self.cancelled_at or self.scheduled_time
+
+    @property
+    def dial_recipient(self):
+        """Who this call rings, or None when there is nobody to ring.
+
+        The two sides of dial_target are different kinds of object — a
+        Caregiver row and the Patient themself — and every surface that asks
+        "who is on this call" wants the same three things off either one. So
+        they are answered here rather than by an `if` repeated in the view, the
+        panel and the picker.
+
+        None when the chosen side has no number: a caregiver who was never
+        recorded, or a client whose own number is blank. That is the same
+        answer as "this call cannot be placed", which is what the callers do
+        with it.
+        """
+        # Only a phone call rings anybody. This used to test for IN_PERSON
+        # alone, which would have had an online meeting place a Twilio call.
+        if self.modality != Meeting.Modality.PHONE:
+            return None
+        if self.dial_target == Meeting.DialTarget.CLIENT:
+            who = self.patient
+        else:
+            who = self.patient.caregiver if self.patient_id else None
+        return who if (who and who.phone_number) else None
+
+    @property
+    def kind(self):
+        """``'call'``, ``'visit'`` or ``'online'`` — how lists and the panel say it.
+
+        Every surface used to branch on ``modality == IN_PERSON`` as a yes/no,
+        which a third modality silently turns into "call". Asking this instead
+        keeps the vocabulary in one place.
+        """
+        if self.modality == Meeting.Modality.IN_PERSON:
+            return "visit"
+        if self.modality == Meeting.Modality.ONLINE:
+            return "online"
+        return "call"
+
+    @property
+    def is_online(self):
+        return self.modality == Meeting.Modality.ONLINE
 
     @property
     def panel_token(self):
@@ -420,11 +778,75 @@ class Meeting(models.Model):
         return f"Meeting with {self.patient} at {self.scheduled_time}"
 
 
+class CallLeg(models.Model):
+    """One outbound call placed for one meeting.
+
+    A conference is two calls — the navigator's phone and the client side — and
+    Twilio answers each with a Call SID the instant it is placed. Those SIDs
+    were being discarded: make_phone_conference had no return statement at all,
+    so the one fact that ties a recording to the call it came from was created
+    and thrown away, and every surface downstream was left to work it out again
+    from phone numbers, which cannot.
+
+    This is where that fact waits. The audio arrives minutes or hours later
+    carrying nothing but its own SID and two numbers; get_recordings_from_twilio
+    joins on call_sid and copies meeting, patient and leg onto the recording.
+
+    A row here records a call that was placed, not a recording that exists. A
+    leg nobody answered, or one placed with recording switched off, simply never
+    gets one, and that is not a fault — it is what an unanswered call looks
+    like.
+    """
+
+    call_sid = models.CharField(
+        max_length=64, unique=True,
+        help_text=_("Twilio's Call SID for this leg."),
+    )
+    meeting = models.ForeignKey(
+        Meeting, on_delete=models.CASCADE, related_name="legs",
+    )
+    # Denormalised from the meeting for the same reason CallRecording keeps it:
+    # so the answer survives the meeting being deleted, and so filling in a
+    # recording costs one read rather than a join.
+    patient = models.ForeignKey(
+        Patient, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="call_legs",
+    )
+    leg = models.SmallIntegerField(choices=CallRecording.Leg.choices)
+    to_number = models.CharField(max_length=100, blank=True, default="")
+    conference_name = models.CharField(max_length=64, blank=True, default="")
+    placed_at = models.DateTimeField(auto_now_add=True)
+    placed_by = models.ForeignKey(
+        'ConvAIUser', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="call_legs_placed",
+    )
+
+    class Meta:
+        ordering = ["-placed_at"]
+
+    def __str__(self):
+        return f"{self.get_leg_display()} leg {self.call_sid} of meeting {self.meeting_id}"
+
+
 class Protocol(models.Model):
     """A self-contained protocol (1 … 8, llamada final, etc.)."""
     number      = models.PositiveSmallIntegerField(unique=True)
     title       = models.CharField(max_length=120)
     description = models.TextField(blank=True)
+
+    # Some protocols are asked once — the Basic Information Request, where
+    # asking twice would be a mistake. Others are instruments meant to be
+    # re-taken: the IQCODE compares someone with how they were, and a score
+    # only means anything next to the last one.
+    #
+    # This changes how answers are *read*, never how they are stored — they
+    # have always been kept one per question per call. A repeatable protocol
+    # gives each call its own round with the earlier ones beneath it, and never
+    # reads as finished.
+    repeatable = models.BooleanField(
+        default=False,
+        help_text="This protocol is answered again on later calls, each call its own round.",
+    )
 
     class Meta:
         ordering = ["number"]
@@ -456,6 +878,27 @@ class Answer(models.Model):
     One answer per (meeting, question) pair.
     Blank answers are not stored (view logic deletes row if left empty).
     """
+    # Whether the caregiver texted this back or a navigator typed it. The panel
+    # tints the two differently: on a call half answered by text, whose words
+    # these are changes what you do with them.
+    by_text = models.BooleanField(
+        default=False,
+        help_text="True when the protocol_qa automation captured this from a message",
+    )
+
+    class Source(models.TextChoices):
+        """Whose words these are, which by_text could only answer for text.
+
+        A voice interviewer in an online meeting is a third way an answer
+        arrives, and "came back by text" is wrong for it. ``by_text`` is kept,
+        and written alongside, for one release so nothing reading it breaks.
+        """
+        NAVIGATOR = "navigator", _("Navigator")
+        TEXT = "text", _("By text")
+        VOICE = "voice", _("By voice")
+
+    source = models.CharField(max_length=12, choices=Source.choices,
+                              default=Source.NAVIGATOR)
     meeting  = models.ForeignKey(
         "Meeting", related_name="answers", on_delete=models.CASCADE
     )
@@ -477,14 +920,30 @@ class Agent(models.Model):
         # 'prompt' agents are user-created, run in-process, and use a stored
         # system prompt with no tools.
         PROMPT = "prompt", _("Prompt-based")
+        # 'sensei' agents forward the turn to the external Sensei service over
+        # its REST endpoint (see ConvAI.sensei and agents.md). Deliberately a
+        # kind of its own rather than a flavour of REMOTE: remote agents speak
+        # LangGraph over host:port, Sensei speaks a small JSON operation
+        # protocol over HTTPS, and the two share no connection settings.
+        SENSEI = "sensei", _("Sensei")
 
     name = models.CharField(max_length=100, unique=True)
+
+    # One line on what the agent is *for*, shown on its card on the Agents page
+    # so the list reads as a roster rather than four names and a model id. Native
+    # agents ship with one (seeded in migration 0082); every kind can edit it.
+    description = models.CharField(
+        max_length=200, blank=True, default="",
+        help_text=_("One line on what this agent does. Shown on its card on the "
+                    "Agents page, where about 90 characters fit."),
+    )
 
     kind = models.CharField(
         max_length=16, choices=Kind.choices, default=Kind.REMOTE, db_index=True,
         help_text=_("Remote = runs on a LangGraph server (host:port). "
                     "Native = ships with the platform. "
-                    "Prompt-based = in-process agent driven by a stored prompt."),
+                    "Prompt-based = in-process agent driven by a stored prompt. "
+                    "Sensei = forwards the turn to the external Sensei service."),
     )
     native_key = models.CharField(
         max_length=64, blank=True, default="",
@@ -509,6 +968,43 @@ class Agent(models.Model):
                     "API (live speech in/out) instead of the text chat."),
     )
 
+    # For prompt-based agents: the RAG subtype. When on, the agent gains a
+    # `search_documents` tool backed by the documents uploaded against it
+    # (see RagDocument / RagChunk). Off = a plain prompt agent with no tools.
+    rag_enabled = models.BooleanField(
+        default=False,
+        help_text=_("Prompt-based agents only: give the agent a searchable "
+                    "knowledge base built from documents you upload."),
+    )
+    # How many chunks the retrieval tool returns per search.
+    rag_top_k = models.PositiveSmallIntegerField(
+        default=5, validators=[MinValueValidator(1)],
+        help_text=_("How many document extracts the search tool returns per query."),
+    )
+
+    # For prompt-based agents: which platform tools this agent may call, and
+    # the wording that tells it how. See ConvAI.native_agents.tool_registry,
+    # which owns the slugs and the shipped default prompt for each.
+    #
+    #     {"conversation_privacy": {}, "report_summary": {"prompt": "..."}}
+    #
+    # Presence of the key is what "enabled" means, and an *absent* "prompt"
+    # key is what "use the shipped default" means. That is deliberate: storing
+    # a copy of the default would freeze it, so an improvement to the shipped
+    # wording would reach no existing agent, and "Reset to default" becomes a
+    # key deletion rather than a copy that is right only until the next
+    # release. A JSONField rather than a field pair per tool for the same
+    # reason `detectors` is one: a third tool should not need a migration.
+    #
+    # Any enabled tool makes the agent a react agent — a plain prompt agent has
+    # no tool loop at all. build_prompt_graph takes that branch on its own; the
+    # form does not ask.
+    tools = models.JSONField(
+        default=dict, blank=True,
+        help_text=_("Prompt-based agents only: platform tools this agent may call, "
+                    "keyed by tool slug, with an optional prompt override."),
+    )
+
     # Model behind in-process agents (native + prompt-based). Blank uses the
     # platform default (DEFAULT_AGENT_MODEL). May be provider-prefixed, e.g.
     # 'openai/gpt-4.1-mini', 'anthropic/claude-sonnet-4-6'. Under USE_AZURE it is
@@ -524,6 +1020,28 @@ class Agent(models.Model):
     langgraph_name = models.CharField(max_length=100, blank=True, default="")
     host = models.CharField(max_length=100, blank=True, default="")
     port = models.PositiveIntegerField(null=True, blank=True)
+
+    # Remote agents only: hand this agent a per-run token so it can report a
+    # summary and set the conversation's visibility over /api/v1/run/. Off by
+    # default — an agent that never calls back should never hold a credential.
+    # See ConvAI.run_tokens and agent_tools.md.
+    allow_callbacks = models.BooleanField(
+        default=False,
+        help_text=_("Remote agents only: give each run a short-lived token that lets "
+                    "the agent report a summary and set the conversation's "
+                    "visibility, for that one conversation only."),
+    )
+    # A remote agent whose conversations are hidden from the link worker until
+    # the client agrees otherwise — RECO v2 asks, and unhides on a yes. Needs
+    # allow_callbacks, or nothing could ever unhide them. Prompt-based agents do
+    # not use this field: theirs start hidden whenever the Conversation privacy
+    # tool is on. See conversation_privacy.starts_hidden.
+    starts_hidden = models.BooleanField(
+        default=False,
+        help_text=_("Remote agents with callbacks: each conversation starts hidden "
+                    "from the client's link worker, and the agent unhides it if the "
+                    "client agrees."),
+    )
 
     # Who the LLM should imitate (role/persona)
     classification_role = models.TextField(
@@ -553,9 +1071,189 @@ class Agent(models.Model):
     )
 
     tts_voice_id = models.CharField(max_length=40, blank=True, null=True)
+    # The same agent's voice when Azure AI Speech is the TTS provider, e.g.
+    # "pt-BR-FranciscaNeural". Kept apart from tts_voice_id because a voice name
+    # means nothing to the other provider. See text_to_speech.md.
+    azure_voice = models.CharField(
+        max_length=80, blank=True, default="",
+        help_text="Azure AI Speech voice name, used when Azure is the TTS provider.",
+    )
+
+    @property
+    def conversations_start_hidden(self) -> bool:
+        """Whether a new conversation with this agent starts hidden, here and now."""
+        from .conversation_privacy import starts_hidden
+        return starts_hidden(self)
+
+    @property
+    def active_tts_voice(self) -> str:
+        """The voice set on this agent for the TTS provider in use, or ''."""
+        from .tts import agent_voice
+        return agent_voice(self)
+
+    @property
+    def tool_labels(self) -> list:
+        """Short names of the platform tools switched on, in registry order."""
+        from .native_agents import tool_registry
+        return [str(tool_registry.spec(s)["tab"]) for s in tool_registry.enabled_slugs(self)]
+
+    # Agents that answer staff only, and so are never offered for a client's
+    # conversations. Link Worker v2's tools refuse anybody who is not staff (see
+    # link_worker_v2.md), so assigning it to a client would give them an agent
+    # that can do nothing — and would put a beta in every agent picker whether
+    # or not it was switched on.
+    STAFF_ONLY_NATIVE_KEYS = ("link_worker_v2",)
+
+    @classmethod
+    def for_clients(cls):
+        """The agents that may be given a client (or a client-facing flow)."""
+        return cls.objects.exclude(kind=cls.Kind.NATIVE,
+                                   native_key__in=cls.STAFF_ONLY_NATIVE_KEYS)
 
     def __str__(self):
-        return f"{self.name} @ {self.host}:{self.port}"
+        # host:port only identifies a *remote* agent. Every other kind has none,
+        # so the old unconditional form rendered "Loopback @ :None" in admin
+        # dropdowns and anywhere else an agent is listed by name.
+        if self.kind == self.Kind.REMOTE and self.host:
+            return f"{self.name} @ {self.host}:{self.port}"
+        return self.name
+
+
+# ---------------------------------------------------------------------------
+# RAG-based prompt agents (see agents.md → "RAG-based agents")
+#
+# The knowledge base is deliberately *lightweight*: no external vector store, no
+# extra service. A document's text is split into chunks, each chunk is embedded
+# once, and the vector is kept on the row as a packed float32 blob. Retrieval
+# loads the (few thousand) vectors for one agent and scores them with numpy.
+#
+# Because the vectors live with the document, switching a document **off** is
+# just a boolean — the embeddings are kept and never recomputed when it comes
+# back on. Only deleting the document throws them away.
+# ---------------------------------------------------------------------------
+def _rag_upload_to(instance, filename):
+    """Store uploads under ``media/rag_documents/<agent_id>/<uuid><ext>``.
+
+    The stored name is randomised: two people may upload ``notes.pdf`` for the
+    same agent, and the display name is kept separately in ``original_name``.
+    """
+    ext = os.path.splitext(filename)[1].lower()[:10]
+    return os.path.join("rag_documents", str(instance.agent_id or "unassigned"),
+                        f"{uuid.uuid4().hex}{ext}")
+
+
+class RagDocument(models.Model):
+    """One uploaded source document in a RAG agent's knowledge base.
+
+    Ingestion (extract → chunk → embed) runs on the background pool and the
+    progress fields below are the *only* record of it, so a browser that
+    reloads — or a user who closes the tab — picks the job back up simply by
+    reading these rows.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", _("Queued")
+        EXTRACTING = "extracting", _("Reading text")
+        CHUNKING = "chunking", _("Splitting into chunks")
+        EMBEDDING = "embedding", _("Computing vectors")
+        READY = "ready", _("Ready")
+        FAILED = "failed", _("Failed")
+
+    # Statuses that mean "a worker should be on this right now". Used to spot
+    # jobs orphaned by a restart (see `is_stalled`).
+    ACTIVE_STATUSES = ("pending", "extracting", "chunking", "embedding")
+
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="rag_documents")
+    file = models.FileField(
+        upload_to=_rag_upload_to,
+        validators=[FileExtensionValidator(allowed_extensions=["txt", "md", "pdf", "docx"])],
+    )
+    original_name = models.CharField(max_length=255)
+    size_bytes = models.PositiveIntegerField(default=0)
+
+    # Off = excluded from retrieval, vectors kept. On/off costs nothing.
+    enabled = models.BooleanField(default=True, db_index=True)
+
+    status = models.CharField(max_length=16, choices=Status.choices,
+                              default=Status.PENDING, db_index=True)
+    error = models.TextField(blank=True, default="")
+
+    chunk_total = models.PositiveIntegerField(default=0)
+    chunk_done = models.PositiveIntegerField(default=0)
+    # Characters of extracted text — shown in the UI, and 0 means "nothing
+    # readable in this file" (e.g. a scanned PDF with no text layer).
+    char_count = models.PositiveIntegerField(default=0)
+
+    # Which embedding model produced the stored vectors. Kept per document so a
+    # later change of model is visible rather than silently mixing vector
+    # spaces; mismatched documents are skipped at retrieval time.
+    embedding_model = models.CharField(max_length=120, blank=True, default="")
+    embedding_dim = models.PositiveIntegerField(default=0)
+
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                    on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(default=timezone.now)
+    # Touched on every progress tick, so it doubles as the worker's heartbeat.
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at"]
+        # Named explicitly: retrieval and the knowledge-base page both filter on
+        # exactly this triple, and an explicit name keeps the migration and the
+        # model in step (an auto-generated one is a hash of the column list).
+        indexes = [models.Index(fields=["agent", "enabled", "status"],
+                                name="rag_doc_agent_enabled_idx")]
+
+    def __str__(self):
+        return f"{self.original_name} ({self.agent_id})"
+
+    @property
+    def progress(self) -> int:
+        """Percent complete, 0-100, for the progress bar."""
+        if self.status == self.Status.READY:
+            return 100
+        if self.status == self.Status.FAILED:
+            return 0
+        if self.status == self.Status.PENDING:
+            return 0
+        if self.status == self.Status.EXTRACTING:
+            return 5
+        if self.status == self.Status.CHUNKING:
+            return 15
+        if not self.chunk_total:
+            return 20
+        # Embedding spans 20→100%.
+        return min(99, 20 + int(80 * self.chunk_done / self.chunk_total))
+
+    def is_stalled(self, seconds: int = 300) -> bool:
+        """True if this job claims to be running but its worker went away.
+
+        A process restart (deploy, crash) leaves rows mid-ingest with nobody
+        working them. The heartbeat in ``updated_at`` is how we tell.
+        """
+        if self.status not in self.ACTIVE_STATUSES:
+            return False
+        return (timezone.now() - self.updated_at).total_seconds() > seconds
+
+
+class RagChunk(models.Model):
+    """One embedded slice of a ``RagDocument``.
+
+    ``embedding`` is the raw little-endian float32 vector, L2-normalised at
+    write time so similarity is a plain dot product.
+    """
+    document = models.ForeignKey(RagDocument, on_delete=models.CASCADE, related_name="chunks")
+    ordinal = models.PositiveIntegerField(default=0)
+    text = models.TextField()
+    embedding = models.BinaryField()
+
+    class Meta:
+        ordering = ["document_id", "ordinal"]
+        indexes = [models.Index(fields=["document", "ordinal"],
+                                name="rag_chunk_doc_ordinal_idx")]
+
+    def __str__(self):
+        return f"{self.document_id}#{self.ordinal}"
 
 
 class Conversation(models.Model):
@@ -573,6 +1271,27 @@ class Conversation(models.Model):
 
     summary       = models.TextField(blank=True, help_text="Automatic short abstract")
     topic         = models.CharField(max_length=120, blank=True, help_text="Classification label/topic")
+
+    # --- The agent's own summary (see agent_tools.md) ---
+    # Written by the agent that held the conversation, through the
+    # `report_summary` tool or the summary endpoint, rather than by the
+    # classifier reading the transcript afterwards. Kept in its own field
+    # instead of overwriting `summary`, because the two are different claims
+    # and neither should be able to silently destroy the other: the classifier
+    # re-runs on every batch pass, and an agent that reports twice in a
+    # conversation should not be racing it.
+    #
+    # Preferred over `summary` when the panel draws one — the agent was in the
+    # conversation and the classifier was reading it from outside. See
+    # ConvAI.conversation_summary, which is the only place that rule lives.
+    agent_summary = models.TextField(
+        blank=True, default="",
+        help_text="Summary reported by the agent that held this conversation.",
+    )
+    agent_summary_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the agent last reported a summary for this conversation.",
+    )
     is_important  = models.BooleanField(default=False, db_index=True, help_text="Requires human attention?")
     visited       = models.BooleanField(default=False, db_index=True, help_text="Has been reviewed in dashboard?")
     analyzed      = models.BooleanField(default=False, db_index=True, help_text="Has analysis been run?")
@@ -587,6 +1306,34 @@ class Conversation(models.Model):
         help_text="Human validation of detector booleans, keyed by the same labels."
     )
 
+    # --- Client-requested privacy (see conversation_privacy.md) ---
+    # Set by the client themselves, through a tool the agent offers them: this
+    # exchange is not for their link worker to read. The navigator still sees
+    # that it happened and how long it was — the row, the time span, the
+    # message count — and its summary, which is the one thing written out of
+    # the words that a hidden conversation still shows (see
+    # ConvAI.conversation_summary). What goes is the messages themselves, the
+    # topic, and the detector answers the classifier wrote from them.
+    #
+    # Per conversation and nothing wider. The client is answering "this one",
+    # not signing a standing policy, and a thread rolls over after a couple of
+    # hours idle — so the next conversation starts visible and they are asked
+    # again if the agent offers it again.
+    #
+    # Deliberately *not* gated on CONVERSATION_PRIVACY_ENABLED at read time.
+    # The switch decides whether the platform may take the promise; it does
+    # not decide whether a promise already made still holds. An admin turning
+    # the feature off stops new conversations being hidden and leaves the ones
+    # already hidden alone. See ConvAI.conversation_privacy.
+    hidden = models.BooleanField(
+        default=False, db_index=True,
+        help_text="Client asked that this conversation not be readable by their link worker.",
+    )
+    hidden_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the client last asked for this conversation to be hidden.",
+    )
+
     class Meta:
         ordering = ["-last_message_at"]
         indexes = [
@@ -597,6 +1344,18 @@ class Conversation(models.Model):
 
     def __str__(self):
         return f"{self.id}"
+
+    def save(self, *args, **kwargs):
+        # Hidden from the first write, for an agent whose conversations start
+        # hidden. Here rather than at each place a Conversation is created
+        # (there are several), and on creation only: from then on it is the
+        # client's answer, given through the agent, that decides.
+        if self._state.adding and self.agent_id and not self.hidden:
+            from .conversation_privacy import starts_hidden
+            if starts_hidden(self.agent):
+                self.hidden = True
+                self.hidden_at = self.hidden_at or timezone.now()
+        super().save(*args, **kwargs)
 
 
 class SelfRegistration(models.Model):
@@ -708,6 +1467,27 @@ class SiteConfiguration(models.Model):
         ("0", _("Off")),
     ]
 
+    # Every choice list below keeps a blank first entry with the same meaning as
+    # TRISTATE's: "no override, use whatever .env says".
+    EMAIL_PROVIDERS = [
+        ("", _("Use .env default")),
+        ("azure", _("Azure Communication Services")),
+        ("smtp", _("SMTP")),
+    ]
+
+    SMTP_SECURITY = [
+        ("", _("Use .env default")),
+        ("tls", _("STARTTLS (port 587)")),
+        ("ssl", _("SSL/TLS (port 465)")),
+        ("none", _("None")),
+    ]
+
+    REMINDER_CHANNELS = [
+        ("", _("Use .env default")),
+        ("whatsapp", _("WhatsApp")),
+        ("email", _("Email")),
+    ]
+
     # --- Behaviour / feature flags (live) ---
     hide_meeting_steps = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
     enable_automations = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
@@ -724,11 +1504,50 @@ class SiteConfiguration(models.Model):
     elevenlabs_api_key = models.CharField(max_length=255, blank=True, default="")
     elevenlabs_voice_id = models.CharField(max_length=255, blank=True, default="")
 
+    # --- Text to speech (see text_to_speech.md) ---
+    # Who speaks every voice reply. Blank follows TTS_PROVIDER in .env, and
+    # ElevenLabs when that is unset too — so nothing changes until chosen.
+    TTS_PROVIDER_CHOICES = [
+        ("", "Use .env default"),
+        ("elevenlabs", "ElevenLabs"),
+        ("azure", "Azure AI Speech"),
+    ]
+    tts_provider = models.CharField(max_length=20, choices=TTS_PROVIDER_CHOICES, blank=True, default="")
+    azure_speech_key = models.CharField(max_length=255, blank=True, default="")
+    azure_speech_region = models.CharField(max_length=100, blank=True, default="")
+    azure_speech_voice = models.CharField(max_length=80, blank=True, default="")
+
     # --- Messaging templates (live) ---
     twilio_sms_from = models.CharField(max_length=20, blank=True, default="", validators=[_E164])
     sms_template_start_infection_sid = models.CharField(max_length=34, blank=True, default="", validators=[_HX_SID])
     sms_template_start_infection_text = models.TextField(blank=True, default="")
     whatsapp_template_care_plan_sid = models.CharField(max_length=34, blank=True, default="", validators=[_HX_SID])
+
+    # --- Email (live) ---
+    # Which provider carries outbound mail. Everything the platform sends —
+    # password-reset links, meeting reminders, the test message — goes through
+    # ConvAI.mailer.PlatformEmailBackend, which reads these on every send, so
+    # changing provider or credentials here needs no restart.
+    email_provider = models.CharField(max_length=10, choices=EMAIL_PROVIDERS, blank=True, default="")
+    email_from = models.CharField(max_length=254, blank=True, default="")
+    email_from_name = models.CharField(max_length=120, blank=True, default="")
+    email_reply_to = models.CharField(max_length=254, blank=True, default="")
+    # Azure Communication Services Email. Either paste the whole connection
+    # string, or give the endpoint and access key and let the platform assemble
+    # one from them.
+    azure_email_connection_string = models.CharField(max_length=500, blank=True, default="")
+    azure_email_endpoint = models.CharField(max_length=255, blank=True, default="")
+    azure_email_access_key = models.CharField(max_length=500, blank=True, default="")
+    # SMTP. Port is a CharField so blank keeps the tri-state meaning the rest of
+    # this table uses: empty falls back to .env, not to zero.
+    smtp_host = models.CharField(max_length=255, blank=True, default="")
+    smtp_port = models.CharField(max_length=6, blank=True, default="")
+    smtp_user = models.CharField(max_length=255, blank=True, default="")
+    smtp_password = models.CharField(max_length=255, blank=True, default="")
+    smtp_security = models.CharField(max_length=5, choices=SMTP_SECURITY, blank=True, default="")
+
+    # Which channel a meeting reminder goes out on.
+    reminder_channel = models.CharField(max_length=10, choices=REMINDER_CHANNELS, blank=True, default="")
 
     # --- Branding (live) ---
     brand_name = models.CharField(max_length=255, blank=True, default="")
@@ -741,6 +1560,11 @@ class SiteConfiguration(models.Model):
     # --- Agent models / LLM providers (live) ---
     # Default model for in-process agents when an Agent has no explicit model.
     default_agent_model = models.CharField(max_length=200, blank=True, default="")
+    # The model behind every automatic summary and safety review — conversation
+    # classification, meeting and call-transcript summaries — whatever model the
+    # agents themselves chat with. Blank keeps the old resolution (the agent's
+    # model, then the default above). See agents.md, "Classification and alerts".
+    summary_model = models.CharField(max_length=200, blank=True, default="")
     # Provider API keys (secrets). Blank falls back to the environment.
     anthropic_api_key = models.CharField(max_length=255, blank=True, default="")
     google_api_key = models.CharField(max_length=255, blank=True, default="")
@@ -767,6 +1591,122 @@ class SiteConfiguration(models.Model):
     # Azure region hosting the preview WebRTC gateway (e.g. 'swedencentral').
     azure_realtime_webrtc_region = models.CharField(max_length=40, blank=True, default="")
 
+    # Embeddings behind RAG-based prompt agents. Blank uses
+    # 'text-embedding-3-small' — multilingual, and the cheapest of the OpenAI
+    # embedding models. Under USE_AZURE the deployment name is taken from
+    # azure_embedding_deployment (falling back to the model name).
+    rag_embedding_model = models.CharField(max_length=120, blank=True, default="")
+    azure_embedding_deployment = models.CharField(max_length=100, blank=True, default="")
+
+    # --- Sensei (live) ---
+    # Off by default, and deliberately so: most installations have no Sensei
+    # service to talk to, and the flag is what keeps the whole feature — the
+    # agent kind, its settings, and its create button — out of their way. See
+    # agents.md -> "Sensei agents".
+    sensei_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+    sensei_api_url = models.CharField(max_length=500, blank=True, default="")
+    sensei_function_key = models.CharField(max_length=500, blank=True, default="")
+    # HMAC key behind the opaque per-patient id sent to Sensei. Sensei never
+    # learns who a patient is; it only ever sees a stable digest. Rotating this
+    # value orphans every Sensei-side account, so it is generated once and left
+    # alone (see ConvAI.sensei.external_user_id).
+    sensei_user_id_secret = models.CharField(max_length=200, blank=True, default="")
+
+    # --- Message export (live) ---
+    # Off by default, like Sensei: downloading every client's messages is
+    # something a study needs, not something every installation should offer.
+    # See message_export.md.
+    message_export_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+    # A separate switch from the one above: that one lets admins take every
+    # message at once, this one lets a navigator take one conversation of
+    # their own client's from the panel. Different people, different amounts,
+    # so an installation can want one without the other.
+    conversation_download_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # --- Conversation privacy (live) ---
+    # Off by default, like Sensei and the exports above: letting a client keep
+    # an exchange from their own link worker is a decision about how a service
+    # is run, and an installation that never made it should not find the
+    # feature switched on. While it is off the agent tool is not offered and
+    # the API does not exist.
+    #
+    # Turning it off again does not un-hide anything — see Conversation.hidden.
+    conversation_privacy_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # --- Study enrolment (live) ---
+    # Off by default, like conversation privacy above. Running a study is what a
+    # few deployments do, not what the platform is for: an installation that
+    # never enrolled anybody should not carry an enrolment panel, a public
+    # /join/ URL or a consent flow it has no use for. While it is off every
+    # enrolment route 404s and Settings -> Participants holds only this switch.
+    #
+    # Turning it off again deletes nothing — the enrolments and the consent
+    # records they signed stay exactly as they are. See participant_management.md.
+    study_enrolment_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # --- Link Worker v2 (beta) ---
+    # Which assistant answers in the staff chat bubble. Off (the default) keeps
+    # the original Link Worker, untouched. On hands the bubble to v2, which can
+    # also read a client's record — meetings, protocol answers and how they
+    # changed, alerts, notes, conversation summaries — within the same rules as
+    # the screens, and logs every record it reads (RecordAccess). See
+    # link_worker_v2.md.
+    link_worker_v2_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # --- Link Worker on WhatsApp (beta) ---
+    # Lets a navigator ask Link Worker v2 from their own phone, over the
+    # service's WhatsApp number — at a client's door, say. Needs v2 on as well.
+    # Off by default; while off, WhatsApp behaves exactly as before. See
+    # link_worker_whatsapp.md.
+    link_worker_whatsapp_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # The ElevenLabs voice for a voice-note reply when the link worker spoke
+    # Portuguese. Blank uses the v2 agent's own voice.
+    link_worker_voice_pt_br = models.CharField(
+        max_length=40, blank=True, default="",
+        help_text="ElevenLabs voice ID used when a link worker's voice note is in Portuguese.",
+    )
+    # The same, when Azure AI Speech is the TTS provider. Blank uses
+    # pt-BR-FranciscaNeural.
+    link_worker_azure_voice_pt_br = models.CharField(
+        max_length=80, blank=True, default="",
+        help_text="Azure voice name used when a link worker's voice note is in Portuguese.",
+    )
+
+    # How many words an access code is built from. Three (~250^3) is the default:
+    # enough space that the rate limit below does the real work, short enough to
+    # read down a phone line without losing your place.
+    enrolment_code_words = models.PositiveSmallIntegerField(
+        default=3,
+        validators=[MinValueValidator(2)],
+        help_text="Words per participant access code (2-4). Three is usually right.",
+    )
+
+    # Wrong-code attempts allowed from one address per hour. An access code is a
+    # credential handed out over the phone, so this — not the size of the code
+    # space — is what actually stands between it and a brute-force.
+    enrolment_code_attempt_limit = models.PositiveSmallIntegerField(
+        default=10,
+        validators=[MinValueValidator(1)],
+        help_text="Wrong access-code attempts allowed per address per hour before a lockout.",
+    )
+
+    # Whether the claim form asks for a date of birth at all. Off by default: a
+    # study that does not need to identify people this way should not be holding
+    # their date of birth to no purpose.
+    enrolment_require_dob = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # Whether claiming a valid code creates the client straight away, or files it
+    # for an admin the way a SelfRegistration is filed. On by default, because
+    # issuing the code *was* the vouching — asking an admin to confirm what a
+    # clinician already decided is a queue that teaches people to click through.
+    enrolment_auto_approve = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # The wording on the public /join/ page. The first thing a participant reads,
+    # and entirely local to the study, so it is content rather than code. Blank
+    # falls back to a shipped neutral default.
+    enrolment_landing_text = models.TextField(blank=True, default="")
+
     # --- Editable content (live) ---
     # Markdown source for the Help page. Blank falls back to the shipped default
     # (see ConvAI.default_help.DEFAULT_HELP_MARKDOWN) until an admin edits it.
@@ -780,6 +1720,7 @@ class SiteConfiguration(models.Model):
     # Blank falls back to the shipped defaults in ConvAI.default_prompts.
     meeting_summary_prompt = models.TextField(blank=True, default="", help_text="Base prompt for summarizing a meeting's protocol answers")
     transcript_summary_prompt = models.TextField(blank=True, default="", help_text="Base prompt for summarizing a call transcript")
+    transcript_moments_prompt = models.TextField(blank=True, default="", help_text="Base prompt for pulling key moments out of a call transcript")
 
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -853,3 +1794,636 @@ class SeenMark(models.Model):
             cls.objects.filter(user=user, token__in=list(tokens))
             .values_list("token", flat=True)
         )
+
+
+class Note(models.Model):
+    """Something a person wrote about one call, meeting, alert or conversation.
+
+    Before this there was a single ``Meeting.notes`` text field, overwritten on
+    every save: no author, no time, one note per meeting and none at all for the
+    other three kinds. A note is a small record with a person attached, so it is
+    a row.
+
+    The parent is an explicit nullable FK per kind rather than a generic
+    relation. It is more columns, but the queries stay simple, the database
+    keeps the integrity, and permission checks can follow the parent object
+    through code that already knows how to authorise it.
+    """
+
+    body = models.TextField()
+    author = models.ForeignKey(
+        'ConvAIUser', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="notes_written",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    meeting = models.ForeignKey(
+        Meeting, null=True, blank=True, on_delete=models.CASCADE, related_name="notes_list")
+    recording = models.ForeignKey(
+        CallRecording, null=True, blank=True, on_delete=models.CASCADE, related_name="notes_list")
+    alert = models.ForeignKey(
+        Alert, null=True, blank=True, on_delete=models.CASCADE, related_name="notes_list")
+    conversation = models.ForeignKey(
+        Conversation, null=True, blank=True, on_delete=models.CASCADE, related_name="notes_list")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Note {self.pk} by {self.author or 'unknown'}"
+
+    @property
+    def parent(self):
+        return self.meeting or self.recording or self.alert or self.conversation
+
+    @property
+    def patient(self):
+        """The client a note belongs to, whichever kind it hangs off.
+
+        Permissions are decided per client, so every note has to be able to name
+        one without the caller knowing which parent it has.
+        """
+        parent = self.parent
+        if parent is None:
+            return None
+        if isinstance(parent, CallRecording):
+            # A recording names its client where the call wrote one down, and
+            # falls back to matching numbers where it did not — one rule, kept
+            # on the model so every surface asks the same question.
+            return parent.resolve_patient()
+        return getattr(parent, "patient", None)
+
+
+class SummaryEdit(models.Model):
+    """A person's own words about something a model also summarised.
+
+    Two shapes, for historical reasons that are worth keeping straight.
+
+    On a **meeting, recording or alert** this row records that somebody
+    replaced the generated overview *in place*: the text lives in the parent's
+    own field and this only says whose words they now are, which is why the
+    panel drops the violet "a model wrote this" styling and prints a byline.
+
+    On a **conversation** the generated summary is read-only, and ``body``
+    holds the navigator's summary as a block of its own alongside it. Nothing
+    is overwritten in either direction: the machine's claim about the exchange
+    and a person's claim about it are different claims, and the panel shows
+    both rather than letting the later one erase the earlier. See
+    ConvAI.conversation_summary.
+
+    The parent is an explicit nullable one-to-one per kind, following Note
+    rather than a generic relation, so a deleted parent takes its edit record
+    with it and permission checks can follow the parent object through code
+    that already knows how to authorise it. One row per parent: this records
+    the current state of the text, not a revision history.
+    """
+
+    author = models.ForeignKey(
+        'ConvAIUser', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="summary_edits",
+    )
+    edited_at = models.DateTimeField(auto_now=True)
+
+    # The person's own summary, where it is kept beside the generated one
+    # rather than written over it. Blank on the in-place kinds, whose text is
+    # in the parent's field — so a blank body is "edited in place", not "wrote
+    # nothing", and the panel must not read it as an empty human summary.
+    body = models.TextField(
+        blank=True, default="",
+        help_text=("The person's own summary, kept alongside the generated one. "
+                   "Used for conversations; blank for the kinds whose overview "
+                   "is edited in place."),
+    )
+
+    meeting = models.OneToOneField(
+        Meeting, null=True, blank=True, on_delete=models.CASCADE, related_name="summary_edit")
+    recording = models.OneToOneField(
+        CallRecording, null=True, blank=True, on_delete=models.CASCADE, related_name="summary_edit")
+    conversation = models.OneToOneField(
+        Conversation, null=True, blank=True, on_delete=models.CASCADE, related_name="summary_edit")
+    # Only alerts the classifier raised have a generated overview to correct.
+    # One a person raised is already their own words, and the panel leaves it
+    # read-only rather than offering to edit what they just typed.
+    alert = models.OneToOneField(
+        'Alert', null=True, blank=True, on_delete=models.CASCADE, related_name="summary_edit")
+
+    class Meta:
+        ordering = ["-edited_at"]
+
+    def __str__(self):
+        return f"SummaryEdit {self.pk} by {self.author or 'unknown'}"
+
+    @property
+    def parent(self):
+        return self.meeting or self.recording or self.conversation or self.alert
+
+
+### Study enrolment
+#
+# Three models behind one switch (SiteConfiguration.study_enrolment_enabled):
+# a Study people are enrolled into, an Enrolment per person, and an append-only
+# ConsentRecord of what they agreed to. See participant_management.md.
+
+
+# What a new Study starts with, so the first consent page is not a blank form an
+# admin has to invent from nothing. Deliberately generic — a real study replaces
+# the wording — but the third item is the one that matters here: this platform
+# runs a classifier over every inbound message and raises safety alerts from it,
+# and until now nothing recorded anybody agreeing to that.
+DEFAULT_CONSENT_ITEMS = [
+    {
+        "key": "participation",
+        "text": ("I confirm I have read the Participant Information Sheet, or had it "
+                 "explained to me, and have had the opportunity to ask questions. I "
+                 "agree to take part. I understand participation is voluntary and I "
+                 "can withdraw at any time without giving a reason and without it "
+                 "affecting my care."),
+        "required": True,
+    },
+    {
+        "key": "data",
+        "text": ("I understand that my conversations, including my messages, the "
+                 "replies, timestamps and engagement data, will be collected and "
+                 "analysed for this study, and de-identified where possible before "
+                 "analysis, reporting or publication."),
+        "required": True,
+    },
+    {
+        "key": "safety_monitoring",
+        "text": ("I understand that automated methods may review my conversations for "
+                 "content suggesting severe distress, self-harm, suicidality or "
+                 "safeguarding concerns, that these support human review and do not "
+                 "make clinical decisions, and that confidentiality will be maintained "
+                 "unless something suggests a serious risk to me or to others."),
+        "required": True,
+    },
+]
+
+
+class Study(models.Model):
+    """One study, or one arm of one, that participants are enrolled into.
+
+    The archive this came from fixed its two arms as a choice list on the model,
+    which meant a third arm — or a different institution's study entirely — was a
+    migration. It is a row here instead: which studies exist is a fact about a
+    deployment, not about the platform.
+
+    A Study also owns its **consent wording**, as data rather than template
+    markup. That is what lets a study team correct a sentence without waiting for
+    a deploy, and it is why ConsentRecord can record per-item answers against
+    keys nobody hard-coded.
+    """
+
+    slug = models.SlugField(
+        max_length=50, unique=True,
+        help_text="Short identifier used in URLs and exports, e.g. 'health-coach'.",
+    )
+    display_name = models.CharField(
+        max_length=200,
+        help_text="Full name shown to participants, e.g. 'Health Coaching Waitlist Study'.",
+    )
+
+    # Closed rather than deleted: a finished study still has to answer for the
+    # people in it. Closing refuses new enrolments and leaves everything else
+    # working, so existing participants keep their agent and their history.
+    is_open = models.BooleanField(
+        default=True,
+        help_text="When off, existing participants continue but no new enrolments are accepted.",
+    )
+
+    # --- Consent ---
+    pis_url = models.URLField(
+        blank=True, default="",
+        help_text="Link to the Participant Information Sheet.",
+    )
+    consent_version = models.CharField(
+        max_length=20, default="1.0",
+        help_text="Version shown to participants and stored on every consent record.",
+    )
+    consent_intro = models.TextField(
+        blank=True, default="",
+        help_text="The paragraph shown above the consent tick-boxes.",
+    )
+    consent_items = models.JSONField(
+        blank=True, default=list,
+        help_text="The tick-boxes themselves: a list of {key, text, required}.",
+    )
+
+    # --- External questionnaires ---
+    # Redirects, not integrations. The archive hard-coded two Qualtrics URLs as
+    # module constants; they belong to the study, so they live on it.
+    consent_survey_url = models.URLField(
+        blank=True, default="",
+        help_text="Optional survey to send the participant to straight after consent.",
+    )
+    baseline_url = models.URLField(
+        blank=True, default="",
+        help_text="Optional baseline questionnaire, after the consent survey.",
+    )
+
+    # --- Enrolment behaviour for this arm ---
+    # Per study rather than platform-wide: an arm that talks to people by SMS
+    # cannot work without a number, and one that talks in the browser can.
+    require_phone = models.BooleanField(
+        default=False,
+        help_text="Require a phone number to claim a code. Needed for SMS or WhatsApp arms.",
+    )
+    default_agent = models.ForeignKey(
+        'Agent',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="studies",
+        help_text="Agent given to this study's participants when they consent. Without one, their messages get no reply.",
+    )
+
+    # --- Governance paper trail ---
+    chief_investigator = models.CharField(max_length=200, blank=True, default="")
+    iras_project_id = models.CharField(max_length=50, blank=True, default="")
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Studies"
+        ordering = ["display_name"]
+
+    def __str__(self):
+        return f"{self.display_name} (v{self.consent_version})"
+
+    def save(self, *args, **kwargs):
+        # A study with no tick-boxes would render a consent page that consents to
+        # nothing, so a new one starts from the shipped set rather than empty.
+        if not self.consent_items:
+            self.consent_items = [dict(item) for item in DEFAULT_CONSENT_ITEMS]
+        super().save(*args, **kwargs)
+
+    @property
+    def consent_locked(self) -> bool:
+        """True once somebody has consented to the *current* version.
+
+        Same rule a Protocol follows once answers are recorded against it: the
+        wording somebody agreed to is evidence, and evidence does not get edited
+        underneath them. Changing it from here on means bumping
+        ``consent_version``, which starts a fresh version and leaves the existing
+        records pointing at the text those people actually read.
+        """
+        return ConsentRecord.objects.filter(
+            enrolment__study=self, consent_version=self.consent_version
+        ).exists()
+
+    @property
+    def stale_consent_count(self) -> int:
+        """Participants whose latest consent predates the current version.
+
+        Worth surfacing rather than inferring: it is the difference between "this
+        cohort consented to what is on the page" and "this cohort consented to
+        something we have since rewritten", which is a question a study team gets
+        asked and should not have to run a query to answer.
+        """
+        return (
+            Enrolment.objects
+            .filter(study=self, consents__isnull=False)
+            .exclude(consents__consent_version=self.consent_version)
+            .distinct()
+            .count()
+        )
+
+    def required_item_keys(self) -> list:
+        return [i.get("key") for i in (self.consent_items or []) if i.get("required")]
+
+
+class Enrolment(models.Model):
+    """One person's place in a study, from before they arrive until they finish.
+
+    This is deliberately **not** a ``SelfRegistration``. That model is the inbox
+    for someone unknown who messaged the service: it is keyed on their phone
+    number and it is consumed the moment an admin approves it. An enrolment runs
+    the other way — a clinician who already knows the person issues a code, and
+    the record has to outlive the approval to carry the study arm, the lifecycle
+    and the consent history for as long as the study lasts.
+
+    ``patient`` is null until the participant consents, so the Clients page can
+    list people who have not arrived yet (its enrolment panel) without the client
+    table filling up with records for people who never agreed to anything.
+    """
+
+    class Status(models.TextChoices):
+        INVITED = "invited", _("Invited")
+        CONSENTED = "consented", _("Consented")
+        ACTIVE = "active", _("Active")
+        COMPLETED = "completed", _("Completed")
+        WITHDRAWN = "withdrawn", _("Withdrawn")
+
+    # The only statuses a member of staff sets by hand. Invited and consented
+    # are facts the platform records — a consent record exists or it does not —
+    # so letting somebody pick them from a list would let the list say a person
+    # consented when nobody has. Withdrawn has side effects and its own action.
+    MANUAL_STATUSES = (Status.ACTIVE, Status.COMPLETED)
+
+    study = models.ForeignKey(Study, on_delete=models.PROTECT, related_name="enrolments")
+
+    # Null until claimed. PROTECT is wrong here and SET_NULL is right: deleting a
+    # client should not silently delete the study's record that they were in it.
+    patient = models.OneToOneField(
+        'Patient',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="enrolment",
+    )
+
+    access_code = models.CharField(
+        max_length=64, unique=True, db_index=True,
+        help_text="The code the participant uses to claim their place. Single use.",
+    )
+
+    # Held here, not on Patient: at pre-enrolment there is no Patient yet. After
+    # the claim the Patient carries the working copy and this stays as what the
+    # clinician originally entered.
+    name = models.CharField(max_length=120)
+    lastname = models.CharField(max_length=120)
+
+    # Nullable, and no sentinel date. The archive wrote '2000-01-01' as a
+    # placeholder and then tested against that string to tell whether a code had
+    # been claimed, which conflates "unknown" with a real date somebody might
+    # have.
+    date_of_birth = models.DateField(null=True, blank=True)
+    phone_number = PhoneNumberField(blank=True, null=True)
+
+    status = models.CharField(
+        max_length=12, choices=Status.choices, default=Status.INVITED, db_index=True,
+    )
+
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    withdrawn_at = models.DateTimeField(null=True, blank=True)
+    withdrawn_reason = models.CharField(max_length=300, blank=True, default="")
+
+    created_by = models.ForeignKey(
+        ConvAIUser,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="enrolments_created",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["study", "status"]),
+            models.Index(fields=["-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.name} {self.lastname} — {self.study.slug} ({self.get_status_display()})"
+
+    @property
+    def is_claimed(self) -> bool:
+        return self.claimed_at is not None
+
+    @property
+    def latest_consent(self):
+        return self.consents.order_by("-agreed_at").first()
+
+    @property
+    def consent_is_current(self) -> bool:
+        """Whether this person's latest consent matches their study's version."""
+        latest = self.latest_consent
+        return bool(latest and latest.consent_version == self.study.consent_version)
+
+
+class ConsentRecord(models.Model):
+    """What one person agreed to, when, and in which words.
+
+    **Append-only.** Re-consenting to a new version inserts a row; nothing is
+    ever updated. That is the whole point of the model: the archive kept consent
+    as three booleans on the participant, so a reworded form quietly became the
+    thing everybody had supposedly agreed to, and there was no way to show what
+    any individual had actually read.
+
+    ``items_text`` snapshots the wording alongside the answers, because a Study's
+    ``consent_items`` can be corrected and a record that only stored keys would
+    lose the sentence it was evidence for.
+    """
+
+    enrolment = models.ForeignKey(Enrolment, on_delete=models.CASCADE, related_name="consents")
+
+    consent_version = models.CharField(max_length=20)
+
+    # {key: bool} for every tick-box presented, so an optional item that was
+    # declined is recorded as declined rather than missing.
+    items = models.JSONField(default=dict)
+
+    # The wording as presented, keyed the same way. Kept so this row still means
+    # something after the study edits its form.
+    items_text = models.JSONField(blank=True, default=dict)
+
+    agreed_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    # Routine provenance for a consent record. Nullable because a record written
+    # by a clinician on someone's behalf, or by a test, has neither.
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=400, blank=True, default="")
+
+    class Meta:
+        ordering = ["-agreed_at"]
+        indexes = [models.Index(fields=["enrolment", "-agreed_at"])]
+
+    def __str__(self):
+        return f"Consent v{self.consent_version} — {self.enrolment_id} @ {self.agreed_at:%Y-%m-%d}"
+
+    def save(self, *args, **kwargs):
+        # Guard rather than trust: this model's value is that rows are immutable,
+        # and an accidental .save() on a loaded instance would be the one way to
+        # lose that without noticing.
+        if self.pk is not None:
+            raise ValidationError(
+                "ConsentRecord is append-only; record a new consent instead of editing one."
+            )
+        super().save(*args, **kwargs)
+
+
+class RecordAccess(models.Model):
+    """One look at a client's record by an assistant or through the API.
+
+    Written by ``ConvAI.client_records`` — the single place the Link Worker v2
+    tools and the client-record endpoints read from — so neither can read a
+    record without leaving a row. It answers the question a health service is
+    asked about any assistant that can see everyone: *who looked at whose
+    record, when, and for what.*
+
+    **Append-only**, like ``ConsentRecord``: an access log that can be edited
+    records nothing. The labels are copied at the time, so a row still reads
+    sensibly after the account or the client it names has been deleted.
+    """
+
+    class Via(models.TextChoices):
+        AGENT = "agent", "Assistant"
+        API = "api", "API"
+        WHATSAPP = "whatsapp", "WhatsApp"
+
+    class Action(models.TextChoices):
+        FIND = "find", "Find clients"
+        LOAD = "load", "Load a client"
+        OVERVIEW = "overview", "Client overview"
+        MEETINGS = "meetings", "Upcoming meetings"
+        ANSWERS = "answers", "Protocol answers"
+        HISTORY = "history", "Protocol history"
+        SEARCH = "search", "Record search"
+
+    at = models.DateTimeField(auto_now_add=True, db_index=True)
+    user = models.ForeignKey(ConvAIUser, on_delete=models.SET_NULL, null=True, blank=True,
+                             related_name="record_accesses")
+    user_label = models.CharField(max_length=150, blank=True)
+    # Null for a caseload-wide question that matched nobody.
+    patient = models.ForeignKey("Patient", on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name="record_accesses")
+    patient_label = models.CharField(max_length=200, blank=True)
+    action = models.CharField(max_length=16, choices=Action.choices)
+    via = models.CharField(max_length=8, choices=Via.choices)
+    # What was asked: a protocol, a search term, a date window. Never an answer.
+    detail = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ["-at"]
+        verbose_name = "Record access"
+        verbose_name_plural = "Record accesses"
+        indexes = [models.Index(fields=["patient", "-at"]), models.Index(fields=["user", "-at"])]
+
+    def __str__(self):
+        return f"{self.user_label} → {self.patient_label or '—'} ({self.action}, {self.at:%Y-%m-%d %H:%M})"
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValidationError("RecordAccess is append-only.")
+        super().save(*args, **kwargs)
+
+
+class StaffWhatsAppLink(models.Model):
+    """A navigator's phone, linked to the Link Worker assistant on WhatsApp.
+
+    Proven, not typed in: the navigator asks for a code on their profile page
+    and sends it from the phone itself. Until then ``verified_at`` is empty and
+    the number is nobody's.
+
+    Also holds the WhatsApp session: the conversation thread, and the one client
+    the link worker has **loaded** — the assistant answers about that client and
+    no other until they load a different one. The choice is the link worker's;
+    today's meetings are offered as the obvious ones. See
+    link_worker_whatsapp.md.
+    """
+
+    user = models.OneToOneField(ConvAIUser, on_delete=models.CASCADE,
+                                related_name="whatsapp_link")
+    phone_number = PhoneNumberField()
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    # The pending code, hashed: it is a credential while it lasts.
+    code_hash = models.CharField(max_length=128, blank=True, default="")
+    code_expires_at = models.DateTimeField(null=True, blank=True)
+    code_tries = models.PositiveSmallIntegerField(default=0)
+
+    # The session.
+    thread_id = models.CharField(max_length=36, blank=True, default="")
+    last_message_at = models.DateTimeField(null=True, blank=True)
+    loaded_patient = models.ForeignKey("Patient", on_delete=models.SET_NULL,
+                                       null=True, blank=True, related_name="+")
+    loaded_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Staff WhatsApp link"
+        verbose_name_plural = "Staff WhatsApp links"
+
+    def __str__(self):
+        state = "verified" if self.verified_at else "pending"
+        return f"{self.user.get_username()} · {self.phone_number} ({state})"
+
+
+class Job(models.Model):
+    """One unit of background work, queued in the database.
+
+    The in-process pools in ``async_reply`` are right for work that is short
+    and can be lost — a WhatsApp reply. Transcribing an hour of audio is
+    neither, and it used to run inside the request that asked for it, holding a
+    browser and a web thread for minutes. A row here is the work's state, so it
+    survives the process that was running it, can be retried by a person, and is
+    picked up by whichever worker is free. See ``ConvAI.jobs`` and
+    background_jobs.md.
+    """
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", _("Queued")
+        RUNNING = "running", _("Running")
+        DONE = "done", _("Done")
+        FAILED = "failed", _("Failed")
+        CANCELLED = "cancelled", _("Cancelled")
+
+    kind = models.CharField(max_length=64, db_index=True)
+    payload = models.JSONField(default=dict, blank=True)
+    # What the job is about, as "<label>:<pk>", so a page can ask "is anything
+    # running for this recording?" without knowing the payload's shape.
+    ref = models.CharField(max_length=96, blank=True, default="", db_index=True)
+    # Two requests to transcribe the same recording are one piece of work. The
+    # key is unique only while a job is live (see Meta), so the same work can be
+    # queued again once the last attempt has finished.
+    dedupe_key = models.CharField(max_length=128, null=True, blank=True)
+
+    status = models.CharField(max_length=16, choices=Status.choices,
+                              default=Status.QUEUED)
+    priority = models.SmallIntegerField(default=0)
+    run_after = models.DateTimeField(default=timezone.now)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    max_attempts = models.PositiveSmallIntegerField(default=3)
+
+    locked_by = models.CharField(max_length=128, blank=True, default="")
+    locked_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    last_error = models.TextField(blank=True, default="")
+    result = models.JSONField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(ConvAIUser, null=True, blank=True,
+                                   on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        indexes = [models.Index(fields=["status", "run_after", "priority"])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["dedupe_key"],
+                condition=Q(status__in=["queued", "running"]),
+                name="job_live_dedupe_key",
+            ),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.kind} #{self.pk} ({self.status})"
+
+    @property
+    def is_live(self) -> bool:
+        return self.status in (self.Status.QUEUED, self.Status.RUNNING)
+
+
+class JobWorker(models.Model):
+    """A ``run_jobs`` process, as last heard from.
+
+    Nothing reads this to schedule work — claiming is done on the Job rows. It
+    exists so a page can say "nobody is working the queue" instead of showing a
+    transcription as queued forever when the worker container is not running.
+    """
+
+    name = models.CharField(max_length=128, unique=True)
+    started_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+    kinds = models.CharField(max_length=255, blank=True, default="")
+
+    def __str__(self):
+        return self.name

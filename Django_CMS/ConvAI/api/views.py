@@ -1,6 +1,7 @@
 # ConvAI/api/views.py
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import timedelta
 
@@ -39,8 +40,14 @@ from .serializers import (
     AnswerUpsertItemSerializer,
     MeetingAnswersUpsertInSerializer,
     PatientDetailsAppendInSerializer,
-    PatientDetailsAppendOutSerializer
+    PatientDetailsAppendOutSerializer,
+    ConversationVisibilityInSerializer,
+    ConversationVisibilityOutSerializer,
+    ConversationSummaryInSerializer,
+    ConversationSummaryOutSerializer,
+    RunOutSerializer,
 )
+from ..run_tokens import RunTokenAuthentication
 from ..models import (
     Conversation, 
     Message, 
@@ -55,6 +62,8 @@ from ..models import (
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
 
 
 STALE_THREAD_HOURS = 2  # change to 3 if you prefer
@@ -222,11 +231,17 @@ def _persist_exchange(user: User, conv: Conversation, user_text: str, bot_text: 
         or "api-user"
     )
 
-    Message.objects.create(
+    from ..message_attribution import create_message
+    # Owned by the API account that sent it. The identity string above is only
+    # the address it is recorded under; the account is what it belongs to.
+    create_message(
         user=identity,
         conversation_id=str(conv.id),
         user_message=user_text,
         response_message=bot_text,
+        patient=getattr(conv, "patient", None),
+        account=user,
+        sender_role=Message.SenderRole.API,
     )
 
     # Keep Conversation fresh & ensure agent is set from user if field exists
@@ -579,7 +594,8 @@ class MeetingCreateView(APIView):
       "patient_id": int,
       "scheduled_time": ISO8601,
       "type": int (optional),
-      "scheduled_protocol": int|null (optional)
+      "scheduled_protocols": [int, ...] (optional, protocol numbers),
+      "scheduled_protocol": int|null (optional, deprecated — one protocol number)
     }
 
     Rules:
@@ -611,8 +627,24 @@ class MeetingCreateView(APIView):
         )
         if "type" in v:
             meeting.type = v["type"]
-        if "scheduled_protocol" in v:
-            meeting.scheduled_protocol = v["scheduled_protocol"]
+
+        # Numbers in, protocols out. Both spellings are accepted; the singular
+        # one is the shape this endpoint shipped with and means a list of one.
+        # A number nothing answers to is an error rather than a silent no-op —
+        # the old field took any integer 1..10 and most of them were nobody's
+        # protocol, which is how calls ended up booked against nothing.
+        wanted = list(v.get("scheduled_protocols") or [])
+        if v.get("scheduled_protocol"):
+            wanted.append(v["scheduled_protocol"])
+        booked = list(Protocol.objects.filter(number__in=set(wanted)))
+        missing = sorted(set(wanted) - {p.number for p in booked})
+        if missing:
+            return Response(
+                {"ok": False,
+                 "detail": "No protocol with number(s): %s"
+                           % ", ".join(str(n) for n in missing)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Conflict check: ±59 minutes for THIS navigator's patient list
         mt = meeting.scheduled_time
@@ -631,6 +663,8 @@ class MeetingCreateView(APIView):
             )
 
         meeting.save()
+        if booked:
+            meeting.scheduled_protocols.set(booked)
         out = MeetingOutSerializer(meeting).data
         return Response({"ok": True, "meeting": out}, status=status.HTTP_201_CREATED)
 
@@ -638,7 +672,11 @@ class PatientProtocolsFilledView(APIView):
     """
     GET /api/v1/patients/<patient_id>/protocols/filled/
     Returns meetings for the patient where at least one answer exists:
-    [{meeting_id, scheduled_time, protocol_number, answered_count}, ...]
+    [{meeting_id, scheduled_time, protocol_numbers, protocol_number,
+      answered_count}, ...]
+
+    `protocol_number` is the first of `protocol_numbers` and is kept for
+    clients written before a call could cover more than one.
     """
     authentication_classes = AUTH_CLASSES
     permission_classes = [IsAuthenticated]
@@ -656,23 +694,27 @@ class PatientProtocolsFilledView(APIView):
         meetings = (
             Meeting.objects
             .filter(patient_id=patient.id)
+            .prefetch_related("executed_protocols", "scheduled_protocols")
             .order_by("-scheduled_time")
         )
 
         payload = []
         for m in meetings:
-            proto_number = m.executed_protocol or m.scheduled_protocol
-            if not proto_number:
+            covered = (list(m.executed_protocols.all())
+                       or list(m.scheduled_protocols.all()))
+            if not covered:
                 continue
 
             answered_count = Answer.objects.filter(meeting=m).count()
             if answered_count == 0:
                 continue
 
+            numbers = sorted(p.number for p in covered)
             payload.append({
                 "meeting_id": m.id,
                 "scheduled_time": m.scheduled_time,
-                "protocol_number": proto_number,
+                "protocol_numbers": numbers,
+                "protocol_number": numbers[0],
                 "answered_count": answered_count,
             })
 
@@ -886,3 +928,439 @@ class PatientDetailsAppendView(APIView):
             "details": updated,
         })
         return Response(out.data, status=status.HTTP_200_OK)
+
+class ConversationVisibilityView(APIView):
+    """
+    GET  /api/v1/conversations/<conversation_id>/visibility/
+    POST /api/v1/conversations/<conversation_id>/visibility/
+    Authorization: Bearer <token>  (or "Token <key>" under DRF TokenAuthentication)
+    Body (POST): { "hidden": true }
+
+    Whether this conversation's content is readable by the client's link
+    worker. This is the contract behind the agent tool that asks the client
+    the question — see ConvAI/native_agents/privacy_tool.py and
+    conversation_privacy.md.
+
+    404 rather than 403 in every refusal, the feature being switched off
+    included. A caller who may not touch this conversation should not learn
+    from the status code whether it exists, and an installation that never
+    turned the feature on has no endpoint to find.
+
+    Idempotent on purpose: an agent whose client says "hide it" twice should
+    not have to care, and the response always describes the state the
+    conversation is now in rather than what changed.
+    """
+    authentication_classes = AUTH_CLASSES
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, conversation_id):
+        conv = self._conversation(request, conversation_id)
+        return Response(self._out(conv), status=status.HTTP_200_OK)
+
+    def post(self, request, conversation_id):
+        from .. import conversation_privacy
+
+        conv = self._conversation(request, conversation_id)
+        ser = ConversationVisibilityInSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        hidden = ser.validated_data["hidden"]
+        conversation_privacy.set_hidden(conv, hidden)
+        # Logged with the acting account because a service token can write to
+        # any conversation (see ConvAI.conversation_actors). The log is what
+        # makes that traceable after the fact.
+        logger.info("Conversation %s visibility set to hidden=%s by %s",
+                    conv.id, hidden, request.user.get_username())
+        return Response(self._out(conv), status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _conversation(request, conversation_id):
+        from django.http import Http404
+        from .. import conversation_actors, conversation_privacy
+
+        if not conversation_privacy.enabled():
+            raise Http404
+        try:
+            conv_uuid = uuid.UUID(str(conversation_id))
+        except (TypeError, ValueError):
+            raise Http404
+        conv = (Conversation.objects
+                .select_related("patient__tester_account")
+                .filter(id=conv_uuid).first())
+        if conv is None:
+            raise Http404
+
+        # Whose conversation it is. One rule, in conversation_actors, shared
+        # with the summary endpoint — and bound to the *patient* rather than to
+        # a user account, because on WhatsApp and SMS there is no account to
+        # bind to: save_message has never set Conversation.user. A navigator is
+        # deliberately not on the list; the switch is the client's own answer
+        # about their own privacy, and a link worker setting it on their behalf
+        # would make it worth nothing.
+        if not conversation_actors.may_act_on(conv, request.user):
+            raise Http404
+        return conv
+
+    @staticmethod
+    def _out(conv):
+        # Counted over the conversation key, which is what a navigator sees on
+        # the divider — so the number the agent reads back to the client is the
+        # same number the link worker is left with.
+        count = Message.objects.filter(conversation_id=str(conv.id)).count()
+        return ConversationVisibilityOutSerializer({
+            "conversation_id": str(conv.id),
+            "hidden": conv.hidden,
+            "hidden_at": conv.hidden_at,
+            "message_count": count,
+        }).data
+
+
+class ConversationSummaryView(APIView):
+    """
+    GET  /api/v1/conversations/<conversation_id>/summary/
+    POST /api/v1/conversations/<conversation_id>/summary/
+    Authorization: Bearer <token>  (or "Token <key>" under DRF TokenAuthentication)
+    Body (POST): { "summary": "..." }
+
+    What the agent that held this conversation says it was about. The contract
+    behind the `report_summary` tool, for remote agents that cannot reach the
+    ORM — see ConvAI/native_agents/summary_tool.py and agent_tools.md.
+
+    Deliberately **not** behind a feature switch, unlike the sibling visibility
+    endpoint. Gating that one is load-bearing: it decides whether the platform
+    may make a promise to a client. A summary is the same kind of thing the
+    classifier already writes unasked on every conversation, so a switch would
+    only mean a fresh installation's agents fail silently.
+
+    404 rather than 403 in every refusal, matching the visibility endpoint: a
+    caller who may not touch this conversation should not learn from the status
+    code whether it exists.
+
+    Idempotent. Each report replaces the last, and the response describes the
+    state the conversation is now in rather than what changed — a conversation
+    grows while it is happening, so the agent's latest reading of it is the one
+    worth keeping.
+    """
+    authentication_classes = AUTH_CLASSES
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, conversation_id):
+        conv = self._conversation(request, conversation_id)
+        return Response(self._out(conv), status=status.HTTP_200_OK)
+
+    def post(self, request, conversation_id):
+        from .. import conversation_summary
+
+        conv = self._conversation(request, conversation_id)
+        ser = ConversationSummaryInSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        text = ser.validated_data["summary"]
+        conversation_summary.set_agent_summary(conv, text)
+        # Logged with the acting account because a service token can write to
+        # any conversation (see ConvAI.conversation_actors). The length, not the
+        # text: a summary is content, and the application log is not where
+        # content belongs.
+        logger.info("Agent summary recorded for conversation %s (%d chars) by %s",
+                    conv.id, len(text), request.user.get_username())
+        return Response(self._out(conv), status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _conversation(request, conversation_id):
+        from django.http import Http404
+        from .. import conversation_actors
+
+        try:
+            conv_uuid = uuid.UUID(str(conversation_id))
+        except (TypeError, ValueError):
+            raise Http404
+        conv = (Conversation.objects
+                .select_related("patient__tester_account")
+                .filter(id=conv_uuid).first())
+        if conv is None:
+            raise Http404
+        if not conversation_actors.may_act_on(conv, request.user):
+            raise Http404
+        return conv
+
+    @staticmethod
+    def _out(conv):
+        from .. import conversation_summary
+
+        text, source, _when = conversation_summary.machine_summary(conv)
+        return ConversationSummaryOutSerializer({
+            "conversation_id": str(conv.id),
+            "summary": text,
+            "source": source,
+            "agent_summary": conv.agent_summary or "",
+            "agent_summary_at": conv.agent_summary_at,
+            "hidden": conv.hidden,
+        }).data
+
+
+class _RunView(APIView):
+    """Base for the endpoints a remote agent calls about the run it is in.
+
+    Authenticated **only** by a run token (ConvAI.run_tokens), and the token
+    decides the conversation: none of these take an id. That is the difference
+    from ``/conversations/<id>/…``, which exist for people with personal tokens:
+    here there is no id for the agent, or a model inside it, to forge or get
+    wrong, and a token issued for one conversation cannot reach another.
+
+    Every refusal of a valid token is a 404, as elsewhere in this API: the
+    conversation missing, or a scope the token was not given.
+    """
+    authentication_classes = [RunTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    scope = None
+
+    def _conversation(self, request):
+        from django.http import Http404
+
+        claims = request.auth
+        if self.scope and not claims.allows(self.scope):
+            raise Http404
+        try:
+            conv_uuid = uuid.UUID(claims.conversation_id)
+        except (TypeError, ValueError):
+            raise Http404
+        conv = Conversation.objects.filter(id=conv_uuid).first()
+        if conv is None:
+            raise Http404
+        # The token names the client it was issued for. A conversation now on a
+        # different client's file is not the one this token is about.
+        if claims.patient_id and conv.patient_id and conv.patient_id != claims.patient_id:
+            raise Http404
+        return conv
+
+    @staticmethod
+    def _out(conv, claims):
+        from .. import conversation_privacy, conversation_summary
+
+        text, source, _when = conversation_summary.machine_summary(conv)
+        return RunOutSerializer({
+            "conversation_id": str(conv.id),
+            "patient_id": conv.patient_id,
+            "summary": text,
+            "source": source,
+            "hidden": conv.hidden,
+            "privacy_available": conversation_privacy.enabled(),
+            "scopes": list(claims.scopes),
+            "expires_at": claims.expires,
+        }).data
+
+
+class RunView(_RunView):
+    """
+    GET /api/v1/run/
+    Authorization: RunToken <cc_run_token from the run config>
+
+    The conversation this run is about, as the agent is allowed to see it.
+    """
+
+    def get(self, request):
+        conv = self._conversation(request)
+        return Response(self._out(conv, request.auth), status=status.HTTP_200_OK)
+
+
+class RunSummaryView(_RunView):
+    """
+    POST /api/v1/run/summary/   {"summary": "..."}
+
+    The agent's summary of this run's conversation. Same rules as the
+    per-conversation endpoint: replaces the last, blank and over-long refused.
+    """
+    scope = "summary"
+
+    def post(self, request):
+        from .. import conversation_summary
+
+        conv = self._conversation(request)
+        ser = ConversationSummaryInSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        text = ser.validated_data["summary"]
+        conversation_summary.set_agent_summary(conv, text)
+        logger.info("Agent summary recorded for conversation %s (%d chars) by %s",
+                    conv.id, len(text), request.user.get_username())
+        return Response(self._out(conv, request.auth), status=status.HTTP_200_OK)
+
+
+class RunVisibilityView(_RunView):
+    """
+    POST /api/v1/run/visibility/   {"hidden": true}
+
+    The client's answer about whether their link worker may read this
+    conversation. 404 while CONVERSATION_PRIVACY_ENABLED is off, as the
+    per-conversation endpoint is.
+    """
+    scope = "visibility"
+
+    def _conversation(self, request):
+        from django.http import Http404
+        from .. import conversation_privacy
+
+        if not conversation_privacy.enabled():
+            raise Http404
+        return super()._conversation(request)
+
+    def post(self, request):
+        from .. import conversation_privacy
+
+        conv = self._conversation(request)
+        ser = ConversationVisibilityInSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        hidden = ser.validated_data["hidden"]
+        conversation_privacy.set_hidden(conv, hidden)
+        logger.info("Conversation %s visibility set to hidden=%s by %s",
+                    conv.id, hidden, request.user.get_username())
+        return Response(self._out(conv, request.auth), status=status.HTTP_200_OK)
+
+
+class EnrolmentLookupView(APIView):
+    """
+    GET /api/v1/enrolments/?phone=+447700900000
+    GET /api/v1/enrolments/?code=maple-crane-frost
+
+    Whether somebody is enrolled in a study, for an external agent that needs to
+    know who it is talking to before it answers.
+
+    This replaces an endpoint in the implementation it came from that was
+    unauthenticated and CSRF-exempt, and returned a participant's name for any
+    phone number posted to it — a lookup oracle for whether a given person is in
+    a study. Here it needs the same bearer token as everything else, and 404s
+    entirely while study enrolment is switched off.
+
+    It deliberately does not return the access code: the code is a credential,
+    and reading it back out over the API would make a token that can list
+    participants into a token that can impersonate them.
+    """
+    authentication_classes = AUTH_CLASSES
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        from django.http import Http404
+
+        from .. import enrolment as enrolment_service
+        from ..enrolment.codes import normalise_code
+        from ..models import Enrolment
+
+        if not enrolment_service.enabled():
+            raise Http404
+
+        phone = (request.query_params.get("phone") or "").strip()
+        code = normalise_code(request.query_params.get("code") or "")
+        if not phone and not code:
+            return Response(
+                {"detail": "Provide either ?phone= or ?code=."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Newest first: one number can have been enrolled more than once (a
+        # withdrawal and a later re-enrolment), and the latest is the live one.
+        qs = Enrolment.objects.select_related("study", "patient").order_by("-created_at")
+        row = qs.filter(access_code=code).first() if code else qs.filter(phone_number=phone).first()
+
+        if row is None:
+            return Response({"enrolled": False}, status=status.HTTP_200_OK)
+
+        latest = row.latest_consent
+        return Response({
+            "enrolled": True,
+            "name": row.name,
+            "lastname": row.lastname,
+            "study": row.study.slug,
+            "study_name": row.study.display_name,
+            "status": row.status,
+            "patient_id": row.patient_id,
+            "consent": {
+                "given": latest is not None,
+                "version": latest.consent_version if latest else None,
+                "current": row.consent_is_current,
+                "at": latest.agreed_at.isoformat() if latest else None,
+            },
+        }, status=status.HTTP_200_OK)
+
+
+# ----------------------------------------------------------------------------
+# Client records — what staff may ask about their clients
+# ----------------------------------------------------------------------------
+# Thin views over ConvAI.client_records, the module Link Worker v2's tools call
+# too, so the API and the assistant share one permission rule, one privacy rule,
+# one access log and one answer shape. Personal-token auth: these act as the
+# person holding the token — a navigator reads their own clients, an admin
+# everyone. Every refusal is a 404, as in the rest of this API's newer
+# endpoints: a client you may not see reads exactly like one that does not exist.
+#
+# Behind the Link Worker v2 switch, like the assistant: an installation that has
+# not opted in does not gain a new way to read every client's record. While it
+# is off these 404 as if they did not exist. See link_worker_v2.md.
+
+class _ClientRecordsView(APIView):
+    authentication_classes = AUTH_CLASSES
+    permission_classes = [IsAuthenticated]
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        from django.http import Http404
+
+        from ..site_config import get_bool
+        if not get_bool("LINK_WORKER_V2_ENABLED"):
+            raise Http404
+
+    def _answer(self, fn, *args, **kwargs):
+        from .. import client_records as records
+        try:
+            return Response(fn(self.request.user, *args, via="api", **kwargs),
+                            status=status.HTTP_200_OK)
+        except records.NotVisible:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        except records.BadQuestion as exc:  # an unknown or ambiguous protocol, a short search
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ClientOverviewView(_ClientRecordsView):
+    """GET /api/v1/patients/<id>/overview/ — everything held about one client."""
+
+    def get(self, request, patient_id: int, *args, **kwargs):
+        from .. import client_records as records
+        return self._answer(records.overview, patient_id)
+
+
+class UpcomingMeetingsView(_ClientRecordsView):
+    """GET /api/v1/meetings/upcoming/?patient_id=&days=30 — one client or the caseload."""
+
+    def get(self, request, *args, **kwargs):
+        from .. import client_records as records
+        try:
+            days = int(request.query_params.get("days") or 30)
+        except ValueError:
+            return Response({"detail": "days must be a whole number."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return self._answer(records.upcoming_meetings,
+                            patient_id=request.query_params.get("patient_id") or None, days=days)
+
+
+class ClientProtocolAnswersView(_ClientRecordsView):
+    """GET /api/v1/patients/<id>/protocols/answers/?protocol= — latest answer per question."""
+
+    def get(self, request, patient_id: int, *args, **kwargs):
+        from .. import client_records as records
+        return self._answer(records.protocol_answers, patient_id,
+                            request.query_params.get("protocol") or None)
+
+
+class ClientProtocolHistoryView(_ClientRecordsView):
+    """GET /api/v1/patients/<id>/protocols/<protocol>/history/ — answers call by call.
+
+    ``protocol`` is a number or words from the title, as the assistant takes it.
+    """
+
+    def get(self, request, patient_id: int, protocol: str, *args, **kwargs):
+        from .. import client_records as records
+        return self._answer(records.protocol_history, patient_id, protocol)
+
+
+class RecordSearchView(_ClientRecordsView):
+    """GET /api/v1/records/search/?q= — a phrase across every visible client's record."""
+
+    def get(self, request, *args, **kwargs):
+        from .. import client_records as records
+        return self._answer(records.search_records, request.query_params.get("q") or "")

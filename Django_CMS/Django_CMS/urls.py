@@ -40,6 +40,10 @@ urlpatterns += [
     path('', include('ConvAI.urls')),
 ]
 
+# Online meetings, only where the app is part of the deployment (MEETINGS_APP).
+if getattr(settings, "MEETINGS_APP", False):
+    urlpatterns += [path('', include('meetings.urls'))]
+
 if settings.DEBUG:
     # Serve ONLY public branding assets (the logo shown on the login page) from
     # /media/. All other media is private — care plans, voice notes, TTS, call

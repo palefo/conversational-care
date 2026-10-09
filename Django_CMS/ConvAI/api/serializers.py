@@ -3,6 +3,11 @@ from rest_framework import serializers
 from ..models import Alert, Patient, Meeting
 from django.contrib.auth import get_user_model
 
+# The one place the summary length limit is defined: the agent tool refuses
+# the same length the endpoint does, so an agent that hits the limit gets the
+# same answer whichever route it took.
+from ..native_agents.summary_tool import MAX_SUMMARY_CHARS
+
 User = get_user_model()
 
 class MessageInSerializer(serializers.Serializer):
@@ -81,6 +86,13 @@ class MeetingCreateInSerializer(serializers.Serializer):
     patient_id = serializers.IntegerField()
     scheduled_time = serializers.DateTimeField()
     type = serializers.IntegerField(required=False)
+    # A call can cover more than one protocol. `scheduled_protocol` is the
+    # single-value spelling this endpoint shipped with; it still works and means
+    # a list of one. Both are protocol *numbers*, and a number with no protocol
+    # behind it is rejected rather than stored.
+    scheduled_protocols = serializers.ListField(
+        child=serializers.IntegerField(), required=False, allow_empty=True,
+    )
     scheduled_protocol = serializers.IntegerField(required=False, allow_null=True)
 
 
@@ -88,6 +100,11 @@ class MeetingOutSerializer(serializers.ModelSerializer):
     patient = PatientOutSerializer(read_only=True)
     type_display = serializers.CharField(source="get_type_display", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+    scheduled_protocols = serializers.SerializerMethodField()
+    executed_protocols = serializers.SerializerMethodField()
+    # Kept so clients written against the old shape keep parsing. Both report
+    # the first protocol of what may now be several.
+    scheduled_protocol = serializers.SerializerMethodField()
     scheduled_protocol_display = serializers.SerializerMethodField()
 
     class Meta:
@@ -98,12 +115,32 @@ class MeetingOutSerializer(serializers.ModelSerializer):
             "created_time",
             "type", "type_display",
             "status", "status_display",
+            "scheduled_protocols", "executed_protocols",
             "scheduled_protocol", "scheduled_protocol_display",
             "patient",
         ]
 
+    @staticmethod
+    def _brief(protocols):
+        return [
+            {"id": p.pk, "number": p.number, "title": p.title,
+             "repeatable": p.repeatable}
+            for p in protocols
+        ]
+
+    def get_scheduled_protocols(self, obj):
+        return self._brief(obj.scheduled_protocols.order_by("number"))
+
+    def get_executed_protocols(self, obj):
+        return self._brief(obj.executed_protocols.order_by("number"))
+
+    def get_scheduled_protocol(self, obj):
+        first = obj.scheduled_protocols.order_by("number").first()
+        return first.number if first else None
+
     def get_scheduled_protocol_display(self, obj):
-        return obj.get_scheduled_protocol_display() if obj.scheduled_protocol else None
+        first = obj.scheduled_protocols.order_by("number").first()
+        return f"{first.number}. {first.title}" if first else None
 
 class AnswerUpsertItemSerializer(serializers.Serializer):
     question_id = serializers.IntegerField()
@@ -128,3 +165,69 @@ class PatientDetailsAppendOutSerializer(serializers.Serializer):
     target = serializers.CharField()
     appended_at = serializers.DateTimeField()
     details = serializers.CharField()  # the updated markdown blob
+
+class ConversationVisibilityInSerializer(serializers.Serializer):
+    """The client's answer, and nothing else.
+
+    ``hidden`` is required rather than defaulted: this endpoint is the record
+    of somebody being asked a yes/no question, and a body that forgot to say
+    which should be refused rather than guessed at.
+    """
+    hidden = serializers.BooleanField()
+
+
+class ConversationVisibilityOutSerializer(serializers.Serializer):
+    conversation_id = serializers.CharField()
+    hidden = serializers.BooleanField()
+    hidden_at = serializers.DateTimeField(allow_null=True)
+    # What the link worker will still see. Returned so the agent can tell the
+    # client exactly what was and was not kept from them, in the same breath
+    # as confirming the change.
+    message_count = serializers.IntegerField()
+
+
+class ConversationSummaryInSerializer(serializers.Serializer):
+    """What the agent says the conversation was about.
+
+    Trimmed and length-capped here rather than in the view, so the tool and the
+    endpoint refuse the same things for the same reasons. ``allow_blank`` is off
+    on purpose: erasing a summary a navigator may already have read is a
+    different act from writing one, and nothing has asked for it, so a blank
+    body is a 400 rather than a quiet delete.
+    """
+    summary = serializers.CharField(
+        allow_blank=False, trim_whitespace=True,
+        max_length=MAX_SUMMARY_CHARS,
+    )
+
+
+class ConversationSummaryOutSerializer(serializers.Serializer):
+    conversation_id = serializers.CharField()
+    # The summary the link worker will actually read, and which of the two
+    # writers produced it — 'agent', 'classifier', or '' when nothing has
+    # summarised it yet. Returned rather than left to the caller to infer, so an
+    # agent can tell whether its own report is the one on screen.
+    summary = serializers.CharField(allow_blank=True)
+    source = serializers.CharField(allow_blank=True)
+    agent_summary = serializers.CharField(allow_blank=True)
+    agent_summary_at = serializers.DateTimeField(allow_null=True)
+    # Whether the client asked their link worker not to read this conversation.
+    # Worth knowing when writing the summary: on a hidden conversation the
+    # summary is the *only* thing the link worker gets.
+    hidden = serializers.BooleanField()
+
+
+class RunOutSerializer(serializers.Serializer):
+    """What a remote agent's run token lets it see about its own conversation."""
+    conversation_id = serializers.CharField()
+    patient_id = serializers.IntegerField(allow_null=True)
+    # The summary the link worker reads now, and who wrote it — 'agent',
+    # 'classifier', or '' when nothing has summarised it yet.
+    summary = serializers.CharField(allow_blank=True)
+    source = serializers.CharField(allow_blank=True)
+    hidden = serializers.BooleanField()
+    # Whether the platform currently takes visibility requests at all, so an
+    # agent can tell a client "that isn't available here" instead of trying.
+    privacy_available = serializers.BooleanField()
+    scopes = serializers.ListField(child=serializers.CharField())
+    expires_at = serializers.DateTimeField()

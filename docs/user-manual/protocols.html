@@ -47,6 +47,12 @@ follow during calls — onboarding interviews, follow-ups, assessments. Admins
 and navigators design them in a form-style editor; answers recorded during
 meetings are stored per client.</p>
 
+<p>A protocol reaches a call in two steps. First it is added to a client's
+<strong>programme</strong> on their profile, which is what puts it in their call
+panel at all. Then a call is booked to <strong>address</strong> one or more of
+them, which is what lifts those to the top of the panel while the call is
+happening.</p>
+
 <h2>The protocol list</h2>
 <p>Under <kbd class="ui">Settings → Protocols</kbd> (or the protocol pages)
 each protocol shows its title and whether it is still <em>editable</em> or
@@ -63,9 +69,37 @@ Markdown with a formatting toolbar (bold, italic, headings, lists, links,
 code) and a live <kbd class="ui">Preview</kbd>.</li>
 <li>Reorder by dragging, duplicate a question, or move it down; delete what you
 don't need.</li>
-<li><kbd class="ui">Save</kbd>. The protocol can now be attached to meetings
-when <a href="calls.html">scheduling calls</a>.</li>
+<li><kbd class="ui">Save</kbd>. The protocol can now be added to a client's
+programme, and attached to meetings when
+<a href="calls.html">scheduling calls</a>.</li>
 </ol>
+
+<h2>Choosing who a protocol applies to</h2>
+<p>Open a client and click <kbd class="ui">Edit</kbd>. Under
+<strong>Protocols</strong>, tick the ones this person works through. Only those
+appear in their call panel.</p>
+<p>A new client starts with nothing ticked, so their panel is empty until
+somebody decides what they are on. Unticking a protocol later removes it from
+the panel; it never deletes answers already recorded against it, and re-ticking
+brings them back into view.</p>
+
+<h2>Protocols answered more than once</h2>
+<p>Most protocols are asked once. Some are instruments meant to be re-taken —
+a cognitive-decline questionnaire compares someone with how they were, so the
+score only means something next to the last one.</p>
+<p>Tick <strong>This protocol is answered more than once</strong> in the
+editor and every call records its own <em>round</em>: the questions come up
+empty for the call you are on, with the earlier rounds listed under each one,
+dated and read-only. The protocol never reads as <em>Complete</em> — it says
+which round this is, or when the last one was.</p>
+<p>This is the one setting that stays editable after a protocol locks, because
+you usually discover a protocol is repeatable only after using it once. It
+changes how answers are displayed, never what they say.</p>
+
+<div class="callout"><div class="c-title">Correcting an earlier round</div>
+There is no <kbd class="ui">Update</kbd> button on a previous round. Open the
+call that round belongs to and change it there, so every round stays a record
+of one conversation.</div>
 
 <div class="callout"><div class="c-title">Tip</div>
 Because locked protocols cannot change, duplicate an existing protocol into a

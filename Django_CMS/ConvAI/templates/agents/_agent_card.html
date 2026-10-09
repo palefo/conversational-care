@@ -2,29 +2,49 @@
 {% comment %} One agent as a card. Expects `a` (Agent). Kind drives icon/colour/meta. {% endcomment %}
 <div class="agent-card">
   <div class="flex items-start gap-3">
-    {% if a.kind == 'prompt' %}
+    {% if a.kind == 'prompt' and a.rag_enabled %}
+      <span class="agent-avatar bg-violet-50 text-violet-600"><span class="material-icons-outlined">library_books</span></span>
+    {% elif a.kind == 'prompt' %}
       <span class="agent-avatar bg-indigo-50 text-indigo-600"><span class="material-icons-outlined">chat</span></span>
     {% elif a.kind == 'remote' %}
       <span class="agent-avatar bg-sky-50 text-sky-600"><span class="material-icons-outlined">cloud</span></span>
+    {% elif a.kind == 'sensei' %}
+      <span class="agent-avatar bg-teal-50 text-teal-600"><span class="material-icons-outlined">sensors</span></span>
     {% else %}
       <span class="agent-avatar bg-emerald-50 text-emerald-600"><span class="material-icons-outlined">bolt</span></span>
     {% endif %}
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
         <h3 class="font-semibold text-gray-900 truncate">{{ a.name }}</h3>
-        {% if a.kind == 'prompt' %}
+        {% if a.kind == 'prompt' and a.rag_enabled %}
+          <span class="agent-badge bg-violet-100 text-violet-700">{% trans "RAG" %}</span>
+        {% elif a.kind == 'prompt' %}
           <span class="agent-badge bg-indigo-100 text-indigo-700">{% trans "Prompt" %}</span>
         {% elif a.kind == 'remote' %}
           <span class="agent-badge bg-sky-100 text-sky-700">{% trans "Remote" %}</span>
+        {% elif a.kind == 'sensei' %}
+          <span class="agent-badge bg-teal-100 text-teal-700">{% trans "Sensei" %}</span>
         {% else %}
           <span class="agent-badge bg-emerald-100 text-emerald-700">{% trans "Native" %}</span>
         {% endif %}
       </div>
-      <p class="text-xs text-gray-500 truncate mt-0.5">
-        {% if a.kind == 'prompt' %}
+      {% comment %}
+        What the agent is *for*, in the admin's own words. Without one, fall back
+        to the line this used to show — the technical identity, which at least
+        tells the cards apart. The identity is repeated as a chip below either
+        way, so writing a description never hides it.
+      {% endcomment %}
+      {# The title is the whole sentence, for the rare description that still #}
+      {# runs past the two lines the card can show. #}
+      <p class="agent-desc mt-0.5"{% if a.description %} title="{{ a.description }}"{% endif %}>
+        {% if a.description %}
+          {{ a.description }}
+        {% elif a.kind == 'prompt' %}
           {{ a.system_prompt|truncatechars:70|default:_("No prompt set") }}
         {% elif a.kind == 'remote' %}
           {{ a.langgraph_name|default:_("Remote LangGraph agent") }}
+        {% elif a.kind == 'sensei' %}
+          {% trans "Answers from the client's own sensor data, via Sensei." %}
         {% else %}
           <code>{{ a.native_key }}</code>
         {% endif %}
@@ -34,15 +54,40 @@
 
   {# ── meta chips ── #}
   <div class="mt-3 flex flex-wrap gap-1.5">
+    {% if a.description %}
+      {% if a.kind == 'native' %}
+        <span class="agent-chip" title="{% trans 'Built-in graph this agent runs' %}">
+          <span class="material-icons-outlined text-[13px]">bolt</span>
+          <code class="truncate">{{ a.native_key }}</code>
+        </span>
+      {% elif a.kind == 'remote' and a.langgraph_name %}
+        <span class="agent-chip" title="{% trans 'LangGraph name' %}">
+          <span class="material-icons-outlined text-[13px]">account_tree</span>
+          <span class="truncate">{{ a.langgraph_name }}</span>
+        </span>
+      {% endif %}
+    {% endif %}
     {% if a.kind == 'remote' %}
       <span class="agent-chip" title="{% trans 'Host' %}">
         <span class="material-icons-outlined text-[13px]">dns</span>
         <span class="truncate">{{ a.host|default:"—" }}{% if a.port %}:{{ a.port }}{% endif %}</span>
       </span>
+    {% elif a.kind == 'sensei' %}
+      {# No model chip: the answering model runs on Sensei's side, not ours. #}
+      <span class="agent-chip" title="{% trans 'Answered by the external Sensei service' %}">
+        <span class="material-icons-outlined text-[13px]">sensors</span>
+        {% trans "Sensei service" %}
+      </span>
     {% else %}
       <span class="agent-chip" title="{% trans 'Model' %}">
         <span class="material-icons-outlined text-[13px]">memory</span>
         <code>{{ a.model|default:_("default") }}</code>
+      </span>
+    {% endif %}
+    {% if a.kind == 'prompt' and a.rag_enabled %}
+      <span class="agent-chip" title="{% trans 'Documents searched by this agent' %}">
+        <span class="material-icons-outlined text-[13px]">library_books</span>
+        {% blocktrans count n=a.active_document_count %}{{ n }} document{% plural %}{{ n }} documents{% endblocktrans %}
       </span>
     {% endif %}
     {% if a.kind == 'prompt' and a.realtime_enabled %}
@@ -51,12 +96,33 @@
         {% trans "Real-time voice" %}
       </span>
     {% endif %}
-    {% if a.tts_voice_id %}
-      <span class="agent-chip" title="{% trans 'Voice ID' %}">
-        <span class="material-icons-outlined text-[13px]">graphic_eq</span>
-        <span class="truncate">{{ a.tts_voice_id }}</span>
+    {% comment %}
+      Tools change what an agent can *do* to a conversation — hide it, write
+      the summary a link worker reads — and make it a tool-calling agent, which
+      is slower per turn. Both are worth knowing from the roster without opening
+      the form.
+    {% endcomment %}
+    {% for label in a.tool_labels %}
+      <span class="agent-chip agent-chip-tool" title="{% trans 'Platform tool this agent may call' %}">
+        <span class="material-icons-outlined text-[13px]">build</span>{{ label }}
+      </span>
+    {% endfor %}
+    {% if a.kind == 'remote' and a.allow_callbacks %}
+      <span class="agent-chip agent-chip-tool" title="{% trans 'Each run gets a token for /api/v1/run/, scoped to its conversation' %}">
+        <span class="material-icons-outlined text-[13px]">sync_alt</span>{% trans "Callbacks" %}
       </span>
     {% endif %}
+    {% if a.conversations_start_hidden %}
+      <span class="agent-chip agent-chip-tool" title="{% trans 'Conversations start hidden from the link worker until the client agrees' %}">
+        <span class="material-icons-outlined text-[13px]">visibility_off</span>{% trans "Starts hidden" %}
+      </span>
+    {% endif %}
+    {% with voice=a.active_tts_voice %}{% if voice %}
+      <span class="agent-chip" title="{% trans 'Voice for spoken replies' %}">
+        <span class="material-icons-outlined text-[13px]">graphic_eq</span>
+        <span class="truncate">{{ voice }}</span>
+      </span>
+    {% endif %}{% endwith %}
   </div>
 
   {# ── actions ── #}

@@ -1,0 +1,98 @@
+{% load i18n %}
+{% comment %}
+  The online meeting's actions in the meeting panel — what "Start call" is for
+  a phone call. Included by the core panel through ConvAI.extensions only while
+  online meetings are on; the core never knows this file exists.
+
+  The room opens in a window of its own: a call cannot survive the app
+  navigating underneath it, and the navigator keeps the client's record open
+  beside the meeting this way. window.open is called synchronously in the
+  click so popup blockers let it through.
+{% endcomment %}
+{% with o=panel_item.online %}
+  {% if not o.configured %}
+    <button type="button" class="dp-btn" disabled
+            title="{% trans 'An administrator needs to connect a meeting server in Settings → Online meetings.' %}">
+      <span class="material-icons-outlined" style="font-size:16px" aria-hidden="true">videocam_off</span>{% trans "Meeting server not set up" %}
+    </button>
+  {% else %}
+    <button type="button" class="dp-btn dpc-go mtg-join" data-room="{{ o.room_url }}" data-win="cc-meeting-{{ panel_item.meeting.pk }}">
+      {% if o.live %}<span class="dpc-go-dot" aria-hidden="true" style="display:block"></span>{% endif %}
+      <span class="material-icons-outlined" style="font-size:18px" aria-hidden="true">videocam</span>
+      <span>{% if o.live %}{% trans "Rejoin — meeting in progress" %}{% else %}{% trans "Open the meeting room" %}{% endif %}</span>
+    </button>
+  {% endif %}
+  <div class="dp-acts-row">
+    <button type="button" class="dp-btn mtg-copy" data-url="{{ o.invite_url }}" data-csrf="{{ csrf_token }}"
+            title="{% trans 'Copy the link the client joins with' %}">
+      <span class="material-icons-outlined" style="font-size:16px" aria-hidden="true">link</span>{% trans "Copy link" %}
+    </button>
+    <button type="button" class="dp-btn" data-dpdialog="mtgSend">
+      <span class="material-icons-outlined" style="font-size:16px" aria-hidden="true">send</span>{% trans "Send link" %}
+    </button>
+  </div>
+
+  <dialog class="dp-dialog" id="mtgSend">
+    <form method="post" action="{{ o.send_url }}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <h3>{% trans "Send the meeting link" %}</h3>
+      <p class="dp-dialog-sub">
+        {% blocktrans with who=panel_item.to.who %}{{ who }} gets a link that opens in their browser — nothing to install. It works from shortly before the start time, and a calendar invitation comes with the email.{% endblocktrans %}
+      </p>
+      <div class="dp-fld">
+        <span>{% trans "Send by" %}</span>
+        <label style="display:flex;gap:8px;align-items:center;font-size:.8125rem;margin:.25rem 0">
+          <input type="radio" name="channel" value="email" {% if o.has_email %}checked{% else %}disabled{% endif %}>
+          {% trans "Email" %}{% if not o.has_email %} <small style="color:#94a3b8">— {% trans "no address on file" %}</small>{% endif %}
+        </label>
+        <label style="display:flex;gap:8px;align-items:center;font-size:.8125rem;margin:.25rem 0">
+          <input type="radio" name="channel" value="sms" {% if not o.has_email and o.has_phone %}checked{% endif %}{% if not o.has_phone %}disabled{% endif %}>
+          {% trans "Text message (SMS)" %}{% if not o.has_phone %} <small style="color:#94a3b8">— {% trans "no number on file" %}</small>{% endif %}
+        </label>
+        <label style="display:flex;gap:8px;align-items:center;font-size:.8125rem;margin:.25rem 0">
+          <input type="radio" name="channel" value="whatsapp" {% if not o.has_phone %}disabled{% endif %}>
+          {% trans "WhatsApp" %} <small style="color:#94a3b8">— {% trans "only if they wrote in during the last 24 hours" %}</small>
+        </label>
+      </div>
+      {% if o.join_url %}
+        <div class="dp-fld">
+          <span>{% trans "Or share it yourself" %}</span>
+          <input type="text" readonly value="{{ o.join_url }}" onclick="this.select()">
+        </div>
+      {% endif %}
+      <div class="dp-dialog-acts" style="display:flex;gap:6px;justify-content:flex-end;margin-top:12px">
+        <a class="dp-btn" href="{{ o.ics_url }}"><span class="material-icons-outlined" style="font-size:16px" aria-hidden="true">event</span>{% trans "Calendar file" %}</a>
+        <button type="button" class="dp-btn" data-dpclose>{% trans "Close" %}</button>
+        <button type="submit" class="dp-btn dp-btn-pri"{% if not o.has_email and not o.has_phone %} disabled{% endif %}>{% trans "Send" %}</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    (function () {
+      var join = document.querySelector('.mtg-join');
+      if (join) join.addEventListener('click', function () {
+        var w = window.open(join.dataset.room, join.dataset.win,
+                            'popup=yes,width=1280,height=820,noopener=no');
+        if (!w) { location.href = join.dataset.room; return; }
+        try { w.focus(); } catch (e) {}
+      });
+      var copy = document.querySelector('.mtg-copy');
+      if (copy) copy.addEventListener('click', function () {
+        var label = copy.lastChild.textContent;
+        fetch(copy.dataset.url, {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'X-CSRFToken': copy.dataset.csrf, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        }).then(function (r) { return r.json(); }).then(function (d) {
+          if (!d.url) throw new Error();
+          return navigator.clipboard.writeText(d.url).then(function () {
+            if (window.toast) window.toast('{% trans "Meeting link copied." %}');
+            copy.lastChild.textContent = ' {% trans "Copied" %}';
+            setTimeout(function () { copy.lastChild.textContent = label; }, 1800);
+          }, function () { window.prompt('{% trans "Copy the meeting link:" %}', d.url); });
+        }).catch(function () { if (window.toast) window.toast('{% trans "The link could not be made." %}'); });
+      });
+    })();
+  </script>
+{% endwith %}

@@ -11,6 +11,19 @@ import os
 
 register = template.Library()
 
+@register.filter(name='detector_label')
+def detector_label(title):
+    """Read a classifier alert's title in the viewer's language.
+
+    The title of an alert the classifier raised is the detector's label, and
+    built-in labels are stored in English so the stored string keeps matching
+    the config and the dedupe. This translates it for display only; labels an
+    admin wrote pass through as their own words.
+    """
+    from ..utils_conversation_classification import display_label
+    return display_label(title)
+
+
 @register.filter
 def get_item(dictionary, key):
     """Fetches a dictionary item by key"""
@@ -65,6 +78,12 @@ def brand_logo_url():
     return static(_cfg_brand_logo())
 
 @register.simple_tag
+def link_worker_v2_on():
+    """Whether the chat bubble runs Link Worker v2 (beta). See link_worker_v2.md."""
+    from ..site_config import get_bool
+    return get_bool("LINK_WORKER_V2_ENABLED")
+
+@register.simple_tag
 def brand_name():
     """Return brand display name (DB override, else settings/ENV)."""
     return _cfg_brand_name()
@@ -97,3 +116,25 @@ def first_unit(value):
     whole message — the extra precision is noise on a row you are scanning.
     """
     return str(value).split(",")[0].strip()
+
+
+@register.inclusion_tag("settings/_azure_voices.html")
+def azure_voice_datalist():
+    """``<datalist id="azure-voices">``: suggestions for every Azure voice field.
+
+    The fields stay free text; this only saves looking names up. See ConvAI.tts.
+    """
+    from ..tts import azure_voices
+    return {"voices": azure_voices()}
+
+
+@register.simple_tag
+def online_meetings_on():
+    """Whether online meetings can be started right now (ConvAI.extensions).
+
+    For a core template to offer an online-meeting action only where the
+    optional app is installed and switched on; anything inside the guarded
+    block — a `{% url 'meetings:…' %}` included — is never rendered otherwise.
+    """
+    from ConvAI import extensions
+    return extensions.online_available()

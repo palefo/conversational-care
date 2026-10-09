@@ -167,3 +167,47 @@ ASYNC_WHATSAPP_REPLY = (
 # Higher values allow more concurrent replies at the cost of more memory/CPU per
 # web process. Ignored when ASYNC_WHATSAPP_REPLY is off.
 WHATSAPP_WORKERS = max(1, int(os.getenv("WHATSAPP_WORKERS", "2") or "2"))
+
+# Number of background worker threads used to ingest RAG documents (read →
+# chunk → embed). Separate from WHATSAPP_WORKERS so a long upload cannot sit in
+# front of a waiting WhatsApp reply. Two is plenty: the work is dominated by
+# waiting on the embeddings API, and each thread holds a DB connection.
+RAG_WORKERS = max(1, int(os.getenv("RAG_WORKERS", "2") or "2"))
+
+# --- Background job queue (see background_jobs.md) ---
+# Long work that must survive the request — transcribing a recording, mixing a
+# meeting down — is a Job row worked by the `worker` compose service
+# (`manage.py run_jobs`). JOBS_RUNNER=thread runs jobs inside the web process
+# instead, for an installation that does not want the extra container.
+JOBS_RUNNER = (os.getenv("JOBS_RUNNER", "worker") or "worker").strip().lower()
+# Run each job inline, inside enqueue(). For tests and local debugging only.
+JOBS_EAGER = os.getenv("JOBS_EAGER", "0").strip().lower() in ("1", "true", "yes", "on")
+
+# --- Online meetings (optional app; see online_meetings.md) ---
+# Installed unless MEETINGS_APP=0. Installed is not the same as on: the feature
+# is switched on in Settings → Online meetings (or ONLINE_MEETINGS_ENABLED) and
+# is off by default. Leaving the app out entirely removes its tables from use,
+# its URLs and its Settings tab; the core never imports it.
+MEETINGS_APP = os.getenv("MEETINGS_APP", "1").strip().lower() not in ("0", "false", "no", "off")
+if MEETINGS_APP:
+    INSTALLED_APPS += ["meetings"]
+    # The agent workers and LiveKit's webhooks reach this app over the compose
+    # network as http://web:8000, so that host name has to be accepted.
+    if "web" not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS = ALLOWED_HOSTS + ["web"]
+
+
+# --- Outbound email (see email.md) ---
+# One backend for everything: it picks Azure Communication Services or SMTP at
+# send time from the live configuration, so Django's own password-reset mail and
+# the platform's reminders travel the same way, and switching provider in
+# Settings → Email needs no restart.
+EMAIL_BACKEND = "ConvAI.mailer.PlatformEmailBackend"
+# Read once at boot and only used as a placeholder — PlatformEmailBackend
+# replaces it with the configured sender on every message.
+DEFAULT_FROM_EMAIL = os.getenv("EMAIL_FROM", "") or "no-reply@localhost"
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+# How long a password-reset link stays valid. Three hours: long enough to
+# survive a message sitting unread over lunch, short enough that a forwarded or
+# archived mail is not a standing key to the account.
+PASSWORD_RESET_TIMEOUT = int(os.getenv("PASSWORD_RESET_TIMEOUT", "10800") or "10800")

@@ -84,12 +84,16 @@
   }
   .wa-hint code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
+  /* The resting state is visible and the animation supplies the arrival, rather
+     than the element being declared at opacity:0 and relying on the animation to
+     reveal it. Anything that suppresses animations — an extension, a print
+     stylesheet, a browser that never fires them — then costs the arrival, not
+     the conversation. */
   .wa-msg {
     display: flex; max-width: 78%; align-items: flex-start;
-    opacity: 0; transform: translateY(10px);
-    animation: waFadeIn .28s ease-out forwards;
+    animation: waFadeIn .28s ease-out both;
   }
-  @keyframes waFadeIn { to { opacity: 1; transform: translateY(0); } }
+  @keyframes waFadeIn { from { opacity: 0; transform: translateY(10px); } }
   .wa-msg.user { align-self: flex-end; }
   .wa-msg.bot  { align-self: flex-start; }
   .wa-msg + .wa-msg.user,
@@ -209,6 +213,36 @@
 
   @media (max-width: 768px) {
     .wa-chat { max-width: 100%; box-shadow: none; }
+  }
+
+  /* ---------- Reduced motion ----------
+     This is the page a client uses, on their own phone, possibly while unwell —
+     the one surface in the product where a looping animation is least
+     affordable. Not "no feedback": each moving thing keeps a still equivalent
+     that survives a frozen frame.
+
+     Arrival cross-fades instead of sliding. The travel is what causes trouble;
+     the fade still marks that a message landed. */
+  @media (prefers-reduced-motion: reduce) {
+    .wa-msg { animation-name: waFadeSoft; }
+    @keyframes waFadeSoft { from { opacity: 0; } }
+
+    /* Both dots stop. Each has a companion that already carries the state
+       without moving: the typing bubble is itself the "composing" signal, and
+       the recording dot sits beside a timer that is visibly counting. A loop
+       this slow is exactly the kind flagged as vestibular trouble, and neither
+       is the only thing saying "now". */
+    .wa-typing-bubble span { animation: none; opacity: .6; }
+    .wa-recdot { animation: none; }
+
+    /* Long programmatic scrolls are motion too, and this thread scrolls itself
+       on every reply. */
+    .wa-thread { scroll-behavior: auto; }
+
+    /* The press still registers — only its easing goes, so the change lands in
+       one step rather than over time. */
+    .wa-iconbtn, .wa-fieldbtn { transition: none; }
+    .wa-iconbtn:hover { transform: none; }
   }
 </style>
 {% endblock %}

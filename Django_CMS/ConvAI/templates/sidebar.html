@@ -5,10 +5,21 @@
       <a href="{% url 'dashboard' %}" class="sidebar-logo inline-flex items-center">
         <img src="{% brand_logo_url %}" alt="{% brand_name %}" class="w-auto" />
       </a>
+      {% comment %}
+        Two different jobs, so two different glyphs. Open, the rail is a thing
+        you can put away, and « says which way it goes. Collapsed, there is no
+        rail to point at any more — it is just the menu, and ≡ is what a menu
+        looks like. Swapped by CSS, so the right one is showing on the first
+        paint, before any script runs.
+      {% endcomment %}
       <button id="sidebarToggle" type="button"
         class="sidebar-toggle flex items-center justify-center p-2 rounded-lg text-gray-700 hover:text-sky-700"
-        aria-label="{% trans 'Toggle sidebar' %}" aria-expanded="true" title="{% trans 'Toggle sidebar' %}">
-        <span class="material-icons-outlined">menu_open</span>
+        data-label-collapse="{% trans 'Collapse sidebar' %}"
+        data-label-expand="{% trans 'Expand sidebar' %}"
+        aria-label="{% trans 'Collapse sidebar' %}" aria-expanded="true"
+        title="{% trans 'Collapse sidebar' %}">
+        <span class="material-icons-outlined sb-ico-collapse">keyboard_double_arrow_left</span>
+        <span class="material-icons-outlined sb-ico-expand">menu</span>
       </button>
     </div>
     <nav>
@@ -52,7 +63,12 @@
         </li>
         <li class="mb-2">
           <a
-            href="{% url 'calendar' %}{% if panel_item %}?item={{ panel_item.token }}{% endif %}"
+            {% comment %}
+              Carried the open panel across until the three navigation layers
+              were settled. Calendar is in the main menu, so it is a first-layer
+              move like every other item here and leaves the panel behind.
+            {% endcomment %}
+            href="{% url 'calendar' %}"
             title="{% trans 'Calendar' %}"
             class="sidebar-item flex items-center py-2 px-3 rounded-lg
                    {% if active_page == 'calendar' %}active{% else %}text-gray-700 hover:text-sky-700{% endif %}"
@@ -61,7 +77,24 @@
             <span class="sidebar-label">{% trans "Calendar" %}</span>
           </a>
         </li>
-        {% if perms.ConvAI.access_configuration %}
+      </ul>
+
+      {% comment %}
+        The rail carries two kinds of destination: the four places the work
+        happens, and the two where the system is set up. They were one list, so
+        Settings sat directly under Calendar as though it were somewhere you go
+        during a shift. The heading is the whole separation — no rule under it,
+        because a line *and* a word is a lot of furniture for two items.
+
+        It lives inside the permission check on purpose: without configuration
+        access there is no second group, and a heading standing over nothing is
+        worse than no heading. Same check, one block, so the two cannot drift.
+      {% endcomment %}
+      {% if perms.ConvAI.access_configuration %}
+      <h2 id="sidebarConfigGroup" class="sidebar-group">
+        <span class="sidebar-group-label">{% trans "Configuration" %}</span>
+      </h2>
+      <ul aria-labelledby="sidebarConfigGroup">
         <li class="mb-2">
           <a
             href="{% url 'agents' %}"
@@ -84,8 +117,8 @@
             <span class="sidebar-label">{% trans "Settings" %}</span>
           </a>
         </li>
-        {% endif %}
       </ul>
+      {% endif %}
     </nav>
   </div>
 

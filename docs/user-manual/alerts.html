@@ -54,6 +54,30 @@ alongside calls, meetings and conversations. Unread alerts are shown in bold;
 opening one marks it read, for you only. Old links to the alerts page still
 work — they redirect. The description below is of the panel.</div>
 
+<h2>Where alerts come from</h2>
+<p>Two places, and the alert says which:</p>
+<ul>
+<li><strong>The agent found it</strong> (source <em>Conversation</em>). Every
+message a client sends is read by the classifier as it arrives. When it matches
+one of the agent's detectors that is set to raise an alert, an alert appears
+within about a minute — no one has to press anything. The alert is titled with
+the detector that fired, opens on <em>what triggered this</em> — one line naming
+the moment, usually in the client's own words — and links to the exact
+conversation.</li>
+<li><strong>A navigator raised it</strong> (source <em>Default</em>). See
+<a href="#raising">raising an alert yourself</a> below.</li>
+</ul>
+<p>Which detectors raise alerts is set per agent, under
+<strong>Agents &rarr; edit &rarr; Advanced: conversation classification</strong>.
+Detectors that are <em>not</em> set to raise still flag the conversation for
+review — they just don't put it in anyone's queue.</p>
+
+<div class="callout warn"><div class="c-title">Self-harm is always on</div>
+One detector cannot be switched off: any expression of wanting to die, of
+self-harm, or of not wanting to go on raises a high-priority alert on every
+agent, whether or not anyone configured it. You can reword how it is described
+to the model, but not disable it or lower its priority.</div>
+
 <h2>What an alert shows</h2>
 <ul>
 <li><strong>Active alerts</strong> — cards showing the client, a summary, when
@@ -80,7 +104,7 @@ optionally what changed for the client. Notes are saved to the alert log for
 the whole team.</li>
 </ol>
 
-<h2>Raising an alert yourself</h2>
+<h2 id="raising">Raising an alert yourself</h2>
 <p>Not every alert comes from the agent. While reading a conversation you can
 press <kbd class="ui">Raise an alert</kbd> and record what you saw — a short
 title, a level, and what the agent missed or what worried you. Alerts you raise

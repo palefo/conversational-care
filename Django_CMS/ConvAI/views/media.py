@@ -34,15 +34,13 @@ def twilio_audio_download(request, message_id: int, kind: str):
 
 @login_required
 def serve_protected_file(request, id):
-    # AS-08/F4 / WB-05 fix: enforce ownership — non-staff may only fetch a recording
-    # whose from/to number belongs to a patient (or their caregiver) they navigate.
+    # AS-08/F4 / WB-05 fix: enforce ownership — non-staff may only fetch a
+    # recording belonging to a client they navigate. Which client that is now
+    # comes from the recording itself where the call wrote it down, and falls
+    # back to the numbers where it did not; see CallRecording.owner_patients.
     rec = CallRecording.objects.filter(recording_sid=id).first()
     if not is_admin(request.user):
-        nums = {str(getattr(rec, "from_number", "") or ""), str(getattr(rec, "to_number", "") or "")} if rec else set()
-        owns = bool(rec) and Patient.objects.filter(
-            Q(navigator=request.user) &
-            (Q(phone_number__in=nums) | Q(caregiver__phone_number__in=nums))
-        ).exists()
+        owns = bool(rec) and rec.owner_patients().filter(navigator=request.user).exists()
         if not owns:
             return HttpResponseForbidden(_("You are not authorised to access this file."))
     audio_path = get_path_audio(id)
@@ -60,36 +58,44 @@ def serve_audio_file(request, message_id, which):
     using the FileField’s own path.
     """
     msg = get_object_or_404(Message, pk=message_id)
-    # AS-08/F4 fix: enforce per-object ownership. Staff may fetch any; a
-    # PatientTester only their own linked patient's audio; a navigator only
-    # audio belonging to a patient they navigate (matched by sender phone or
-    # by patient-linked Conversation — tester chat stores a username).
+    # AS-08/F4 fix: enforce per-object ownership. Admins may fetch any; a
+    # tester only audio they sent or their own linked client's; a navigator
+    # only audio on a client they navigate.
+    #
+    # Decided by the message's owner, fixed when it arrived. This used to match
+    # the sender's number against clients' *current* numbers, which made access
+    # follow a phone number: a number recycled to a new client handed the old
+    # client's voice notes to the new client's navigator. Only a legacy row the
+    # backfill could not place still falls back to numbers.
+    # See ConvAI.message_attribution.
     if not is_admin(request.user):
         tp = getattr(request.user, "test_patient", None)
-        # The in-app test chat labels Message.user with the tester's username, so
-        # allow that; also allow the patient/caregiver phone (WhatsApp/SMS audio).
-        allowed = {request.user.get_username()}
-        if tp:
-            if tp.phone_number:
-                allowed.add(str(tp.phone_number))
-            if tp.caregiver and tp.caregiver.phone_number:
-                allowed.add(str(tp.caregiver.phone_number))
-        ok = (msg.user or "").strip() in allowed
-        if not ok:
+        owner = msg.patient
+        ok = (msg.account_id == request.user.id
+              or (owner is not None and (owner.navigator_id == request.user.id
+                                         or (tp is not None and owner.pk == tp.pk))))
+        legacy = owner is None and not msg.account_id and not msg.sender_role
+        if not ok and legacy:
             sender = (msg.user or "").strip()
-            ok = Patient.objects.filter(
+            allowed = {request.user.get_username()}
+            if tp:
+                if tp.phone_number:
+                    allowed.add(str(tp.phone_number))
+                if tp.caregiver and tp.caregiver.phone_number:
+                    allowed.add(str(tp.caregiver.phone_number))
+            ok = sender in allowed or Patient.objects.filter(
                 Q(navigator=request.user) &
                 (Q(phone_number=sender) | Q(caregiver__phone_number=sender))
             ).exists()
-        if not ok and msg.conversation_id:
-            try:
-                conv_uuid = uuid.UUID(str(msg.conversation_id))
-            except (ValueError, TypeError):
-                conv_uuid = None
-            if conv_uuid:
-                ok = Conversation.objects.filter(
-                    id=conv_uuid, patient__navigator=request.user
-                ).exists()
+            if not ok and msg.conversation_id:
+                try:
+                    conv_uuid = uuid.UUID(str(msg.conversation_id))
+                except (ValueError, TypeError):
+                    conv_uuid = None
+                if conv_uuid:
+                    ok = Conversation.objects.filter(
+                        id=conv_uuid, patient__navigator=request.user
+                    ).exists()
         if not ok:
             return HttpResponseForbidden(_("You are not authorised to access this audio."))
     if which == "input":
@@ -154,11 +160,14 @@ def send_care_plan_whatsapp(request, pk: int):
         return redirect("patient_detail", pk=pk)
 
     # Log context message (no media body stored; link is Twilio-only)
-    Message.objects.create(
+    from ..message_attribution import create_message
+    create_message(
         conversation_id=f"careplan-{patient.pk}",
         user=str(patient.caregiver.phone_number),
         user_message="",
-        response_message="Se envió el Plan de Cuidado (PDF) vía WhatsApp template."
+        response_message="Se envió el Plan de Cuidado (PDF) vía WhatsApp template.",
+        patient=patient,
+        sender_role=Message.SenderRole.PLATFORM,
     )
 
     messages.success(request, _("Care plan sent via WhatsApp."))

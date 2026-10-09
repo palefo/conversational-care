@@ -1,0 +1,54 @@
+{% load i18n %}
+{% comment %}
+One document row. Expects `d` (RagDocument).
+
+This is the *first paint* of a row; once the page's poller starts it rebuilds
+the same markup in JavaScript (`rowHtml` in agent_knowledge.html). Keep the two
+in step — class names here are what the CSS and the click handler both key off.
+{% endcomment %}
+<div class="kb-row {% if not d.enabled %}is-off{% endif %}" data-doc="{{ d.pk }}">
+  {% if d.original_name|lower|slice:"-4:" == ".pdf" %}
+    <span class="kb-icon bg-red-50 text-red-500"><span class="material-icons-outlined text-lg">picture_as_pdf</span></span>
+  {% elif d.original_name|lower|slice:"-5:" == ".docx" %}
+    <span class="kb-icon bg-blue-50 text-blue-500"><span class="material-icons-outlined text-lg">description</span></span>
+  {% else %}
+    <span class="kb-icon bg-slate-100 text-slate-500"><span class="material-icons-outlined text-lg">article</span></span>
+  {% endif %}
+
+  <div class="flex-1 min-w-0">
+    <div class="kb-name">{{ d.original_name }}</div>
+    <div class="kb-meta">
+      {{ d.size_bytes|filesizeformat }}
+      {% if d.status == 'ready' %}
+        · {{ d.chunk_total }} {% trans "chunks" %}{% if not d.enabled %} · {% trans "Not searched" %}{% endif %}
+      {% elif d.status == 'embedding' and d.chunk_total %}
+        · {% trans "Computing vectors" %} {{ d.chunk_done }}/{{ d.chunk_total }}
+      {% else %}
+        · {{ d.get_status_display }}
+      {% endif %}
+    </div>
+    {% if d.status != 'ready' %}
+      <div class="kb-bar {% if d.status == 'failed' %}is-failed{% endif %}">
+        <span style="width: {% if d.status == 'failed' %}100{% else %}{{ d.progress }}{% endif %}%"></span>
+      </div>
+    {% endif %}
+    {% if d.error %}<div class="kb-err">{{ d.error }}</div>{% endif %}
+  </div>
+
+  <div class="flex items-center gap-1.5 flex-shrink-0">
+    {% if d.status == 'failed' %}
+      <button type="button" class="kb-iconbtn" data-act="retry" title="{% trans 'Try again' %}">
+        <span class="material-icons-outlined text-lg">refresh</span>
+      </button>
+    {% else %}
+      {# Off keeps the vectors; only Delete throws them away. #}
+      <button type="button" class="kb-switch" role="switch" data-act="toggle"
+              aria-checked="{% if d.enabled %}true{% else %}false{% endif %}"
+              {% if d.status != 'ready' %}disabled{% endif %}
+              title="{% trans 'Include in searches' %}"></button>
+    {% endif %}
+    <button type="button" class="kb-iconbtn danger" data-act="delete" title="{% trans 'Delete' %}">
+      <span class="material-icons-outlined text-lg">delete</span>
+    </button>
+  </div>
+</div>

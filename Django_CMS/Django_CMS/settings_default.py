@@ -280,8 +280,9 @@ MEDIA_ROOT = str(BASE_DIR.parent / "media")
 #   media/
 #     branding/          public  — brand logo (login page)
 #     care_plans/        private — uploaded care-plan PDFs
-#     voice/             private — ElevenLabs TTS + inbound user voice notes
+#     voice/             private — TTS replies + inbound user voice notes
 #     call_recordings/   private — call recordings downloaded from Twilio
+#     rag_documents/     private — documents uploaded to RAG-based agents
 #
 # Paths are overridable via env for deployments that mount storage elsewhere.
 VOICE_RECORDINGS_DIR = os.getenv("VOICE_RECORDINGS_DIR") or os.path.join(MEDIA_ROOT, "voice")

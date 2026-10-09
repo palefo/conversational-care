@@ -1,6 +1,13 @@
-from ._base import *  # noqa: F401,F403
+import logging
 
-__all__ = ['_build_config_context', 'approve_self_registration', 'config', 'config_save', 'download_client_sdk', 'run_conversation_classification', 'update_twilio_phonecalls']
+from ._base import *  # noqa: F401,F403
+from .. import conversation_privacy, extensions, message_export
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+
+__all__ = ['_build_config_context', 'approve_self_registration', 'config', 'config_save', 'download_client_sdk', 'run_conversation_classification', 'send_test_email_view', 'update_twilio_phonecalls']
+
+logger = logging.getLogger(__name__)
 
 
 def download_client_sdk(request):
@@ -36,7 +43,7 @@ def update_twilio_phonecalls(request):
         return redirect('config')
 
 
-def _qr_svg(data: str) -> str:
+def _qr_svg(data: str, svg_id: str = "srQrSvg") -> str:
     """Render ``data`` as a compact, dependency-light QR SVG (run-length rects).
 
     Scalable and CSP-safe (no external JS): the browser can also rasterise it to
@@ -71,7 +78,7 @@ def _qr_svg(data: str) -> str:
     # Explicit width/height (attributes) give the SVG an intrinsic size so it can
     # be rasterised to a canvas; CSS in the template controls the displayed size.
     return (
-        f'<svg id="srQrSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {n} {n}" '
+        f'<svg id="{svg_id}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {n} {n}" '
         f'width="{n}" height="{n}" shape-rendering="crispEdges" '
         f'style="width:100%;height:auto;display:block">'
         f'<rect width="{n}" height="{n}" fill="#ffffff"/>'
@@ -80,29 +87,132 @@ def _qr_svg(data: str) -> str:
 
 
 def _selfreg_qr_context(request):
-    """Build the WhatsApp "join" QR context for the Self-registration tab.
+    """Build the "join" QR codes for the Self-registration tab: one per channel.
 
-    The QR encodes a ``wa.me`` deep link that opens WhatsApp to the platform
-    number with a pre-filled message in the platform language.
+    Both open the phone's app on the platform number with a pre-filled message
+    in the platform language; whichever the person sends, an unknown number is
+    handed to the self-registration agent (``utils._handle_self_registration_flow``).
+
+    * **WhatsApp** encodes a ``wa.me`` deep link to ``PLATFORM_PHONE``.
+    * **SMS** encodes ``SMSTO:<number>:<message>``, the form phone cameras
+      recognise as "send a text", to the number SMS is sent from
+      (``TWILIO_SMS_FROM``, else ``PLATFORM_PHONE`` — as :func:`send_sms_text`).
+      The shareable link is the ``sms:`` URI, for a web page or an email.
     """
     from urllib.parse import quote
 
-    raw_phone = (get_setting("PLATFORM_PHONE") or "").strip()
-    digits = re.sub(r"\D", "", raw_phone)
     message = str(_("Hi! I want to register"))
 
-    ctx = {
+    def number(setting):
+        raw = (get_setting(setting) or "").strip()
+        digits = re.sub(r"\D", "", raw)
+        return raw, (f"+{digits}" if digits else "")
+
+    wa_raw, wa_e164 = number("PLATFORM_PHONE")
+    sms_raw, sms_e164 = number("TWILIO_SMS_FROM")
+    sms_from_platform = not sms_e164
+    if sms_from_platform:
+        sms_raw, sms_e164 = wa_raw, wa_e164
+
+    whatsapp = {"phone": wa_raw, "url": "", "qr_svg": ""}
+    if wa_e164:
+        whatsapp["url"] = f"https://wa.me/{wa_e164[1:]}?text={quote(message)}"
+        whatsapp["qr_svg"] = _qr_svg(whatsapp["url"], "srQrSvgWhatsapp")
+
+    sms = {"phone": sms_raw, "from_platform": sms_from_platform, "url": "", "qr_svg": ""}
+    if sms_e164:
+        # "?&body=" rather than "?body=": the one spelling both iOS and Android read.
+        sms["url"] = f"sms:{sms_e164}?&body={quote(message)}"
+        sms["qr_svg"] = _qr_svg(f"SMSTO:{sms_e164}:{message}", "srQrSvgSms")
+
+    return {
         "enabled": get_bool("SELF_REGISTRATION_ENABLED"),
         "agent_name": (get_setting("SELF_REG_AGENT_NAME") or "").strip(),
-        "phone": raw_phone,
         "message": message,
-        "url": "",
-        "qr_svg": "",
+        "whatsapp": whatsapp,
+        "sms": sms,
     }
-    if digits:
-        ctx["url"] = f"https://wa.me/{digits}?text={quote(message)}"
-        ctx["qr_svg"] = _qr_svg(ctx["url"])
-    return ctx
+
+
+def _email_status_context(request):
+    """Whether email is ready to send, for the banner on the Email tab.
+
+    Reported from the same check the backend runs before every send, so the
+    page cannot claim email works while sends are failing for a missing value.
+    """
+    from ..mailer import provider, reminder_channel, status
+
+    ok, reason = status()
+    return {
+        "ok": ok,
+        "reason": reason,
+        "provider": provider(),
+        "reminder_channel": reminder_channel(),
+        # Pre-filled into the test-email box: the address the admin can check.
+        "test_to": request.user.email or "",
+    }
+
+
+def _sensei_status_context():
+    """Whether Sensei is on and fully configured, for the banner on its tab."""
+    from .. import sensei
+
+    ok, reason = sensei.configured()
+    return {
+        "enabled": sensei.enabled(),
+        "ok": ok,
+        "reason": reason,
+        "api_url": sensei.api_url(),
+    }
+
+
+def _participants_context(request):
+    """The Participants tab: the studies, the cohort counts, and what is wrong.
+
+    The warnings are the point. A switched-on feature with no open study is a
+    public page that cannot be used, and a study whose consent version has moved
+    past its participants is a governance question somebody will be asked — both
+    are cheap to detect here and expensive to discover later.
+    """
+    from .. import enrolment as enrolment_service
+
+    if not enrolment_service.enabled():
+        # The tab is not rendered at all while the feature is off, so nothing here
+        # is needed — and the settings page should cost exactly what it did before
+        # this feature existed.
+        return {"enabled": False, "studies": [], "any_open": False}
+
+    studies = []
+    for study in Study.objects.all().order_by("display_name"):
+        counts = {
+            row["status"]: row["n"]
+            for row in (Enrolment.objects.filter(study=study)
+                        .values("status").annotate(n=Count("id")))
+        }
+        studies.append({
+            "obj": study,
+            "counts": counts,
+            "total": sum(counts.values()),
+            "consent_locked": study.consent_locked,
+            "stale": study.stale_consent_count,
+            "items": study.consent_items or [],
+        })
+
+    join_url = request.build_absolute_uri(reverse("enrolment_landing"))
+
+    return {
+        "enabled": True,
+        "studies": studies,
+        "any_open": any(s["obj"].is_open for s in studies),
+        "join_url": join_url,
+        "join_qr_svg": _qr_svg(join_url, "enrolJoinQr"),
+        "auto_approve": enrolment_service.auto_approve(),
+        "awaiting_approval": Enrolment.objects.filter(
+            status=Enrolment.Status.CONSENTED, patient__isnull=True
+        ).count(),
+        "total_enrolments": Enrolment.objects.count(),
+        "total_consents": ConsentRecord.objects.count(),
+    }
 
 
 def _build_config_context(request, forms_override=None, active_tab="general"):
@@ -126,21 +236,44 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
     def _form(name):
         return forms_override.get(name) or _CONFIG_FORMS[name](instance=cfg)
 
+    participants = _participants_context(request)
+
+    # Tabs contributed by optional apps (see ConvAI/extensions.py). Each brings
+    # its own template and context; the core only lists and places them.
+    ext_tabs = extensions.settings_tabs()
+    extension_panels = []
+    for tab in ext_tabs:
+        try:
+            ctx = tab["context"](request, forms_override.get(tab["id"]))
+        except Exception:
+            logger.exception("Settings tab %s failed to build", tab.get("id"))
+            continue
+        extension_panels.append({"id": tab["id"], "template": tab["template"], "ctx": ctx})
+
     return {
         "active_page": "admin",
         "active_tab": active_tab,
+        "extension_panels": extension_panels,
         # (id, label, material-icon) for the settings sidebar.
         "tabs": [
             ("general", _("General"), "tune"),
             ("integrations", _("Integrations"), "key"),
             ("messaging", _("Messaging"), "forum"),
+            ("email", _("Email"), "mail"),
             ("branding", _("Branding"), "palette"),
             ("agents", _("Agents"), "smart_toy"),
+            ("sensei", _("Sensei"), "sensors"),
             ("prompts", _("Prompts"), "auto_awesome"),
             ("protocols", _("Protocols"), "checklist"),
             ("registrations", _("Registrations"), "how_to_reg"),
             ("selfreg", _("Self registration"), "qr_code_2"),
+            # Always listed, because it holds the study-enrolment switch; while
+            # enrolment is off the switch is all it holds (see config.html).
+            ("participants", _("Participants"), "groups"),
             ("api", _("API client"), "terminal"),
+            ("privacy", _("Privacy"), "lock"),
+            ("export", _("Export"), "download"),
+            *[(t["id"], t["label"], t["icon"]) for t in ext_tabs],
             ("maintenance", _("Maintenance"), "build"),
         ],
         # Absolute URLs for the API-client instructions (wget / base_url).
@@ -150,14 +283,38 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
         "api_enabled": getattr(settings, "ENABLE_API", True),
         "self_regs": SelfRegistration.objects.order_by("-created_at"),
         "selfreg": _selfreg_qr_context(request),
-        "agents": Agent.objects.all().order_by("name"),
+        "agents": Agent.for_clients().order_by("name"),
         "protocols": protocols,
         "general_form": _form("general"),
         "integrations_form": _form("integrations"),
         "messaging_form": _form("messaging"),
+        # Numbers more than one client can be reached on, and the older messages
+        # still matched by number because the backfill could not place them.
+        # See ConvAI.message_attribution.
+        **_attribution_context(),
+        "email_form": _form("email"),
         "branding_form": _form("branding"),
+        # Whether mail could go out right now, and if not, what is missing.
+        "email_status": _email_status_context(request),
         "agents_form": _form("agents"),
         "prompts_form": _form("prompts"),
+        "sensei_form": _form("sensei"),
+        # Whether a Sensei turn could succeed right now, reported from the same
+        # check the adapter runs — so the tab cannot say "ready" while every
+        # turn is failing on a missing value.
+        "sensei_status": _sensei_status_context(),
+        "export_form": _form("export"),
+        "export_enabled": message_export.enabled(),
+        "conversation_download_enabled": message_export.conversation_download_enabled(),
+        "privacy_form": _form("privacy"),
+        "conversation_privacy_enabled": conversation_privacy.enabled(),
+        # How many conversations are hidden right now. The tab claiming the
+        # feature is off while a hundred exchanges are still withheld would be
+        # the one thing an admin reading this page must not be told.
+        "hidden_conversation_count": Conversation.objects.filter(hidden=True).count(),
+        "participants_form": _form("participants"),
+        "participants": participants,
+        "export_columns": message_export.COLUMN_NOTES,
         # Boot-only values shown read-only (require .env change + restart).
         "boot_info": {
             "language": settings.LANGUAGE_CODE,
@@ -168,6 +325,20 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
                 "/" + getattr(settings, "TWILIO_WEBHOOK_PATH", "webhooks/whatsapp")
             ),
         },
+    }
+
+
+def _attribution_context():
+    from .. import message_attribution
+
+    shared = [
+        {"number": number,
+         "holders": [{"role": role, "patient": p} for role, p in holders]}
+        for number, holders in sorted(message_attribution.shared_numbers().items())
+    ]
+    return {
+        "shared_numbers": shared,
+        "legacy_message_count": Message.objects.filter(message_attribution.legacy_q()).count(),
     }
 
 
@@ -186,7 +357,18 @@ def config_save(request):
     section = request.POST.get("section", "general")
     form_cls = _CONFIG_FORMS.get(section)
     if not form_cls:
-        return redirect("config")
+        # A tab an optional app contributed: it binds and saves its own form.
+        tab = next((t for t in extensions.settings_tabs() if t["id"] == section), None)
+        if tab is None:
+            return redirect("config")
+        form = tab["bind"](request)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Settings saved."))
+            return redirect(f"{reverse('config')}?tab={section}#{section}")
+        messages.error(request, _("Please correct the errors below."))
+        ctx = _build_config_context(request, forms_override={section: form}, active_tab=section)
+        return render(request, "settings/config.html", ctx)
 
     form = form_cls(request.POST, request.FILES, instance=SiteConfiguration.load())
     if form.is_valid():
@@ -202,73 +384,79 @@ def config_save(request):
 @login_required
 @admin_required
 @require_POST
+def send_test_email_view(request):
+    """Send one throwaway message to prove the email configuration works.
+
+    Configuration you cannot try is configuration you find out about when a
+    password reset silently fails, so the provider's own error is put in front
+    of the admin rather than logged.
+    """
+    from ..mailer import send_test_email
+
+    to = (request.POST.get("to") or "").strip() or (request.user.email or "").strip()
+    back = f"{reverse('config')}?tab=email#email"
+
+    if not to:
+        messages.error(request, _("Enter an address to send the test to."))
+        return redirect(back)
+
+    try:
+        validate_email(to)
+    except ValidationError:
+        messages.error(request, _("“%(address)s” is not a valid email address.") % {"address": to})
+        return redirect(back)
+
+    ok, detail = send_test_email(to)
+    if ok:
+        messages.success(request, _("Test email sent to %(address)s.") % {"address": to})
+    else:
+        messages.error(request, _("The test email could not be sent: %(detail)s") % {"detail": detail})
+    return redirect(back)
+
+
+@login_required
+@admin_required
+@require_POST
 def run_conversation_classification(request):
     """
     Classify:
       • conversations never analyzed, OR
       • conversations whose last_message_at is newer than analyzed_at.
-    Prefer the Agent stored on Conversation; fall back to patient->agent if missing.
+
+    Inbound messages are classified as they arrive, so this is now a backstop
+    rather than the only way it ever happens: it catches conversations that
+    predate the hook, and anything the ingest pool dropped while the model or
+    the process was down. It goes through the same
+    ``review_conversation`` the hook does, so a re-run cannot reach a
+    different verdict than a live message would have.
+
     Configuration action — admins only.
     """
+    from ..conversation_alerts import review_conversation
+
     to_analyze = (
         Conversation.objects
         .filter(Q(analyzed=False) | Q(analyzed_at__isnull=True) | Q(last_message_at__gt=F("analyzed_at")))
         .order_by("started_at")
+        .values_list("id", flat=True)
     )
 
     processed = 0
-    for conv in to_analyze.iterator(chunk_size=100):
-        conv_id_str = str(conv.id)
-        rows = build_message_rows_for_conv(conv_id_str, Message)
-        if not rows:
-            conv.analyzed = True
-            conv.analyzed_at = timezone.now()
-            conv.save(update_fields=["analyzed", "analyzed_at"])
-            continue
-
-        # 1) Primary: agent from Conversation
-        agent = getattr(conv, "agent", None)
-
-        # 2) Fallback: infer from the first message → Patient.agent
-        if agent is None:
-            first_msg = (
-                Message.objects
-                .filter(conversation_id=conv_id_str)
-                .order_by("timestamp")
-                .first()
-            )
-            if first_msg:
-                ms_user = (first_msg.user or "").strip()
-                p = (
-                    Patient.objects
-                    .filter(Q(phone_number=ms_user) | Q(caregiver__phone_number=ms_user))
-                    .select_related("agent")
-                    .first()
-                )
-                agent = getattr(p, "agent", None) if p else None
-
-        try:
-            result = classify_conversation_with_llm(rows, agent=agent)
-            conv.summary      = (result.get("abstract") or "")[:2000]
-            conv.topic        = (result.get("classification") or "")[:120]
-            conv.is_important = bool(result.get("important"))
-            auto_flags        = result.get("detectors") or {}
-            conv.auto_flags   = auto_flags if isinstance(auto_flags, dict) else {}
-            conv.analyzed     = True
-            conv.analyzed_at  = timezone.now()
-            conv.visited      = False
-
-            conv.save(update_fields=[
-                "summary", "topic", "is_important", "auto_flags", "analyzed", "analyzed_at", "visited"
-            ])
+    raised = 0
+    for conv_id in list(to_analyze):
+        outcome = review_conversation(conv_id)
+        if outcome["analyzed"]:
             processed += 1
-        except Exception:
-            # Skip this conversation on model/API errors
-            continue
+        raised += len(outcome["alerts"])
 
-
-
-    messages.success(request, _("Classification completed. Conversations processed: %(n)s.") % {"n": processed})
+    if raised:
+        messages.success(request, _(
+            "Classification completed. Conversations processed: %(n)s. Alerts raised: %(a)s."
+        ) % {"n": processed, "a": raised})
+    else:
+        messages.success(request, _(
+            "Classification completed. Conversations processed: %(n)s."
+        ) % {"n": processed})
     return redirect("config")
 
 
@@ -284,7 +472,7 @@ def approve_self_registration(request, pk):
 
     # Optional Agent selection
     agent_id = request.POST.get("agent_id") or ""
-    agent = Agent.objects.filter(pk=agent_id).first() if agent_id else None
+    agent = Agent.for_clients().filter(pk=agent_id).first() if agent_id else None
 
     caregiver = Caregiver.objects.create(
         name=sr.name,

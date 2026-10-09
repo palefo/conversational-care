@@ -1,6 +1,7 @@
 from ._base import *  # noqa: F401,F403
+from django.utils.http import url_has_allowed_host_and_scheme
 
-__all__ = ['_may_edit', 'protocol_create', 'protocol_delete', 'protocol_editor', 'protocol_editor_save', 'protocol_view', 'start_protocol_automation']
+__all__ = ['_may_edit', 'protocol_create', 'protocol_delete', 'protocol_editor', 'protocol_editor_save', 'protocol_view', 'start_protocol_automation', 'dismiss_sms_offer']
 
 
 def _may_edit(user, meeting):
@@ -25,7 +26,14 @@ def protocol_view(request, meeting_id, protocol_num):
         form = ProtocolAnswerForm(meeting=meeting, protocol=protocol,
                                   data=request.POST)
         if form.is_valid():
-            form.save()
+            written = form.save()
+            # The panel saves over fetch and needs to know what did not land.
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({
+                    "ok": True,
+                    "written": written,
+                    "conflicts": form.conflicts,
+                })
             url = reverse(
                 "protocol_view",
                 kwargs={"meeting_id": meeting.id, "protocol_num": protocol.number}
@@ -93,6 +101,19 @@ def protocol_editor(request, protocol_num):
     })
 
 
+def _repeatable_from(payload, protocol):
+    """Read the repeatable flag out of an editor payload.
+
+    Absent means unchanged rather than False, so a client that does not know
+    about the field cannot silently turn a longitudinal protocol back into a
+    one-off.
+    """
+    value = payload.get("repeatable")
+    if value is None:
+        return protocol.repeatable
+    return bool(value)
+
+
 @login_required
 @require_POST
 def protocol_editor_save(request, protocol_num):
@@ -115,17 +136,33 @@ def protocol_editor_save(request, protocol_num):
 
     protocol = get_object_or_404(Protocol, number=protocol_num)
 
+    try:
+        payload = json.loads(request.body)
+    except (ValueError, TypeError):
+        return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
+
     if Answer.objects.filter(question__protocol=protocol).exists():
+        # Locked, with one exception: a payload carrying nothing but the
+        # repeatable flag.
+        #
+        # Whether a protocol is answered once or on every call is something you
+        # find out *after* using it once — the IQCODE looked like any other
+        # protocol until the second round came due. Refusing it here would mean
+        # the flag could only ever be set on a protocol nobody had used, which
+        # is exactly the protocol nobody yet knows the answer for.
+        #
+        # Safe to allow: it changes how answers are read, never what they say.
+        # Anything else in the payload and this is an ordinary edit, refused as
+        # before — the exemption is for the flag, not for the lock.
+        if set(payload) == {"repeatable"}:
+            protocol.repeatable = bool(payload["repeatable"])
+            protocol.save(update_fields=["repeatable"])
+            return JsonResponse({"ok": True, "repeatable": protocol.repeatable})
         return JsonResponse(
             {"ok": False, "error": "locked",
              "message": "El protocolo tiene respuestas y no puede editarse."},
             status=409,
         )
-
-    try:
-        payload = json.loads(request.body)
-    except (ValueError, TypeError):
-        return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
 
     title = (payload.get("title") or "").strip()
     description = (payload.get("description") or "").strip()
@@ -142,7 +179,8 @@ def protocol_editor_save(request, protocol_num):
     with transaction.atomic():
         protocol.title = title[:120]
         protocol.description = description
-        protocol.save(update_fields=["title", "description"])
+        protocol.repeatable = _repeatable_from(payload, protocol)
+        protocol.save(update_fields=["title", "description", "repeatable"])
 
         # Safe because no answers reference these questions.
         protocol.questions.all().delete()
@@ -194,6 +232,15 @@ def protocol_delete(request, protocol_num):
     return redirect(f"{reverse('config')}?tab=protocols#protocols")
 
 
+def _back_to_protocol(request, meeting, protocol):
+    """Back to where an automation action was pressed, else the protocol page."""
+    nxt = request.POST.get("next")
+    if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()},
+                                               require_https=request.is_secure()):
+        return redirect(nxt)
+    return redirect("protocol_view", meeting_id=meeting.id, protocol_num=protocol.number)
+
+
 @require_POST
 @login_required
 def start_protocol_automation(request, meeting_id, protocol_num):
@@ -208,6 +255,20 @@ def start_protocol_automation(request, meeting_id, protocol_num):
     if not _may_edit(request.user, meeting):
         return HttpResponseForbidden(_("You do not have permission to do this."))
 
+    # A voice interview running in this meeting's online room is already
+    # collecting these answers. Two agents asking the same questions over two
+    # channels would only race each other to the same fields.
+    from .. import extensions
+    live = extensions.live_state(meeting) or {}
+    if live.get("interview_running"):
+        messages.error(request, _("The voice interviewer is collecting answers in this "
+                                  "meeting's online room. Stop it there first."))
+        return _back_to_protocol(request, meeting, protocol)
+
+    # Which way to send. WhatsApp unless the navigator has answered the offer
+    # made after a WhatsApp failure — see the failure branch below.
+    channel = "sms" if request.POST.get("channel") == "sms" else "whatsapp"
+
     patient   = meeting.patient
     caregiver = patient.caregiver
     if not caregiver or not caregiver.phone_number:
@@ -219,7 +280,7 @@ def start_protocol_automation(request, meeting_id, protocol_num):
         kind=Agent.Kind.NATIVE, native_key="protocol_qa"
     ).first()
     if not agent:
-        messages.error(request, 'No se encontró el agente nativo "protocol_qa".')
+        messages.error(request, _('The built-in "protocol_qa" agent is missing.'))
         return redirect("protocol_view", meeting_id=meeting.id, protocol_num=protocol.number)
 
     # Assign the agent, remember the context + agent to revert to, and open a
@@ -235,23 +296,93 @@ def start_protocol_automation(request, meeting_id, protocol_num):
         extra_configurable=automation_context(patient),
     )
 
-    # Send via WhatsApp and persist ONLY the assistant reply
+    # Send, and persist ONLY the assistant reply.
     to_e164 = str(caregiver.phone_number)
-    sent_ok = send_whatsapp_text(to_e164, reply_text)
 
-    save_message(
-        phone=to_e164,
-        user_message="",
-        response_message=reply_text,
-        thread_id=new_thread_id,
-        patient=patient,
-    )
-
-    if sent_ok:
-        messages.success(request, _("Automation started."))
+    if channel == "sms":
+        # The navigator has already been told WhatsApp could not reach them and
+        # has chosen this, so there is no second question to ask here.
+        sent_ok = send_sms_text(to_e164, reply_text)
+        reason = "" if sent_ok else str(_("The SMS could not be sent."))
     else:
-        messages.warning(request, _("Automation could not send the WhatsApp message."))
+        # WhatsApp accepts a message it is about to fail, so the bool this used
+        # to read said "sent" for a message nobody received — see
+        # send_whatsapp_text_result.
+        result = send_whatsapp_text_result(to_e164, reply_text)
+        sent_ok, reason = result["ok"], result["reason"]
 
+    if not sent_ok:
+        # Nothing reached the caregiver, so nothing should behave as if it had.
+        # Left as it was, the client stayed switched to the protocol agent for
+        # the next three hours and the panel showed the protocol as out with
+        # them — over a question they were never asked. Their next message,
+        # about anything at all, would have been read as an answer to it.
+        end_automation(patient)
+
+        # WhatsApp being shut is not the same kind of failure as the number
+        # being wrong: SMS would get there. Rather than quietly switching
+        # channel on the navigator's behalf — health questions over SMS is
+        # their call, not the platform's — the panel asks. The offer is held in
+        # the session because it belongs to the person who pressed the button,
+        # not to the meeting: a second navigator opening the same panel should
+        # see the protocol un-asked, not somebody else's half-finished decision.
+        # Said out loud either way. The dialogue below is the offer, but it only
+        # exists in the panel, and this same button is on the protocol page,
+        # which has no panel to render it into — so the failure would be
+        # completely silent there.
+        messages.warning(
+            request,
+            _("%(who)s was not asked anything: the message could not be sent. "
+              "%(why)s") % {"who": caregiver.name, "why": reason},
+        )
+
+        if channel != "sms":
+            request.session["ask_sms_offer"] = {
+                "meeting": meeting.pk,
+                "protocol": protocol.number,
+                "who": caregiver.name,
+                "reason": reason,
+            }
+            request.session.modified = True
+    else:
+        # Only what actually went out is written to the conversation.
+        save_message(
+            phone=to_e164,
+            user_message="",
+            response_message=reply_text,
+            thread_id=new_thread_id,
+            patient=patient,
+        )
+        request.session.pop("ask_sms_offer", None)
+        if channel == "sms":
+            messages.success(request, _("Sent to %s by SMS.") % caregiver.name)
+        else:
+            messages.success(request, _("Sent to %s by text.") % caregiver.name)
+
+    # Back where it was pressed. Sending is now something you do from the panel
+    # while working the call, so landing on a page of its own afterwards loses
+    # the list, the filters and the panel underneath.
+    nxt = request.POST.get("next")
+    if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()},
+                                               require_https=request.is_secure()):
+        return redirect(nxt)
     return redirect("protocol_view", meeting_id=meeting.id, protocol_num=protocol.number)
 
 
+@require_POST
+@login_required
+def dismiss_sms_offer(request):
+    """Put away the "send it by SMS instead?" offer without sending anything.
+
+    The offer is the only trace a failed WhatsApp send leaves — the automation
+    was already reverted — so declining it is just forgetting it. No meeting is
+    named because the session holds one offer at a time.
+    """
+    request.session.pop("ask_sms_offer", None)
+    request.session.modified = True
+
+    nxt = request.POST.get("next")
+    if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()},
+                                               require_https=request.is_secure()):
+        return redirect(nxt)
+    return redirect("dashboard")

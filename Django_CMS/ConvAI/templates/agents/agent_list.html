@@ -20,9 +20,17 @@
     box-shadow: 0 1px 2px rgba(16,24,40,.04); transition: box-shadow .15s, border-color .15s; display: flex; flex-direction: column; }
   .agent-card:hover { box-shadow: 0 8px 20px -6px rgba(16,24,40,.14); border-color: #e2e8f0; }
   .agent-avatar { width: 2.5rem; height: 2.5rem; border-radius: .6rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  /* Two lines, then ellipsis: enough for a description to say something, few
+     enough that cards in a row stay the same height. */
+  .agent-desc { font-size: .75rem; line-height: 1.35; color: #64748b;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    overflow: hidden; }
+  .agent-desc code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .agent-chip { display: inline-flex; align-items: center; gap: .3rem; padding: .18rem .5rem; border-radius: 9999px;
     background: #f1f5f9; color: #475569; font-size: .72rem; font-weight: 500; max-width: 100%; }
   .agent-chip code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  /* Tools: what the agent can do to a conversation, set apart from what it is. */
+  .agent-chip-tool { background: #eef2ff; color: #4338ca; }
   .agent-badge { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: .12rem .45rem; border-radius: 9999px; flex-shrink: 0; }
   .agent-empty { border: 1.5px dashed #e2e8f0; border-radius: .75rem; padding: 2.75rem 1rem; text-align: center; background: #fafbfc; }
 
@@ -50,29 +58,44 @@
     <span class="material-icons-outlined text-base">bolt</span>{% trans "Native" %}
     <span class="count">{{ native_agents|length }}</span>
   </button>
+  {% if show_sensei %}
+  <button type="button" data-agent-tab="sensei" class="agent-tab">
+    <span class="material-icons-outlined text-base">sensors</span>{% trans "Sensei" %}
+    <span class="count">{{ sensei_agents|length }}</span>
+  </button>
+  {% endif %}
 </div>
 
 {% comment %} ---------- Prompt-based ---------- {% endcomment %}
 <section class="agent-panel" data-agent-panel="prompt">
-  <p class="text-sm text-gray-500 max-w-xl mb-4">{% trans "Custom in-process agents driven by a system prompt you write. No tools." %}</p>
-  {% if prompt_agents %}
-    <div class="agent-grid">
-      {% for a in prompt_agents %}{% include "agents/_agent_card.html" with a=a %}{% endfor %}
-      <a href="{% url 'agent_create' 'prompt' %}" class="agent-card agent-add">
-        <span class="material-icons-outlined text-3xl">add</span>
-        <span class="font-medium text-sm">{% trans "New prompt agent" %}</span>
-      </a>
-    </div>
-  {% else %}
-    <div class="agent-empty">
-      <span class="material-icons-outlined text-4xl text-indigo-300">chat</span>
-      <p class="mt-2 font-medium text-gray-700">{% trans "No prompt-based agents yet." %}</p>
-      <p class="text-sm text-gray-500 mb-4">{% trans "Create one and drive it with your own system prompt." %}</p>
-      <a href="{% url 'agent_create' 'prompt' %}" class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
-        <span class="material-icons-outlined text-base">add</span>{% trans "New prompt agent" %}
-      </a>
-    </div>
-  {% endif %}
+  <p class="text-sm text-gray-500 max-w-xl mb-4">{% trans "Custom in-process agents driven by a system prompt you write. Two subtypes: plain, and RAG-based — the same prompt plus a search tool over documents you upload." %}</p>
+
+  {% comment %} ── plain ── {% endcomment %}
+  <h2 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+    <span class="material-icons-outlined text-base text-indigo-500">chat</span>{% trans "Plain" %}
+  </h2>
+  {# Not "no tools" any more: platform tools can be ticked on any prompt agent. #}
+  <p class="text-xs text-gray-500 mb-3">{% trans "Driven by the prompt, plus any platform tools ticked on the agent." %}</p>
+  <div class="agent-grid mb-8">
+    {% for a in plain_prompt_agents %}{% include "agents/_agent_card.html" with a=a %}{% endfor %}
+    <a href="{% url 'agent_create' 'prompt' %}" class="agent-card agent-add">
+      <span class="material-icons-outlined text-3xl">add</span>
+      <span class="font-medium text-sm">{% trans "New prompt agent" %}</span>
+    </a>
+  </div>
+
+  {% comment %} ── RAG ── {% endcomment %}
+  <h2 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+    <span class="material-icons-outlined text-base text-violet-500">library_books</span>{% trans "RAG-based" %}
+  </h2>
+  <p class="text-xs text-gray-500 mb-3">{% trans "Answers from documents you upload — PDF, Word or text — and says which one it used. Multilingual: a question in one language finds answers written in another." %}</p>
+  <div class="agent-grid">
+    {% for a in rag_agents %}{% include "agents/_agent_card.html" with a=a %}{% endfor %}
+    <a href="{% url 'agent_create' 'prompt' %}?rag=1" class="agent-card agent-add">
+      <span class="material-icons-outlined text-3xl">add</span>
+      <span class="font-medium text-sm">{% trans "New RAG agent" %}</span>
+    </a>
+  </div>
 </section>
 
 {% comment %} ---------- Remote ---------- {% endcomment %}
@@ -114,6 +137,45 @@
     </div>
   {% endif %}
 </section>
+{% comment %} ---------- Sensei ---------- {% endcomment %}
+{% if show_sensei %}
+<section class="agent-panel" data-agent-panel="sensei">
+  <p class="text-sm text-gray-500 max-w-xl mb-4">{% trans "Agents that hand the conversation to Sensei, an external service that answers from the wearable and phone health data a client has synced to it. Only the text of the turn is shared — the two systems keep separate databases." %}</p>
+
+  {% if not sensei_enabled %}
+    <div class="px-4 py-3 mb-4 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-sm flex items-start gap-2">
+      <span class="material-icons-outlined text-base">warning_amber</span>
+      <div>
+        {% trans "Sensei is switched off, so these agents will not answer." %}
+        <a class="underline font-medium" href="{% url 'config' %}?tab=sensei#sensei">{% trans "Turn it on in Settings" %}</a>.
+      </div>
+    </div>
+  {% endif %}
+
+  {% if sensei_agents %}
+    <div class="agent-grid">
+      {% for a in sensei_agents %}{% include "agents/_agent_card.html" with a=a %}{% endfor %}
+      {% if sensei_enabled %}
+        <a href="{% url 'agent_create' 'sensei' %}" class="agent-card agent-add">
+          <span class="material-icons-outlined text-3xl">add</span>
+          <span class="font-medium text-sm">{% trans "New Sensei agent" %}</span>
+        </a>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="agent-empty">
+      <span class="material-icons-outlined text-4xl text-teal-300">sensors</span>
+      <p class="mt-2 font-medium text-gray-700">{% trans "No Sensei agents yet." %}</p>
+      <p class="text-sm text-gray-500 mb-4">{% trans "Add one to let clients ask about their own sensor data." %}</p>
+      {% if sensei_enabled %}
+        <a href="{% url 'agent_create' 'sensei' %}" class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+          <span class="material-icons-outlined text-base">add</span>{% trans "New Sensei agent" %}
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -131,7 +193,7 @@
       t.addEventListener('click', function () { activate(t.dataset.agentTab); });
     });
     var initial = (location.hash || '').replace('#', '');
-    var valid = ['prompt', 'remote', 'native'];
+    var valid = ['prompt', 'remote', 'native', 'sensei'];
     activate(valid.indexOf(initial) >= 0 ? initial : 'prompt');
   })();
 </script>

@@ -114,13 +114,36 @@ def whatsapp_webhook(request):
         return HttpResponse("<Response></Response>", content_type="text/xml")
 
     # -------------------- SYNC BRANCH (existing behavior) --------------------
-    phone_e164 = from_num.replace("whatsapp:", "").strip()
-    patient = (
-        Patient.objects
-        .filter(Q(phone_number=phone_e164) | Q(caregiver__phone_number=phone_e164))
-        .select_related("agent")
-        .first()
-    )
+    from ..message_attribution import normalise, resolve_inbound
+
+    phone_e164 = normalise(from_num)
+
+    # A navigator's own phone sending a voice note, for the Link Worker on
+    # WhatsApp: answered by Link Worker v2, never looked up as a client. Their
+    # typed messages take the ordinary path below — process_received_message
+    # routes those. See ConvAI.staff_whatsapp.
+    if is_whatsapp and get_bool("WHATSAPP_AUDIO_ENABLED") and num_media == 1:
+        from .. import staff_whatsapp
+        staff_link = staff_whatsapp.voice_link(phone_e164)
+        content_t = request.POST.get("MediaContentType0", "")
+        if staff_link is not None and is_audio_content_type(content_t):
+            reply_text, out_name, msg = staff_whatsapp.voice_note_reply(
+                staff_link, request.POST.get("MediaUrl0", ""), content_t)
+            from xml.sax.saxutils import escape as _xml_escape
+            media = ""
+            if out_name and msg is not None:
+                token = build_signed_download_token(msg.id, "output", ttl_seconds=600)
+                media = "<Media>" + _xml_escape(request.build_absolute_uri(
+                    reverse("twilio_audio_download", args=[msg.id, "output"]) + f"?t={token}"
+                )) + "</Media>"
+            return HttpResponse(
+                f'<?xml version="1.0" encoding="UTF-8"?><Response><Message>'
+                f'<Body>{_xml_escape(reply_text)}</Body>{media}</Message></Response>',
+                content_type="text/xml")
+
+    # The one lookup by number for this message; see ConvAI.message_attribution.
+    inbound = resolve_inbound(phone_e164)
+    patient = inbound.patient
 
     # WhatsApp AUDIO (sync only; keep your current path)
     if is_whatsapp and get_bool("WHATSAPP_AUDIO_ENABLED") and num_media == 1:
@@ -161,16 +184,18 @@ def whatsapp_webhook(request):
                     )
 
                 out_name = f"{ts}_wa_out.mp3"
-                voice_id = resolve_tts_voice_id(getattr(patient, "agent", None))
-                synthesize_speech_elevenlabs(reply_text, out_name, voice_id=voice_id)
+                synthesize_speech(reply_text, out_name, agent=getattr(patient, "agent", None))
 
-                msg = Message.objects.create(
+                from ..message_attribution import create_message
+                msg = create_message(
                     user=phone_e164,
                     conversation_id=thread_id,
                     user_message=transcript,
                     response_message=reply_text,
                     input_audio_file=in_name,
                     response_audio_file=out_name,
+                    patient=patient,
+                    sender_role=inbound.role,
                 )
 
                 # Build single-use signed URL for Twilio to download
@@ -240,6 +265,23 @@ def send_chat_message(request):
                              'bot_message': str(_("Conversation ended. Send a message to start a new one.")),
                              'reset': True})
 
+    # Link Worker v2 (beta), where Settings -> Agents switches it on. It is
+    # told who is asking by staff_user_id, set here and nowhere a client's
+    # conversation could reach — and it is given no API token. See
+    # link_worker_v2.md.
+    if get_bool("LINK_WORKER_V2_ENABLED"):
+        v2 = Agent.objects.filter(kind=Agent.Kind.NATIVE, native_key='link_worker_v2').first()
+        if v2 is not None:
+            extra = {}
+            if is_navigator(request.user):
+                extra = {'staff_user_id': request.user.pk, 'is_admin': is_admin(request.user)}
+            bot_msg = generate_response_with_agent(
+                v2, request.user, user_msg, thread_id, extra_configurable=extra,
+            )
+            save_message(request.user.get_username(), user_msg, bot_msg, thread_id,
+                         account=request.user, sender_role=Message.SenderRole.STAFF)
+            return JsonResponse({'user_message': user_msg, 'bot_message': bot_msg})
+
     # The bubble always uses the built-in Link Worker agent.
     agent = Agent.objects.filter(kind=Agent.Kind.NATIVE, native_key='link_worker').first()
     if agent is None:
@@ -261,7 +303,10 @@ def send_chat_message(request):
         extra_configurable=extra_configurable,
     )
     # Persist both sides (thread_id == conversation_id).
-    save_message(request.user.get_username(), user_msg, bot_msg, thread_id)
+    # A navigator talking to the Link Worker: their own conversation, on no
+    # client's file. Owned by the login, not guessed from the username later.
+    save_message(request.user.get_username(), user_msg, bot_msg, thread_id,
+                 account=request.user, sender_role=Message.SenderRole.STAFF)
     return JsonResponse({'user_message': user_msg, 'bot_message': bot_msg})
 
 
@@ -330,8 +375,12 @@ def send_external_message(request):
     if not user_msg:
         return HttpResponseBadRequest("Empty message")
 
+    # The tester login stands in for the client: the client's file, typed
+    # through the tester account. Both are stamped, so the file keeps the
+    # message and the record still says which login sent it.
     bot_msg = process_message_for_patient(
-        patient, user_msg, user_label=_chat_user_label(request.user)
+        patient, user_msg, user_label=_chat_user_label(request.user),
+        sender_role=Message.SenderRole.TESTER, account=request.user,
     )
 
     return JsonResponse({
@@ -428,12 +477,10 @@ def process_audio(request):
     thread_id = patient.current_thread_id
     resp_text = generate_response_langgraph(patient, transcript, thread_id)
 
-    # 4) ElevenLabs TTS
+    # 4) TTS, with whichever provider Settings names (ConvAI.tts)
     out_name = f"{ts}_out.mp3"
     out_path = os.path.join(VOICE_RECORDINGS_DIR, out_name)
-    # you already have synthesize_speech_elevenlabs utility
-    voice_id = resolve_tts_voice_id(getattr(patient, "agent", None))
-    synthesize_speech_elevenlabs(resp_text, out_name, voice_id=voice_id)
+    synthesize_speech(resp_text, out_name, agent=getattr(patient, "agent", None))
 
     # 5) persist both sides like the text path does: save_message also upserts
     # the Conversation and links it to the patient/agent, so voice turns show up
@@ -443,6 +490,8 @@ def process_audio(request):
         patient=patient,
         input_audio_file=in_name,
         response_audio_file=out_name,
+        account=request.user,
+        sender_role=Message.SenderRole.TESTER,
     )
 
     return JsonResponse({

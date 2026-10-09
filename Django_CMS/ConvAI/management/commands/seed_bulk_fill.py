@@ -283,9 +283,16 @@ class Command(BaseCommand):
                         scheduled_time=when,
                         type=Meeting.MeetingType.REGULAR,
                         status=st,
-                        scheduled_protocol=pr,
-                        executed_protocol=pr if st == Meeting.Status.COMPLETED else None,
                     )
+                    # Relations, so they are set after the row exists — and the
+                    # client is put on the protocol, or their panel will not
+                    # show the call's own protocol back to them.
+                    proto = Protocol.objects.filter(number=pr).first()
+                    if proto:
+                        m.scheduled_protocols.add(proto)
+                        if st == Meeting.Status.COMPLETED:
+                            m.executed_protocols.add(proto)
+                        patient.protocols.add(proto)
                     n_meet += 1
 
                     if st == Meeting.Status.COMPLETED:
@@ -314,6 +321,10 @@ class Command(BaseCommand):
                                 end_time=m.scheduled_time + timezone.timedelta(seconds=dur),
                                 duration=dur,
                                 filename=wav_path,
+                                # Attributed at creation, as a real call now is.
+                                meeting=m,
+                                patient=patient,
+                                leg=CallRecording.Leg.DYAD,
                                 transcript="Simulated call transcript for demo purposes.",
                                 transcript_summary="Caregiver check-in; medication and routine reviewed.",
                                 transcribed_at=m.scheduled_time,

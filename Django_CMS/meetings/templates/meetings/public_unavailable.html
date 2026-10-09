@@ -1,0 +1,10 @@
+{% extends "meetings/_public_base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Link not available" %}{% endblock %}
+{% block content %}
+<div class="lb-simple">
+  <div class="lb-icon"><span class="mi">link_off</span></div>
+  <h1>{% trans "This link isn't available" %}</h1>
+  <p>{% trans "It may have expired, the meeting may have been moved or cancelled, or the link may be incomplete. If you were expecting to join a meeting, please contact your care team for a new link." %}</p>
+</div>
+{% endblock %}

@@ -10,7 +10,7 @@
     padding: .5rem .75rem; font-size: .875rem; background: #fff; color: #111827;
   }
   .client-form input:focus, .client-form select:focus, .client-form textarea:focus {
-    outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.15);
+    outline: none; border-color: var(--brand-primary); box-shadow: 0 0 0 3px rgba(3,105,161,.15);
   }
   .client-form .fld { margin-bottom: 1.1rem; }
   .client-avatar { width: 2.75rem; height: 2.75rem; border-radius: .6rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -51,6 +51,12 @@
         {{ form.phone_number }}
         {% for e in form.phone_number.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
       </div>
+      <div class="fld">
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+        {{ form.email }}
+        <p class="text-xs text-gray-500 mt-1">{{ form.email.help_text }}</p>
+        {% for e in form.email.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+      </div>
       {% if form.navigator %}
       <div class="fld">
         <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ form.navigator.id_for_label }}">{{ form.navigator.label }}</label>
@@ -68,7 +74,7 @@
 
     <div class="mt-2 mb-4 pt-4 border-t border-gray-100">
       <h2 class="text-sm font-semibold text-gray-700 mb-1">{% trans "Caregiver" %}</h2>
-      <p class="text-xs text-gray-500 mb-3">{% trans "The caregiver's phone is the number called when you start a call." %}</p>
+      <p class="text-xs text-gray-500 mb-3">{% trans "The caregiver's phone is the number called when you start a call; their e-mail is where reminders go when the platform sends reminders by email." %}</p>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
       <div class="fld">
@@ -81,12 +87,19 @@
         {{ form.caregiver_lastname }}
         {% for e in form.caregiver_lastname.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
       </div>
-      <div class="fld sm:col-span-2">
+      <div class="fld">
         <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ form.caregiver_phone.id_for_label }}">{{ form.caregiver_phone.label }}</label>
         {{ form.caregiver_phone }}
         {% for e in form.caregiver_phone.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
       </div>
+      <div class="fld">
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ form.caregiver_email.id_for_label }}">{{ form.caregiver_email.label }}</label>
+        {{ form.caregiver_email }}
+        {% for e in form.caregiver_email.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+      </div>
     </div>
+
+    {% include "patients/_protocols_field.html" %}
 
     <div class="flex gap-2 mt-6 pt-4 border-t border-gray-100">
       <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Save changes" %}</button>

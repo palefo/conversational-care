@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import ConvAIUser, Message, CallRecording, Caregiver, Patient, Meeting, Protocol, Question, Answer, Agent, Conversation, SelfRegistration, Alert
+from .models import ConvAIUser, Message, CallLeg, CallRecording, Caregiver, Patient, Meeting, Protocol, Question, Answer, Agent, Conversation, SelfRegistration, Alert, RagDocument, Study, Enrolment, ConsentRecord, RecordAccess, StaffWhatsAppLink
 from django.db.models import Q
 from django.utils.html import format_html, escape
 from django.utils.safestring import mark_safe
@@ -19,6 +19,24 @@ class ConvAIUserAdmin(UserAdmin):
     add_fieldsets = UserAdmin.add_fieldsets + (
         ("Settings", {"fields": ("phone_number", "agent")}),
     )
+
+    def get_fieldsets(self, request, obj=None):
+        """Offer the study field only where study enrolment is switched on.
+
+        With it off the platform has to look exactly as it did before the feature
+        existed, so an installation that never runs a study is never asked which
+        study a member of staff belongs to.
+        """
+        from .site_config import get_bool
+
+        fieldsets = super().get_fieldsets(request, obj)
+        if not get_bool("STUDY_ENROLMENT_ENABLED"):
+            return fieldsets
+        return tuple(
+            (name, {**opts, "fields": tuple(opts["fields"]) + ("study",)}
+                   if name == "Settings" else opts)
+            for name, opts in fieldsets
+        )
 
 
 class HasInputAudioFilter(admin.SimpleListFilter):
@@ -192,6 +210,7 @@ class MessageAdmin(admin.ModelAdmin):
         qs.update(liked=False, disliked=False, warning=False, dangerous=False)
 
 admin.site.register(CallRecording)
+admin.site.register(CallLeg)
 admin.site.register(Caregiver)
 admin.site.register(Patient)
 admin.site.register(Meeting)
@@ -223,172 +242,20 @@ from django.utils.html import format_html, escape
 from django.utils.safestring import mark_safe
 
 from .models import Agent
-
-
-class DetectorsKeyValueWidget(forms.Widget):
-    """
-    Renders Agent.detectors (JSON) as a dynamic table:
-      Label | Instruction | [remove]
-    Adds + button to append rows. On submit, pairs are reconstructed into a dict.
-    """
-
-    def render(self, name, value, attrs=None, renderer=None):
-        value = value or {}
-        if not isinstance(value, dict):
-            # tolerate bad/legacy data
-            value = {}
-
-        # rows html
-        rows_html = []
-        idx = 0
-        for label, instr in value.items():
-            rows_html.append(self._row_html(name, idx, label, instr))
-            idx += 1
-
-        # if empty, render one blank starter row
-        if not rows_html:
-            rows_html.append(self._row_html(name, 0, "", ""))
-
-        table = f"""
-        <div class="det-kv" id="det-kv-{escape(name)}">
-          <table class="det-kv__table">
-            <thead>
-              <tr>
-                <th style="width:28%;">Label</th>
-                <th>Instruction (how to detect)</th>
-                <th style="width:40px;"></th>
-              </tr>
-            </thead>
-            <tbody id="{escape(name)}-tbody">
-              {''.join(rows_html)}
-            </tbody>
-          </table>
-          <button type="button" class="button det-kv__add" data-target="{escape(name)}-tbody">+ Add detector</button>
-        </div>
-        {self._script_block(name, idx)}
-        {self._style_block()}
-        """
-        return mark_safe(table)
-
-    def value_from_datadict(self, data, files, name):
-        """
-        Collect all inputs like:
-          {name}_key_<id>, {name}_val_<id>
-        and build a dict. Blank labels are ignored.
-        """
-        prefix_key = f"{name}_key_"
-        prefix_val = f"{name}_val_"
-        out = {}
-        # iterate over keys; pick those with our prefix
-        for k in list(data.keys()):
-            if not k.startswith(prefix_key):
-                continue
-            suffix = k[len(prefix_key):]
-            label = (data.get(k, "") or "").strip()
-            instr = (data.get(f"{prefix_val}{suffix}", "") or "").strip()
-            if label:
-                out[label] = instr
-        return out
-
-    # ---- helpers ----
-    def _row_html(self, name, idx, label, instr):
-        return f"""
-          <tr class="det-kv__row" data-row="{idx}">
-            <td>
-              <input type="text"
-                     name="{escape(name)}_key_{idx}"
-                     value="{escape(label)}"
-                     class="vTextField det-kv__label"
-                     placeholder="e.g. Medication confusion"/>
-            </td>
-            <td>
-              <textarea name="{escape(name)}_val_{idx}"
-                        rows="2"
-                        class="vLargeTextField det-kv__instr"
-                        placeholder="Instruction: when should this be true?">{escape(instr)}</textarea>
-            </td>
-            <td class="det-kv__actions">
-              <button type="button" class="button det-kv__remove" title="Remove">–</button>
-            </td>
-          </tr>
-        """
-
-    def _script_block(self, name, start_idx):
-        # small inline JS to add/remove rows
-        return f"""
-<script>
-(function() {{
-  const tbodyId = "{escape(name)}-tbody";
-  let nextIdx = {int(start_idx) + 1};
-
-  function mkRowHTML(i) {{
-    return `
-      <tr class="det-kv__row" data-row="${{i}}">
-        <td>
-          <input type="text" name="{escape(name)}_key_${{i}}" class="vTextField det-kv__label" placeholder="e.g. Medication confusion"/>
-        </td>
-        <td>
-          <textarea name="{escape(name)}_val_${{i}}" rows="2" class="vLargeTextField det-kv__instr" placeholder="Instruction: when should this be true?"></textarea>
-        </td>
-        <td class="det-kv__actions">
-          <button type="button" class="button det-kv__remove" title="Remove">–</button>
-        </td>
-      </tr>`;
-  }}
-
-  document.addEventListener('click', function(ev) {{
-    const t = ev.target;
-
-    // Add row
-    if (t.classList.contains('det-kv__add')) {{
-      const targetId = t.getAttribute('data-target');
-      const tbody = document.getElementById(targetId);
-      tbody.insertAdjacentHTML('beforeend', mkRowHTML(nextIdx++));
-      ev.preventDefault();
-      return;
-    }}
-
-    // Remove row
-    if (t.classList.contains('det-kv__remove')) {{
-      const row = t.closest('.det-kv__row');
-      if (!row) return;
-      const tbody = row.parentElement;
-      // If it's the only row, clear inputs instead of removing to keep one blank row
-      if (tbody.querySelectorAll('.det-kv__row').length <= 1) {{
-        row.querySelector('.det-kv__label').value = '';
-        row.querySelector('.det-kv__instr').value = '';
-      }} else {{
-        row.remove();
-      }}
-      ev.preventDefault();
-      return;
-    }}
-  }});
-}})();
-</script>
-        """
-
-    def _style_block(self):
-        return """
-<style>
-  .det-kv__table { width:100%; border-collapse: collapse; margin-bottom: .5rem; }
-  .det-kv__table th, .det-kv__table td { border-bottom: 1px solid #eee; padding: .4rem .5rem; vertical-align: top; }
-  .det-kv__label { width: 100%; }
-  .det-kv__instr { width: 100%; min-height: 2.5rem; }
-  .det-kv__actions { text-align: center; }
-  .det-kv__add { margin-top: .25rem; }
-</style>
-        """
+from .forms import DetectorTableWidget
 
 
 class AgentForm(forms.ModelForm):
-    detectors = forms.Field(widget=DetectorsKeyValueWidget(), required=False)
+    # The same table the Agents page uses. There were two detector editors and
+    # only one of them ever learned about raising alerts; sharing the widget is
+    # what stops that happening again.
+    detectors = forms.JSONField(widget=DetectorTableWidget(), required=False)
 
     class Meta:
         model = Agent
         fields = (
             "name", "kind", "native_key", "system_prompt",
-            "langgraph_name", "host", "port", "tts_voice_id",
+            "langgraph_name", "host", "port", "tts_voice_id", "azure_voice",
             "classification_role", "abstract_instruction",
             "detectors",
         )
@@ -401,10 +268,10 @@ class AgentAdmin(admin.ModelAdmin):
     list_filter = ("kind",)
     search_fields = ("name",)
     fieldsets = (
-        (None, {"fields": ("name", "kind", "native_key", "tts_voice_id")}),
+        (None, {"fields": ("name", "kind", "native_key", "tts_voice_id", "azure_voice")}),
         ("Prompt-based", {
             "description": "Only used when kind = Prompt-based.",
-            "fields": ("system_prompt",),
+            "fields": ("system_prompt", "rag_enabled", "rag_top_k"),
         }),
         ("Remote connection", {
             "description": "Only used when kind = Remote.",
@@ -419,6 +286,28 @@ class AgentAdmin(admin.ModelAdmin):
         }),
     )
 
+@admin.register(RagDocument)
+class RagDocumentAdmin(admin.ModelAdmin):
+    """Read-only view of RAG agents' documents.
+
+    Uploading and deleting belong on the agent's Knowledge base page, which
+    runs the ingestion; creating a row here would leave a document with no
+    chunks and no job behind it. Everything is editable through that page —
+    this is for looking at what a knowledge base actually contains.
+    """
+    list_display = ("original_name", "agent", "status", "enabled",
+                    "chunk_total", "embedding_model", "updated_at")
+    list_filter = ("status", "enabled", "agent")
+    search_fields = ("original_name",)
+    readonly_fields = ("agent", "file", "original_name", "size_bytes", "status",
+                       "error", "chunk_total", "chunk_done", "char_count",
+                       "embedding_model", "embedding_dim", "uploaded_by",
+                       "created_at", "updated_at")
+
+    def has_add_permission(self, request):
+        return False
+
+
 @admin.register(Conversation)
 class ConversationAdmin(admin.ModelAdmin):
     list_display = (
@@ -428,6 +317,7 @@ class ConversationAdmin(admin.ModelAdmin):
         "visited",
         "rating",
         "analyzed",
+        "hidden",
         "last_message_at",
         "analyzed_at",
         "message_count"
@@ -437,6 +327,7 @@ class ConversationAdmin(admin.ModelAdmin):
         "is_important",
         "visited",
         "analyzed",
+        "hidden",
         "rating",
         ("last_message_at", admin.DateFieldListFilter),
         ("analyzed_at", admin.DateFieldListFilter),
@@ -451,13 +342,28 @@ class ConversationAdmin(admin.ModelAdmin):
     date_hierarchy = "last_message_at"
     list_per_page = 50
 
-    readonly_fields = ("id", "started_at", "last_message_at", "analyzed_at")
+    readonly_fields = ("id", "started_at", "last_message_at", "analyzed_at", "hidden_at",
+                       "agent_summary_at")
     fieldsets = (
         ("Identity & Timestamps", {
             "fields": ("id", "started_at", "last_message_at"),
         }),
         ("Feedback", {
             "fields": ("rating", "feedback", "human_flags"),
+        }),
+        # The agent's own summary is kept apart from the classifier's, above,
+        # because they have different authors and neither should be able to
+        # destroy the other. The panel prefers this one when it is set; clearing
+        # it here falls the display back to the classifier's. See
+        # ConvAI.conversation_summary.
+        ("Agent summary", {
+            "fields": ("agent_summary", "agent_summary_at"),
+            "description": (
+                "Written by the agent that held this conversation, through its "
+                "report_summary tool or the summary endpoint. Shown to the link "
+                "worker in preference to the automatic summary below, and shown "
+                "even when the conversation is hidden."
+            ),
         }),
         ("Analysis", {
             "fields": (
@@ -469,6 +375,19 @@ class ConversationAdmin(admin.ModelAdmin):
                 "analyzed_at",
                 "auto_flags"
             )
+        }),
+        # Editable here on purpose. The client sets this through their agent,
+        # but somebody has to be able to answer "they rang and asked me to
+        # undo it", and the admin is the surface that already assumes an
+        # administrator reading everything. See conversation_privacy.md.
+        ("Privacy", {
+            "fields": ("hidden", "hidden_at"),
+            "description": (
+                "When hidden, the client's link worker sees that this conversation "
+                "happened, how many messages it holds and its summary — but not its "
+                "content, topic or review. Administrators are unaffected, and a "
+                "conversation that raised a self-harm alert is readable regardless."
+            ),
         }),
     )
 
@@ -509,6 +428,9 @@ class ConversationAdmin(admin.ModelAdmin):
 
     @admin.action(description="Clear analysis (summary/topic/flags) and mark unanalyzed")
     def action_clear_analysis(self, request, queryset):
+        # The agent's summary is deliberately left alone: it was not produced by
+        # the analysis this action clears, and re-running the classifier will not
+        # produce it again.
         queryset.update(
             summary="",
             topic="",
@@ -527,3 +449,162 @@ class AlertAdmin(admin.ModelAdmin):
     list_filter = ("alert_type", "priority", "status", "user")
     search_fields = ("title", "description", "data")
     actions = [mark_resolved]
+
+### Study enrolment
+#
+# The app has its own pages for all of this (Settings -> Participants, the
+# enrolment panel on Clients, and each participant's page), which is where a
+# study team should work. These registrations
+# are the administrator's fallback: somewhere to look when a row is behaving oddly,
+# and somewhere to fix data the UI deliberately will not let anybody touch.
+
+
+class _EnrolmentGatedAdmin(admin.ModelAdmin):
+    """Present in the registry, invisible while study enrolment is off.
+
+    Admin registration happens at import time, long before the database can be
+    read, so these cannot be registered conditionally. Denying module permission
+    achieves the same thing at the point it matters: the models vanish from the
+    admin index and their pages 403, so an installation that is not running a
+    study sees the admin exactly as it was before this feature.
+    """
+
+    @staticmethod
+    def _on() -> bool:
+        from .site_config import get_bool
+        return get_bool("STUDY_ENROLMENT_ENABLED")
+
+    def has_module_permission(self, request):
+        return self._on() and super().has_module_permission(request)
+
+    def has_view_permission(self, request, obj=None):
+        return self._on() and super().has_view_permission(request, obj)
+
+    def has_add_permission(self, request):
+        return self._on() and super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self._on() and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._on() and super().has_delete_permission(request, obj)
+
+
+class ConsentRecordInline(admin.TabularInline):
+    """Read-only by construction: ConsentRecord refuses to be re-saved.
+
+    Shown inline because the consent history is the thing you actually want when
+    you open an enrolment in the admin.
+    """
+    model = ConsentRecord
+    extra = 0
+    can_delete = False
+    fields = ("consent_version", "items", "agreed_at", "ip_address")
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Study)
+class StudyAdmin(_EnrolmentGatedAdmin):
+    list_display = ("display_name", "slug", "consent_version", "is_open",
+                    "enrolment_count", "chief_investigator")
+    list_filter = ("is_open",)
+    search_fields = ("display_name", "slug", "iras_project_id", "chief_investigator")
+    readonly_fields = ("created_at", "updated_at")
+
+    @admin.display(description="Participants")
+    def enrolment_count(self, obj):
+        return obj.enrolments.count()
+
+    def has_delete_permission(self, request, obj=None):
+        # A study with participants is a record about real people. The FK is
+        # PROTECTed anyway; this keeps the button from appearing at all.
+        if obj is not None and obj.enrolments.exists():
+            return False
+        return request.user.is_superuser and super().has_delete_permission(request, obj)
+
+
+@admin.register(Enrolment)
+class EnrolmentAdmin(_EnrolmentGatedAdmin):
+    list_display = ("name", "lastname", "study", "access_code", "status",
+                    "claimed_at", "patient", "created_at")
+    list_filter = ("study", "status")
+    search_fields = ("name", "lastname", "access_code")
+    readonly_fields = ("claimed_at", "created_at", "updated_at", "withdrawn_at")
+    autocomplete_fields = ()
+    inlines = [ConsentRecordInline]
+
+    def has_delete_permission(self, request, obj=None):
+        # Deleting an enrolment would cascade to its consent records, which are
+        # not deletable on their own for good reason. Withdraw instead.
+        if obj is not None and obj.consents.exists():
+            return False
+        return request.user.is_superuser and super().has_delete_permission(request, obj)
+
+
+@admin.register(ConsentRecord)
+class ConsentRecordAdmin(_EnrolmentGatedAdmin):
+    """Deliberately look-only. The model raises on any re-save; this makes the
+    admin agree with it rather than offering a form that cannot be submitted."""
+
+    list_display = ("enrolment", "consent_version", "agreed_at", "ip_address")
+    list_filter = ("consent_version", "enrolment__study")
+    search_fields = ("enrolment__name", "enrolment__lastname", "enrolment__access_code")
+    readonly_fields = ("enrolment", "consent_version", "items", "items_text",
+                       "agreed_at", "ip_address", "user_agent")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # Consent is evidence. Deleting it is not an administrative convenience.
+        return False
+
+
+@admin.register(RecordAccess)
+class RecordAccessAdmin(admin.ModelAdmin):
+    """Who read whose record through Link Worker v2 or the client-record API.
+
+    Look-only, like ConsentRecord: an access log anybody could edit or prune
+    would record nothing. See link_worker_v2.md.
+    """
+
+    list_display = ("at", "user_label", "patient_label", "action", "via", "detail")
+    list_filter = ("via", "action")
+    search_fields = ("user_label", "patient_label", "detail")
+    date_hierarchy = "at"
+    readonly_fields = ("at", "user", "user_label", "patient", "patient_label",
+                       "action", "via", "detail")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(StaffWhatsAppLink)
+class StaffWhatsAppLinkAdmin(admin.ModelAdmin):
+    """Navigators' phones linked to the Link Worker on WhatsApp.
+
+    Deleting a row unlinks the phone — what an admin does for a navigator who
+    has lost theirs. The code is only ever stored hashed. See
+    link_worker_whatsapp.md.
+    """
+
+    list_display = ("user", "phone_number", "verified_at", "loaded_patient", "last_message_at")
+    search_fields = ("user__username", "user__first_name", "user__last_name")
+    readonly_fields = ("user", "phone_number", "verified_at", "code_hash", "code_expires_at",
+                       "code_tries", "thread_id", "last_message_at", "loaded_patient",
+                       "loaded_at", "created_at")
+
+    def has_add_permission(self, request):
+        return False

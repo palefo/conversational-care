@@ -1,4 +1,16 @@
-/* Figma Styles of your File */
+/* Figma Styles of your File
+   ─────────────────────────
+   This is the CLIENT-FACING palette, and its teal is deliberate rather than a
+   stale export. It is loaded only by registration/login.html and read only by
+   login.css — which is correct: teal is what someone sees before they are
+   inside the product, and what a client sees in the chat and voice pages
+   (those set it locally as --wa-header / --rtc-header rather than loading this
+   file, so #006877 is currently written in three places).
+
+   The care team's app is blue, and its tokens live in app_new_design.css.
+   Changing a value here will not move the application, and changing one there
+   will not move this page. That is the intended boundary — see the palette note
+   at the top of app_new_design.css's :root block, and STYLING.md. */
 :root {
   --app-red-500: #ba1a1a;
   --app-primary-color-50: #f3f8fb;

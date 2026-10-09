@@ -1,0 +1,73 @@
+{% load i18n %}
+{% comment %}
+  The transcription job behind a recording, while there is one worth showing.
+  Included beside both transcript views (meeting and recording panels). While
+  the job is live it polls a small status endpoint and reloads the panel once
+  the job has finished, so the transcript appears without the navigator doing
+  anything — and without reloading every few seconds while nothing changes.
+
+  Expects `st` (summarization.transcription_state) and `poll_url`.
+{% endcomment %}
+{% if st %}
+  {% if st.live %}
+    <div class="dp-job{% if st.no_worker %} dp-job-stuck{% endif %}" role="status" aria-live="polite"
+         data-dp-job="{{ poll_url }}" data-status="{{ st.status }}">
+      {% if st.no_worker %}
+        <span class="material-icons-outlined dp-job-ic" aria-hidden="true">hourglass_empty</span>
+        <div>
+          <b>{% trans "Waiting for a background worker" %}</b>
+          <span>{% trans "The transcription is queued, but no worker is running to pick it up. Ask an administrator to start the worker service." %}</span>
+        </div>
+      {% else %}
+        <span class="dp-job-spin" aria-hidden="true"></span>
+        <div>
+          {% if st.retrying %}
+            <b>{% trans "Retrying the transcription" %}</b>
+            <span>{% trans "The last attempt hit an error; it is being tried again." %}</span>
+          {% elif st.status == "running" %}
+            <b>{% trans "Transcribing…" %}</b>
+            <span>{% trans "This usually takes a minute or two. The transcript appears here when it is ready." %}</span>
+          {% else %}
+            <b>{% trans "Queued for transcription" %}</b>
+            <span>{% trans "It starts in a moment." %}</span>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+    <script>
+      (function () {
+        var el = document.querySelector('[data-dp-job][data-status]');
+        if (!el || el.dataset.polling) return;
+        el.dataset.polling = '1';
+        var url = el.dataset.dpJob, was = el.dataset.status, timer = null, tries = 0;
+        function tick() {
+          tries += 1;
+          fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) {
+              if (!d || !document.body.contains(el)) return stop();
+              if (d.status !== was) {
+                stop();
+                if (window.dpReload) window.dpReload(); else location.reload();
+              }
+            })
+            .catch(function () {});
+          // Back off gently on a long job: 4s, then 8s after a minute.
+          timer = setTimeout(tick, tries > 15 ? 8000 : 4000);
+        }
+        function stop() { if (timer) { clearTimeout(timer); timer = null; } }
+        timer = setTimeout(tick, 4000);
+        (window.dpCleanup = window.dpCleanup || []).push(stop);
+      })();
+    </script>
+  {% elif st.failed %}
+    <div class="dp-job dp-job-failed" role="status">
+      <span class="material-icons-outlined dp-job-ic" aria-hidden="true">error_outline</span>
+      <div>
+        <b>{% trans "The transcription failed" %}</b>
+        {% if st.error %}<span>{{ st.error }}</span>{% endif %}
+        <span>{% trans "Transcribing again retries it; the recording itself is safe." %}</span>
+      </div>
+    </div>
+  {% endif %}
+{% endif %}

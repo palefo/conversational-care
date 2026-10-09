@@ -28,7 +28,7 @@
     padding: .5rem .75rem; font-size: .875rem; background: #fff; color: #111827;
   }
   .settings-panel input:focus, .settings-panel select:focus, .settings-panel textarea:focus {
-    outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,.15);
+    outline: none; border-color: var(--brand-primary); box-shadow: 0 0 0 3px rgba(3,105,161,.15);
   }
   .stg-group { border-top: 1px solid #f1f5f9; padding-top: 1.25rem; margin-top: 1.25rem; }
   .stg-group-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
@@ -151,6 +151,160 @@
         <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
       </form>
     </div>
+
+    {% comment %}
+      Whose a message is is decided once, when it arrives, from the number it
+      came from (ConvAI.message_attribution). A number more than one client can
+      be reached on is where that decision is a rule rather than a fact, so they
+      are listed here to be checked. Not an error: households share a phone.
+    {% endcomment %}
+    <div class="card p-6 mt-6">
+      <div class="flex items-start gap-3 mb-4">
+        <span class="material-icons-outlined bg-amber-50 text-amber-600 rounded-lg p-2">call_split</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Shared numbers" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "An incoming message is filed on one client's record when it arrives, and stays there if the number later changes. When a number belongs to more than one client, the client's own number wins over a caregiver's; then the client that number last wrote about; then the oldest record." %}</p>
+        </div>
+      </div>
+      {% if shared_numbers %}
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-gray-500 border-b border-gray-100">
+            <th class="py-2 pr-4 font-medium">{% trans "Number" %}</th>
+            <th class="py-2 font-medium">{% trans "Reaches" %}</th>
+          </tr></thead>
+          <tbody>
+            {% for row in shared_numbers %}
+              <tr class="border-b border-gray-50 align-top">
+                <td class="py-2 pr-4 font-mono text-gray-800">{{ row.number }}</td>
+                <td class="py-2">
+                  {% for h in row.holders %}
+                    <a href="{% url 'patient_detail' h.patient.pk %}" class="text-sky-700 hover:underline">{{ h.patient }}</a>
+                    <span class="text-gray-500">({% if h.role == 'client' %}{% trans "own number" %}{% else %}{% trans "caregiver" %}{% endif %})</span>{% if not forloop.last %}, {% endif %}
+                  {% endfor %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="text-sm text-gray-600">{% trans "No number is shared by more than one client." %}</p>
+      {% endif %}
+      {% if legacy_message_count %}
+        <p class="text-xs text-gray-500 mt-4">
+          {% blocktrans count n=legacy_message_count %}{{ n }} older message could not be placed on a client when message owners were introduced, so it is still matched by phone number.{% plural %}{{ n }} older messages could not be placed on a client when message owners were introduced, so they are still matched by phone number.{% endblocktrans %}
+        </p>
+      {% endif %}
+    </div>
+  </section>
+
+  {# ═════════ Email ═════════ #}
+  <section class="settings-panel hidden" data-tab="email">
+    <div class="card p-6 mb-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">mail</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Outbound email" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Password-reset links, meeting reminders and anything else the platform sends go out this way. Secrets are never shown again after saving — leave them blank to keep the current value." %}</p>
+        </div>
+      </div>
+
+      {# Whether mail would go out right now, from the same check the sender runs. #}
+      {% if email_status.ok %}
+        <div class="px-4 py-3 mb-5 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">check_circle</span>
+          <div>
+            {% if email_status.provider == 'azure' %}
+              {% blocktrans %}Email is configured and sending through <b>Azure Communication Services</b>.{% endblocktrans %}
+            {% else %}
+              {% blocktrans %}Email is configured and sending through <b>SMTP</b>.{% endblocktrans %}
+            {% endif %}
+          </div>
+        </div>
+      {% else %}
+        <div class="px-4 py-3 mb-5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">warning_amber</span>
+          <div>{{ email_status.reason }}</div>
+        </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="email">
+
+        <div class="stg-group-title" style="margin-top:0;">{% trans "Provider" %}</div>
+        {% include "settings/_field.html" with field=email_form.email_provider %}
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Sender" %}</div>
+          <div class="stg-grid2">
+            {% include "settings/_field.html" with field=email_form.email_from %}
+            {% include "settings/_field.html" with field=email_form.email_from_name %}
+          </div>
+          {% include "settings/_field.html" with field=email_form.email_reply_to %}
+        </div>
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Azure Communication Services" %}</div>
+          <p class="text-xs text-gray-500 mb-3">{% trans "Used when the provider above is Azure. Give either the whole connection string, or the endpoint and access key — the platform builds the connection string from the pair." %}</p>
+          {% include "settings/_field.html" with field=email_form.azure_email_connection_string %}
+          <div class="stg-grid2">
+            {% include "settings/_field.html" with field=email_form.azure_email_endpoint %}
+            {% include "settings/_field.html" with field=email_form.azure_email_access_key %}
+          </div>
+        </div>
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "SMTP" %}</div>
+          <p class="text-xs text-gray-500 mb-3">{% trans "Used when the provider above is SMTP." %}</p>
+          <div class="stg-grid2">
+            {% include "settings/_field.html" with field=email_form.smtp_host %}
+            {% include "settings/_field.html" with field=email_form.smtp_port %}
+            {% include "settings/_field.html" with field=email_form.smtp_user %}
+            {% include "settings/_field.html" with field=email_form.smtp_password %}
+            {% include "settings/_field.html" with field=email_form.smtp_security %}
+          </div>
+        </div>
+
+        <div class="mt-5">
+          <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+        </div>
+      </form>
+    </div>
+
+    {# Try it, rather than find out when a password reset silently fails. #}
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-4">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">outgoing_mail</span>
+        <div>
+          <h3 class="font-medium text-gray-800">{% trans "Send a test email" %}</h3>
+          <p class="text-sm text-gray-500">{% trans "Sends one message with the settings above. Save any changes first — the test uses what is stored, not what is typed." %}</p>
+        </div>
+      </div>
+      <form method="post" action="{% url 'send_test_email' %}" id="testEmailForm" class="flex flex-wrap items-end gap-3">
+        {% csrf_token %}
+        <div class="stg-field flex-1 min-w-[16rem] mb-0">
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="testEmailTo">{% trans "Send to" %}</label>
+          <input type="email" id="testEmailTo" name="to" value="{{ email_status.test_to }}"
+                 placeholder="you@example.com" required>
+        </div>
+        <button type="submit" id="testEmailBtn" class="button-primary py-2 px-4 rounded-lg flex items-center font-medium text-sm"
+                {% if not email_status.ok %}disabled title="{% trans 'Configure a provider above first.' %}"{% endif %}>
+          <span>{% trans "Send test email" %}</span>
+          <svg id="testEmailSpinner" class="ml-2 h-4 w-4 text-white animate-spin hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+          </svg>
+        </button>
+      </form>
+      <p class="text-xs text-gray-500 mt-3">
+        {% if email_status.reminder_channel == 'email' %}
+          {% blocktrans %}Meeting reminders are currently sent by <b>email</b>.{% endblocktrans %}
+        {% else %}
+          {% blocktrans %}Meeting reminders are currently sent over <b>WhatsApp</b>.{% endblocktrans %}
+        {% endif %}
+        <button type="button" class="underline font-medium" data-goto-tab="messaging">{% trans "Change this" %}</button>
+      </p>
+    </div>
   </section>
 
   {# ═════════ Branding ═════════ #}
@@ -190,8 +344,19 @@
         {% csrf_token %}
         <input type="hidden" name="section" value="agents">
 
-        <div class="stg-group-title" style="margin-top:0;">{% trans "Default model" %}</div>
-        {% include "settings/_field.html" with field=agents_form.default_agent_model %}
+        <div class="stg-group-title" style="margin-top:0;">{% trans "Chat bubble assistant" %}</div>
+        {% include "settings/_field.html" with field=agents_form.link_worker_v2_enabled %}
+        <div class="stg-grid2">
+          {% include "settings/_field.html" with field=agents_form.link_worker_whatsapp_enabled %}
+          {% include "settings/_field.html" with field=agents_form.link_worker_voice_pt_br %}
+          {% include "settings/_field.html" with field=agents_form.link_worker_azure_voice_pt_br %}
+        </div>
+
+        <div class="stg-group-title">{% trans "Default model" %}</div>
+        <div class="stg-grid2">
+          {% include "settings/_field.html" with field=agents_form.default_agent_model %}
+          {% include "settings/_field.html" with field=agents_form.summary_model %}
+        </div>
 
         <div class="stg-group">
           <div class="stg-group-title">{% trans "Provider API keys" %}</div>
@@ -236,11 +401,32 @@
           </div>
         </div>
 
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Text to speech (voice replies)" %}</div>
+          <p class="text-xs text-gray-500 mb-3">{% trans "Who speaks the replies to voice notes and the voice chat. Azure AI Speech needs a Speech resource: its key and region are under Keys and Endpoint in the Azure portal." %}</p>
+          {% include "settings/_field.html" with field=agents_form.tts_provider %}
+          <div class="stg-grid2">
+            {% include "settings/_field.html" with field=agents_form.azure_speech_key %}
+            {% include "settings/_field.html" with field=agents_form.azure_speech_region %}
+            {% include "settings/_field.html" with field=agents_form.azure_speech_voice %}
+          </div>
+        </div>
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Embeddings (RAG agents)" %}</div>
+          <p class="text-xs text-gray-500 mb-3">{% trans "Used to index and search the documents uploaded to prompt-based agents with a knowledge base. The default is multilingual: a question in one language finds answers in documents written in another." %}</p>
+          <div class="stg-grid2">
+            {% include "settings/_field.html" with field=agents_form.rag_embedding_model %}
+            {% include "settings/_field.html" with field=agents_form.azure_embedding_deployment %}
+          </div>
+        </div>
+
         <div class="mt-5">
           <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
         </div>
       </form>
     </div>
+    {% azure_voice_datalist %}
     <datalist id="model-suggestions">
       <option value="openai/gpt-4.1-mini"></option>
       <option value="openai/gpt-4.1"></option>
@@ -254,6 +440,69 @@
   </section>
 
   {# ═════════ Prompts ═════════ #}
+  {# ═════════ Sensei ═════════ #}
+  <section class="settings-panel hidden" data-tab="sensei">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">sensors</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Sensei" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Sensei is an external service that answers questions about the wearable and phone health data a client has synced to it. Turn this on to allow Sensei agents; no health data is shared either way — only the text of the conversation. Secrets are never shown again after saving — leave them blank to keep the current value." %}</p>
+        </div>
+      </div>
+
+      {% comment %} Same check the adapter runs before every turn, so this
+      cannot claim Sensei is ready while calls are failing on a missing
+      value. {% endcomment %}
+      {% if not sensei_status.enabled %}
+        <div class="px-4 py-3 mb-5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">toggle_off</span>
+          <div>{% trans "Sensei is off. While it is off, Sensei agents cannot be created and any that already exist stop answering." %}</div>
+        </div>
+      {% elif sensei_status.ok %}
+        <div class="px-4 py-3 mb-5 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">check_circle</span>
+          <div>
+            {% trans "Sensei is on and configured." %}
+            <a class="underline font-medium" href="{% url 'agents' %}#sensei">{% trans "Manage Sensei agents" %}</a>
+          </div>
+        </div>
+      {% else %}
+        <div class="px-4 py-3 mb-5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">warning_amber</span>
+          <div>{{ sensei_status.reason }}</div>
+        </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="sensei">
+        {% include "settings/_field.html" with field=sensei_form.sensei_enabled %}
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Connection" %}</div>
+          {% include "settings/_field.html" with field=sensei_form.sensei_api_url %}
+          {% include "settings/_field.html" with field=sensei_form.sensei_function_key %}
+        </div>
+
+        <div class="stg-group">
+          <div class="stg-group-title">{% trans "Client identity" %}</div>
+          {% include "settings/_field.html" with field=sensei_form.sensei_user_id_secret %}
+        </div>
+
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+    </div>
+
+    <div class="card p-6 mt-6">
+      <h3 class="font-semibold text-gray-800 mb-2">{% trans "How clients sign in to Sensei" %}</h3>
+      <p class="text-sm text-gray-500 mb-3">{% trans "Sensei keeps its own accounts. A client links theirs by sending one of these to a Sensei agent — passcodes are removed before the message is stored." %}</p>
+      <pre class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs overflow-x-auto"><code>/login &lt;AppUserId&gt; &lt;Passcode&gt;
+/register_user &lt;NewAppUserId&gt; &lt;NewPasscode&gt;</code></pre>
+      <p class="text-xs text-gray-500 mt-2">{% trans "A newly registered account can chat straight away. Questions about sensor data also need the client to sign in to the Sensei mobile app with the same AppUserId and sync their health data." %}</p>
+    </div>
+  </section>
+
   <section class="settings-panel hidden" data-tab="prompts">
     <div class="card p-6">
       <div class="flex items-start gap-3 mb-5">
@@ -355,7 +604,7 @@ result = client.schedule_meeting(
     patient_id=10,
     scheduled_time_iso="2026-08-01T15:30:00Z",
     type=1,                # 0 Onboarding, 1 Regular, 2 Final, 3 Initial
-    scheduled_protocol=2,  # optional protocol number
+    scheduled_protocols=[2, 3],  # optional protocol numbers
 )
 print(result)</code></pre>
         </div>
@@ -458,6 +707,7 @@ print(result)</code></pre>
               <tr class="text-left text-gray-500 border-b">
                 <th class="py-2 pr-4">{% trans "Name" %}</th>
                 <th class="py-2 pr-4">{% trans "Phone" %}</th>
+                <th class="py-2 pr-4">{% trans "Via" %}</th>
                 <th class="py-2 pr-4">{% trans "E-mail" %}</th>
                 <th class="py-2 pr-4">{% trans "Status" %}</th>
                 <th class="py-2 pr-4">{% trans "Created" %}</th>
@@ -469,6 +719,7 @@ print(result)</code></pre>
                 <tr class="border-b">
                   <td class="py-2 pr-4">{{ sr.name }} {{ sr.lastname }}</td>
                   <td class="py-2 pr-4">{{ sr.phone_number|default:"—" }}</td>
+                  <td class="py-2 pr-4">{% if sr.details.channel == "sms" %}{% trans "SMS" %}{% elif sr.details.channel == "whatsapp" %}{% trans "WhatsApp" %}{% else %}—{% endif %}</td>
                   <td class="py-2 pr-4">{{ sr.email|default:"—" }}</td>
                   <td class="py-2 pr-4">
                     {% if sr.state == 0 %}
@@ -523,7 +774,7 @@ print(result)</code></pre>
               </span>
             {% endif %}
           </div>
-          <p class="text-sm text-gray-500">{% trans "Share this QR in demos so people can start a WhatsApp chat that registers them. Scanning opens WhatsApp with a pre-filled message in the platform language." %}</p>
+          <p class="text-sm text-gray-500">{% trans "Share these QR codes so people can register themselves, on WhatsApp or by SMS. Scanning opens the app with a pre-filled message in the platform language; whichever they send, the registration agent answers on the same channel." %}</p>
         </div>
       </div>
 
@@ -537,69 +788,447 @@ print(result)</code></pre>
         </div>
       {% endif %}
 
-      {% if selfreg.url %}
-        <div class="flex flex-col md:flex-row gap-6 items-start">
-          {# QR #}
-          <div class="flex-shrink-0">
-            <div class="border border-gray-200 rounded-xl p-3 bg-white" style="width:220px;">
-              {{ selfreg.qr_svg|safe }}
-            </div>
-            <div class="flex items-center gap-2 mt-3">
-              <button type="button" onclick="srDownloadPng()" class="button-primary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1">
-                <span class="material-icons-outlined text-base">download</span>{% trans "Download" %}
-              </button>
-              <button type="button" onclick="srCopyImage()" class="button-secondary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1">
-                <span class="material-icons-outlined text-base">content_copy</span>{% trans "Copy image" %}
-              </button>
-            </div>
+      <dl class="text-sm divide-y divide-gray-100 mb-5 max-w-xl">
+        <div class="flex justify-between gap-4 py-2">
+          <dt class="text-gray-500">{% trans "Pre-filled message" %}</dt>
+          <dd class="font-medium text-gray-800">“{{ selfreg.message }}”</dd>
+        </div>
+        <div class="flex justify-between gap-4 py-2">
+          <dt class="text-gray-500">{% trans "Handled by" %}</dt>
+          <dd class="font-medium text-gray-800">{{ selfreg.agent_name|default:_("— not selected —") }}</dd>
+        </div>
+      </dl>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% trans "WhatsApp" as t_wa %}{% trans "WhatsApp link" as l_wa %}
+        {% include "settings/_selfreg_qr_card.html" with ch="whatsapp" title=t_wa icon="chat" qr=selfreg.whatsapp link_label=l_wa file="whatsapp-registration-qr.png" %}
+        {% trans "SMS" as t_sms %}{% trans "SMS link" as l_sms %}
+        {% include "settings/_selfreg_qr_card.html" with ch="sms" title=t_sms icon="sms" qr=selfreg.sms link_label=l_sms file="sms-registration-qr.png" %}
+      </div>
+    </div>
+  </section>
+
+  {# ═════════ Participants ═════════ #}
+  {% comment %}
+    While study enrolment is off this tab holds the switch and nothing else —
+    no options, no join link, no studies, no queries. The switch has to be
+    somewhere an admin can reach it: SiteConfiguration is not in the Django
+    admin, so hiding the whole tab would leave .env as the only way in, and an
+    admin who switched it Off here could never switch it back.
+
+    Order matters here. The switch is the decision somebody came to this tab to
+    make, so it is first and it looks like a switch. The caveats stay on the
+    page — they are the honest part — but below the controls rather than in
+    front of them, where a wall of grey was the first thing anybody saw.
+  {% endcomment %}
+  <style>
+    .pt-switch {
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+      padding: .9rem 1rem; border-radius: .6rem;
+      background: var(--brand-light); border: 1px solid #bae6fd;
+      margin-bottom: 1.25rem;
+    }
+    .pt-switch-t { font-size: .9rem; font-weight: 600; color: var(--text-primary); }
+    .pt-switch-h { font-size: .78rem; color: var(--text-secondary); margin-top: .15rem;
+                   line-height: 1.5; max-width: 46rem; }
+    .pt-switch-c { flex: 0 0 11rem; margin-left: auto; }
+    .pt-switch-c select { margin: 0; }
+    .pt-switch .stg-field { margin: 0; }
+    /* The panel renders this field's label and help text itself, so the ones
+       _field.html emits are hidden — but not its errors, which are also <p>
+       and are the one thing that must never be silently swallowed. */
+    .pt-switch .stg-field label,
+    .pt-switch .stg-field p.text-gray-500 { display: none; }
+
+    .pt-join { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start;
+               padding-top: 1.25rem; margin-top: 1.25rem;
+               border-top: 1px solid #f1f5f9; }
+    .pt-join-main { flex: 1 1 22rem; min-width: 0; }
+    .pt-join-row { display: flex; gap: .5rem; margin: .5rem 0 .9rem; }
+    .pt-join-row input { flex: 1 1 auto; min-width: 0; font-size: .8rem !important; }
+    .pt-copy { flex: 0 0 auto; display: inline-flex; align-items: center;
+               justify-content: center; width: 2.4rem; border-radius: .5rem;
+               border: 1px solid #d1d5db; background: #fff; color: var(--text-secondary);
+               cursor: pointer; }
+    .pt-copy:hover { border-color: var(--brand-primary); color: var(--brand-primary);
+                     background: var(--brand-light); }
+    .pt-copy.is-done { border-color: #16a34a; color: #16a34a; background: #f0fdf4; }
+    .pt-stats { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .pt-stat { flex: 1 1 7rem; padding: .6rem .75rem; border-radius: .5rem;
+               background: var(--surface-background); border: 1px solid var(--border-color); }
+    .pt-stat b { display: block; font-size: 1.15rem; font-weight: 600;
+                 color: var(--text-primary); line-height: 1.2; }
+    .pt-stat span { font-size: .72rem; color: var(--text-muted); }
+    .pt-qr { flex: 0 0 auto; text-align: center; }
+    .pt-qr-img { width: 7.5rem; }
+    .pt-qr-cap { font-size: .68rem; color: var(--text-muted); margin-top: .3rem; }
+
+    .pt-caveat { margin-top: 1.25rem; padding: .85rem 0 0;
+                 border-top: 1px solid #f1f5f9; }
+    .pt-caveat summary { font-size: .78rem; font-weight: 500; color: var(--text-secondary);
+                         cursor: pointer; display: inline-flex; align-items: center;
+                         gap: .35rem; list-style: none; }
+    .pt-caveat summary::-webkit-details-marker { display: none; }
+    .pt-caveat summary .material-icons-outlined { font-size: 1rem; transition: transform .15s; }
+    .pt-caveat[open] summary .material-icons-outlined { transform: rotate(90deg); }
+    .pt-caveat ul { margin: .7rem 0 0; padding-left: 1.1rem; border-left: 2px solid #e2e8f0; }
+    .pt-caveat li { font-size: .78rem; color: var(--text-secondary); line-height: 1.55;
+                    margin-bottom: .45rem; list-style: none; position: relative; }
+    .pt-caveat li::before { content: "—"; color: var(--text-muted); margin-right: .4rem; }
+
+    .pt-sttbl { width: 100%; font-size: .85rem; border-collapse: collapse; }
+    .pt-sttbl th { text-align: left; padding: .5rem .75rem .5rem 0; font-weight: 500;
+                   color: var(--text-muted); font-size: .75rem;
+                   border-bottom: 1px solid var(--border-color); }
+    .pt-sttbl td { padding: .75rem .75rem .75rem 0; border-bottom: 1px solid #f1f5f9;
+                   vertical-align: top; }
+    .pt-sttbl tr:last-child td { border-bottom: 0; }
+    .pt-st-nm { font-weight: 500; color: var(--text-primary); }
+    .pt-st-slug { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                  font-size: .72rem; color: var(--text-muted); margin-top: .1rem; }
+    .pt-tag { display: inline-flex; align-items: center; gap: .25rem; font-size: .7rem;
+              padding: .18rem .45rem; border-radius: 999px; white-space: nowrap; }
+    .pt-tag--lock { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+    .pt-tag--open { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .pt-tag--shut { background: var(--surface-background); color: var(--text-muted);
+                    border: 1px solid var(--border-color); }
+    .pt-tag .material-icons-outlined { font-size: .8rem; }
+    .pt-stale { font-size: .72rem; color: #b45309; margin-top: .25rem; }
+    .pt-edit { color: var(--brand-primary); text-decoration: none; font-size: .82rem; }
+    .pt-edit:hover { text-decoration: underline; }
+  </style>
+
+  <section class="settings-panel hidden" data-tab="participants">
+    <div class="card p-6 mb-5">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">groups</span>
+        <div class="flex-1">
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Study enrolment" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Pre-enrol participants, issue each one an access code, and take versioned consent on a public join page. For running a research study on this platform." %}</p>
+        </div>
+      </div>
+
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="participants">
+
+        {# The decision somebody came here to make, first and unmissable. #}
+        <div class="pt-switch">
+          <div style="flex:1 1 20rem;min-width:0">
+            <div class="pt-switch-t">{{ participants_form.study_enrolment_enabled.label }}</div>
+            <div class="pt-switch-h">{{ participants_form.study_enrolment_enabled.help_text }}</div>
           </div>
-
-          {# Details #}
-          <div class="flex-1 min-w-0 w-full">
-            <div class="mb-4">
-              <span class="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">{% trans "Pre-filled message" %}</span>
-              <p class="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">“{{ selfreg.message }}”</p>
-            </div>
-
-            <div class="mb-4">
-              <span class="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">{% trans "WhatsApp link" %}</span>
-              <div class="flex items-center gap-2">
-                <code id="srLink" class="flex-1 min-w-0 text-xs bg-gray-50 border border-gray-200 rounded-lg p-2 break-all select-all">{{ selfreg.url }}</code>
-                <button type="button" onclick="srCopyLink(this)" class="button-secondary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1 flex-shrink-0">
-                  <span class="material-icons-outlined text-base">link</span>{% trans "Copy" %}
-                </button>
-              </div>
-            </div>
-
-            <dl class="text-sm divide-y divide-gray-100">
-              <div class="flex justify-between py-2">
-                <dt class="text-gray-500">{% trans "Platform number" %}</dt>
-                <dd class="font-medium text-gray-800">{{ selfreg.phone }}</dd>
-              </div>
-              <div class="flex justify-between py-2">
-                <dt class="text-gray-500">{% trans "Handled by" %}</dt>
-                <dd class="font-medium text-gray-800">{{ selfreg.agent_name|default:_("— not selected —") }}</dd>
-              </div>
-            </dl>
-            <a href="{{ selfreg.url }}" target="_blank" rel="noopener"
-               class="button-secondary py-1.5 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1 mt-4">
-              <span class="material-icons-outlined text-base">open_in_new</span>{% trans "Test the link" %}
-            </a>
+          <div class="pt-switch-c">
+            {% include "settings/_field.html" with field=participants_form.study_enrolment_enabled %}
           </div>
         </div>
+
+        {% if participants.enabled %}
+        {% if not participants.any_open %}
+          <div class="mb-5 px-4 py-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 text-sm flex items-start gap-2">
+            <span class="material-icons-outlined text-base">warning</span>
+            <div>{% trans "Enrolment is on but no study is open, so the join page cannot be used. Create or open a study below." %}</div>
+          </div>
+        {% endif %}
+
+        <div class="stg-grid2">
+          {% include "settings/_field.html" with field=participants_form.enrolment_auto_approve %}
+          {% include "settings/_field.html" with field=participants_form.enrolment_require_dob %}
+          {% include "settings/_field.html" with field=participants_form.enrolment_code_words %}
+          {% include "settings/_field.html" with field=participants_form.enrolment_code_attempt_limit %}
+        </div>
+        {% include "settings/_field.html" with field=participants_form.enrolment_landing_text %}
+        {% else %}
+          {% comment %}config_save binds the whole form, so the options travel
+            along unseen: switching enrolment on or off must not reset them.{% endcomment %}
+          {{ participants_form.enrolment_auto_approve.as_hidden }}
+          {{ participants_form.enrolment_require_dob.as_hidden }}
+          {{ participants_form.enrolment_code_words.as_hidden }}
+          {{ participants_form.enrolment_code_attempt_limit.as_hidden }}
+          {{ participants_form.enrolment_landing_text.as_hidden }}
+        {% endif %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+
+      {% if participants.enabled %}
+      {# ── the join page ── #}
+      <div class="pt-join">
+        <div class="pt-join-main">
+          <div class="stg-group-title" style="margin-bottom:0">{% trans "Join page" %}</div>
+          <p class="text-sm text-gray-500">{% trans "Give participants this link, or print the code." %}</p>
+          <div class="pt-join-row">
+            <input type="text" readonly value="{{ participants.join_url }}" id="joinUrlField">
+            <button type="button" class="pt-copy" id="joinCopyBtn"
+                    title="{% trans 'Copy the link' %}" aria-label="{% trans 'Copy the link' %}">
+              <span class="material-icons-outlined text-sm">content_copy</span>
+            </button>
+          </div>
+          <div class="pt-stats">
+            <div class="pt-stat">
+              <b>{{ participants.total_enrolments }}</b>
+              <span>{% trans "participants enrolled" %}</span>
+            </div>
+            <div class="pt-stat">
+              <b>{{ participants.total_consents }}</b>
+              <span>{% trans "consent records" %}</span>
+            </div>
+            {% if not participants.auto_approve %}
+              <div class="pt-stat">
+                <b>{{ participants.awaiting_approval }}</b>
+                <span>{% trans "awaiting admission" %}</span>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        {% if participants.join_qr_svg %}
+          <div class="pt-qr">
+            <div class="pt-qr-img">{{ participants.join_qr_svg|safe }}</div>
+            <div class="pt-qr-cap">{% trans "Scan to join" %}</div>
+          </div>
+        {% endif %}
+      </div>
+
+      {# ── the caveats: still here, no longer in the way ── #}
+      <details class="pt-caveat">
+        <summary>
+          <span class="material-icons-outlined">chevron_right</span>
+          {% trans "What this does not cover" %}
+        </summary>
+        <ul>
+          <li>{% trans "It records that somebody agreed. It is not a qualified e-consent system — there is no signature, no witness step and no sponsor approval built in." %}</li>
+          <li>{% trans "Withdrawing a participant stops the platform contacting them and switches their agent off. It does not erase the conversations they already had." %}</li>
+          <li>{% trans "An access code is a single credential in plain text. Its protection is the attempt limit above, not secrecy." %}</li>
+          <li>{% trans "Nobody is randomised to a study arm. Whoever enrols the participant chooses it." %}</li>
+        </ul>
+      </details>
+      {% endif %}
+    </div>
+
+    {% if participants.enabled %}
+
+    {# ── Studies ─────────────────────────────────────────────── #}
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-4">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">science</span>
+        <div class="flex-1">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-lg font-semibold text-gray-800">{% trans "Studies" %}</h2>
+            <form method="post" action="{% url 'study_create' %}">
+              {% csrf_token %}
+              <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+                <span class="material-icons-outlined text-sm">add</span>{% trans "New study" %}
+              </button>
+            </form>
+          </div>
+          <p class="text-sm text-gray-500">{% trans "Each study owns its consent wording, its information sheet and the agent its participants talk to. Consent wording stays editable until somebody consents to it, after which raising the version starts a new one." %}</p>
+        </div>
+      </div>
+
+      {% if participants.studies %}
+        <div class="overflow-x-auto">
+          <table class="pt-sttbl">
+            <thead>
+              <tr>
+                <th>{% trans "Study" %}</th>
+                <th>{% trans "Consent" %}</th>
+                <th>{% trans "Participants" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in participants.studies %}
+                <tr>
+                  <td>
+                    <div class="pt-st-nm">{{ s.obj.display_name }}</div>
+                    <div class="pt-st-slug">{{ s.obj.slug }}</div>
+                    {% if not s.obj.default_agent_id %}
+                      <div class="pt-stale">{% trans "No agent set — its participants will get no replies" %}</div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
+                      <span>v{{ s.obj.consent_version }}</span>
+                      <span style="color:var(--text-muted)">&middot; {{ s.items|length }} {% trans "items" %}</span>
+                      {% if s.consent_locked %}
+                        <span class="pt-tag pt-tag--lock">
+                          <span class="material-icons-outlined">lock</span>{% trans "signed" %}
+                        </span>
+                      {% endif %}
+                    </div>
+                    {% if s.stale %}
+                      <div class="pt-stale">
+                        {% blocktrans count n=s.stale %}{{ n }} on an older version{% plural %}{{ n }} on an older version{% endblocktrans %}
+                      </div>
+                    {% endif %}
+                  </td>
+                  <td>{{ s.total }}</td>
+                  <td>
+                    {% if s.obj.is_open %}
+                      <span class="pt-tag pt-tag--open">{% trans "Open" %}</span>
+                    {% else %}
+                      <span class="pt-tag pt-tag--shut">{% trans "Closed" %}</span>
+                    {% endif %}
+                  </td>
+                  <td style="text-align:right;padding-right:0">
+                    <a href="{% url 'study_editor' s.obj.pk %}" class="pt-edit">{% trans "Edit" %}</a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       {% else %}
-        <div class="px-4 py-3 rounded-lg bg-red-50 border border-red-300 text-red-800 text-sm flex items-start gap-2">
-          <span class="material-icons-outlined text-base">error_outline</span>
+        <p class="text-sm text-gray-500">{% trans "No studies yet. Create one to start enrolling participants." %}</p>
+      {% endif %}
+    </div>
+
+    <script>
+      (function () {
+        var btn = document.getElementById('joinCopyBtn');
+        var field = document.getElementById('joinUrlField');
+        if (!btn || !field) { return; }
+        btn.addEventListener('click', function () {
+          var done = function () {
+            btn.classList.add('is-done');
+            setTimeout(function () { btn.classList.remove('is-done'); }, 1200);
+          };
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(field.value).then(done, function () {});
+          } else {
+            field.select();
+            try { document.execCommand('copy'); done(); } catch (e) {}
+          }
+        });
+      }());
+    </script>
+    {% endif %}
+  </section>
+
+  {# ═════════ Privacy ═════════ #}
+  <section class="settings-panel hidden" data-tab="privacy">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">lock</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Conversation privacy" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Whether a client can ask that one conversation not be readable by their link worker. Their link worker still sees that the conversation happened, when it was, how many messages it held and its summary — what is withheld is the messages themselves, the topic and the review." %}</p>
+        </div>
+      </div>
+
+      <div class="px-4 py-3 mb-5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm">
+        <p class="font-medium mb-1">{% trans "What this does not cover" %}</p>
+        <ul class="list-disc pl-5 space-y-1 text-gray-600">
+          <li>{% trans "Administrators read every conversation, hidden or not." %}</li>
+          <li>{% trans "A conversation that raised a self-harm alert stays readable by the link worker. The alert has to be actionable, so this one is not something a client can switch off." %}</li>
+          <li>{% trans "Conversations are still classified and can still raise alerts. An alert raised from a hidden conversation names its detector and priority, but not the sentence that triggered it or the alert's own generated overview." %}</li>
+          <li>{% trans "It applies to one conversation at a time, not to the client. The next conversation starts readable." %}</li>
+        </ul>
+      </div>
+
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="privacy">
+        {% include "settings/_field.html" with field=privacy_form.conversation_privacy_enabled %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+
+      {% if hidden_conversation_count %}
+        {% comment %}
+          Shown whether the switch is on or off, and deliberately so: turning
+          the feature off does not un-hide anything that is already hidden, and
+          a page that went quiet about those conversations would be telling an
+          admin they had taken something back that they had not.
+        {% endcomment %}
+        <div class="px-4 py-3 mt-5 rounded-lg bg-sky-50 border border-sky-100 text-sky-900 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">info</span>
           <div>
-            {% blocktrans %}No <b>platform phone number</b> is configured, so a WhatsApp link can't be built. Add it under{% endblocktrans %}
-            <button type="button" class="underline font-medium" data-goto-tab="integrations">{% trans "Integrations" %}</button>.
+            {% blocktrans count n=hidden_conversation_count %}{{ n }} conversation is currently hidden at a client's request.{% plural %}{{ n }} conversations are currently hidden at clients' requests.{% endblocktrans %}
+            {% if not conversation_privacy_enabled %}
+              {% trans "They stay hidden while the switch is off — turning the feature off stops new requests, it does not withdraw the ones already made." %}
+            {% endif %}
           </div>
         </div>
       {% endif %}
     </div>
   </section>
 
+  {# ═════════ Export ═════════ #}
+  <section class="settings-panel hidden" data-tab="export">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">download</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Message export" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Download stored messages as a CSV file, one row per message, for analysis outside the platform. Clients and users appear by internal id only — no names, phone numbers or email addresses — but message text is exported exactly as it was written." %}</p>
+        </div>
+      </div>
+
+      {% if not export_enabled and not conversation_download_enabled %}
+        <div class="px-4 py-3 mb-5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">toggle_off</span>
+          <div>{% trans "Both are off. While they are off, nobody can download messages." %}</div>
+        </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="export">
+        {% include "settings/_field.html" with field=export_form.message_export_enabled %}
+        {% include "settings/_field.html" with field=export_form.conversation_download_enabled %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+
+      {% if conversation_download_enabled %}
+        <p class="text-sm text-gray-500 mt-5">{% trans "Conversation downloads are on. Each conversation in a chat's Conversation tab has a download button beside its start and end time. Navigators see it on their own clients only; admins on every client. The file has the same columns as the full message export." %}</p>
+      {% endif %}
+    </div>
+
+    {% if export_enabled %}
+    <div class="card p-6 mt-6">
+      <h3 class="font-semibold text-gray-800 mb-2">{% trans "Download messages" %}</h3>
+      <p class="text-sm text-gray-500 mb-4">{% blocktrans with tz=boot_info.timezone %}Leave both dates empty to export everything. Both days are included, and days follow the platform timezone ({{ tz }}).{% endblocktrans %}</p>
+      <form method="get" action="{% url 'export_messages' %}" class="flex flex-wrap items-end gap-4">
+        <label class="text-sm">
+          <span class="block text-gray-600 mb-1">{% trans "From" %}</span>
+          <input type="date" name="from" class="form-control">
+        </label>
+        <label class="text-sm">
+          <span class="block text-gray-600 mb-1">{% trans "To" %}</span>
+          <input type="date" name="to" class="form-control">
+        </label>
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm inline-flex items-center gap-1">
+          <span class="material-icons-outlined text-base">download</span>{% trans "Download CSV" %}
+        </button>
+      </form>
+
+      <details class="mt-6 text-sm">
+        <summary class="cursor-pointer font-medium text-gray-700">{% trans "What is in the file" %}</summary>
+        <p class="text-gray-500 mt-2 mb-3">{% trans "Each stored exchange — a client's message and the agent's reply — becomes two rows that share a message_id. Messages the platform sent on its own (reminders, alert messages, care plans) have only the platform's row." %}</p>
+        <dl class="divide-y divide-gray-100">
+          {% for name, note in export_columns %}
+            <div class="py-2 grid grid-cols-1 md:grid-cols-4 gap-1">
+              <dt><code class="text-xs">{{ name }}</code></dt>
+              <dd class="md:col-span-3 text-gray-600">{{ note }}</dd>
+            </div>
+          {% endfor %}
+        </dl>
+      </details>
+    </div>
+    {% endif %}
+  </section>
+
   {# ═════════ Maintenance ═════════ #}
+  {% comment %}
+    Tabs from optional apps (online meetings, …). Each panel is the app's own
+    template; the core only places it. See ConvAI/extensions.py.
+  {% endcomment %}
+  {% for ext in extension_panels %}
+    <section class="settings-panel hidden" data-tab="{{ ext.id }}">
+      {% include ext.template with ctx=ext.ctx %}
+    </section>
+  {% endfor %}
+
   <section class="settings-panel hidden" data-tab="maintenance">
     <div class="card p-6 mb-6">
       <div class="flex items-start gap-3">
@@ -650,7 +1279,9 @@ print(result)</code></pre>
 {{ block.super }}
 <script>
   (function () {
-    const validTabs = ['general','integrations','messaging','branding','agents','prompts','protocols','registrations','selfreg','api','maintenance'];
+    // Keep in step with the `tabs` list in views/settings_views.py: a tab
+    // missing here is a sidebar entry that silently falls back to General.
+    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','participants','api','privacy','export','maintenance'{% for ext in extension_panels %},'{{ ext.id|escapejs }}'{% endfor %}];
     const buttons = document.querySelectorAll('.stg-navitem');
     const panels  = document.querySelectorAll('.settings-panel');
 
@@ -680,16 +1311,16 @@ print(result)</code></pre>
     icon.textContent = 'check';
     setTimeout(() => { icon.textContent = prev; }, 1500);
   }
-  function srCopyLink(btn) {
-    const link = document.getElementById('srLink');
+  function srCopyLink(btn, ch) {
+    const link = document.getElementById('srLink-' + ch);
     const text = link ? link.textContent.trim() : '';
     if (!text) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(() => srFlash(btn), () => {});
     }
   }
-  function srRasterize(cb, size) {
-    const svg = document.getElementById('srQrSvg');
+  function srRasterize(ch, cb, size) {
+    const svg = document.getElementById(ch === 'sms' ? 'srQrSvgSms' : 'srQrSvgWhatsapp');
     if (!svg) return;
     const xml = new XMLSerializer().serializeToString(svg);
     const src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
@@ -705,25 +1336,25 @@ print(result)</code></pre>
     };
     img.src = src;
   }
-  function srDownloadPng() {
-    srRasterize(function (blob) {
+  function srDownloadPng(ch, filename) {
+    srRasterize(ch, function (blob) {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'whatsapp-registration-qr.png';
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
     }, 1024);
   }
-  function srCopyImage() {
+  function srCopyImage(ch) {
     if (!(navigator.clipboard && window.ClipboardItem)) {
       alert('{% trans "This browser cannot copy images. Use Download instead." %}');
       return;
     }
-    srRasterize(function (blob) {
+    srRasterize(ch, function (blob) {
       if (!blob) return;
       navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).catch(function () {
         alert('{% trans "Could not copy the image. Use Download instead." %}');
@@ -733,6 +1364,10 @@ print(result)</code></pre>
 
   document.getElementById('actionForm')?.addEventListener('submit', function(){
     const btn=document.getElementById('submitBtn'); const sp=document.getElementById('btnSpinner');
+    btn.disabled=true; sp.classList.remove('hidden');
+  });
+  document.getElementById('testEmailForm')?.addEventListener('submit', function(){
+    const btn=document.getElementById('testEmailBtn'); const sp=document.getElementById('testEmailSpinner');
     btn.disabled=true; sp.classList.remove('hidden');
   });
   document.getElementById('classifyForm')?.addEventListener('submit', function(){

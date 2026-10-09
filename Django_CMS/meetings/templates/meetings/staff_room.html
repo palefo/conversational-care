@@ -1,0 +1,225 @@
+{% load static i18n custom_filters %}<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>{% blocktrans with p=patient.name %}Online meeting · {{ p }}{% endblocktrans %} · {% brand_name %}</title>
+  <link rel="preload" href="{% static 'app/fonts/dm-sans-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{% static 'app/fonts/material-icons-outlined.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{% static 'meetings/room.css' %}">
+</head>
+<body data-audience="staff">
+{% comment %}
+  The navigator's meeting window. Opened as its own window from the meeting's
+  panel, because a WebRTC call cannot survive the main app navigating — this
+  way the app stays usable alongside the call. Everything the page knows comes
+  from `boot` (below) and the JSON endpoints; nothing about the call is decided
+  here.
+{% endcomment %}
+<div class="rm" id="rm" aria-live="polite">
+  <header class="rm-top">
+    <div class="rm-brand">
+      <img class="rm-logo" src="{% brand_logo_url %}" alt="{% brand_name %}">
+      <div class="rm-title">
+        <b>{% blocktrans with p=patient.name l=patient.lastname %}Online meeting with {{ p }} {{ l }}{% endblocktrans %}</b>
+        <span>{% if invite %}{% blocktrans with n=invite.display_name %}Joining by link: {{ n }}{% endblocktrans %} · {% endif %}{{ meeting.scheduled_time|date:"D j M, H:i" }}</span>
+      </div>
+    </div>
+    <div class="rm-spacer"></div>
+    <span class="rm-chip rm-rec" id="rmRec" hidden data-state="starting" title="{% trans 'Audio only — video is never recorded' %}">{% trans "Recording" %}</span>
+    <span class="rm-chip rm-hide-sm"><span class="mi">schedule</span><span class="rm-clock" id="rmClock">0:00</span></span>
+    <span class="rm-chip rm-hide-sm" title="{% trans 'Connection quality' %}"><span class="rm-quality" id="rmQuality" data-q="unknown"><i></i><i></i><i></i></span></span>
+    <button type="button" class="rm-btn rm-btn-icon" id="rmRailToggle" aria-pressed="true" aria-controls="rmRail">
+      <span class="mi">view_sidebar</span><span class="rm-tip">{% trans "People and interview" %}</span>
+    </button>
+  </header>
+
+  <div class="rm-body">
+    <main class="rm-main">
+      <div class="rm-banner" id="rmBanner" role="status" hidden><span class="rm-spin"></span><span id="rmBannerText"></span></div>
+      <div class="rm-stage" id="rmStage" aria-label="{% trans 'Participants' %}"></div>
+
+      <div class="rm-dock" id="rmDock" role="toolbar" aria-label="{% trans 'Meeting controls' %}">
+        <button type="button" class="rm-btn rm-btn-icon" id="rmMic" aria-pressed="true">
+          <span class="mi">mic</span><span class="rm-tip" data-on="{% trans 'Mute (M)' %}" data-off="{% trans 'Unmute (M)' %}">{% trans "Mute (M)" %}</span>
+        </button>
+        <button type="button" class="rm-btn rm-btn-icon is-off" id="rmCam" aria-pressed="false">
+          <span class="mi">videocam_off</span><span class="rm-tip" data-on="{% trans 'Turn camera off (V)' %}" data-off="{% trans 'Turn camera on (V)' %}">{% trans "Turn camera on (V)" %}</span>
+        </button>
+        <div style="position:relative">
+          <button type="button" class="rm-btn rm-btn-icon" id="rmDevBtn" aria-haspopup="menu" aria-expanded="false">
+            <span class="mi">tune</span><span class="rm-tip">{% trans "Microphone, camera and speaker" %}</span>
+          </button>
+          <div class="rm-menu" id="rmDevMenu" role="menu" hidden></div>
+        </div>
+        <span class="rm-dock-sep" aria-hidden="true"></span>
+        <button type="button" class="rm-btn rm-btn-ai" id="rmAsk" hidden>
+          <span class="mi">graphic_eq</span><span class="rm-lbl" id="rmAskLbl">{% trans "Ask the assistant" %}</span>
+          <span class="rm-tip" id="rmAskTip">{% trans "Hold to talk to the assistant — everyone hears the answer" %}</span>
+        </button>
+        <span class="rm-dock-sep" aria-hidden="true" id="rmAskSep" hidden></span>
+        <div class="rm-split" style="position:relative">
+          <button type="button" class="rm-btn rm-btn-danger" id="rmLeave">
+            <span class="mi">call_end</span><span class="rm-lbl">{% trans "End" %}</span>
+          </button>
+          <button type="button" class="rm-btn rm-btn-danger" id="rmLeaveMore" aria-haspopup="menu" aria-expanded="false" aria-label="{% trans 'More ways to leave' %}">
+            <span class="mi" style="font-size:18px">expand_less</span>
+          </button>
+          <div class="rm-menu" id="rmLeaveMenu" role="menu" hidden style="left:auto;right:0;transform:none">
+            <button type="button" class="rm-opt is-danger" data-act="end"><span class="mi">call_end</span>{% trans "End the meeting for everyone" %}</button>
+            <button type="button" class="rm-opt" data-act="leave"><span class="mi">logout</span>{% trans "Leave, and keep the meeting open" %}</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="rm-rail" id="rmRail" aria-label="{% trans 'Meeting side panel' %}">
+      <div class="rm-tabs" role="tablist">
+        <button type="button" class="rm-tab is-on" role="tab" data-tab="people" aria-selected="true">
+          <span class="mi">group</span>{% trans "People" %}<span class="rm-count" id="rmKnockCount" hidden>0</span>
+        </button>
+        <button type="button" class="rm-tab" role="tab" data-tab="interview" aria-selected="false">
+          <span class="mi">fact_check</span>{% trans "Interview" %}
+        </button>
+      </div>
+
+      <section class="rm-pane" data-pane="people">
+        <div class="rm-sect" id="rmLobbySect">
+          <h3>{% trans "Waiting to join" %}
+            <label style="display:inline-flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-weight:500;font-size:12px;color:var(--ink-3)">
+              <input type="checkbox" id="rmAutoAdmit"> {% trans "Admit automatically" %}
+            </label>
+          </h3>
+          <div id="rmLobby"><div class="rm-empty">{% trans "Nobody is waiting. When someone opens their link, they appear here for you to let in." %}</div></div>
+        </div>
+        <div class="rm-sect">
+          <h3>{% trans "In the meeting" %}</h3>
+          <div id="rmPeople"></div>
+        </div>
+        <div class="rm-sect">
+          <h3>{% trans "Their link" %}</h3>
+          <div class="rm-link">
+            <code id="rmLinkUrl">{{ join_url|default:_("No link yet") }}</code>
+            <button type="button" class="rm-sbtn" id="rmCopy"><span class="mi" style="font-size:16px">content_copy</span>{% trans "Copy" %}</button>
+          </div>
+          <div class="rm-row">
+            <button type="button" class="rm-sbtn" data-send="email"><span class="mi" style="font-size:16px">mail</span>{% trans "Email" %}</button>
+            <button type="button" class="rm-sbtn" data-send="sms"><span class="mi" style="font-size:16px">sms</span>{% trans "SMS" %}</button>
+            <button type="button" class="rm-sbtn" data-send="whatsapp"><span class="mi" style="font-size:16px">chat</span>{% trans "WhatsApp" %}</button>
+            <button type="button" class="rm-sbtn rm-sbtn-ghost" id="rmRotate" title="{% trans 'Make a new link; the old one stops working' %}"><span class="mi" style="font-size:16px">autorenew</span>{% trans "New link" %}</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="rm-pane" data-pane="interview" hidden>
+        <div id="rmIvIdle">
+          <div class="rm-iv-head">
+            <b>{% trans "Voice interviewer" %}</b>
+            <span>{% trans "An AI interviewer asks the questions of a protocol out loud, one at a time, and writes the answers in as they are given. You stay in the meeting and can pause or take over at any moment." %}</span>
+          </div>
+          <label class="rm-field"><span>{% trans "Questions" %}</span>
+            <select class="rm-select" id="rmIvProtocol"></select>
+          </label>
+          <label class="rm-field"><span>{% trans "Ask" %}</span>
+            <select class="rm-select" id="rmIvWho"></select>
+          </label>
+          <button type="button" class="rm-sbtn rm-sbtn-ai" id="rmIvStart" style="width:100%;justify-content:center;height:40px">
+            <span class="mi" style="font-size:18px">record_voice_over</span>{% trans "Start the interview" %}
+          </button>
+          <p class="rm-empty" id="rmIvNote" style="margin-top:12px" hidden></p>
+        </div>
+        <div id="rmIvLive" hidden>
+          <div class="rm-iv-head">
+            <b id="rmIvTitle"></b>
+            <span id="rmIvSub"></span>
+            <div class="rm-progress"><i id="rmIvBar"></i></div>
+            <span id="rmIvCount" style="font-size:12px;color:var(--ink-3)"></span>
+            <div class="rm-row">
+              <button type="button" class="rm-sbtn" id="rmIvPause"><span class="mi" style="font-size:16px">pause</span><span>{% trans "Pause" %}</span></button>
+              <button type="button" class="rm-sbtn" id="rmIvSayBtn"><span class="mi" style="font-size:16px">edit_note</span>{% trans "Tell it…" %}</button>
+              <button type="button" class="rm-sbtn rm-sbtn-danger" id="rmIvStop"><span class="mi" style="font-size:16px">stop_circle</span>{% trans "Stop" %}</button>
+            </div>
+            <div id="rmIvSayBox" hidden style="margin-top:10px">
+              <textarea class="rm-textarea" id="rmIvSay" placeholder="{% trans 'e.g. “Skip the medication questions, we covered them earlier.”' %}"></textarea>
+              <div class="rm-row"><button type="button" class="rm-sbtn rm-sbtn-pri" id="rmIvSaySend">{% trans "Send to the interviewer" %}</button></div>
+            </div>
+          </div>
+          <div id="rmIvQs"></div>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+{# Pre-join: check devices before anyone can see or hear you. #}
+<div class="rm-overlay" id="rmPrejoin">
+  <div class="rm-prejoin">
+    <div>
+      <div class="rm-preview" id="rmPreview">
+        <video id="rmPreviewVideo" autoplay muted playsinline hidden></video>
+        <div class="rm-avatar" id="rmPreviewAvatar" style="--hue:200"></div>
+        <div class="rm-preview-bar">
+          <button type="button" class="rm-btn rm-btn-icon" id="rmPreMic" aria-pressed="true"><span class="mi">mic</span><span class="rm-tip">{% trans "Microphone" %}</span></button>
+          <button type="button" class="rm-btn rm-btn-icon is-off" id="rmPreCam" aria-pressed="false"><span class="mi">videocam_off</span><span class="rm-tip">{% trans "Camera" %}</span></button>
+        </div>
+      </div>
+      <div class="rm-meter" style="margin-top:14px" aria-hidden="true"><i id="rmPreMeter"></i></div>
+    </div>
+    <div>
+      <h1>{% trans "Ready to join?" %}</h1>
+      <p class="rm-sub" id="rmPreSub">{% trans "Check your microphone is picking you up — the bar moves when you speak. The camera is off until you turn it on." %}</p>
+      <dl class="rm-kv">
+        <dt>{% trans "Client" %}</dt><dd>{{ patient.name }} {{ patient.lastname }}</dd>
+        <dt>{% trans "With" %}</dt><dd>{% if invite %}{{ invite.display_name }} ({{ invite.get_invitee_display|lower }}){% else %}{% trans "No link sent yet" %}{% endif %}</dd>
+        <dt>{% trans "Recording" %}</dt><dd id="rmPreRec">{% trans "Audio only, if on for this installation" %}</dd>
+      </dl>
+      <label class="rm-field"><span>{% trans "Microphone" %}</span><select class="rm-select" id="rmPreMicSel"></select></label>
+      <div class="rm-row" style="margin-top:18px">
+        <button type="button" class="rm-btn rm-btn-accent rm-big" id="rmJoin"><span class="mi">login</span>{% trans "Join now" %}</button>
+      </div>
+      <p class="rm-empty" id="rmPreErr" style="margin-top:14px" hidden></p>
+    </div>
+  </div>
+</div>
+
+{# After ending: record how it went, in the same words as the panel. #}
+<div class="rm-overlay" id="rmOutcome" hidden>
+  <div class="rm-card">
+    <h2>{% trans "How did the meeting go?" %}</h2>
+    <p>{% trans "This is recorded against the meeting, just as for a call. The recording and transcript appear in the meeting's panel once they are ready." %}</p>
+    <div class="rm-outcomes" id="rmOutcomes"></div>
+    <div class="rm-row"><button type="button" class="rm-sbtn rm-sbtn-ghost" id="rmOutcomeSkip">{% trans "Decide later" %}</button></div>
+  </div>
+</div>
+
+{# Left (or was removed) without ending. #}
+<div class="rm-overlay" id="rmLeft" hidden>
+  <div class="rm-card">
+    <h2 id="rmLeftTitle">{% trans "You left the meeting" %}</h2>
+    <p id="rmLeftText">{% trans "The meeting is still open for the others. You can rejoin from here or from the meeting's panel." %}</p>
+    <div class="rm-row">
+      <button type="button" class="rm-btn rm-btn-accent" id="rmRejoin"><span class="mi">login</span>{% trans "Rejoin" %}</button>
+      <button type="button" class="rm-btn" id="rmClose"><span class="mi">close</span>{% trans "Close this window" %}</button>
+    </div>
+  </div>
+</div>
+
+<div class="rm-overlay" id="rmAudio" hidden>
+  <div class="rm-card" style="text-align:center">
+    <h2>{% trans "Turn on sound" %}</h2>
+    <p>{% trans "Your browser needs a click before it plays the others' audio." %}</p>
+    <button type="button" class="rm-btn rm-btn-accent rm-big" id="rmAudioBtn"><span class="mi">volume_up</span>{% trans "Turn on sound" %}</button>
+  </div>
+</div>
+
+<div class="rm-toasts" id="rmToasts" aria-live="polite"></div>
+
+{{ boot|json_script:"rm-boot" }}
+{{ i18n|json_script:"rm-i18n" }}
+<script>window.CC_CSRF = "{{ csrf_token }}";</script>
+<script src="{% static 'meetings/vendor/livekit-client.umd.js' %}"></script>
+<script src="{% static 'meetings/room-core.js' %}"></script>
+<script src="{% static 'meetings/staff-room.js' %}"></script>
+</body>
+</html>

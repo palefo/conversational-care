@@ -159,3 +159,41 @@ input:focus {
   outline: none;
   box-shadow: 0 0 0 3px var(--app-primary-color-200, #9cc5cc);
 }
+
+/* Signed-out pages other than the login form: the four password-reset steps
+   plus the "Forgot your password?" link that starts them. */
+.auth-note {
+  margin: 0;
+  color: var(--app-neutral-600, #5b5c5c);
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  line-height: 21px;
+  font-weight: 400;
+  text-align: center;
+}
+.auth-link {
+  color: var(--app-primary-color-500, #006877);
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-align: center;
+  text-decoration: none;
+}
+.auth-link:hover { text-decoration: underline; }
+/* Sits under the password field rather than in the gap between fields, so it
+   reads as belonging to it. */
+.field-hint {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -8px;
+}
+.field-error {
+  margin: 0;
+  color: var(--app-red-500, #ba1a1a);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+}

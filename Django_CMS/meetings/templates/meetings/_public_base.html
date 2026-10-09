@@ -1,0 +1,38 @@
+{% load static i18n custom_filters %}<!DOCTYPE html>
+<html lang="{{ lang|default:LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#006877">
+  <title>{% block title %}{% trans "Online meeting" %}{% endblock %} · {{ brand }}</title>
+  <link rel="preload" href="{% static 'app/fonts/dm-sans-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{% static 'app/fonts/material-icons-outlined.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{% static 'meetings/room.css' %}">
+</head>
+<body data-audience="client">
+{% comment %}
+  The client-facing shell: nobody here is signed in, and most people arrive on
+  a phone from a text message. Light and plain before the meeting (like the
+  login and enrolment pages they may know), the dark stage once they are in.
+{% endcomment %}
+<div class="lb" id="lb">
+  <header class="lb-top">
+    <img src="{% brand_logo_url %}" alt="{{ brand }}">
+    {% block lang %}
+    <form class="lb-lang" method="get">
+      <label class="sr-only" for="lbLang">{% trans "Language" %}</label>
+      <select id="lbLang" name="lang" onchange="this.form.submit()">
+        {% for code, name in languages %}<option value="{{ code }}"{% if code == lang %} selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select>
+    </form>
+    {% endblock %}
+  </header>
+  <main class="lb-main">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="lb-foot">{% blocktrans %}A private meeting with your care team, provided by {{ brand }}.{% endblocktrans %}</footer>
+</div>
+{% block after %}{% endblock %}
+</body>
+</html>

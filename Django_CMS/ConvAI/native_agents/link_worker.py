@@ -123,8 +123,8 @@ def _search_patients(user, q: str = "") -> str:
 
 
 def _schedule_meeting(user, patient_id: int, scheduled_dt: datetime,
-                      type: int | None, scheduled_protocol: int | None) -> str:
-    from ..models import Patient, Meeting
+                      type: int | None, protocol_numbers: list[int] | None) -> str:
+    from ..models import Patient, Meeting, Protocol
     from ..roles import is_admin
     from django.utils import timezone
 
@@ -153,18 +153,30 @@ def _schedule_meeting(user, patient_id: int, scheduled_dt: datetime,
     meeting = Meeting(patient=patient, scheduled_time=scheduled_dt)
     if type is not None:
         meeting.type = type
-    if scheduled_protocol is not None:
-        meeting.scheduled_protocol = scheduled_protocol
     meeting.save()
 
-    return (
-        "MEETING_OK\n"
-        f"id={meeting.id}\n"
-        f"time={timezone.localtime(meeting.scheduled_time):%Y-%m-%d %H:%M}\n"
-        f"patient={patient.name} {patient.lastname}\n"
-        f"type={meeting.get_type_display()}\n"
-        f"protocol={meeting.get_scheduled_protocol_display() or '—'}"
-    )
+    # Only protocols that exist. The tool used to take a bare integer against a
+    # hard-coded list of ten, so the agent could book a call against a protocol
+    # nobody had created — and the call would then open on a panel with nothing
+    # in it. Anything unrecognised is reported back rather than stored.
+    booked, unknown = [], []
+    for n in (protocol_numbers or []):
+        protocol = Protocol.objects.filter(number=n).first()
+        (booked if protocol else unknown).append(protocol or n)
+    if booked:
+        meeting.scheduled_protocols.set(booked)
+
+    lines = [
+        "MEETING_OK",
+        f"id={meeting.id}",
+        f"time={timezone.localtime(meeting.scheduled_time):%Y-%m-%d %H:%M}",
+        f"patient={patient.name} {patient.lastname}",
+        f"type={meeting.get_type_display()}",
+        "protocols=" + (", ".join(f"{p.number}. {p.title}" for p in booked) or "—"),
+    ]
+    if unknown:
+        lines.append("ignored_unknown_protocols=" + ", ".join(str(n) for n in unknown))
+    return "\n".join(lines)
 
 
 @register("link_worker")
@@ -221,11 +233,15 @@ def build(checkpointer, model_name=None):
         patient_id: int = Field(..., description="The selected client's ID.")
         when: str = Field(..., description="Date/time string. ISO 8601 preferred; natural text accepted.")
         type: int | None = Field(None, description="Meeting type (0 Onboarding, 1 Regular [default], 2 Final, 3 Initial).")
-        scheduled_protocol: int | None = Field(None, description="Optional protocol number (1..10).")
+        scheduled_protocols: list[int] | None = Field(
+            None,
+            description=("Numbers of the protocols this call should cover. Use the numbers "
+                         "of protocols that exist in the platform; unknown ones are ignored."),
+        )
 
     @tool("schedule_meeting", args_schema=ScheduleMeetingInput)
     def schedule_meeting_tool(patient_id: int, when: str, type: int | None = None,
-                              scheduled_protocol: int | None = None) -> str:
+                              scheduled_protocols: list[int] | None = None) -> str:
         """Schedule a meeting for a client at the requested time (permissions apply)."""
         cfg = ensure_config().get("configurable", {}) or {}
         user = _authenticate_actor(cfg)
@@ -238,7 +254,7 @@ def build(checkpointer, model_name=None):
             return ("I couldn't parse that date/time. Please give a precise time, "
                     "e.g. 2026-07-15 15:30.")
         try:
-            return _schedule_meeting(user, patient_id, scheduled_dt, type, scheduled_protocol)
+            return _schedule_meeting(user, patient_id, scheduled_dt, type, scheduled_protocols)
         except Exception as e:  # pragma: no cover - defensive
             return f"Scheduling failed: {e}"
 

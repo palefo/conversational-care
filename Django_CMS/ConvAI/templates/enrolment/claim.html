@@ -1,0 +1,61 @@
+{% extends "enrolment/_base.html" %}{% load i18n %}
+{% block title %}{% trans "Enter your access code" %}{% endblock %}
+{% block subtitle %}{% trans "Enter your access code" %}{% endblock %}
+{% block steps %}
+  <div class="join-steps">
+    <span class="is-now">{% trans "Your code" %}</span>
+    <span>{% trans "Consent" %}</span>
+    <span>{% trans "Done" %}</span>
+  </div>
+{% endblock %}
+{% block content %}
+  {% if locked %}
+    <div class="join-locked">
+      {% trans "Too many incorrect attempts from this connection. Please wait an hour and try again, or contact the person who gave you your code." %}
+    </div>
+  {% endif %}
+
+  <form method="post" class="form">
+    {% csrf_token %}
+
+    <div class="field">
+      <label for="id_access_code">{% trans "Access code" %}</label>
+      <input type="text" name="access_code" id="id_access_code" required autofocus
+             class="join-code" autocomplete="off" autocapitalize="none" spellcheck="false"
+             placeholder="{% trans 'e.g. maple-crane-frost' %}"
+             {% if locked %}disabled{% endif %}>
+      <p class="field-hint">
+        {% trans "Three words with hyphens, as written on the card you were given. Capital letters and spaces are fine." %}
+      </p>
+    </div>
+
+    {% if require_dob %}
+      <div class="field">
+        <label for="id_date_of_birth">{% trans "Date of birth" %}</label>
+        <input type="date" name="date_of_birth" id="id_date_of_birth" required
+               {% if locked %}disabled{% endif %}>
+      </div>
+    {% endif %}
+
+    <div class="field">
+      <label for="id_phone_number">{% trans "Mobile number" %}</label>
+      <input type="tel" name="phone_number" id="id_phone_number"
+             autocomplete="tel" placeholder="{% trans 'e.g. +447700900000' %}"
+             {% if require_phone %}required{% endif %}
+             {% if locked %}disabled{% endif %}>
+      <p class="field-hint">
+        {% if require_phone %}
+          {% trans "Your study sends messages by text or WhatsApp, so a mobile number is needed." %}
+        {% else %}
+          {% trans "Only needed if your study contacts you by text or WhatsApp. Leave blank otherwise." %}
+        {% endif %}
+      </p>
+    </div>
+
+    <button type="submit" class="submit-button" {% if locked %}disabled{% endif %}>
+      {% trans "Continue" %}
+    </button>
+  </form>
+
+  <a class="auth-link" href="{% url 'enrolment_landing' %}">{% trans "Back" %}</a>
+{% endblock %}

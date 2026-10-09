@@ -71,7 +71,7 @@
   .pac-search-input:focus,
   .pac-filter-search:focus,
   .pac-per-page select:focus {
-    border-color: #0ea5e9;
+    border-color: var(--brand-primary);
     box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
   }
 
@@ -92,7 +92,7 @@
 
   .pac-dropdown-btn:hover,
   .pac-dropdown-btn.active {
-    border-color: #0ea5e9;
+    border-color: var(--brand-primary);
     color: #0369a1;
     background: #f0f9ff;
   }
@@ -111,7 +111,7 @@
     height: 1.1rem;
     padding: 0 0.3rem;
     border-radius: 9999px;
-    background: #0284c7;
+    background: var(--brand-secondary);
     color: #fff;
     font-size: 0.625rem;
     font-weight: 600;
@@ -269,7 +269,7 @@
   }
 
   .pac-option-row input {
-    accent-color: #0284c7;
+    accent-color: var(--brand-secondary);
   }
 
   .pac-th-inner {
@@ -329,6 +329,15 @@
 
   .pac-call-cell .material-icons-outlined {
     font-size: 1rem;
+  }
+
+  .pac-comm-kind {
+    font-size: 0.7rem;
+    color: #6b7280;
+    background: #f3f4f6;
+    border-radius: 9999px;
+    padding: 0.05rem 0.45rem;
+    margin-left: 0.15rem;
   }
 
   .pac-clickable-row {
@@ -395,9 +404,9 @@
   }
 
   .pac-page-btn.active {
-    background: #0284c7;
+    background: var(--brand-secondary);
     color: #fff;
-    border-color: #0284c7;
+    border-color: var(--brand-secondary);
   }
 
   .pac-page-btn:disabled {
@@ -436,7 +445,7 @@
   .client-modal select:focus,
   .client-modal textarea:focus {
     outline: none;
-    border-color: #0ea5e9;
+    border-color: var(--brand-primary);
     box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
   }
 </style>
@@ -450,6 +459,370 @@
     <span class="material-icons-outlined text-base">person_add</span>{% trans "Add client" %}
   </button>
 </header>
+
+{% comment %}
+  Study enrolment, where an installation runs one. It sits on the Clients page
+  rather than a page of its own because a participant *is* a client the moment
+  they consent — a second list would have shown most of the cohort twice. What
+  belongs here is only what Clients cannot show: people issued a code who have
+  not arrived yet, and the form for issuing one.
+
+  The resting state is the waiting list, not the form. Enrolling happens in
+  bursts at the start of a study; checking who has not arrived happens every
+  day. So the form is behind a button and the list is what you see.
+
+  While the feature is off `enrolment.enabled` is false and none of this renders,
+  so the page is exactly what it was before the feature existed.
+{% endcomment %}
+{% if enrolment.enabled %}
+<style>
+  /* Colours come from the design tokens in app_new_design.css, never literals —
+     the staff accent is changed in one place. Borders and radii match the
+     .pac-* controls below so the two blocks read as one page. */
+  .enr { margin-bottom: 1.5rem; }
+
+  .enr-card {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  .enr-bar {
+    display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+    padding: 0.85rem 1.1rem;
+    background: var(--brand-light);
+    border-bottom: 1px solid var(--border-color);
+  }
+  .enr-ico {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; border-radius: 0.5rem;
+    background: #fff; color: var(--brand-primary);
+    border: 1px solid var(--border-color); flex-shrink: 0;
+  }
+  .enr-ico .material-icons-outlined { font-size: 1.1rem; }
+  .enr-ttl { font-size: 0.875rem; font-weight: 600; color: var(--text-primary); line-height: 1.2; }
+  .enr-sub { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.1rem; }
+  .enr-spacer { flex: 1 1 auto; }
+
+  .enr-counts { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+  .enr-count {
+    font-size: 0.72rem; line-height: 1; padding: 0.3rem 0.55rem;
+    border-radius: 999px; background: #fff;
+    border: 1px solid var(--border-color); color: var(--text-secondary);
+    white-space: nowrap;
+  }
+  .enr-count b { color: var(--text-primary); font-weight: 600; }
+
+  .enr-add {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.45rem 0.8rem; border-radius: 0.375rem;
+    background: var(--brand-primary); color: #fff; border: 0;
+    font-size: 0.8rem; font-weight: 500; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .enr-add:hover { background: var(--brand-secondary); }
+  .enr-add .material-icons-outlined { font-size: 1rem; }
+  .enr-add[aria-expanded="true"] .enr-add-open { display: none; }
+  .enr-add:not([aria-expanded="true"]) .enr-add-close { display: none; }
+
+  /* ── the form, revealed ── */
+  .enr-form { padding: 1rem 1.1rem; border-bottom: 1px solid var(--border-color);
+              background: var(--surface-background); }
+  .enr-grid { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; }
+  .enr-f { display: flex; flex-direction: column; gap: 0.3rem; }
+  .enr-f > label {
+    font-size: 0.72rem; font-weight: 500; color: var(--text-secondary);
+    letter-spacing: 0.01em;
+  }
+  .enr-f input, .enr-f select {
+    border: 1px solid #d1d5db; border-radius: 0.375rem;
+    /* background-color, not the `background` shorthand: the Tailwind forms
+       plugin paints a <select>'s chevron as a background-image, and the
+       shorthand silently erases it. */
+    background-color: #fff;
+    color: #374151; font-size: 0.875rem; padding: 0.5rem 0.7rem; outline: none;
+    width: 100%;
+  }
+  .enr-f select { padding-right: 2.2rem; }
+  .enr-f input:focus, .enr-f select:focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 2px rgba(3, 105, 161, 0.15);
+  }
+  .enr-f input::placeholder { color: var(--text-muted); }
+  .enr-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+              font-size: 0.82rem; letter-spacing: 0.01em; }
+  .enr-gen {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2.3rem; border: 1px solid #d1d5db; border-radius: 0.375rem;
+    background: #fff; color: var(--text-secondary); cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .enr-gen:hover { border-color: var(--brand-primary); color: var(--brand-primary);
+                   background: var(--brand-light); }
+  .enr-gen .material-icons-outlined { font-size: 1rem; }
+  .enr-submit {
+    flex: 0 0 auto; align-self: flex-end;
+    padding: 0.55rem 1.1rem; border-radius: 0.375rem; border: 0;
+    background: var(--brand-primary); color: #fff;
+    font-size: 0.8rem; font-weight: 500; cursor: pointer;
+  }
+  .enr-submit:hover { background: var(--brand-secondary); }
+  .enr-hint { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.6rem; }
+
+  /* ── the waiting list ── */
+  .enr-list { padding: 0.35rem 1.1rem 0.6rem; }
+  .enr-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.6rem 0; border-bottom: 1px solid #f1f5f9;
+  }
+  .enr-row:last-child { border-bottom: 0; }
+  .enr-av {
+    width: 1.9rem; height: 1.9rem; border-radius: 999px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--brand-light); color: var(--brand-primary);
+    font-size: 0.68rem; font-weight: 600; letter-spacing: 0.02em;
+  }
+  .enr-who { min-width: 0; flex: 1 1 11rem; }
+  .enr-who { display: block; }
+  .enr-nm { display: block; font-size: 0.85rem; font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .enr-st { display: block; font-size: 0.72rem; color: var(--text-muted);
+            margin-top: 0.1rem; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; }
+  .enr-chip {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.76rem; padding: 0.25rem 0.5rem; border-radius: 0.3rem;
+    background: var(--surface-background); border: 1px solid var(--border-color);
+    color: var(--text-primary); cursor: pointer; flex-shrink: 0;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .enr-chip:hover { border-color: var(--brand-primary); background: var(--brand-light); }
+  .enr-chip .material-icons-outlined { font-size: 0.85rem; color: var(--text-muted); }
+  .enr-chip.is-copied { border-color: #16a34a; background: #f0fdf4; }
+  .enr-chip.is-copied .material-icons-outlined { color: #16a34a; }
+  .enr-pend {
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;
+    font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 999px;
+    background: #fffbeb; color: #92400e; border: 1px solid #fde68a;
+    white-space: nowrap;
+  }
+  .enr-go { font-size: 0.78rem; color: var(--brand-primary); text-decoration: none;
+            white-space: nowrap; }
+  .enr-go:hover { text-decoration: underline; }
+
+  .enr-empty {
+    padding: 1rem 1.1rem; font-size: 0.82rem; color: var(--text-secondary);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .enr-empty .material-icons-outlined { font-size: 1.05rem; color: var(--text-muted); }
+
+  .enr-foot {
+    display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+    padding: 0.6rem 1.1rem; border-top: 1px solid var(--border-color);
+    background: var(--surface-background);
+    font-size: 0.72rem; color: var(--text-muted);
+  }
+  .enr-foot a { color: var(--text-secondary); text-decoration: none; }
+  .enr-foot a:hover { text-decoration: underline; color: var(--brand-primary); }
+
+  @media (max-width: 720px) {
+    .enr-grid > * { flex: 1 1 100%; }
+    .enr-row { flex-wrap: wrap; }
+  }
+</style>
+
+<div class="enr">
+  <div class="enr-card">
+
+    <div class="enr-bar">
+      <span class="enr-ico"><span class="material-icons-outlined">how_to_reg</span></span>
+      <div>
+        <div class="enr-ttl">{% trans "Study enrolment" %}</div>
+        <div class="enr-sub">
+          {% trans "Issue an access code. They become a client here once they consent." %}
+        </div>
+      </div>
+      <span class="enr-spacer"></span>
+
+      <div class="enr-counts">
+        {% for value, label in enrolment.statuses %}
+          {% if enrolment.counts|get_item:value %}
+            <span class="enr-count"><b>{{ enrolment.counts|get_item:value }}</b> {{ label|lower }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      {% if enrolment.open_studies %}
+        <button type="button" class="enr-add" id="enrToggle" aria-expanded="false"
+                aria-controls="enrForm">
+          <span class="material-icons-outlined enr-add-open">add</span>
+          <span class="material-icons-outlined enr-add-close">close</span>
+          <span>{% trans "Enrol participant" %}</span>
+        </button>
+      {% endif %}
+    </div>
+
+    {% if enrolment.open_studies %}
+      <form method="post" action="{% url 'participant_enrol' %}" class="enr-form"
+            id="enrForm" hidden>
+        {% csrf_token %}
+        <div class="enr-grid">
+          <div class="enr-f" style="flex:1 1 9rem">
+            <label for="enrFirst">{% trans "First name" %}</label>
+            <input type="text" name="name" id="enrFirst" required>
+          </div>
+          <div class="enr-f" style="flex:1 1 9rem">
+            <label for="enrLast">{% trans "Last name" %}</label>
+            <input type="text" name="lastname" id="enrLast" required>
+          </div>
+          <div class="enr-f" style="flex:1 1 14rem">
+            <label for="enrStudy">{% trans "Study" %}</label>
+            <select name="study" id="enrStudy" required>
+              {% for s in enrolment.open_studies %}
+                <option value="{{ s.pk }}">{{ s.display_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="enr-f" style="flex:1 1 9rem">
+            <label for="enrPhone">{% trans "Mobile" %}</label>
+            <input type="tel" name="phone_number" id="enrPhone" placeholder="+44 7700 900000">
+          </div>
+          <div class="enr-f" style="flex:1 1 13rem">
+            <label for="enrCode">{% trans "Access code" %}</label>
+            <div style="display:flex;gap:.4rem">
+              <input type="text" name="access_code" id="enrCode" class="enr-mono"
+                     style="flex:1 1 auto;min-width:0"
+                     placeholder="{% trans 'generated' %}"
+                     autocomplete="off" spellcheck="false">
+              <button type="button" class="enr-gen" id="enrGen"
+                      title="{% trans 'Generate a code' %}"
+                      aria-label="{% trans 'Generate a code' %}">
+                <span class="material-icons-outlined">shuffle</span>
+              </button>
+            </div>
+          </div>
+          <button type="submit" class="enr-submit">{% trans "Enrol" %}</button>
+        </div>
+        <p class="enr-hint">
+          {% if enrolment.auto_approve %}
+            {% trans "Leave the code blank and one will be generated. They become a client automatically once they claim it and consent." %}
+          {% else %}
+            {% trans "Leave the code blank and one will be generated. Automatic admission is off, so you will admit each participant after they consent." %}
+          {% endif %}
+        </p>
+      </form>
+    {% endif %}
+
+    {% if enrolment.waiting %}
+      <div class="enr-list">
+        {% for e in enrolment.waiting %}
+          <div class="enr-row" {% if request.GET.highlight == e.pk|stringformat:"s" %}style="background:#fffbeb;margin:0 -1.1rem;padding-left:1.1rem;padding-right:1.1rem"{% endif %}>
+            <span class="enr-av">{{ e.name|slice:":1"|upper }}{{ e.lastname|slice:":1"|upper }}</span>
+            <span class="enr-who">
+              <span class="enr-nm">{{ e.name }} {{ e.lastname }}</span>
+              <span class="enr-st">
+                {{ e.study.display_name }} &middot;
+                {% blocktrans with d=e.created_at|date:"j M" %}issued {{ d }}{% endblocktrans %}
+              </span>
+            </span>
+            {% if e.status == 'consented' %}
+              <span class="enr-pend">{% trans "awaiting admission" %}</span>
+            {% endif %}
+            <button type="button" class="enr-chip" data-copy="{{ e.access_code }}"
+                    title="{% trans 'Copy this code' %}">
+              <span>{{ e.access_code }}</span>
+              <span class="material-icons-outlined">content_copy</span>
+            </button>
+            <a class="enr-go" href="{% url 'participant_detail' e.pk %}">{% trans "Open" %}</a>
+          </div>
+        {% endfor %}
+      </div>
+    {% elif enrolment.open_studies %}
+      <p class="enr-empty">
+        <span class="material-icons-outlined">check_circle</span>
+        {% trans "Nobody is waiting — everyone who has a code has used it." %}
+      </p>
+    {% else %}
+      <p class="enr-empty">
+        <span class="material-icons-outlined">info</span>
+        <span>
+          {% trans "No study is open for enrolment." %}
+          {% if enrolment.is_admin %}
+            <a href="{% url 'config' %}?tab=participants#participants"
+               style="color:var(--brand-primary)">{% trans "Open or create one in Settings" %}</a>.
+          {% else %}
+            {% trans "Ask an administrator to open one." %}
+          {% endif %}
+        </span>
+      </p>
+    {% endif %}
+
+    <div class="enr-foot">
+      <span class="material-icons-outlined" style="font-size:.9rem">link</span>
+      <span>{% trans "Join page" %}</span>
+      <a href="{{ enrolment.join_url }}" target="_blank" rel="noopener">{{ enrolment.join_url }}</a>
+      {% if enrolment.withdrawn_count %}
+        <span class="enr-spacer"></span>
+        <span>{% blocktrans count n=enrolment.withdrawn_count %}{{ n }} withdrawn{% plural %}{{ n }} withdrawn{% endblocktrans %}</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    // Reveal the form. Kept closed by default: checking who has not arrived is
+    // the daily job, enrolling is the occasional one.
+    var toggle = document.getElementById('enrToggle');
+    var form   = document.getElementById('enrForm');
+    if (toggle && form) {
+      toggle.addEventListener('click', function () {
+        var open = form.hasAttribute('hidden');
+        if (open) { form.removeAttribute('hidden'); } else { form.setAttribute('hidden', ''); }
+        toggle.setAttribute('aria-expanded', String(open));
+        if (open) { document.getElementById('enrFirst').focus(); }
+      });
+      // Somebody who just enrolled lands here with ?highlight=; the form has
+      // done its job, so it stays shut and the new row is what they see.
+    }
+
+    var gen = document.getElementById('enrGen');
+    var field = document.getElementById('enrCode');
+    if (gen && field) {
+      gen.addEventListener('click', function () {
+        gen.disabled = true;
+        fetch('{% url "participant_generate_code" %}', {credentials: 'same-origin'})
+          .then(function (r) { return r.json(); })
+          .then(function (d) { if (d.code) { field.value = d.code; } })
+          .catch(function () { /* they can type one instead */ })
+          .then(function () { gen.disabled = false; });
+      });
+    }
+
+    // Copy a code: a clinician is about to read it out or paste it into a text.
+    document.querySelectorAll('[data-copy]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var code = btn.getAttribute('data-copy');
+        var done = function () {
+          btn.classList.add('is-copied');
+          setTimeout(function () { btn.classList.remove('is-copied'); }, 1200);
+        };
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(code).then(done, function () {});
+        } else {
+          var t = document.createElement('textarea');
+          t.value = code; document.body.appendChild(t); t.select();
+          try { document.execCommand('copy'); done(); } catch (e) {}
+          document.body.removeChild(t);
+        }
+      });
+    });
+  }());
+</script>
+{% endif %}
 
 <div class="pac-toolbar">
   <div class="pac-toolbar-left flex-1">
@@ -583,9 +956,10 @@
           </div>
         </th>
 
-        <th class="px-6 py-3 pac-sortable" scope="col" id="th-last-call" onclick="pacSortTable('last_call_time')">
+        <th class="px-6 py-3 pac-sortable" scope="col" id="th-last-comm" onclick="pacSortTable('last_comm_time')"
+            title="{% trans 'The last call, meeting or chat message from the client or their caregiver' %}">
           <div class="pac-th-inner">
-            {% trans "Last call" %}
+            {% trans "Last communication" %}
             <span class="pac-sort-arrow">↕</span>
           </div>
         </th>
@@ -693,6 +1067,18 @@ function pacCallCell(value, icon, cls) {
   return `<span class="pac-call-cell ${cls}"><span class="material-icons-outlined">${icon}</span>${pacEsc(value)}</span>`;
 }
 
+// Last communication: when, and by which channel — so a client who only ever
+// uses the chatbot reads as in touch, and you can tell it was a chat.
+const PAC_COMM_ICONS = { call: 'call', visit: 'event', chat: 'forum' };
+
+function pacCommCell(row) {
+  if (!row.last_comm_time) return `<span class="text-gray-400 italic">—</span>`;
+  const icon = PAC_COMM_ICONS[row.last_comm_kind] || 'history';
+  return `<span class="pac-call-cell text-gray-600" title="${pacEsc(row.last_comm_label || '')}">` +
+         `<span class="material-icons-outlined">${icon}</span>${pacEsc(row.last_comm_time)}` +
+         `<span class="pac-comm-kind">${pacEsc(row.last_comm_label || '')}</span></span>`;
+}
+
 function pacHasNextCall(row) {
   return row.next_call_time !== null &&
     row.next_call_time !== undefined &&
@@ -761,7 +1147,7 @@ function pacRender() {
           </td>
 
           <td class="px-6 py-4 text-gray-700">
-            ${pacCallCell(r.last_call_time, 'history', 'text-gray-500')}
+            ${pacCommCell(r)}
           </td>
         </tr>
       `;
@@ -821,9 +1207,14 @@ function pacGetFiltered() {
     });
   }
 
+  // Date columns sort on their ISO twin: the shown text is day-first
+  // (01/10/2026), which neither Date() nor a string comparison orders.
+  const PAC_SORT_KEYS = { next_call_time: 'next_call_iso', last_comm_time: 'last_comm_iso' };
+
   d.sort((a, b) => {
-    let av = a[PAC_STATE.sortCol];
-    let bv = b[PAC_STATE.sortCol];
+    const key = PAC_SORT_KEYS[PAC_STATE.sortCol] || PAC_STATE.sortCol;
+    let av = a[key];
+    let bv = b[key];
 
     const aEmpty = av === null || av === undefined || String(av).trim() === '';
     const bEmpty = bv === null || bv === undefined || String(bv).trim() === '';
@@ -862,7 +1253,7 @@ function pacGetFiltered() {
       return PAC_STATE.sortDir === 'asc' ? cmp : -cmp;
     }
 
-    if (PAC_STATE.sortCol === 'last_call_time') {
+    if (PAC_STATE.sortCol === 'last_comm_time') {
       if (aEmpty && bEmpty) return 0;
       if (aEmpty) return 1;
       if (bEmpty) return -1;
@@ -982,7 +1373,7 @@ function pacUpdateSortHeaders() {
     caregiver_name: 'th-caregiver',
     ...(PAC_IS_SUPERUSER ? { navigator_name: 'th-navigator' } : {}),
     next_call_time: 'th-next-call',
-    last_call_time: 'th-last-call',
+    last_comm_time: 'th-last-comm',
   };
 
   Object.entries(cols).forEach(([col, id]) => {
@@ -1336,9 +1727,15 @@ pacRender();
           {{ client_form.lastname }}
         </div>
       </div>
-      <div class="mb-3">
-        <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.phone_number.label }}</label>
-        {{ client_form.phone_number }}
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.phone_number.label }}</label>
+          {{ client_form.phone_number }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.email.label }}</label>
+          {{ client_form.email }}
+        </div>
       </div>
       {% if client_admin %}
         <div class="mb-3">
@@ -1361,10 +1758,23 @@ pacRender();
           {{ client_form.caregiver_lastname }}
         </div>
       </div>
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.caregiver_phone.label }}</label>
-        {{ client_form.caregiver_phone }}
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.caregiver_phone.label }}</label>
+          {{ client_form.caregiver_phone }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.caregiver_email.label }}</label>
+          {{ client_form.caregiver_email }}
+        </div>
       </div>
+      {% comment %}
+        The same fieldset the edit form uses. Nothing is ticked by default —
+        which protocols this person is on is a decision about them, and an empty
+        panel asks the question where a full one answered it wrongly.
+      {% endcomment %}
+      {% with form=client_form %}{% include "patients/_protocols_field.html" %}{% endwith %}
+
       <div class="flex justify-end gap-2">
         <button type="button" onclick="clientClose()" class="button-secondary py-2 px-4 rounded-lg text-sm">{% trans "Cancel" %}</button>
         <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Create" %}</button>

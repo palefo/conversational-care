@@ -125,7 +125,11 @@ def dashboard(request):
     # Meetings this user is responsible for. Staff see every meeting, matching
     # how alerts already behave below — without this an admin who schedules a
     # call for another navigator's client never sees it again on Home.
-    user_meetings = Meeting.objects.select_related('patient', 'patient__caregiver')
+    user_meetings = (Meeting.objects
+                     .select_related('patient', 'patient__caregiver')
+                     # Every row on Home reads both, so they come along
+                     # rather than costing two queries per meeting.
+                     .prefetch_related('executed_protocols', 'scheduled_protocols'))
     if not is_admin(user):
         user_meetings = user_meetings.filter(patient__navigator=user)
 
@@ -158,6 +162,20 @@ def dashboard(request):
         "medium": alerts_qs.filter(priority=Alert.Priority.MEDIUM).count(),
         "low": alerts_qs.filter(priority=Alert.Priority.LOW).count(),
     }
+
+    # People waiting to be let in. A self-registration is not an Alert row and
+    # is not made into one: approving the person is what clears it, so it is
+    # read straight from SelfRegistration and leaves the queue the moment its
+    # state changes — nothing to resolve twice, nothing to fall out of step.
+    #
+    # Admins only, because only an admin can approve one (approve_self_registration
+    # is admin_required), and only while self-registration is switched on. With
+    # it off nobody new can sign up by message, so the box stays about alerts.
+    show_registrations = is_admin(user) and get_bool("SELF_REGISTRATION_ENABLED")
+    pending_regs = (SelfRegistration.objects.filter(state=SelfRegistration.State.REGISTERED)
+                    if show_registrations else SelfRegistration.objects.none())
+    alert_counts["registrations"] = pending_regs.count()
+    alert_counts["all"] += alert_counts["registrations"]
 
     # Find a client by name. One box beats four filter chips: priority is on
     # every row already, so narrowing by it answered a question you can see.
@@ -229,18 +247,24 @@ def dashboard(request):
                 else _("Good evening"))
     first_name = (user.get_short_name() or user.get_full_name() or user.username).split(" ")[0]
 
-    # Protocol names live on the Protocol record; Meeting.Protocol only carries
-    # placeholders like "3. Protocol 3", which is what the rows used to show.
-    proto_titles = {p.number: p.title for p in Protocol.objects.all()}
+    # How many questions each protocol carries, for the "3 of 8 recorded" line.
     proto_questions = dict(
-        Protocol.objects.annotate(n=Count("questions")).values_list("number", "n")
+        Protocol.objects.annotate(n=Count("questions")).values_list("pk", "n")
     )
 
+    def _covered(meeting):
+        """The protocols this call covered, or failing that what it is booked for."""
+        return (list(meeting.executed_protocols.all())
+                or list(meeting.scheduled_protocols.all()))
+
     def _protocol_label(meeting):
-        num = meeting.executed_protocol or meeting.scheduled_protocol
-        if num and num in proto_titles:
-            return f"{num}. {proto_titles[num]}"
-        return meeting.get_scheduled_protocol_display() or meeting.get_type_display()
+        covered = _covered(meeting)
+        if covered:
+            return ", ".join(f"{p.number}. {p.title}" for p in covered)
+        # A call with no protocol against it is ordinary — a check-in, a
+        # conversation that went elsewhere. The row says what kind of call it
+        # is rather than leaving the column blank.
+        return meeting.get_type_display()
 
     def _meeting_row(m, answered=None):
         day, hour = _when_labels(m.scheduled_time, now)
@@ -260,13 +284,16 @@ def dashboard(request):
             "status_code": m.status,
             # A call and a visit are different jobs, so the row says which —
             # same vocabulary the Communications page filters on.
-            "kind": "visit" if m.modality == Meeting.Modality.IN_PERSON else "call",
+            "kind": m.kind,
             "in_person": m.modality == Meeting.Modality.IN_PERSON,
+            "online": m.modality == Meeting.Modality.ONLINE,
             "location": m.location,
         }
         if answered is not None:
             # Whether the call produced anything is the useful half of "complete".
-            total = proto_questions.get(m.executed_protocol or m.scheduled_protocol, 0)
+            # Summed across every protocol the call covered, since it can cover
+            # more than one.
+            total = sum(proto_questions.get(p.pk, 0) for p in _covered(m))
             row["recorded"] = (
                 _("nothing recorded") if not answered
                 else _("%(a)d of %(t)d recorded") % {"a": answered, "t": total}
@@ -304,7 +331,9 @@ def dashboard(request):
         keep = {k: v for k, v in (("q", query), ("sort", sort if sort != "priority" else "")) if v}
         return {
             "id": a.id,
-            "title": a.title or "(sin título)",
+            # A classifier alert's title is the detector label, stored in
+            # English so it keeps matching itself. Read in the viewer's own.
+            "title": display_label(a.title) or "(sin título)",
             "patient": f"{a.patient.name} {a.patient.lastname}" if a.patient else "",
             "description": a.description,
             "priority": a.get_priority_display(),
@@ -348,6 +377,65 @@ def dashboard(request):
               shown_alerts_qs.select_related("patient")[:ALERTS_MAX]]
     alerts_capped = len(alerts) == ALERTS_MAX
 
+    def _registration_row(r):
+        age, exact = _humanise_age(r.created_at, now)
+        details = r.details if isinstance(r.details, dict) else {}
+        return {
+            "kind": "registration",
+            "name": f"{r.name} {r.lastname}".strip(),
+            "description": (
+                _("Signed up by message and is waiting to be approved.")
+                if details.get("source") == "self-registration-agent"
+                else _("Registered through the API and is waiting to be approved.")
+            ),
+            "age": age,
+            "age_exact": exact,
+            "created_ts": r.created_at,
+            # Approving needs an agent picked, and that form lives in Settings,
+            # so the row goes there rather than opening a panel.
+            "url": f"{reverse('config')}?tab=registrations#registrations",
+            # No panel and no SeenMark: it is "new" until someone approves it,
+            # which the row already says.
+            "panel_token": "",
+            "unread": False,
+        }
+
+    # The same people, said once at the top of the page as well. In the queue a
+    # sign-up sits behind any High alert and among the rest, which is the right
+    # place to work it but an easy one to miss: nobody else can let them in, so
+    # an admin should not have to scroll to learn they are waiting.
+    waiting = None
+    if alert_counts["registrations"]:
+        newest = list(pending_regs.order_by("-created_at")[:3])
+        age, exact = _humanise_age(newest[0].created_at, now)
+        waiting = {
+            "count": alert_counts["registrations"],
+            "names": [f"{r.name} {r.lastname}".strip() for r in newest],
+            "more": max(0, alert_counts["registrations"] - len(newest)),
+            "age": age,
+            "age_exact": exact,
+            "url": f"{reverse('config')}?tab=registrations#registrations",
+        }
+
+    registrations = pending_regs
+    if query:
+        registrations = registrations.filter(
+            Q(name__icontains=query) | Q(lastname__icontains=query))
+    registrations = [_registration_row(r)
+                     for r in registrations.order_by("-created_at")[:ALERTS_MAX]]
+
+    # Where they sit in the queue. By age, when the queue is sorted by age. By
+    # priority, after the High alerts and ahead of the rest: someone waiting to
+    # be let in is waiting on an admin and nobody else, but they are not in
+    # danger, and a sign-up must never push a crisis off the first page.
+    if sort == "priority":
+        queue = ([a for a in alerts if a["priority_level"] == Alert.Priority.HIGH]
+                 + registrations
+                 + [a for a in alerts if a["priority_level"] != Alert.Priority.HIGH])
+    else:
+        queue = sorted(alerts + registrations, key=lambda row: row["created_ts"],
+                       reverse=(sort == "newest"))
+
 
 
     ### Message trends ###
@@ -359,25 +447,11 @@ def dashboard(request):
 
     msg_qs = Message.objects.filter(timestamp__gte=start_of_day, timestamp__lt=end_of_day)
 
-    # Restrict to this CTN's patients if not staff. Match by phone (WhatsApp)
-    # OR by patient-linked Conversation (tester/voice chat store a username).
+    # Restrict to this navigator's clients if not an admin — by each message's
+    # owner, fixed when it arrived. See ConvAI.message_attribution.
     if not is_admin(request.user):
-        phones = set()
-        for p in Patient.objects.filter(navigator=user).select_related("caregiver"):
-            if p.phone_number:
-                phones.add(str(p.phone_number))
-            if p.caregiver and p.caregiver.phone_number:
-                phones.add(str(p.caregiver.phone_number))
-        conv_ids = [
-            str(cid) for cid in
-            Conversation.objects.filter(patient__navigator=user).values_list("id", flat=True)
-        ]
-        scope_q = Q(pk__in=[])
-        if phones:
-            scope_q |= Q(user__in=list(phones))
-        if conv_ids:
-            scope_q |= Q(conversation_id__in=conv_ids)
-        msg_qs = msg_qs.filter(scope_q)
+        from ..message_attribution import navigator_messages_q
+        msg_qs = msg_qs.filter(navigator_messages_q(user))
 
     total_msgs_today = msg_qs.count()
 
@@ -430,14 +504,21 @@ def dashboard(request):
         'meetings_per_page': MEETINGS_PER_PAGE,
         'mq': mq,
         'msort': msort,
-        'alerts': alerts,
+        # The alert rows with any registrations merged in. _mark_unread above
+        # still reads `alerts` alone: only an alert has a panel to have opened.
+        'alerts': queue,
         'digest': digest,
         'alerts_capped': alerts_capped,
         'alerts_per_page': ALERTS_PER_PAGE,
         'alert_counts': alert_counts,
+        'waiting_registrations': waiting,
         'high_topics': high_topics,
         'next_meeting': next_row,
         'greeting': greeting,
+        # The date under the greeting. Formatted here rather than in the
+        # template so it follows the active locale like every other date on the
+        # page, instead of an English format baked into the markup.
+        'today_label': formats.date_format(now.date(), "l, j F Y"),
         'first_name': first_name,
         'query': query,
         'sort': sort,

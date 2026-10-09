@@ -44,7 +44,7 @@ def _load_builders():
     (e.g. link_worker) must not break the registry for the others.
     """
     from importlib import import_module
-    for mod in ("loopback", "link_worker", "protocol_qa", "self_registration"):
+    for mod in ("loopback", "link_worker", "link_worker_v2", "protocol_qa", "self_registration"):
         try:
             import_module(f"{__name__}.{mod}")
         except Exception as exc:  # pragma: no cover - defensive
@@ -138,14 +138,36 @@ def run_native(native_key: str, thread_id: str, user_message: str,
     )
 
 
-def run_prompt_agent(system_prompt: str, thread_id: str, user_message: str,
+def run_prompt_agent(agent, thread_id: str, user_message: str,
                      configurable: dict | None = None, model_name: str | None = None) -> str:
-    """Run a user-created prompt-based agent using its stored system prompt."""
+    """Run a user-created prompt-based agent using its stored system prompt.
+
+    Takes the ``Agent`` row rather than just the prompt string, because the RAG
+    subtype also needs the agent's id (to scope the knowledge base) and its
+    ``rag_top_k`` — and because the platform tools ticked on the row are read
+    from it by ``tool_registry``.
+    """
     from .prompt_agent import build_prompt_graph
+    from .tool_registry import enabled_slugs
+    rag_enabled = bool(getattr(agent, "rag_enabled", False))
+    # Labels the log line only. Worked out here, in the sync thread, because
+    # enabled_slugs reads the row and is_available reads SiteConfiguration.
+    tool_slugs = enabled_slugs(agent)
+    if tool_slugs:
+        label = "Tool agent (%s)" % ", ".join(tool_slugs)
+    elif rag_enabled:
+        label = "RAG agent"
+    else:
+        label = "Prompt agent"
     return _run_sync(
         lambda: _arun_graph(
-            lambda cp: build_prompt_graph(system_prompt, cp, model_name),
+            lambda cp: build_prompt_graph(
+                agent.system_prompt, cp, model_name,
+                agent_id=agent.pk, rag_enabled=rag_enabled,
+                top_k=getattr(agent, "rag_top_k", 5) or 5,
+                agent=agent,
+            ),
             thread_id, user_message, configurable,
         ),
-        "Prompt agent",
+        label,
     )

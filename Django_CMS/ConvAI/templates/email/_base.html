@@ -1,0 +1,37 @@
+{% load i18n %}
+{% comment %}
+  Shell every platform email extends. Table layout and inline styles are not a
+  style choice: mail clients strip <style> blocks and support little of the
+  cascade, so anything that has to survive Outlook goes in a `style` attribute.
+{% endcomment %}
+<div style="margin:0;padding:0;background:#f3f8fb;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f8fb;padding:32px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+               style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;
+                      font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+                      box-shadow:0 2px 8px rgba(0,54,62,.08);">
+          <tr>
+            <td style="padding:28px 32px 8px 32px;">
+              <p style="margin:0;font-size:15px;font-weight:700;color:#006877;letter-spacing:.2px;">{{ brand_name }}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 32px 28px 32px;color:#2f3131;font-size:15px;line-height:23px;">
+              {% block body %}{% endblock %}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 32px;background:#f7fafb;border-top:1px solid #e6eef0;
+                       color:#767777;font-size:12px;line-height:18px;">
+              {% block footer %}
+                {% blocktrans %}This message was sent automatically by {{ brand_name }}. Please do not reply to it.{% endblocktrans %}
+              {% endblock %}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>

@@ -49,6 +49,28 @@ Topic deep dives:
   access is controlled via ownership-checked views and single-use signed tokens.
 - [Database setup & backups](database.md) — how to set up the database and how
   to perform backups and restore them.
+- [Message export](message_export.md) — the optional CSV export of every stored
+  message (one row per message) for behavioural analysis, the optional
+  per-conversation download for navigators, and how to turn each on.
+- [Whose a message is](message_attribution.md) — how every message is tied to
+  a client (or a login) when it arrives, so a phone number that changes hands
+  takes neither the history nor the access with it.
+- [Participant management](participant_management.md) — for deployments running a
+  research study: pre-enrolling participants, three-word access codes, the public
+  join page, and versioned append-only consent. Off by default.
+- [Link Worker v2 (beta)](link_worker_v2.md) — the chat-bubble assistant that
+  answers questions about clients (next meetings, protocol answers and how they
+  changed, everything on file), the matching REST endpoints and SDK methods, and
+  the access log behind both. Off by default.
+- [Link Worker on WhatsApp](link_worker_whatsapp.md) — navigators ask Link
+  Worker v2 from their own phone, by text or voice note, about one client they
+  load at a time (today's visits suggested). Off by default.
+- [Text to speech](text_to_speech.md) — who speaks voice replies: ElevenLabs
+  (the default) or Azure AI Speech, each agent's voice for each, and setting up
+  an Azure Speech resource.
+- [Agent tools & summaries](agent_tools.md) — the platform tools a prompt-based
+  agent can be given from the agent form, the summary an agent writes for the
+  client's link worker, and how a remote agent authenticates to write one.
 - [Styling & layout](STYLING.md) — where the look of the app actually lives:
   the design system, the Tailwind build, the per-page `<style>` blocks, and the
   two colour systems that currently disagree. Read this before porting the

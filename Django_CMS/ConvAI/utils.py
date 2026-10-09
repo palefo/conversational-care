@@ -7,6 +7,7 @@ import logging
 import os
 from .site_config import get_setting, get_bool, brand_name
 import uuid
+import wave
 import hmac
 import time
 import base64
@@ -31,11 +32,12 @@ from django.conf import settings
 from django.core.cache import cache
 from django.contrib.auth.decorators import user_passes_test
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Q
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 # Local apps
-from .models import CallRecording, Caregiver, Conversation, Message, Patient, Agent
+from .models import CallLeg, CallRecording, Caregiver, Conversation, Message, Patient, Agent
 
 logger = logging.getLogger(__name__)
 
@@ -49,24 +51,58 @@ def make_phone_conference(phone_numbers, record_ctn=True, record_dyad=True):
       - Dyad : Phone number for the Dyad (carer + PlWD)
 
     record is a boolean value that requests recording of the call in twilio
+
+    Returns what was placed: the conference name, and for each leg its side of
+    the conference and the Call SID Twilio answered with. Those SIDs are the
+    only thing that ties the recordings arriving later back to this call. This
+    function used to return nothing at all — the SIDs were created and dropped
+    on the floor, views/calls.py reported {"conference": null} to the browser on
+    every call, and whose recording it was had to be guessed from phone numbers
+    afterwards. See CallLeg, which is what the caller writes them into.
     '''
     account_sid = get_setting("TWILIO_ACCOUNT_SID")
     auth_token = get_setting("TWILIO_AUTH_TOKEN")
     client = Client(account_sid, auth_token)
     conference_name = str(uuid.uuid4()) #to avoid collisions
+    # Two channels rather than one mixed track. Whisper cannot tell voices
+    # apart, but a dual-channel leg already has them apart: what the platform
+    # sent is on one channel and what the person on the other end said is on the
+    # other. That is what lets the transcript name a speaker at all. Mono
+    # recordings still transcribe, just without anyone attributed — see
+    # transcribe_audio. Applies to calls placed from here on; recordings already
+    # on disk are mono and cannot be separated after the fact.
     call1 = client.calls.create(
       record=record_ctn,
+      recording_channels="dual",
       to=phone_numbers["CTN"],
       from_=phone_numbers["Platform"],
       twiml=f'<Response><Dial><Conference endConferenceOnExit="true">{conference_name}</Conference></Dial></Response>'
     )
     call2 = client.calls.create(
       record=record_dyad,
+      recording_channels="dual",
       to=phone_numbers["Dyad"],
       from_=phone_numbers["Platform"],
       twiml=f'<Response><Dial><Conference endConferenceOnExit="true">{conference_name}</Conference></Dial></Response>'
     )
     logger.info("Calls initiated; both participants join the conference on answer.")
+    return {
+        "conference": conference_name,
+        "legs": [
+            {
+                "leg": int(CallRecording.Leg.CTN),
+                "call_sid": call1.sid,
+                "to_number": str(phone_numbers.get("CTN") or ""),
+                "recorded": bool(record_ctn),
+            },
+            {
+                "leg": int(CallRecording.Leg.DYAD),
+                "call_sid": call2.sid,
+                "to_number": str(phone_numbers.get("Dyad") or ""),
+                "recorded": bool(record_dyad),
+            },
+        ],
+    }
 
 def send_sms_with_template(to_e164: str | None, content_sid: str, content_variables: dict | None = None) -> bool:
     """
@@ -101,6 +137,108 @@ def send_sms_with_template(to_e164: str | None, content_sid: str, content_variab
         return True
     except Exception:
         return False
+
+# WhatsApp delivery failures that a navigator can actually do something about.
+# 63016 is the one that matters here: outside the 24-hour customer-service
+# window WhatsApp only accepts an approved template, and this platform has none
+# (the account is currently restricted from creating them). Twilio *accepts*
+# such a message and fails it a moment later, so the reason only exists on the
+# message resource — see send_whatsapp_text_result.
+WHATSAPP_ERRORS = {
+    63016: _("WhatsApp only allows a new conversation to be started with an "
+             "approved template, and they have not replied in the last 24 hours."),
+    63024: _("WhatsApp rejected the number."),
+    63003: _("That number is not reachable on WhatsApp."),
+    63015: _("That number is not reachable on WhatsApp."),
+    21610: _("They have unsubscribed from messages from this number."),
+}
+
+# Statuses Twilio will not move off again.
+_WA_FAILED = ("failed", "undelivered")
+_WA_DONE = ("delivered", "read")
+
+
+def send_whatsapp_text_result(to_e164: str | None, body: str,
+                              *, wait_s: float = 8.0) -> dict:
+    """Send a WhatsApp text and report what actually happened to it.
+
+    ``send_whatsapp_text`` below returns True as soon as Twilio *accepts* the
+    message, which is not the same as it arriving. The failure that matters most
+    here — 63016, freeform text outside the 24-hour window — is reported
+    asynchronously, seconds after a successful create(). Callers that acted on
+    the bool therefore told the navigator the caregiver had been asked something
+    they were never asked.
+
+    So this creates the message and then watches it until Twilio settles on a
+    status or ``wait_s`` runs out. Returns::
+
+        {'ok': bool, 'sid': str|None, 'status': str,
+         'error_code': int|None, 'reason': str}
+
+    ``ok`` is True while nothing has gone wrong — including the still-in-flight
+    case, where the message has been handed over and no failure has come back.
+    A late failure after that is for the status callback to catch, not this.
+    """
+    blank = {'ok': False, 'sid': None, 'status': 'not-sent',
+             'error_code': None, 'reason': ''}
+
+    if not to_e164 or not body:
+        return dict(blank, reason=str(_("There was nothing to send.")))
+
+    account_sid = get_setting("TWILIO_ACCOUNT_SID")
+    auth_token  = get_setting("TWILIO_AUTH_TOKEN")
+    platform_phone = get_setting("PLATFORM_PHONE")
+
+    if not (account_sid and auth_token and platform_phone):
+        return dict(blank, status='unconfigured',
+                    reason=str(_("WhatsApp is not configured on this platform.")))
+
+    try:
+        client = Client(account_sid, auth_token)
+        from_whatsapp = f"whatsapp:{platform_phone}" if not str(platform_phone).startswith("whatsapp:") else platform_phone
+        to_whatsapp   = f"whatsapp:{to_e164}"     if not str(to_e164).startswith("whatsapp:")     else to_e164
+        msg = client.messages.create(
+            from_=from_whatsapp,
+            to=to_whatsapp,
+            body=body.strip(),
+        )
+    except Exception as exc:
+        # A refusal at create() time — bad credentials, malformed number. The
+        # exception is the only description of it that exists.
+        logger.warning("WhatsApp create failed for %s: %s", to_e164, exc)
+        return dict(blank, status='rejected', reason=str(exc))
+
+    sid = msg.sid
+    status = msg.status or 'queued'
+    code = msg.error_code
+
+    # Poll rather than trust the create(). Twilio rejects a 63016 within a
+    # second or two, which is well inside the time this request already spends
+    # generating the message it just sent.
+    deadline = time.monotonic() + max(0.0, wait_s)
+    while status not in _WA_FAILED + _WA_DONE and time.monotonic() < deadline:
+        time.sleep(0.75)
+        try:
+            fetched = client.messages(sid).fetch()
+        except Exception:
+            break  # Sent; we simply cannot watch it. Not a failure.
+        status = fetched.status or status
+        code = fetched.error_code or code
+
+    if status in _WA_FAILED:
+        reason = WHATSAPP_ERRORS.get(code)
+        if reason is None:
+            reason = (
+                str(_("WhatsApp could not deliver it (error %s).")) % code
+                if code else str(_("WhatsApp could not deliver it."))
+            )
+        logger.warning("WhatsApp %s to %s: %s (%s)", status, to_e164, code, sid)
+        return {'ok': False, 'sid': sid, 'status': status,
+                'error_code': code, 'reason': str(reason)}
+
+    return {'ok': True, 'sid': sid, 'status': status,
+            'error_code': code, 'reason': ''}
+
 
 def send_whatsapp_text(to_e164: str | None, body: str) -> bool:
     """
@@ -187,6 +325,82 @@ def generate_response_langgraph(user_or_patient,
     )
 
 
+def _ensure_conversation(thread_id: str, patient=None, agent=None):
+    """The Conversation row for ``thread_id``, created now if this is its first turn.
+
+    ``save_message`` creates the row, but only *after* the agent has replied —
+    so a tool that calls back during the very first turn ("don't let my link
+    worker see this", as an opening message) found nothing to act on and had to
+    say "ask me again later". Created here with the same defaults
+    ``save_message`` uses, so that ``get_or_create`` there simply finds it.
+    """
+    try:
+        conv_uuid = UUID(str(thread_id))
+    except (TypeError, ValueError):
+        return None
+    now = timezone.now()
+    defaults = {"started_at": now, "last_message_at": now}
+    if patient is not None:
+        defaults["patient"] = patient
+    if agent is not None:
+        defaults["agent"] = agent
+    conv, _created = Conversation.objects.get_or_create(id=conv_uuid, defaults=defaults)
+    return conv
+
+
+def _run_identity(agent, user_or_patient, thread_id: str) -> dict:
+    """The ids — and, for a remote agent that calls back, the credential — for a run.
+
+    ``conversation_id`` / ``patient_id`` / ``client_id`` are sent on every run:
+    an id a graph ignores costs nothing, and a remote graph author reading either
+    word should find the key they reached for (the model says Patient, every
+    screen says client). They are **informational**. Nothing on the platform
+    side trusts them; what a remote agent may act on is decided by the token.
+
+    ``cc_run_token`` is sent only to a *remote* agent with ``allow_callbacks``
+    on. It is scoped to this one conversation, expires with its idle window, and
+    works only on ``/api/v1/run/`` — see ConvAI.run_tokens. Personal API tokens
+    are never sent to an agent: a remote agent's run config is stored on a server
+    we do not administer as closely as this one, and a person's token there is
+    that person's whole access. In-process agents get nothing, because their
+    tools reach the database directly.
+    """
+    from . import run_tokens
+
+    patient = user_or_patient if isinstance(user_or_patient, Patient) else None
+    conv = None
+    try:
+        conv = Conversation.objects.filter(id=UUID(str(thread_id))).first()
+    except (TypeError, ValueError):
+        # A thread_id that is not a UUID names no conversation. The run still
+        # goes ahead; it just carries no conversation-bound identity.
+        pass
+    if patient is None and conv is not None:
+        patient = conv.patient
+
+    out = {"conversation_id": str(thread_id or "")}
+    if patient is not None:
+        out["patient_id"] = patient.pk
+        out["client_id"] = patient.pk
+
+    wants_callbacks = (getattr(agent, "kind", "") == "remote"
+                       and bool(getattr(agent, "allow_callbacks", False)))
+    if wants_callbacks:
+        conv = conv or _ensure_conversation(thread_id, patient=patient, agent=agent)
+        if conv is not None:
+            out["cc_run_token"] = run_tokens.mint(
+                conv.id, agent_id=agent.pk,
+                patient_id=conv.patient_id or (patient.pk if patient else None))
+            api_url = (get_setting("AGENT_CALLBACK_URL") or "").strip().rstrip("/")
+            if api_url:
+                out["cc_api_url"] = api_url
+    elif getattr(agent, "kind", "") == "prompt" and getattr(agent, "tools", None):
+        # An in-process agent with tools reaches the database itself, but its
+        # tools still need a row to write to on the first turn.
+        _ensure_conversation(thread_id, patient=patient, agent=agent)
+    return out
+
+
 def generate_response_with_agent(agent,
                                  user_or_patient,
                                  user_message: str,
@@ -215,6 +429,10 @@ def generate_response_with_agent(agent,
         configurable = {
             "user_id": getattr(user_or_patient, "id", None),
             "user_name": user_name,
+            # In-process tools read thread_id (injected by _arun_graph) and fall
+            # back to conversation_id. Both are set so one tool module serves
+            # both kinds of agent without caring which it is running under.
+            **_run_identity(agent, user_or_patient, thread_id),
         }
         if isinstance(extra_configurable, dict) and extra_configurable:
             configurable.update(extra_configurable)
@@ -222,9 +440,20 @@ def generate_response_with_agent(agent,
         if kind == "native":
             from .native_agents import run_native
             return run_native(agent.native_key, thread_id, user_message, configurable, model_name)
-        # prompt-based
+        # prompt-based (plain, or the RAG subtype — run_prompt_agent decides
+        # from the agent's rag_enabled flag)
         from .native_agents import run_prompt_agent
-        return run_prompt_agent(agent.system_prompt, thread_id, user_message, configurable, model_name)
+        return run_prompt_agent(agent, thread_id, user_message, configurable, model_name)
+
+    # Sensei agents: one JSON POST to the external Sensei service. No host/port
+    # of their own — the endpoint and key are installation-wide settings — so
+    # this returns before the LangGraph host allow-list below, which has nothing
+    # to check for them.
+    if kind == "sensei":
+        from . import sensei
+        if not sensei.enabled():
+            return "Sorry, Sensei agents are not enabled on this installation."
+        return sensei.send(user_or_patient, user_message, thread_id)
 
     # AS-06/F8 fix: deny SSRF to non-allow-listed agent hosts.
     if not agent_host_allowed(getattr(agent, "host", "")):
@@ -244,6 +473,11 @@ def generate_response_with_agent(agent,
             "thread_id": thread_id,
             "user_id":   user_or_patient.id,
             "user_name": user_name,
+            # conversation_id / patient_id / client_id, and — only when this
+            # agent has allow_callbacks on — a cc_run_token scoped to this one
+            # conversation. Never a personal token. See ConvAI.run_tokens and
+            # agent_tools.md.
+            **_run_identity(agent, user_or_patient, thread_id),
         }
         if isinstance(extra_configurable, dict) and extra_configurable:
             configurable.update(extra_configurable)  # merge/override
@@ -259,24 +493,108 @@ def generate_response_with_agent(agent,
             config={"configurable": configurable},
         )
         logger.debug("LangGraph result: %s", result)
-        return result["messages"][-1]["content"]
+        return remote_turn_reply(result["messages"]) or result["messages"][-1]["content"]
     except Exception:
         return "Sorry, something went wrong generating the response."
 
 
+def _message_text(content) -> str:
+    """The text of a message's content, whether a string or a list of blocks."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(b.get("text", "") if isinstance(b, dict) else str(b) for b in content)
+    return ""
+
+
+def remote_turn_reply(messages) -> str:
+    """Everything a remote agent said to the person this turn, as one reply.
+
+    A graph can answer one message with several AI messages: RECO v2 swaps its
+    [SUMMARY] token for the summary's texts and then asks whether it looks
+    right, all in one turn. Taking only the last message dropped the summary.
+    So: the AI messages with text that come after the person's message *and*
+    after the turn's last tool step, joined with blank lines. The tool-step
+    boundary is what keeps a supervisor-style graph to its final answer — the
+    sub-agent's draft and the hand-back message come before a tool message, and
+    are working, not reply. If nothing is left (an AI message that spoke and
+    called a tool in one go, then said nothing), the last AI text of the turn.
+    Empty when the turn produced no text at all, for the caller to fall back on.
+    """
+    def kind(m):
+        return (m.get("type") or m.get("role") or "") if isinstance(m, dict) else getattr(m, "type", "")
+
+    def field(m, name, default=None):
+        return m.get(name, default) if isinstance(m, dict) else getattr(m, name, default)
+
+    msgs = list(messages or [])
+    start = 0
+    for i, m in enumerate(msgs):
+        if kind(m) in ("human", "user"):
+            start = i + 1
+    turn = msgs[start:]
+    after_tools = 0
+    for i, m in enumerate(turn):
+        if kind(m) == "tool":
+            after_tools = i + 1
+
+    def texts(seq):
+        out = []
+        for m in seq:
+            if kind(m) not in ("ai", "assistant") or field(m, "tool_calls"):
+                continue
+            text = _message_text(field(m, "content", "")).strip()
+            if text:
+                out.append(text)
+        return out
+
+    found = texts(turn[after_tools:])
+    if not found:
+        spoken = [_message_text(field(m, "content", "")).strip() for m in turn
+                  if kind(m) in ("ai", "assistant")]
+        spoken = [t for t in spoken if t]
+        found = spoken[-1:]
+    return "\n\n".join(found)
+
+
 def save_message(phone: str, user_message: str, response_message: str, thread_id: str,
                  patient: Patient | None = None,
-                 input_audio_file: str = "", response_audio_file: str = ""):
+                 input_audio_file: str = "", response_audio_file: str = "",
+                 *, account=None, sender_role: str | None = None):
     """
     Persist a message pair and ensure there's a Conversation row.
     - Creates Conversation(id=thread_id) if missing.
     - Updates last_message_at.
     - If available, attaches patient and agent to Conversation.
     - Optional audio filenames are stored on the Message (voice turns).
+    - Stamps the Message with its owner (``patient`` / ``account``) and
+      ``sender_role``, so nothing downstream has to work out whose it is from
+      ``phone`` again. See ConvAI.message_attribution.
     Returns the created Message.
+
+    ``sender_role`` should be passed by every caller that knows it. When it is
+    not, it is worked out here from what is known *now*, at write time: no
+    inbound text means the platform wrote it; otherwise the number is matched
+    against this client's own and caregiver numbers.
     """
+    from .message_attribution import create_message, role_for_number
+
+    if sender_role is None:
+        if not (user_message or "").strip():
+            sender_role = Message.SenderRole.PLATFORM
+        else:
+            sender_role = role_for_number(phone, patient)
     now = timezone.now()
     agent = getattr(patient, "agent", None) if patient is not None else None
+
+    # Scrub a Sensei passcode before it reaches the database. This is the one
+    # place every inbound turn is persisted from — WhatsApp, SMS, the external
+    # chat and the tester chat all land here — which is what makes it the right
+    # place: the agent has already been given the raw text by now, and nothing
+    # downstream of this row (the classifier, the transcript a navigator reads,
+    # the summariser) has any business seeing the passcode.
+    from .sensei import redact as _redact_credentials
+    user_message = _redact_credentials(user_message)
 
     with transaction.atomic():
         # Upsert Conversation by UUID primary key
@@ -311,42 +629,32 @@ def save_message(phone: str, user_message: str, response_message: str, thread_id
                 conv.save(update_fields=list(updates.keys()))
 
         # Finally, create the Message
-        return Message.objects.create(
+        return create_message(
             user=phone,
             conversation_id=str(conv.id),  # ensure we use the canonical UUID string
             user_message=user_message,
             response_message=response_message,
             input_audio_file=input_audio_file,
             response_audio_file=response_audio_file,
+            patient=patient,
+            account=account,
+            sender_role=sender_role,
         )
 
 
 def patient_message_q(patient: Patient) -> Q:
-    """Q filter selecting all Message rows that belong to ``patient``.
+    """Q filter selecting all Message rows on ``patient``'s file.
 
-    Matches by EITHER of the two ways a message can be tied to a patient:
-      1. ``Message.user`` is the patient's or caregiver's phone number
-         (WhatsApp/webhook traffic stores the sender phone there), OR
-      2. the message's conversation is linked to the patient via
-         ``Conversation.patient`` (web tester chat and voice chat store a
-         username in ``Message.user``, so phone matching alone misses them).
+    By ``Message.patient``, fixed when each message was written — so a client
+    who changes number keeps their history, and a stranger given their old
+    number does not inherit it. Rows written before that existed, and not
+    placed by the backfill, still fall back to the old matching (current phone
+    numbers, or a conversation tied to this client). The rule lives in
+    ConvAI.message_attribution; this name is kept because a dozen call sites
+    already use it.
     """
-    q = Q(pk__in=[])  # always-false base; OR'ed conditions below widen it
-    nums = []
-    if patient.phone_number:
-        nums.append(str(patient.phone_number))
-    caregiver = getattr(patient, "caregiver", None)
-    if caregiver and caregiver.phone_number:
-        nums.append(str(caregiver.phone_number))
-    if nums:
-        q |= Q(user__in=nums)
-    conv_ids = [
-        str(cid) for cid in
-        Conversation.objects.filter(patient=patient).values_list("id", flat=True)
-    ]
-    if conv_ids:
-        q |= Q(conversation_id__in=conv_ids)
-    return q
+    from .message_attribution import patient_messages_q
+    return patient_messages_q(patient)
 
 
 # ---------------------------
@@ -442,7 +750,34 @@ def automation_turn(patient: Patient) -> dict | None:
     return automation_context(patient)
 
 
-def process_message_for_patient(patient: Patient, raw_message: str, *, user_label: str | None = None) -> str:
+def _review_after_message(message, inbound_text: str) -> None:
+    """Queue a classifier pass over the conversation this message landed in.
+
+    Keyed off the saved Message rather than the thread id it was saved under.
+    ``save_message`` normalises a thread id it cannot read as a UUID into a
+    fresh one, so the two can differ — and a review aimed at the id that got
+    replaced would find no conversation and quietly do nothing, which is the
+    exact failure this whole path exists to stop happening.
+
+    Skipped when the caregiver said nothing — outbound-only turns (reminders,
+    templates) add no new evidence, and classifying them again would be one
+    model call per reminder for a verdict that cannot have changed.
+    """
+    if message is None or not (inbound_text or "").strip():
+        return
+    try:
+        from .conversation_alerts import review_conversation_async
+        review_conversation_async(message.conversation_id)
+    except Exception:
+        # Detection is not allowed to break delivery. The message is already
+        # saved and the reply already sent; the batch pass in Settings remains
+        # the backstop for anything this drops.
+        logger.exception("Could not queue conversation review for %s",
+                         message.conversation_id)
+
+
+def process_message_for_patient(patient: Patient, raw_message: str, *, user_label: str | None = None,
+                                sender_role: str | None = None, account=None) -> str:
     """
     Process a chat message for an already-resolved patient.
 
@@ -450,15 +785,26 @@ def process_message_for_patient(patient: Patient, raw_message: str, *, user_labe
     logged-in test user, not from a phone number). ``user_label`` is only a
     display/identifier string stored on the Message; it defaults to a stable,
     non-phone value.
+
+    ``sender_role`` and ``account`` are what the caller already knows about who
+    wrote in — the inbound resolver for WhatsApp and SMS, the tester login for
+    the web chat — and are stamped onto the message as they are.
     """
     text = raw_message.strip()
     label = user_label or f"patient:{patient.pk}"
+    stamp = {"account": account, "sender_role": sender_role}
 
     # 0) the navigator's switch. Both inbound paths land here, so this is the
     # one place that has to honour it. The message is still recorded — what is
     # suspended is the agent answering, not the caregiver being heard.
     if not patient.chatbot_enabled:
-        save_message(label, text, "", _get_or_create_thread(patient), patient=patient)
+        msg = save_message(label, text, "", _get_or_create_thread(patient), patient=patient,
+                           **stamp)
+        # Reviewed even though nothing answered — arguably especially then. The
+        # switch suspends the agent replying, not the caregiver being heard,
+        # and a crisis disclosed while the agent is off is the one nobody is
+        # already reading.
+        _review_after_message(msg, text)
         return ""
 
     # 1) reset thread on command
@@ -480,33 +826,54 @@ def process_message_for_patient(patient: Patient, raw_message: str, *, user_labe
                                         extra_configurable=extra_configurable)
 
     # 5) persist both sides and upsert Conversation metadata
-    save_message(label, text, reply, thread_id, patient=patient)
+    msg = save_message(label, text, reply, thread_id, patient=patient, **stamp)
+
+    # 6) hand the exchange to the classifier. Off the reply path deliberately:
+    #    this is a second model call, and the caregiver should not wait behind
+    #    it to be answered.
+    _review_after_message(msg, text)
     return reply
 
 
-def process_received_message(phone_number: str, raw_message: str) -> str:
+def process_received_message(phone_number: str, raw_message: str, channel: str | None = None) -> str:
     """
     Main entry for inbound SMS/WhatsApp.
     Resolves the patient by phone, then delegates to
     :func:`process_message_for_patient`.
+
+    ``channel`` is ``"whatsapp"`` or ``"sms"``; when not given it is read off the
+    ``whatsapp:`` prefix Twilio puts on WhatsApp senders. Only the unknown-sender
+    (self-registration) path uses it, to tell the agent how the person wrote in.
     """
-    phone = phone_number.replace("whatsapp:", "").strip()
+    from .message_attribution import normalise, resolve_inbound
+
+    if channel not in ("whatsapp", "sms"):
+        channel = "whatsapp" if str(phone_number or "").startswith("whatsapp:") else "sms"
+    phone = normalise(phone_number)
     text = raw_message.strip()
 
-    # 1) resolve patient by phone (patient or caregiver)
-    patient = (
-        Patient.objects
-        .filter(Q(phone_number=phone) | Q(caregiver__phone_number=phone))
-        .select_related("agent")
-        .first()
-    )
+    # 0) A navigator's own phone, linked for the Link Worker on WhatsApp. None —
+    # and nothing below changes — unless that feature is on and this is such a
+    # number. See ConvAI.staff_whatsapp.
+    from . import staff_whatsapp
+    staff_reply = staff_whatsapp.handle_text(phone, text, channel=channel)
+    if staff_reply is not None:
+        return staff_reply
+
+    # 1) resolve the client this number writes about. The one place, with the
+    # audio paths, that a number is used to decide whose a message is — the
+    # answer is stamped onto the message and never re-derived. See
+    # ConvAI.message_attribution.
+    inbound = resolve_inbound(phone)
+    patient = inbound.patient
     if not patient:
-        sr_reply = _handle_self_registration_flow(phone, text)
+        sr_reply = _handle_self_registration_flow(phone, text, channel=channel)
         if sr_reply is not None:
             return sr_reply
         return "Sorry, we could not find a patient matching this number."
 
-    return process_message_for_patient(patient, raw_message, user_label=phone)
+    return process_message_for_patient(patient, raw_message, user_label=phone,
+                                       sender_role=inbound.role)
 
 
 def download_recording_mp3(recording_sid):
@@ -554,7 +921,6 @@ def get_recordings_from_twilio():
     account_sid = get_setting("TWILIO_ACCOUNT_SID") 
     auth_token = get_setting("TWILIO_AUTH_TOKEN") 
     client = Client(account_sid, auth_token)
-    last_updated = CallRecording.objects.aggregate(max_value=Max('end_time'))['max_value']
     try:
         calls = client.calls.list() 
     except Exception as e:
@@ -568,12 +934,52 @@ def get_recordings_from_twilio():
 
     call_map = {call.sid: (call.from_formatted, call.to_formatted) for call in calls}
 
+    # What is already on file, asked by Twilio's own id for it.
+    #
+    # This used to be a high-water mark on end_time: anything Twilio had not
+    # touched since the newest recording stored was skipped. That answers a
+    # different question from the one being asked. A recording that arrives late
+    # — a long call whose audio Twilio finishes assembling after a shorter, later
+    # one — is behind the mark on the very first sync that sees it, and the mark
+    # only ever moves forward, so it is skipped not once but permanently. That is
+    # why some recordings never appeared at all. Asking which SIDs are already
+    # stored answers "is this new?" without a clock, and a late arrival is simply
+    # picked up on the next run.
+    known = set(CallRecording.objects.values_list("recording_sid", flat=True))
+
+    # What each call was, written down when it was placed. This is what lets a
+    # recording say whose it is instead of being matched by phone number; see
+    # CallLeg and make_phone_conference.
+    seen_call_sids = {getattr(rec, "call_sid", None) or "" for rec in recordings}
+    seen_call_sids.discard("")
+    legs = {
+        leg.call_sid: leg
+        for leg in CallLeg.objects.filter(call_sid__in=seen_call_sids)
+                                  .select_related("meeting", "patient")
+    } if seen_call_sids else {}
+
     for rec in recordings:
-        if (last_updated is not None) and (rec.date_updated <= last_updated):
-            #Only update new recordings!
-            continue 
         rec_sid = rec.sid
-        call_sid = getattr(rec, "call_sid", None)  # associated Call SID
+        call_sid = getattr(rec, "call_sid", None) or ""  # associated Call SID
+        leg = legs.get(call_sid)
+
+        if rec_sid in known:
+            # Already stored, so there is nothing to fetch again. A recording
+            # that landed before its leg was written down — or before there was
+            # anywhere to write it — can still be told what it belongs to now,
+            # which is what carries rows through the deploy that adds this.
+            # Guarded on patient being unset so this only ever fills a blank.
+            if leg is not None:
+                CallRecording.objects.filter(
+                    recording_sid=rec_sid, patient__isnull=True,
+                ).update(
+                    call_sid=call_sid,
+                    meeting=leg.meeting,
+                    patient=leg.patient,
+                    leg=leg.leg,
+                )
+            continue
+
         if call_sid and call_sid in call_map:
             from_num, to_num = call_map[call_sid]
         else:
@@ -582,7 +988,7 @@ def get_recordings_from_twilio():
         end_time = rec.date_updated    # datetime object
         duration = rec.duration or 0
         file_path = download_recording_mp3(rec_sid)
-        
+
         recording = CallRecording.objects.create(
             recording_sid = rec_sid,
             from_number = from_num,
@@ -590,8 +996,17 @@ def get_recordings_from_twilio():
             start_time = start_time,
             end_time = end_time,
             duration = duration,
-            filename = file_path)
-        
+            filename = file_path,
+            # The numbers above are still stored — they are what the fallback
+            # reads for anything placed outside this platform — but they are no
+            # longer how ownership is decided when the leg is known.
+            call_sid = call_sid,
+            meeting = leg.meeting if leg else None,
+            patient = leg.patient if leg else None,
+            leg = leg.leg if leg else None,
+        )
+        known.add(rec_sid)
+
 
 def get_path_audio(id):
     rec = (
@@ -659,14 +1074,67 @@ def send_whatsapp_reminder(meeting):
     )
 
     # Registrar en la base de datos únicamente la parte del sistema
-    Message.objects.create(
+    from .message_attribution import create_message
+    create_message(
         conversation_id  = f"reminder-{meeting.id}",
         user             = str(caregiver.phone_number),
         user_message     = "",
-        response_message = body
+        response_message = body,
+        patient          = meeting.patient,
+        sender_role      = Message.SenderRole.PLATFORM,
     )
     
     return msg.sid  # devuelve el SID del mensaje si es exitoso
+
+
+def reminder_recipient_missing(meeting):
+    """Why this meeting cannot be reminded on the configured channel, or "".
+
+    One place decides it so the button, the view and the send itself never
+    disagree about whether a reminder is possible.
+    """
+    from .mailer import meeting_reminder_recipient, reminder_channel
+
+    if reminder_channel() == "email":
+        if not meeting_reminder_recipient(meeting)[0]:
+            return "no-email"
+        return ""
+    # The WhatsApp reminder is a pre-approved template about a *call*, and it
+    # cannot carry a link. An online meeting's link goes out from the meeting's
+    # own "Send link" instead (the meetings app), so this channel does not
+    # apply to it.
+    if meeting.modality == meeting.Modality.ONLINE:
+        return "online"
+    caregiver = getattr(meeting.patient, "caregiver", None)
+    if not (caregiver and caregiver.phone_number):
+        return "no-phone"
+    return ""
+
+
+def can_send_reminder(meeting):
+    """True when a reminder has somewhere to go on the configured channel."""
+    return not reminder_recipient_missing(meeting)
+
+
+def send_meeting_reminder(meeting):
+    """Remind the caregiver about a meeting over whichever channel is configured.
+
+    Returns the channel used, so the caller can say which one carried it.
+    Raises ValueError when there is nobody to send to — the same failure the
+    WhatsApp path has always raised — and lets provider errors through.
+    """
+    from .mailer import reminder_channel, send_meeting_reminder_email
+
+    if reminder_channel() == "email":
+        send_meeting_reminder_email(meeting)
+        return "email"
+    if meeting.modality == meeting.Modality.ONLINE:
+        # See reminder_recipient_missing: the WhatsApp template is about a call
+        # and cannot carry the link. Send the link from the meeting instead.
+        raise ValueError("Online meetings are reminded by sending their link.")
+    send_whatsapp_reminder(meeting)
+    return "whatsapp"
+
 
 # Role decorators live in ConvAI/roles.py; re-exported here for existing importers.
 from .roles import navigator_required, tester_required as patient_tester_required  # noqa: E402,F401
@@ -706,8 +1174,10 @@ def resolve_tts_voice_id(agent: Optional[Agent] = None, fallback: Optional[str] 
     Decide which ElevenLabs voice to use:
       1) agent.tts_voice_id (or agent.voice_id), if present
       2) 'fallback' param (if provided)
-      3) ELEVENLABS_VOICE_ID env var
+      3) ELEVENLABS_VOICE_ID (Settings, then env)
       4) DEFAULT_TTS_VOICE_ID constant
+
+    ElevenLabs only; ConvAI.tts.voice_for_agent picks for whichever provider is on.
     """
     if agent:
         vid = getattr(agent, "tts_voice_id", None) or getattr(agent, "voice_id", None)
@@ -717,18 +1187,23 @@ def resolve_tts_voice_id(agent: Optional[Agent] = None, fallback: Optional[str] 
     if fallback and isinstance(fallback, str) and fallback.strip():
         return fallback.strip()
 
-    return DEFAULT_TTS_VOICE_ID
+    # The voice saved in Settings → Integrations, then .env, then the constant.
+    return (get_setting("ELEVENLABS_VOICE_ID") or "").strip() or DEFAULT_TTS_VOICE_ID
 
 
 def synthesize_speech_elevenlabs(text: str, filename: str, voice_id: Optional[str] = None) -> str:
     """
     Generate TTS with ElevenLabs into VOICE_RECORDINGS_DIR/filename.
     'voice_id' overrides any defaults/resolution.
+
+    Callers should use ConvAI.tts.synthesize_speech, which honours TTS_PROVIDER.
     """
     from elevenlabs import VoiceSettings, save
     from elevenlabs.client import ElevenLabs
 
-    elevenlabs_client = ElevenLabs()
+    # The key saved in Settings → Integrations wins over .env, as it says it does.
+    api_key = (get_setting("ELEVENLABS_API_KEY") or "").strip()
+    elevenlabs_client = ElevenLabs(api_key=api_key) if api_key else ElevenLabs()
 
     # basic cleanup to avoid artifacts
     cleaned_text = text.replace("*", "").replace("#", "")
@@ -737,7 +1212,7 @@ def synthesize_speech_elevenlabs(text: str, filename: str, voice_id: Optional[st
     os.makedirs(outdir, exist_ok=True)
     output_path = os.path.join(outdir, filename)
 
-    vid = (voice_id or DEFAULT_TTS_VOICE_ID).strip()
+    vid = (voice_id or resolve_tts_voice_id()).strip()
 
     response = elevenlabs_client.text_to_speech.convert(
         voice_id=vid,
@@ -755,14 +1230,404 @@ def synthesize_speech_elevenlabs(text: str, filename: str, voice_id: Optional[st
     save(response, output_path)
     return output_path
 
-def transcribe_audio(file_path):
+def _openai_client():
     # Resolve the OpenAI key the same way the chat models do (DB override → env),
     # so transcription works even when the key is only set in SiteConfiguration.
     api_key = get_setting("OPENAI_API_KEY")
-    openai_client = OpenAI(api_key=api_key) if api_key else OpenAI()
+    return OpenAI(api_key=api_key) if api_key else OpenAI()
+
+
+# Whisper's upload limit is 25 MB. Anything over this is cut into windows first.
+WHISPER_MAX_BYTES = 24 * 1024 * 1024
+WHISPER_WINDOW_S = 600       # ten minutes a window
+WHISPER_OVERLAP_S = 2        # so a word on a cut is heard whole by one window
+
+
+def _whisper(file_path, client=None, prompt=None):
+    """Whisper, asked for its segments instead of only the flat text.
+
+    ``verbose_json`` costs nothing extra and returns every segment with a start
+    and an end. Asking for plain text and throwing the timings away is what left
+    the panel unable to run a timestamp down the side of the transcript or jump
+    the player to a line.
+
+    Files over Whisper's upload limit are transcribed in windows and stitched
+    back together (see _whisper_chunked) rather than rejected — a dual-channel
+    call over about 26 minutes is past the limit on each channel alone.
+    """
+    client = client or _openai_client()
+    try:
+        size = os.path.getsize(file_path)
+    except OSError:
+        size = 0
+    if size > WHISPER_MAX_BYTES:
+        return _whisper_chunked(file_path, client, prompt=prompt)
+    return _whisper_once(file_path, client, prompt=prompt)
+
+
+def _whisper_once(file_path, client, prompt=None):
     with open(file_path, "rb") as audio_file:
-        transcript = openai_client.audio.transcriptions.create(model="whisper-1", file=audio_file)
-    return transcript.text
+        result = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file,
+            response_format="verbose_json",
+            # Words as well as segments. A segment is a window, and on a single
+            # channel it happily spans half the call, because the other party
+            # falling silent is not a boundary Whisper can see from inside one
+            # track. Words carry their own timings, which is the only thing
+            # that can put two channels back into the order they were spoken.
+            timestamp_granularities=["segment", "word"],
+            **({"prompt": prompt} if prompt else {}),
+        )
+    text = (getattr(result, "text", "") or "").strip()
+    segments = []
+    # Whisper hallucinates on silence — "Thank you for watching" over a
+    # minute of nothing — and a per-speaker track in a meeting is mostly
+    # silence. Each segment says how sure it is that there was speech at all;
+    # one that is both probably-not-speech and low-confidence is dropped,
+    # along with the words inside it.
+    dropped = []
+    for seg in (getattr(result, "segments", None) or []):
+        # The SDK hands back objects on some versions and dicts on others.
+        get = seg.get if isinstance(seg, dict) else lambda k, d=None: getattr(seg, k, d)
+        body = (get("text", "") or "").strip()
+        if not body:
+            continue
+        start = round(float(get("start", 0.0) or 0.0), 2)
+        end = round(float(get("end", 0.0) or 0.0), 2)
+        no_speech = get("no_speech_prob", None)
+        logprob = get("avg_logprob", None)
+        if (no_speech is not None and logprob is not None
+                and float(no_speech) > 0.6 and float(logprob) < -1.0):
+            dropped.append((start, end))
+            continue
+        segments.append({"start": start, "end": end, "text": body, "speaker": None})
+
+    words = []
+    for w in (getattr(result, "words", None) or []):
+        get = w.get if isinstance(w, dict) else lambda k, d=None: getattr(w, k, d)
+        token = (get("word", "") or "").strip()
+        if not token:
+            continue
+        ws = round(float(get("start", 0.0) or 0.0), 2)
+        we = round(float(get("end", 0.0) or 0.0), 2)
+        if any(a <= ws < b for a, b in dropped):
+            continue
+        words.append({"start": ws, "end": we, "word": token})
+
+    if dropped:
+        text = " ".join(seg["text"] for seg in segments).strip()
+    return text, segments, words
+
+
+def _media_duration(file_path):
+    """Seconds of audio in ``file_path``, via ffprobe, or None."""
+    import shutil
+    import subprocess
+
+    if not shutil.which("ffprobe"):
+        return None
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", file_path],
+            capture_output=True, text=True, timeout=60, check=True,
+        ).stdout.strip()
+        return float(out) if out else None
+    except (subprocess.SubprocessError, ValueError, OSError):
+        return None
+
+
+def _whisper_chunked(file_path, client, prompt=None):
+    """Transcribe a file too big for one Whisper call, window by window.
+
+    Each window starts ``WHISPER_OVERLAP_S`` early so a word cut by the
+    boundary is heard whole once; the words a window repeats from the one
+    before it are dropped by time. Timings are shifted back onto the original
+    file's clock, so the result is indistinguishable from one long call.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("ffmpeg"):
+        raise RuntimeError(
+            "This recording is larger than Whisper's 25 MB limit and ffmpeg is "
+            "not installed to split it.")
+    duration = _media_duration(file_path)
+    if not duration:
+        raise RuntimeError("Could not read the recording's length to split it.")
+
+    all_text, all_segments, all_words = [], [], []
+    tmpdir = tempfile.mkdtemp(prefix="whisper-")
+    try:
+        start = 0.0
+        index = 0
+        while start < duration:
+            lead = WHISPER_OVERLAP_S if index else 0
+            offset = max(0.0, start - lead)
+            length = WHISPER_WINDOW_S + lead
+            chunk = os.path.join(tmpdir, f"w{index:03d}.mp3")
+            subprocess.run(
+                ["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", f"{offset:.3f}",
+                 "-t", f"{length:.3f}", "-i", file_path, "-ac", "1", "-ar", "16000",
+                 "-b:a", "48k", chunk],
+                check=True, timeout=600,
+            )
+            _text, segs, words = _whisper_once(chunk, client, prompt=prompt)
+            # Keep only what belongs to this window, not the overlap it re-heard.
+            for seg in segs:
+                seg["start"] = round(seg["start"] + offset, 2)
+                seg["end"] = round(seg["end"] + offset, 2)
+                if seg["start"] >= start or not index:
+                    all_segments.append(seg)
+            for w in words:
+                w["start"] = round(w["start"] + offset, 2)
+                w["end"] = round(w["end"] + offset, 2)
+                if w["start"] >= start or not index:
+                    all_words.append(w)
+            start += WHISPER_WINDOW_S
+            index += 1
+            try:
+                os.remove(chunk)
+            except OSError:
+                pass
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+    all_text = " ".join(s["text"] for s in all_segments).strip()
+    return all_text, all_segments, all_words
+
+
+def _join_word(text, word):
+    """Append a Whisper word, which arrives bare and punctuation-first."""
+    if not text:
+        return word
+    if word[0] in ",.!?;:%)]}" or word.startswith("'"):
+        return text + word
+    if text[-1] in "([{$\u00bf\u00a1":
+        return text + word
+    return text + " " + word
+
+
+def _turns_from_words(per_channel):
+    """Who was speaking when, rebuilt by interleaving both channels word by word.
+
+    Segments cannot do this. Each channel is transcribed on its own, so a
+    segment covers a window of *that track* — on the leg where one party was
+    mostly listening, Whisper returned a single segment spanning 0 to 28
+    seconds. Sorting spans like that by start time gives each side's monologue
+    end to end, which is why the transcript did not follow the call even once
+    the two speakers were correctly separated.
+
+    Word timings are per-word and do not overlap, so ordering them across both
+    channels reproduces the conversation, and a turn simply ends wherever the
+    next word belongs to the other speaker.
+    """
+    words = []
+    for speaker, channel in per_channel:
+        for w in channel or []:
+            words.append((w["start"], w["end"], speaker, w["word"]))
+    if not words:
+        return []
+    words.sort(key=lambda w: (w[0], w[1]))
+
+    turns = []
+    for start, end, speaker, word in words:
+        if turns and turns[-1]["speaker"] == speaker:
+            turns[-1]["text"] = _join_word(turns[-1]["text"], word)
+            turns[-1]["end"] = max(turns[-1]["end"], end)
+        else:
+            turns.append({"start": start, "end": end,
+                          "speaker": speaker, "text": word})
+    return turns
+
+
+def _split_stereo(file_path):
+    """Split a two-channel recording into two mono files, or return None.
+
+    A conference leg recorded with ``recording_channels="dual"`` puts each party
+    on its own channel: what the platform sent on one, what the person on the
+    other end said on the other. That is speaker separation for free — Whisper
+    itself cannot tell voices apart. A mono recording has nothing to split, and
+    is transcribed as one track with no speaker attributed.
+    """
+    import audioop
+    import tempfile
+
+    try:
+        with wave.open(file_path, "rb") as src:
+            if src.getnchannels() != 2:
+                return None
+            params = src.getparams()
+            frames = src.readframes(params.nframes)
+    except wave.Error as exc:
+        # Not a RIFF/WAV file at all — an mp3, which is what every stored
+        # recording actually is. "I cannot read this format" is a different
+        # fact from "this recording is mono", and returning None for both is
+        # exactly what hid speaker separation being broken on every Twilio
+        # recording the platform has ever transcribed. Say which one it was.
+        logger.info("%s is not readable as WAV (%s) — cannot split channels.",
+                    file_path, exc)
+        return None
+    except (EOFError, FileNotFoundError):
+        return None
+
+    width = params.sampwidth
+    out = []
+    for channel in (0, 1):
+        mono = audioop.tomono(frames, width, 1 if channel == 0 else 0,
+                              0 if channel == 0 else 1)
+        fd, path = tempfile.mkstemp(suffix=f".ch{channel}.wav")
+        os.close(fd)
+        with wave.open(path, "wb") as dst:
+            dst.setnchannels(1)
+            dst.setsampwidth(width)
+            dst.setframerate(params.framerate)
+            dst.writeframes(mono)
+        out.append(path)
+    return out
+
+
+def _fetch_stereo_wav(recording_sid):
+    """Twilio's WAV rendering of a recording, in a temp file, or None.
+
+    The stored file is an mp3: a quarter of the size, and what the player
+    streams. But a conference leg is recorded with two channels — one party on
+    each — and Python's ``wave`` module cannot open an mp3 at all, so the
+    splitter was always handed a file it could never read. Twilio serves the
+    same recording as WAV with the channels intact, so transcription fetches
+    that, uses it, and throws it away. Nothing on disk changes.
+    """
+    import tempfile
+
+    account_sid = get_setting("TWILIO_ACCOUNT_SID")
+    auth_token = get_setting("TWILIO_AUTH_TOKEN")
+    if not (account_sid and auth_token and recording_sid):
+        return None
+
+    url = (f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}"
+           f"/Recordings/{recording_sid}.wav")
+    try:
+        resp = requests.get(url, auth=(account_sid, auth_token), timeout=60)
+    except Exception as exc:
+        logger.warning("Could not fetch WAV for %s: %s", recording_sid, exc)
+        return None
+    if resp.status_code != 200:
+        logger.warning("Could not fetch WAV for %s: HTTP %s",
+                       recording_sid, resp.status_code)
+        return None
+
+    fd, path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    with open(path, "wb") as out:
+        out.write(resp.content)
+    return path
+
+
+def transcribe_audio(file_path, with_segments=False, recording_sid=None, prompt=None):
+    """Transcribe a recording.
+
+    Returns the plain text by default, so every existing caller keeps working.
+    Pass ``with_segments=True`` for ``(text, segments)``.
+
+    ``recording_sid`` lets a stored mp3 be transcribed from its WAV twin, which
+    is the only way the two parties can be told apart — see _fetch_stereo_wav.
+    Without it the mp3 is transcribed as one mixed track, which is what every
+    recording got until now: both voices in one line, and Whisper cutting
+    segments mid-sentence because it is segmenting an overlap as one stream.
+    """
+    client = _openai_client()
+    channels = _split_stereo(file_path)
+
+    borrowed = None
+    if not channels and recording_sid:
+        borrowed = _fetch_stereo_wav(recording_sid)
+        if borrowed:
+            channels = _split_stereo(borrowed)
+            if not channels:
+                logger.info("WAV for %s is mono; nothing to separate.", recording_sid)
+
+    try:
+        return _transcribe_channels(file_path, channels, client, with_segments,
+                                    prompt=prompt)
+    finally:
+        if borrowed:
+            try:
+                os.remove(borrowed)
+            except OSError:
+                pass
+
+
+def _transcribe_channels(file_path, channels, client, with_segments, prompt=None):
+    if not channels:
+        text, segments, _words = _whisper(file_path, client, prompt=prompt)
+    else:
+        # Two channels, so each side is transcribed on its own. Speaker 1 is
+        # the party the platform dialled out to; speaker 2 is the other side of
+        # the conference.
+        merged, per_channel = [], []
+        try:
+            for number, path in enumerate(channels, start=1):
+                _text, segs, words = _whisper(path, client, prompt=prompt)
+                for seg in segs:
+                    seg["speaker"] = number
+                merged.extend(segs)
+                per_channel.append((number, words))
+        finally:
+            for path in channels:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+
+        # Word timings put the two sides back in the order they were spoken.
+        # Segments cannot — see _turns_from_words. Sorted segments stay as the
+        # fallback for a response that carries no words.
+        segments = _turns_from_words(per_channel)
+        if not segments:
+            merged.sort(key=lambda s: s["start"])
+            segments = merged
+        text = "\n".join(s["text"] for s in segments)
+
+    return (text, segments) if with_segments else text
+
+def transcribe_tracks(tracks, *, prompt=None, client=None):
+    """Transcribe several single-speaker tracks into one interleaved transcript.
+
+    ``tracks`` is a list of ``(speaker, path, offset_s)``: who is on the track,
+    where the file is, and how many seconds into the conversation it starts.
+    A meeting records each participant separately (and each again after a
+    reconnect), so this is the general form of what _transcribe_channels does
+    for a two-channel phone call — and, unlike it, it never deletes its inputs.
+
+    Returns ``(text, segments)`` with ``speaker`` set on every segment to the
+    value given for its track, in the order the words were spoken.
+    """
+    client = client or _openai_client()
+    per_speaker, merged = [], []
+    for speaker, path, offset in tracks:
+        if not path or not os.path.exists(path):
+            continue
+        offset = float(offset or 0.0)
+        _text, segs, words = _whisper(path, client, prompt=prompt)
+        for seg in segs:
+            seg["start"] = round(seg["start"] + offset, 2)
+            seg["end"] = round(seg["end"] + offset, 2)
+            seg["speaker"] = speaker
+        for w in words:
+            w["start"] = round(w["start"] + offset, 2)
+            w["end"] = round(w["end"] + offset, 2)
+        merged.extend(segs)
+        per_speaker.append((speaker, words))
+
+    segments = _turns_from_words(per_speaker)
+    if not segments:
+        merged.sort(key=lambda seg: seg["start"])
+        segments = merged
+    text = "\n".join(seg["text"] for seg in segments)
+    return text, segments
+
 
 ## Self registration logic ##
 
@@ -795,7 +1660,8 @@ def agent_host_allowed(host: str) -> bool:
     return (host or "").strip().lower() in allow
 
 
-def _invoke_langgraph_for_agent(agent: Agent, user_message: str, thread_id: str, phone: str | None = None) -> str:
+def _invoke_langgraph_for_agent(agent: Agent, user_message: str, thread_id: str, phone: str | None = None,
+                                channel: str | None = None) -> str:
     # AS-06/F8 fix: refuse to contact a non-allow-listed agent host.
     if not agent_host_allowed(getattr(agent, "host", "")):
         return "Sorry, the configured agent host is not permitted."
@@ -829,11 +1695,16 @@ def _invoke_langgraph_for_agent(agent: Agent, user_message: str, thread_id: str,
     cfg = {"configurable": {"thread_id": thread_id}}
     if phone:
         cfg["configurable"]["phone_number"] = phone
+    if channel:
+        cfg["configurable"]["channel"] = channel
 
     try:
         result = rg.invoke({"messages": msgs}, config=cfg)
         msgs_out = result.get("messages") if isinstance(result, dict) else None
         if isinstance(msgs_out, list) and msgs_out:
+            joined = remote_turn_reply(msgs_out)
+            if joined:
+                return joined
             last = msgs_out[-1]
             if isinstance(last, dict):
                 content = last.get("content")
@@ -843,7 +1714,30 @@ def _invoke_langgraph_for_agent(agent: Agent, user_message: str, thread_id: str,
     except Exception:
         return "Sorry, something went wrong generating the response."
 
-def _handle_self_registration_flow(phone: str, text: str) -> str | None:
+def _enrolment_join_url() -> str:
+    """Absolute URL of the public join page, or "" when it cannot be built.
+
+    Absolute because it is about to be sent to somebody's phone, where a relative
+    path is useless — and there is no request to build it from, since an inbound
+    WhatsApp message is not a page view.
+
+    It reuses ``AGENT_CALLBACK_URL``, which is already "this platform's public
+    base URL" (it is what remote agents are told to call back on). A second
+    setting holding the same hostname would be one more thing to get out of step.
+    Blank there simply means no link is offered; the agent then registers the
+    person normally rather than pointing them at a URL it had to invent.
+    """
+    from .site_config import get_bool, get_setting
+
+    if not get_bool("STUDY_ENROLMENT_ENABLED"):
+        return ""
+    base = (get_setting("AGENT_CALLBACK_URL") or "").strip().rstrip("/")
+    if not base.startswith(("http://", "https://")):
+        return ""
+    return f"{base}/join/"
+
+
+def _handle_self_registration_flow(phone: str, text: str, channel: str = "whatsapp") -> str | None:
     if not _selfreg_enabled():
         return None
     agent = _get_selfreg_agent()
@@ -864,15 +1758,21 @@ def _handle_self_registration_flow(phone: str, text: str) -> str | None:
         from .native_agents import run_native
         configurable = {
             "phone_number": phone,
+            "channel": channel,
             "platform_language": getattr(settings, "LANGUAGE_CODE", None),
             "brand_name": brand_name(),
         }
+        # Only where a study is running. Its presence is what switches the agent
+        # over to asking about access codes at all — see participant_management.md.
+        join_url = _enrolment_join_url()
+        if join_url:
+            configurable["join_url"] = join_url
         model_name = (getattr(agent, "model", "") or "").strip() or None
         reply = run_native(agent.native_key, thread_id, text, configurable, model_name)
     else:
-        reply = _invoke_langgraph_for_agent(agent, text, thread_id, phone=phone)
+        reply = _invoke_langgraph_for_agent(agent, text, thread_id, phone=phone, channel=channel)
 
-    conv, _ = Conversation.objects.get_or_create(
+    conv, _created = Conversation.objects.get_or_create(
         id=conv_uuid,
         defaults={"started_at": timezone.now(), "last_message_at": timezone.now()},
     )
@@ -881,11 +1781,16 @@ def _handle_self_registration_flow(phone: str, text: str) -> str | None:
     conv.last_message_at = timezone.now()
     conv.save()
 
-    Message.objects.create(
+    from .message_attribution import create_message
+    # No owner: this is somebody asking to become a client, not one yet. The
+    # role marks the row as stamped, so it is never picked up later by number
+    # matching if the same number is saved on a client after approval.
+    create_message(
         user=phone,
         conversation_id=thread_id,
         user_message=text,
         response_message=reply,
+        sender_role=Message.SenderRole.PROSPECT,
     )
     return reply
 
@@ -1102,5 +2007,9 @@ def send_sms_text(to_e164: str | None, body: str) -> bool:
             body=body.strip()
         )
         return True
-    except Exception:
+    except Exception as exc:
+        # This is the reply to a caregiver who texted in. Failing silently left
+        # nothing to find when one went unanswered — the WhatsApp sender above
+        # logs its refusals the same way.
+        logger.warning("SMS create failed for %s: %s", to_e164, exc)
         return False

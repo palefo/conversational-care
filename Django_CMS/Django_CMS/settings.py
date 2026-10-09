@@ -14,9 +14,17 @@ https://docs.django-cms.org/en/release-4.1.x/reference/configuration.html
 """
 from dotenv import load_dotenv
 
+import mimetypes
 import os
 
 load_dotenv()  # Load environment variables from .env
+
+# The fonts are served from this app rather than from Google, and Python's
+# mimetypes table does not know .woff2 on every host — without this the dev
+# static server labels them application/octet-stream, the browser decides the
+# preload it was given does not match what arrived, and fetches each font a
+# second time. A production front end (nginx, whitenoise) sets this itself.
+mimetypes.add_type("font/woff2", ".woff2", True)
 
 from pathlib import Path
 

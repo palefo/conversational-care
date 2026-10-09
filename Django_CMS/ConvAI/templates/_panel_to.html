@@ -1,0 +1,27 @@
+{% load i18n %}
+{% comment %}
+  Who the call reaches, or who wrote in. Sits under the dated facts, on every
+  kind of panel that knows the answer.
+
+  Every call the platform places bridges the navigator and the caregiver — see
+  make_phone_call in views/calls.py, which refuses outright without a caregiver
+  number — so the client whose name heads the panel is not on the call. The
+  panel said so only in the dialling label, which appears once the phones are
+  already ringing, and the two reasons a call cannot be placed lived in a
+  title= on a disabled button: discoverable by hovering something that looks
+  dead.
+
+  The wording is decided in views/_panel.py, where the facts are, and the block
+  is left out entirely when nothing is known. A visit with no caregiver on file
+  has nobody to name — nothing records who turns up — and a chat from a number
+  matching neither of the client's two is not evidence of who wrote it.
+{% endcomment %}
+{% if panel_item.to %}
+  <div class="dp-to{% if panel_item.to.warn %} dp-to-warn{% endif %}">
+    <span class="material-icons-outlined" aria-hidden="true">{{ panel_item.to.icon }}</span>
+    <span class="dp-to-t">
+      {{ panel_item.to.lead }}{% if panel_item.to.who %} <b>{{ panel_item.to.who }}</b>{% if panel_item.to.role %} &middot; {{ panel_item.to.role }}{% endif %}{% if panel_item.to.phone %} &middot; {{ panel_item.to.phone }}{% endif %}{% endif %}
+      {% if panel_item.to.note %}<br><em>{{ panel_item.to.note }}</em>{% endif %}
+    </span>
+  </div>
+{% endif %}

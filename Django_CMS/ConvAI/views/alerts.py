@@ -203,25 +203,17 @@ def alert_detail(request, pk: int):
             return _after_action(request, alert, default="alert_detail")
 
         if form_type == "note_update":
-            internal_note = (request.POST.get("internal_note") or "").strip()
-            data["internal_note"] = internal_note
-            data["internal_note_updated_at"] = timezone.now().isoformat()
-            data["internal_note_updated_by"] = request.user.get_username()
-
-            note_log = data.get("note_log", [])
-            if not isinstance(note_log, list):
-                note_log = []
-            if internal_note:
-                note_log.append({
-                    "note": internal_note,
-                    "at": timezone.now().isoformat(),
-                    "by": request.user.get_username(),
-                })
-                data["note_log"] = note_log[-25:]
-
-            alert.data = data
-            alert.save(update_fields=["data", "updated_at"])
-            messages.success(request, _("Internal note saved."))
+            # A note is a Note row, the same record the detail panel writes and
+            # reads. It used to be a single string overwritten inside the
+            # alert's JSON, with a parallel `note_log` list that nothing ever
+            # displayed — so a note written here was invisible in the panel, and
+            # the previous one was gone.
+            body = (request.POST.get("internal_note") or "").strip()
+            if body:
+                Note.objects.create(alert=alert, body=body, author=request.user)
+                messages.success(request, _("Note saved."))
+            else:
+                messages.warning(request, _("Write something first."))
             return redirect("alert_detail", pk=alert.pk)
 
     conversation_review_url = None
@@ -304,6 +296,10 @@ def alert_detail(request, pk: int):
         "conversation_review_url": conversation_review_url,
         "conversation_messages": conversation_messages,
         "conversation_id": conversation_id,
+        # The same rows the detail panel's Notes tab shows, so the two surfaces
+        # cannot disagree about what was written on an alert.
+        "notes_list": (Note.objects.filter(alert=alert)
+                       .select_related("author").order_by("-created_at")),
         "active_page": "alerts",
     })
 
@@ -395,13 +391,14 @@ def send_alert_sms(request, alert_id: int):
         messages.error(request, _("The alert's user has no phone number."))
         return redirect("alert_detail", pk=alert.id)
 
-    # Try to map phone -> patient (for thread + agent)
-    patient = (
-        Patient.objects
-        .filter(Q(phone_number=to_number) | Q(caregiver__phone_number=to_number))
-        .select_related("agent")
-        .first()
-    )
+    # The client this alert is about, when the alert already says so; only an
+    # alert with no client falls back to working it out from the number, and
+    # then through the same resolver an inbound message uses.
+    # See ConvAI.message_attribution.
+    patient = alert.patient
+    if patient is None:
+        from ..message_attribution import resolve_inbound
+        patient = resolve_inbound(to_number).patient
     thread_id = None
     if patient and patient.agent:
         thread_id = _get_or_create_thread(patient)
@@ -438,11 +435,14 @@ def send_alert_sms(request, alert_id: int):
         append_system_note_to_langgraph(patient, system_note, thread_id=thread_id)
     else:
         # Fallback logging if we couldn't resolve a patient/thread
-        Message.objects.create(
+        from ..message_attribution import create_message
+        create_message(
             conversation_id=f"alert-{alert.id}",
             user=str(to_number),
             user_message="",
             response_message=body_to_log,
+            patient=alert.patient or patient,
+            sender_role=Message.SenderRole.PLATFORM,
         )
 
     # Progress the alert if still CREATED
@@ -473,6 +473,11 @@ def alerts_since(request):
 
     Scope is the same rule the dashboard uses: your own alerts and the alerts
     of clients you navigate, unless you are an admin.
+
+    Admins also hear about people who signed up and are waiting to be approved,
+    on the same terms as the dashboard queue (self-registration on). They are
+    not alerts and have no panel, so they carry an ``href`` to the approval form
+    instead of a token.
     """
     qs = Alert.objects.exclude(status=Alert.AlertStatus.RESOLVED)
     if not is_admin(request.user):
@@ -497,6 +502,22 @@ def alerts_since(request):
     fresh = fresh[:_SINCE_MAX]
 
     out = []
+    if is_admin(request.user) and get_bool("SELF_REGISTRATION_ENABLED"):
+        regs = list(SelfRegistration.objects
+                    .filter(state=SelfRegistration.State.REGISTERED, created_at__gt=since)
+                    .order_by("-created_at")[: _SINCE_MAX + 1])
+        more += max(0, len(regs) - _SINCE_MAX)
+        href = f"{reverse('config')}?tab=registrations#registrations"
+        for r in regs[:_SINCE_MAX]:
+            who = f"{r.name} {r.lastname}".strip()
+            out.append({
+                "id": f"reg-{r.pk}",
+                "high": False,
+                "title": f"{_('New registration')} — {who}" if who else str(_("New registration")),
+                "body": str(_("Waiting to be approved.")),
+                "href": href,
+            })
+
     for a in fresh:
         who = f"{a.patient.name} {a.patient.lastname}".strip() if a.patient else ""
         high = a.priority == Alert.Priority.HIGH
@@ -504,8 +525,8 @@ def alerts_since(request):
         out.append({
             "id": a.pk,
             "high": high,
-            "title": f"{label} — {who}" if who else (a.title or str(label)),
-            "body": a.title or a.description or "",
+            "title": f"{label} — {who}" if who else (display_label(a.title) or str(label)),
+            "body": display_label(a.title) or a.description or "",
             # Just the panel token. The browser hangs it off whatever page it
             # is on, keeping the filters and sort already in the URL, so acting
             # on an alert never costs you the list you were working.

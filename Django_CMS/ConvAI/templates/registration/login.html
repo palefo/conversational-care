@@ -1,4 +1,4 @@
-{% load static custom_filters %}
+{% load static custom_filters i18n %}
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -38,6 +38,10 @@
                 <div class="field">
                     <label for="id_password">Password</label>
                     <input type="password" name="password" autocomplete="current-password" required="" id="id_password" placeholder="Enter your password">
+                </div>
+
+                <div class="field-hint">
+                    <a class="auth-link" href="{% url 'password_reset' %}">{% trans "Forgot your password?" %}</a>
                 </div>
 
                 <button type="submit" class="submit-button">Login</button>

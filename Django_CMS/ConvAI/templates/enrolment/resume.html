@@ -1,0 +1,30 @@
+{% extends "enrolment/_base.html" %}{% load i18n %}
+{% block title %}{% trans "Continue where you left off" %}{% endblock %}
+{% block subtitle %}{% trans "Continue where you left off" %}{% endblock %}
+{% block content %}
+  {% if locked %}
+    <div class="join-locked">
+      {% trans "Too many incorrect attempts from this connection. Please wait an hour and try again." %}
+    </div>
+  {% endif %}
+
+  <p class="join-intro">
+    {% trans "Enter the access code you were given and we will take you back to the right step." %}
+  </p>
+
+  <form method="post" class="form">
+    {% csrf_token %}
+    <div class="field">
+      <label for="id_access_code">{% trans "Access code" %}</label>
+      <input type="text" name="access_code" id="id_access_code" required autofocus
+             class="join-code" autocomplete="off" autocapitalize="none" spellcheck="false"
+             placeholder="{% trans 'e.g. maple-crane-frost' %}"
+             {% if locked %}disabled{% endif %}>
+    </div>
+    <button type="submit" class="submit-button" {% if locked %}disabled{% endif %}>
+      {% trans "Continue" %}
+    </button>
+  </form>
+
+  <a class="auth-link" href="{% url 'enrolment_landing' %}">{% trans "Back" %}</a>
+{% endblock %}

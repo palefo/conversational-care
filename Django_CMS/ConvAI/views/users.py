@@ -154,7 +154,10 @@ def create_user(request):
     form = NavigatorForm(request.POST)
     if form.is_valid():
         cd = form.cleaned_data
-        user = get_user_model()(username=cd['username'], is_staff=False, is_active=True)
+        user = get_user_model()(
+            username=cd['username'], email=cd.get('email') or "",
+            is_staff=False, is_active=True,
+        )
         user.set_password(cd['password'])
         user.save()
         user.groups.add(Group.objects.get(name='Navigator'))

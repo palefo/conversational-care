@@ -1,0 +1,15 @@
+{
+  "alert_pk": 10,
+  "alert_description": "Durante una evaluación sobre memoria, el paciente interrumpe para decir “I am feeling suicidal”. El agente responde con apoyo inmediato, evalúa si hay peligro actual y da instrucciones de emergencia y contactos de crisis.",
+  "alert_data": {
+    "trigger": "El paciente dijo claramente “I am feeling suicidal”, indicando ideación suicida.",
+    "detector": "Self-harm",
+    "trigger_at": "2026-08-26T23:49:09.654040+00:00",
+    "classification": "Emergency",
+    "conversation_id": "47b3b853-0d08-40c5-ad99-7f82d4aa3b9a",
+    "raised_by_human": false
+  },
+  "conv_id": "47b3b853-0d08-40c5-ad99-7f82d4aa3b9a",
+  "conv_summary": "Durante una evaluación sobre memoria, el paciente interrumpe para decir “I am feeling suicidal”. El agente responde con apoyo inmediato, evalúa si hay peligro actual y da instrucciones de emergencia y contactos de crisis.",
+  "conv_topic": "Emergency"
+}

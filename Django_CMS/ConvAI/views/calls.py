@@ -1,11 +1,14 @@
 from ._base import *  # noqa: F401,F403
 import logging
 
+from django.db import transaction
+
 from ._panel import panel_context
+from .. import extensions
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['scoped_meeting_form', 'save_scheduled_meeting', 'calendar_view', 'calendar_create_meeting', 'complete_meeting', 'cancel_meeting', 'edit_meeting', 'pending_call', 'make_phone_call', 'save_meeting_notes', 'schedule_call', 'send_whatsapp_reminder_view']
+__all__ = ['scoped_meeting_form', 'save_scheduled_meeting', 'calendar_view', 'calendar_create_meeting', 'complete_meeting', 'cancel_meeting', 'edit_meeting', 'pending_call', 'make_phone_call', 'start_client_call', 'schedule_call', 'send_whatsapp_reminder_view', 'send_meeting_reminder_view']
 
 
 @login_required
@@ -69,6 +72,9 @@ def save_scheduled_meeting(form):
         return None
 
     meeting.save()
+    # save(commit=False) defers the m2m, so without this the protocols picked in
+    # the dialog never reach the meeting.
+    form.save_m2m()
     return meeting
 
 
@@ -91,6 +97,137 @@ def schedule_call(request):
     return redirect('communications')
 
 
+def _call_error(message, status, fix_href=None, fix_label=None):
+    """A refusal the panel can actually render.
+
+    These used to be bare HttpResponseForbidden/BadRequest bodies, and the
+    panel discarded every one of them in favour of "Could not start the call."
+    Three of the four reasons below are things the navigator can fix in under a
+    minute — but only if they are told which one it is, and where to go.
+    """
+    payload = {'error': message}
+    if fix_href:
+        payload['fix'] = {'href': fix_href, 'label': fix_label}
+    return JsonResponse(payload, status=status)
+
+
+def _record_call_legs(meeting, conference, user):
+    """Write down which Twilio call is which side of this meeting's conference.
+
+    This is the only moment the answer is free. Twilio names each leg here,
+    with the meeting and the client already in hand; the recording turns up
+    later carrying nothing but that name and two phone numbers, and a phone
+    number cannot say which client it is — or whether it is a client at all,
+    the navigator's own leg being a staff number. See CallLeg.
+
+    Deliberately after the conference has been placed, and deliberately
+    swallowed. By the time this runs both phones are already ringing, and
+    failing to write down what the call was must not turn a placed call into an
+    error on the navigator's screen. What is lost when it fails is the exact
+    link, and the recording falls back to being matched by number — which is
+    where every recording was before this.
+    """
+    legs = (conference or {}).get('legs') or []
+    rows = [
+        CallLeg(
+            call_sid=leg.get('call_sid'),
+            meeting=meeting,
+            patient=meeting.patient,
+            leg=leg.get('leg'),
+            to_number=str(leg.get('to_number') or ''),
+            conference_name=str((conference or {}).get('conference') or '')[:64],
+            placed_by=user if getattr(user, 'pk', None) else None,
+        )
+        for leg in legs if leg.get('call_sid')
+    ]
+    if not rows:
+        return
+    try:
+        # The savepoint is what makes swallowing this safe. Without it, a
+        # database error caught here would leave the surrounding transaction
+        # unusable — should ATOMIC_REQUESTS ever be switched on — and the retry
+        # counter below would fail next, turning a bookkeeping miss into the
+        # failed call this is written to avoid.
+        #
+        # ignore_conflicts because call_sid is unique: a SID already written
+        # down is the same leg, not a second one.
+        with transaction.atomic():
+            CallLeg.objects.bulk_create(rows, ignore_conflicts=True)
+    except Exception:
+        logger.exception(
+            "Call placed for meeting %s but its legs could not be recorded; "
+            "its recordings will fall back to number matching.", meeting.pk,
+        )
+
+
+def _place_call(request, meeting):
+    """Bridge the navigator's phone to whoever this meeting is with.
+
+    Split out of make_phone_call so the Call button on the client page places
+    its call the same way a booked one is placed, rather than growing a second
+    copy of the Twilio round trip, the leg bookkeeping and the four refusals.
+    The only difference between the two entry points is where the meeting came
+    from; everything from here down is identical, and has to stay identical —
+    an unscheduled call that skipped _record_call_legs would lose its recording.
+    """
+    recipient = meeting.dial_recipient
+    if recipient is None:
+        # Named, rather than "no caregiver": with two people to choose between,
+        # the reason has to say which of them was chosen and came up short, or
+        # the navigator goes looking at the wrong record.
+        missing = (_("This client has no phone number of their own to call.")
+                   if meeting.dial_target == Meeting.DialTarget.CLIENT
+                   else _("This client has no caregiver with a phone number to call."))
+        return _call_error(
+            missing, 400,
+            reverse('patient_detail', args=[meeting.patient_id]), _("Open the client"),
+        )
+
+    # The conference bridges the navigator's own phone too, so a missing number
+    # here used to reach Twilio as the string "None" and fail obscurely.
+    if not request.user.phone_number:
+        return _call_error(
+            _("Your own phone number is not set, so the call cannot be placed."), 400,
+            reverse('profile'), _("Add your number"),
+        )
+
+    # Convertir a string para Twilio
+    dyad_phone = str(recipient.phone_number)
+    ctn_phone  = str(request.user.phone_number)
+    platform_phone = get_platform_phone()
+
+    try:
+        # Llamada al helper que inicia la conferencia
+        conference = make_phone_conference({
+            'CTN': ctn_phone,
+            'Dyad': dyad_phone,
+            'Platform': platform_phone
+        })
+    except Exception:
+        # The exception text used to be handed to the browser verbatim. Twilio
+        # errors carry account SIDs and endpoint detail, none of which belongs
+        # on a navigator's screen and none of which they could act on — so it
+        # goes to the log, and the panel gets a sentence instead.
+        logger.exception("Failed to start conference for meeting %s", meeting.pk)
+        return _call_error(
+            _("The phone system did not accept the call. Please try again."), 502,
+        )
+
+    _record_call_legs(meeting, conference, request.user)
+
+    # Incrementar retries en 1
+    Meeting.objects.filter(pk=meeting.pk).update(retries=F('retries') + 1)
+
+    # The conference name only. The Call SIDs the helper also returns stay on
+    # this side: they are Twilio's identifiers for the call, the browser has no
+    # use for them, and the panel already deliberately keeps Twilio detail off
+    # the navigator's screen — see _call_error.
+    return JsonResponse({
+        'status': 'ok',
+        'conference': (conference or {}).get('conference')
+    })
+
+
 @login_required
 def make_phone_call(request, meeting_id):
     """
@@ -102,44 +239,73 @@ def make_phone_call(request, meeting_id):
     )
 
     if not (is_admin(request.user) or meeting.patient.navigator_id == request.user.id):
-        return HttpResponseForbidden(_("You do not have permission to start this call."))
+        return _call_error(_("You do not have permission to start this call."), 403)
 
-    caregiver = meeting.patient.caregiver
-    if not caregiver or not caregiver.phone_number:
-        return HttpResponseBadRequest(_("This client has no caregiver with a valid phone number."))
+    return _place_call(request, meeting)
 
-    # The conference bridges the navigator's own phone too, so a missing number
-    # here used to reach Twilio as the string "None" and fail obscurely.
-    if not request.user.phone_number:
-        return HttpResponseBadRequest(
-            _("Your own phone number is not set, so the call cannot be placed.")
-        )
 
-    # Convertir a string para Twilio
-    dyad_phone = str(caregiver.phone_number)
-    ctn_phone  = str(request.user.phone_number)
-    platform_phone = get_platform_phone()
+@require_POST
+@login_required
+def start_client_call(request, patient_id):
+    """Call this client now, without anything having been booked.
 
-    try:
-        # Llamada al helper que inicia la conferencia
-        conference_result = make_phone_conference({
-            'CTN': ctn_phone,
-            'Dyad': dyad_phone,
-            'Platform': platform_phone
-        })
-    except Exception as e:
-        # Loggear e informar error al cliente
-        # logger.exception("Error al iniciar conferencia")
-        return HttpResponseServerError(f"Error iniciando la llamada: {e}")
+    The Call button on the client page. It rings whichever of the client's two
+    numbers was picked — see Meeting.DialTarget — and the call it places is an
+    ordinary Meeting, created here and marked unscheduled.
 
-    # Incrementar retries en 1
-    Meeting.objects.filter(pk=meeting.pk).update(retries=F('retries') + 1)
+    A Meeting rather than a bare Twilio call, because a call outside one is a
+    call the platform cannot hold: CallLeg hangs off a meeting and is what ties
+    the recording arriving hours later back to this client, and the panel's
+    protocols, notes and outcome are all addressed to one. Placing this call
+    without a meeting would mean a call that is recorded nowhere, answered
+    nowhere, and closed nowhere.
 
-    # Puedes devolver detalles de la conferencia si quieres
-    return JsonResponse({
-        'status': 'ok',
-        'conference': conference_result
-    })
+    Deliberately never reuses a booked call, even one due in ten minutes.
+    Folding an unscheduled call into a scheduled one would silently record the
+    booked call as made — and if this was a different conversation, that is a
+    call that now looks done and will not be made.
+    """
+    patient = get_object_or_404(
+        Patient.objects.select_related('caregiver', 'navigator'), pk=patient_id
+    )
+    if not (is_admin(request.user) or patient.navigator_id == request.user.id):
+        return _call_error(_("You do not have permission to call this client."), 403)
+
+    target = (Meeting.DialTarget.CLIENT
+              if (request.POST.get('to') or '').strip() == 'client'
+              else Meeting.DialTarget.CAREGIVER)
+
+    meeting = Meeting.objects.create(
+        patient=patient,
+        # Now, because that is when it is happening. ended_at is what dates it
+        # in Happened once the outcome is recorded; until then this is what the
+        # lists sort it by, and a call placed at 15:40 belongs at 15:40.
+        scheduled_time=timezone.now(),
+        modality=Meeting.Modality.PHONE,
+        status=Meeting.Status.PENDING,
+        dial_target=target,
+        unscheduled=True,
+    )
+
+    response = _place_call(request, meeting)
+
+    if response.status_code != 200:
+        # Nothing was placed, so there was no call — and a meeting left behind
+        # here would be one: a row on the timeline, in the navigator's queue,
+        # asking for an outcome nobody owes it. It only earns its place once
+        # the phones are actually ringing.
+        meeting.delete()
+        return response
+
+    # Where to carry on. The client page opens this meeting's panel rather than
+    # navigating anywhere new, so the call arrives with its protocols, its notes
+    # and its outcome already around it — the same panel a booked call is worked
+    # through in.
+    payload = {'status': 'ok', 'item': meeting.panel_token}
+    recipient = meeting.dial_recipient
+    if recipient is not None:
+        payload['who'] = str(recipient)
+    return JsonResponse(payload)
 
 
 @require_POST
@@ -165,18 +331,36 @@ def complete_meeting(request, meeting_id):
 
     meeting.status = new_status
 
-    # Si se marcó Completed, debemos capturar el protocolo ejecutado
-    if new_status == Meeting.Status.COMPLETED:
-        try:
-            ep = int(request.POST.get('executed_protocol', ''))
-            meeting.executed_protocol = ep
-        except (ValueError, TypeError):
-            messages.error(request, _("You must choose an executed protocol."))
-            return _back_to(request, 'pending_call', call_id=meeting_id)
-    else:
-        meeting.executed_protocol = None
+    # When it actually happened, as opposed to when it was booked. Stamped on
+    # the first outcome only: pressing Change to correct a mis-click is fixing
+    # the record of a call, not moving when the call took place.
+    if new_status != Meeting.Status.PENDING and meeting.ended_at is None:
+        meeting.ended_at = timezone.now()
 
     meeting.save()
+
+    # What the call actually covered. A call can work through more than one
+    # protocol, so this is a set rather than a single number, and it is only
+    # recorded on a call that happened — an unanswered call covered nothing.
+    #
+    # Nothing is rejected for being empty any more: a completed call with no
+    # protocol against it is an ordinary thing (a check-in, a conversation that
+    # went elsewhere), and refusing to record the outcome over it meant the
+    # outcome went unrecorded instead.
+    if new_status == Meeting.Status.COMPLETED:
+        ids = []
+        for raw in request.POST.getlist('executed_protocols'):
+            try:
+                ids.append(int(raw))
+            except (TypeError, ValueError):
+                continue
+        meeting.executed_protocols.set(Protocol.objects.filter(pk__in=ids))
+    else:
+        meeting.executed_protocols.clear()
+    # An online meeting's room (if one is open) closes when the outcome is
+    # recorded; the meetings app listens for this.
+    extensions.meeting_completed.send(sender=Meeting, meeting=meeting,
+                                      status=new_status, by=request.user)
     messages.success(request, _("Meeting status updated."))
     return _back_to(request, 'dashboard')
 
@@ -245,6 +429,19 @@ def calendar_view(request):
         'view_options': [('month', _('Month')), ('week', _('Week')), ('day', _('Day'))],
     }
 
+    # Every view, not only the ones with clickable slots. The Schedule button in
+    # the header opens the same modal from the month as from the week, and a
+    # month rendering it without a form gave a New meeting dialog with nothing
+    # in it but Cancel and Schedule.
+    meeting_form = MeetingForm()
+    if not is_admin(request.user):
+        meeting_form.fields['patient'].queryset = Patient.objects.filter(navigator=request.user)
+    context['meeting_form'] = meeting_form
+    # Which protocols each client is on, so the dialog can float the chosen
+    # client's own to the top the moment they are chosen. Scoped to the clients
+    # the form can pick, which is already scoped to who the user may see.
+    context['protocol_owners'] = meeting_form.protocol_owners()
+
     if view == 'month':
         first_of_month = today_local.replace(day=1) + relativedelta(months=offset)
         year, month = first_of_month.year, first_of_month.month
@@ -300,10 +497,6 @@ def calendar_view(request):
                 })
             grid_rows.append({'label': slot['label'], 'cells': cells})
 
-        meeting_form = MeetingForm()
-        if not is_admin(request.user):
-            meeting_form.fields['patient'].queryset = Patient.objects.filter(navigator=request.user)
-
         if view == 'week':
             last = start_date + timedelta(days=6)
             label = f'{formats.date_format(start_date, "d M")} – {formats.date_format(last, "d M Y")}'
@@ -314,13 +507,13 @@ def calendar_view(request):
             'day_headers': day_headers,
             'grid_rows': grid_rows,
             'span': span,
-            'meeting_form': meeting_form,
         })
 
     # The panel is meant to survive moving around the platform, and the
     # calendar is exactly where you go mid-triage to find a slot — closing it
     # on arrival loses the thing you were scheduling around.
-    context.update(panel_context(request))
+    panel = panel_context(request)
+    context.update(panel)
 
     # Everything except `item`, so clicking an event opens it in place without
     # throwing you back to this month in the default view. Ends in `&` (or is
@@ -329,6 +522,15 @@ def calendar_view(request):
     rest.pop('item', None)
     encoded = rest.urlencode()
     context['cal_qs'] = f"{encoded}&" if encoded else ""
+
+    # The opposite, for the view switcher, Today and the arrows. Those are
+    # third-layer moves — they change what the calendar is showing, not what you
+    # are looking at — so the open panel goes with them. They build their
+    # querystring from scratch rather than from `keep()`, so `item` has to be
+    # handed to them explicitly or it is simply dropped, which is what used to
+    # close the panel on every change of week.
+    open_token = (panel.get('panel_item') or {}).get('token')
+    context['cal_item_qs'] = f"&item={quote_plus(open_token)}" if open_token else ""
 
     return render(request, 'calls/calendar.html', context)
 
@@ -361,10 +563,19 @@ def calendar_create_meeting(request):
             messages.error(request, _("You already have a meeting scheduled within this time range."))
         else:
             meeting.save()
+            # save(commit=False) defers the m2m write; without this the
+            # protocols picked in the dialog are silently dropped.
+            form.save_m2m()
             messages.success(request, _("Meeting scheduled."))
     else:
         messages.error(request, _("Please check the meeting details and try again."))
     return redirect(back)
+
+
+# What an edit can change that an add-on may need to react to: an online
+# meeting's link follows its time, and is withdrawn if the meeting moves to
+# another client or stops being online.
+_WATCHED_FIELDS = ("scheduled_time", "patient_id", "modality")
 
 
 @login_required
@@ -394,6 +605,10 @@ def edit_meeting(request, meeting_id):
     # form about one thing, and sending someone to a page of their own for it
     # lost the list, the calendar and the panel they were working in.
     if request.method == 'POST':
+        # Snapshotted before validation: a ModelForm writes the posted values
+        # onto its instance inside is_valid(), so reading them afterwards would
+        # compare the new values with themselves.
+        before = {f: getattr(meeting, f) for f in _WATCHED_FIELDS}
         form = MeetingForm(request.POST, instance=meeting)
         # Si no es staff, limitar pacientes al CTN (igual que en schedule_call)
         if not is_admin(request.user):
@@ -403,6 +618,11 @@ def edit_meeting(request, meeting_id):
             meeting = form.save(commit=False)
             meeting.navigator = request.user
             meeting.save()
+            form.save_m2m()
+            changed = {f for f in _WATCHED_FIELDS if getattr(meeting, f) != before[f]}
+            if changed:
+                extensions.meeting_changed.send(sender=Meeting, meeting=meeting,
+                                                changed=changed, by=request.user)
             messages.success(request, _("Meeting rescheduled successfully."))
         else:
             # The dialog is gone by the time this lands, so the errors have to
@@ -418,10 +638,12 @@ def edit_meeting(request, meeting_id):
 
 
 @login_required
-def send_whatsapp_reminder_view(request, meeting_id):
-    """
-    View que dispara el envío de un WhatsApp recordatorio al cuidador.
-    Solo el CTN asignado o staff pueden usarla.
+def send_meeting_reminder_view(request, meeting_id):
+    """Remind the caregiver about a meeting, over whichever channel is configured.
+
+    Only the client's navigator or an admin may. The channel — WhatsApp or
+    email — is chosen in Settings → Messaging; this view does not care which,
+    it only reports which one carried it.
     """
     meeting = get_object_or_404(
         Meeting.objects.select_related('patient__caregiver'),
@@ -433,43 +655,32 @@ def send_whatsapp_reminder_view(request, meeting_id):
         return HttpResponseForbidden(_("You do not have permission to send reminders."))
 
     try:
-        send_whatsapp_reminder(meeting)
+        channel = send_meeting_reminder(meeting)
     except ValueError as e:
-        logger.warning("Could not send WhatsApp reminder for meeting %s: %s", meeting_id, e)
-        messages.error(request, _("The reminder could not be sent."))
+        # Nothing to send to — a missing phone number or email address. Worth
+        # saying so, because it is fixed on the client's record, not by retrying.
+        logger.warning("Could not send reminder for meeting %s: %s", meeting_id, e)
+        messages.error(request, _(
+            "The reminder could not be sent: there is no contact address for the "
+            "configured reminder channel."
+        ))
         return _back_to(request, 'pending_call', call_id=meeting_id)
     except Exception as e:
-        # Cualquier otro error de Twilio
-        logger.warning("Twilio error sending WhatsApp reminder for meeting %s: %s", meeting_id, e)
+        # Anything the provider raised — Twilio, Azure or the SMTP server.
+        logger.warning("Provider error sending reminder for meeting %s: %s", meeting_id, e)
         messages.error(request, _("The reminder could not be sent."))
         return _back_to(request, 'pending_call', call_id=meeting_id)
 
-    messages.success(request, _("Reminder sent via WhatsApp."))
+    if channel == "email":
+        messages.success(request, _("Reminder sent by email."))
+    else:
+        messages.success(request, _("Reminder sent via WhatsApp."))
     return _back_to(request, 'pending_call', call_id=meeting_id)
 
 
-@login_required
-@require_POST
-def save_meeting_notes(request, meeting_id):
-    """Store the navigator's free-text notes for a call.
-
-    Autosaved from the detail panel, so it answers with JSON rather than a
-    redirect. Same ownership rule as the protocol answers it sits beside.
-    """
-    meeting = get_object_or_404(
-        Meeting.objects.select_related('patient__navigator'), pk=meeting_id
-    )
-    if not (is_admin(request.user) or meeting.patient.navigator_id == request.user.id):
-        return HttpResponseForbidden(_("You do not have permission to do this."))
-
-    meeting.notes = (request.POST.get("notes") or "").strip()
-    meeting.notes_updated_at = timezone.now()
-    meeting.save(update_fields=["notes", "notes_updated_at"])
-
-    return JsonResponse({
-        "status": "ok",
-        "saved_at": timezone.localtime(meeting.notes_updated_at).strftime("%H:%M"),
-    })
+# The button and the route were called send_whatsapp_reminder back when WhatsApp
+# was the only channel. Kept as an alias so old links and bookmarks still work.
+send_whatsapp_reminder_view = send_meeting_reminder_view
 
 
 @require_POST
@@ -495,6 +706,7 @@ def cancel_meeting(request, meeting_id):
             meeting.cancel_reason = ""
             meeting.cancelled_at = None
             meeting.save(update_fields=["status", "cancel_reason", "cancelled_at"])
+            extensions.meeting_reinstated.send(sender=Meeting, meeting=meeting, by=request.user)
             messages.success(request, _("The call is back on the schedule."))
         return _back_to(request, 'communications')
 
@@ -508,5 +720,6 @@ def cancel_meeting(request, meeting_id):
     meeting.cancel_reason = (request.POST.get("reason") or "").strip()[:200]
     meeting.cancelled_at = timezone.now()
     meeting.save(update_fields=["status", "cancel_reason", "cancelled_at"])
+    extensions.meeting_cancelled.send(sender=Meeting, meeting=meeting, by=request.user)
     messages.success(request, _("Call cancelled. It stays in the history."))
     return _back_to(request, 'communications')
