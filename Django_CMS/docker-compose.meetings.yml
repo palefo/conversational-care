@@ -14,6 +14,13 @@
 #   agent-scribe  ~120 MB → +10 MB per recorded meeting (threads, no inference)
 #   agent-voice   ~110 MB → +250–350 MB per agent in a meeting (one process each)
 #
+# Gated by the feature switch: each service runs under deploy/meetings-gate.sh,
+# which keeps it parked (~1 MB) while online meetings are off — in Settings or
+# ONLINE_MEETINGS_ENABLED — and starts it within a minute of switching them on.
+# Switching off stops them once no meeting is open. MEETINGS_GATE=0 in .env
+# runs them ungated, as before. Leaving out the profile still means no
+# containers at all.
+#
 # Everything reads the same .env as the web app. Required there:
 #   LIVEKIT_API_KEY, LIVEKIT_API_SECRET   any long random strings; shared by all three
 #   LIVEKIT_URL         what browsers connect to, e.g. ws://localhost:7880 (dev)
@@ -23,9 +30,16 @@
 #   LIVEKIT_NODE_IP     the IP browsers reach this machine on (dev: 127.0.0.1,
 #                       or your LAN IP to test from a phone; a server: its public IP)
 
+x-gate: &gate
+  # A tiny init reaps whatever the service leaves behind and passes `docker
+  # stop` on to the gate, which passes it on to the service.
+  init: true
+
 x-agents: &agents
+  <<: *gate
   build: ./meeting_agents
   profiles: ["meetings"]
+  entrypoint: ["sh", "/opt/meetings-gate.sh"]
   env_file:
     - .env
   environment: &agent-env
@@ -36,6 +50,7 @@ x-agents: &agents
     # Recordings are written straight to the shared media volume, where the
     # web app's worker mixes them down. Same path in every container.
     - media_data:/media
+    - ./deploy/meetings-gate.sh:/opt/meetings-gate.sh:ro
   depends_on:
     - livekit
     - web
@@ -43,9 +58,19 @@ x-agents: &agents
 
 services:
   livekit:
+    <<: *gate
     image: livekit/livekit-server:v1.13.9
     profiles: ["meetings"]
+    entrypoint: ["sh", "/opt/meetings-gate.sh", "/livekit-server"]
+    volumes:
+      - ./deploy/meetings-gate.sh:/opt/meetings-gate.sh:ro
     environment:
+      # For the gate (see the top of this file); LiveKit itself ignores them.
+      MEETINGS_SERVICE_KEY: ${MEETINGS_SERVICE_KEY:-}
+      MEETINGS_GATE: ${MEETINGS_GATE:-1}
+      MEETINGS_GATE_POLL: ${MEETINGS_GATE_POLL:-60}
+      MEETINGS_INTERNAL_API_URL: http://web:8000
+      MEETINGS_GATE_NAME: livekit
       # livekit-server reads its whole configuration from LIVEKIT_CONFIG
       # (its --config-body flag), so the keys interpolate from .env here and
       # never sit in a file.
@@ -91,6 +116,9 @@ services:
   agent-scribe:
     <<: *agents
     command: ["python", "-m", "cc_agents.scribe", "start"]
+    environment:
+      <<: *agent-env
+      MEETINGS_GATE_NAME: agent-scribe
     mem_limit: 384m
 
   agent-voice:
@@ -100,6 +128,7 @@ services:
       <<: *agent-env
       # One process per live agent, started on demand; none kept warm.
       CC_VOICE_IDLE_PROCESSES: "0"
+      MEETINGS_GATE_NAME: agent-voice
     mem_limit: 1g
 
   # TLS edge for a server with a domain (profile `edge`). Serves the app and

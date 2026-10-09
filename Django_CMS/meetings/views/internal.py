@@ -68,6 +68,35 @@ def _auth(request, scope: str):
     return run, claims
 
 
+@csrf_exempt
+@require_http_methods(["GET"])
+def gate(request):
+    """Should the meeting services be running? Asked by ``deploy/meetings-gate.sh``.
+
+    The media server and the agents sit parked at a few MB while online
+    meetings are switched off, and start when they are switched on — from
+    Settings or ``ONLINE_MEETINGS_ENABLED``, whichever wins in ``config.enabled``.
+    Switching off never cuts a meeting short: a room still open, or one that
+    closed so recently the recorder may still be handing in its files, keeps
+    them running until it is done.
+
+    Only the service key is needed: the answer names no meeting and no person.
+    """
+    expected = config.service_key()
+    presented = request.headers.get("X-CC-Service-Key", "")
+    if not expected:
+        return _deny(503, "internal API disabled: MEETINGS_SERVICE_KEY is not set")
+    if not hmac.compare_digest(presented.encode(), expected.encode()):
+        return _deny()
+    enabled = config.enabled()
+    live = MeetingSession.objects.filter(status=MeetingSession.Status.LIVE).count()
+    finishing = MeetingSession.objects.filter(
+        status=MeetingSession.Status.ENDED,
+        ended_at__gte=timezone.now() - RECORDING_GRACE).count()
+    return JsonResponse({"run": bool(enabled or live or finishing),
+                         "enabled": enabled, "live": live, "finishing": finishing})
+
+
 def _body(request) -> dict:
     try:
         return json.loads(request.body or b"{}")

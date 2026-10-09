@@ -154,3 +154,39 @@ class LateSegments(RecordingSegments):
                                 json.dumps({"question_id": self.q1.pk, "response": "x"}),
                                 content_type="application/json", **h)
         self.assertEqual(resp.status_code, 410)
+
+
+class Gate(MeetingsTestCase):
+    """What deploy/meetings-gate.sh asks before running LiveKit and the agents."""
+
+    def _ask(self, key="svc-key"):
+        h = {"HTTP_X_CC_SERVICE_KEY": key} if key is not None else {}
+        return self.client.get(reverse("meetings:internal_gate"), **h)
+
+    def test_needs_the_service_key_only(self):
+        self.assertEqual(self._ask(key=None).status_code, 401)
+        self.assertEqual(self._ask(key="nope").status_code, 401)
+        self.assertEqual(self._ask().status_code, 200)
+
+    def test_follows_the_switch(self):
+        self.assertTrue(self._ask().json()["run"])
+        self.set_enabled("0")
+        self.assertFalse(self._ask().json()["run"])
+
+    def test_switching_off_never_cuts_a_meeting_short(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from meetings.models import MeetingSession
+        session = rooms.start(self.meeting, self.nav)
+        self.set_enabled("0")
+        self.assertTrue(self._ask().json()["run"])          # still open
+        rooms.end(session, reason="test")
+        self.assertTrue(self._ask().json()["run"])          # recorder handing in
+        MeetingSession.objects.filter(pk=session.pk).update(
+            ended_at=timezone.now() - timedelta(hours=1))
+        self.assertEqual(self._ask().json(),
+                         {"run": False, "enabled": False, "live": 0, "finishing": 0})
+
+    def test_the_gate_script_reads_this_shape(self):
+        # The shell gate matches on the literal text, not on parsed JSON.
+        self.assertIn('"run": true', self._ask().content.decode())

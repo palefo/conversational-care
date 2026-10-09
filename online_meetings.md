@@ -170,9 +170,24 @@ needed — planned, not built (`LIVEKIT_TURN_ENABLED` turns on UDP TURN only).
 
 | | Web process | Containers | What changes |
 |---|---|---|---|
-| Feature off (Settings) | +~1.5 MB (the app's modules; no LiveKit code) | none needed | Online is not offered when booking; links show the generic "not available" page; existing online meetings stay readable (outcome, notes, recordings). A room already open is allowed to finish. The Settings tab stays visible. |
+| Feature off (Settings) | +~1.5 MB (the app's modules; no LiveKit code) | parked, ~2 MB each (below) | Online is not offered when booking; links show the generic "not available" page; existing online meetings stay readable (outcome, notes, recordings). A room already open is allowed to finish. The Settings tab stays visible. |
 | `MEETINGS_APP=0` | nothing | none | The app is not installed: no URLs, no tab. The core reaches it only through `ConvAI/extensions.py`, whose defaults answer "not available". Recordings already made are core `CallRecording` rows and still play and re-transcribe. Run `python manage.py migrate meetings zero` first if removing the app for good. |
 | Profile not started | — | none | The panel says the meeting server is not set up. |
+
+**The containers follow the switch.** LiveKit and both agents run under
+`deploy/meetings-gate.sh`, which asks the web app (`/meetings/internal/v1/gate/`,
+service key only) every minute whether they should be running. While online
+meetings are off — in Settings, or `ONLINE_MEETINGS_ENABLED` when Settings is
+left on the `.env` default — only the gate's shell runs. Switching on starts
+them within a minute (so give it that long before opening the first room), and
+switching off stops them once no room is open and no recorder is still handing
+in its files. Nothing touches Docker, and a reboot comes back to whichever state
+the switch says.
+
+If the web app cannot be asked (it is restarting, or `MEETINGS_SERVICE_KEY`
+differs) nothing changes: a running service keeps running, a parked one stays
+parked and says so in its log. `MEETINGS_GATE=0` runs them ungated, as before;
+`MEETINGS_GATE_POLL` sets the interval.
 
 ## Denoising
 

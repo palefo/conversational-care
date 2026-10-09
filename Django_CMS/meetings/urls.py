@@ -40,6 +40,7 @@ urlpatterns = [
 
     # LiveKit and the agent workers
     path("meetings/hooks/livekit/", webhooks.livekit_webhook, name="webhook"),
+    path("meetings/internal/v1/gate/", internal.gate, name="internal_gate"),
     path("meetings/internal/v1/run/", internal.run_config, name="internal_run"),
     path("meetings/internal/v1/run/status/", internal.run_status, name="internal_status"),
     path("meetings/internal/v1/protocol/questions/", internal.protocol_questions,
