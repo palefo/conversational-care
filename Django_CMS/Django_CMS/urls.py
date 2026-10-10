@@ -16,7 +16,6 @@ Including another URLconf
 """
 from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from django.views.i18n import JavaScriptCatalog
@@ -44,15 +43,21 @@ urlpatterns += [
 if getattr(settings, "MEETINGS_APP", False):
     urlpatterns += [path('', include('meetings.urls'))]
 
-if settings.DEBUG:
-    # Serve ONLY public branding assets (the logo shown on the login page) from
-    # /media/. All other media is private — care plans, voice notes, TTS, call
-    # recordings — and is reachable exclusively through ownership-checked views
-    # or short-lived signed tokens, never as a static /media/ URL. In production
-    # the reverse proxy must apply the same rule: expose /media/branding/ only.
-    # See file_storage.md.
-    urlpatterns += static(
-        settings.MEDIA_URL + "branding/",
-        document_root=os.path.join(settings.MEDIA_ROOT, "branding"),
-    )
+# Serve ONLY public branding assets (the logo shown on the login page) from
+# /media/. All other media is private — care plans, voice notes, TTS, call
+# recordings — and is reachable exclusively through ownership-checked views or
+# short-lived signed tokens, never as a static /media/ URL. See file_storage.md.
+#
+# Served whatever DEBUG says: `static()` returns nothing once DEBUG is off, so a
+# logo uploaded in Settings → Branding stopped showing on every installation
+# running in production mode. A logo is a few KB requested once per visitor,
+# the same order as the static files the app server already serves; a reverse
+# proxy in front may still take /media/branding/ over, as file_storage.md says.
+from django.urls import re_path
+from django.views.static import serve as _serve_branding
+
+urlpatterns += [
+    re_path(r"^%sbranding/(?P<path>.*)$" % settings.MEDIA_URL.lstrip("/"), _serve_branding,
+            {"document_root": os.path.join(settings.MEDIA_ROOT, "branding")}),
+]
 

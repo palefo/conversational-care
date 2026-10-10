@@ -115,8 +115,9 @@ location /media/branding/ {
 # Care plans, voice, and recordings are served by Django views with auth.
 ```
 
-In development Django enforces the same rule: `DEBUG` static serving is scoped
-to `/media/branding/` only (see `Django_CMS/urls.py`).
+Without a web server in front, the app enforces the same rule itself: it serves
+`/media/branding/` only (see `Django_CMS/urls.py`), with `DEBUG` on or off — a
+logo uploaded in Settings → Branding used to disappear once `DEBUG` was off.
 
 ## Future work
 

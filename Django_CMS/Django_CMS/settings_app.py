@@ -34,6 +34,23 @@ INSTALLED_APPS += ["markdownify", "widget_tweaks"]
 # MC-001/F6 fix: DEBUG defaults to False; only on when DJANGO_DEBUG is truthy.
 DEBUG = os.getenv("DJANGO_DEBUG", "0").strip().lower() in ("1", "true", "yes", "on")
 
+# Errors reach the container log whether DEBUG is on or off. Django's own
+# default sends request errors to the console only while DEBUG is on, and
+# otherwise to "mail the admins", which no installation configures — so a
+# production 500 left no trace at all. Request lines (django.server) keep
+# Django's default handler. DJANGO_LOG_LEVEL raises or lowers the rest.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"plain": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
+    "root": {"handlers": ["console"], "level": os.getenv("DJANGO_LOG_LEVEL", "WARNING")},
+    "loggers": {
+        "django": {"handlers": ["console"], "level": os.getenv("DJANGO_LOG_LEVEL", "WARNING"),
+                   "propagate": False},
+    },
+}
+
 
 # Internationalization
 USE_I18N = True

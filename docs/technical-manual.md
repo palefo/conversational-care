@@ -293,7 +293,8 @@ precedence over `.env`.
 | Variable | Default | Description |
 | --- | --- | --- |
 | `DJANGO_SECRET_KEY` | dev-only fallback | **Required in production.** Django signing key. |
-| `DJANGO_DEBUG` | `0` | Enable Django debug mode (never in production). |
+| `DJANGO_DEBUG` | `0` | Enable Django debug mode (never in production). Static files and the branding logo are served either way. |
+| `DJANGO_LOG_LEVEL` | `WARNING` | What reaches the container log. Request errors (tracebacks) are logged at any setting, with DEBUG on or off. |
 | `ALLOWED_HOSTS` | `localhost,127.0.0.1,0.0.0.0` | Comma-separated deployment hosts. |
 | `CSRF_TRUSTED_ORIGINS` | *(empty)* | Comma-separated origins incl. scheme. |
 | `PLATFORM_LANG` | `English` | UI language: `English`, `Spanish`, `Portuguese`, `Italian`, `Korean`, `Chinese`. |

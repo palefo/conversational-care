@@ -58,4 +58,6 @@ EXPOSE 8000
 
 # Specify the default command to run when starting the container
 # We use 0.0.0.0 to make the server accessible from outside the container
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# --insecure keeps the static files (CSS, JS, fonts) served when DJANGO_DEBUG=0,
+# which is how production runs; with DEBUG on it changes nothing.
+CMD ["python", "manage.py", "runserver", "--insecure", "0.0.0.0:8000"]

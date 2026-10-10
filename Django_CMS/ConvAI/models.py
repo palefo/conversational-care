@@ -146,6 +146,15 @@ class Message(models.Model):
             # The client timeline and the day panel both ask "this client's
             # messages on this day", which is this index exactly.
             models.Index(fields=["patient", "timestamp"], name="message_patient_ts_idx"),
+            # Legacy rows — written before attribution, never placed by the
+            # backfill — are still matched by number or by conversation (see
+            # message_attribution.legacy_q). Indexed on their own, so that match
+            # is a lookup into a small, closed set rather than a scan of every
+            # message: no new row is ever written without an owner or a role.
+            models.Index(fields=["user"], name="message_legacy_user_idx",
+                         condition=models.Q(patient__isnull=True, account__isnull=True, sender_role="")),
+            models.Index(fields=["conversation_id"], name="message_legacy_conv_idx",
+                         condition=models.Q(patient__isnull=True, account__isnull=True, sender_role="")),
         ]
 
     def __str__(self):

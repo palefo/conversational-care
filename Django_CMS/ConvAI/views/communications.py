@@ -10,14 +10,16 @@ A recording is not an event here. It belongs to the meeting it came from and is
 played inside that meeting's panel; see build_patient_events, which folds the
 two together for the same reason.
 """
+import heapq
 import unicodedata
 
 from ._base import *  # noqa: F401,F403
 from ._panel import panel_context
-from .patients import build_patient_events
+from .patients import build_events_by_patient
 from .calls import scoped_meeting_form, save_scheduled_meeting
 from .. import extensions
 
+from django.db.models import Max
 from django.utils.timesince import timesince
 from django.utils.translation import ngettext
 
@@ -237,6 +239,168 @@ def _fold(text):
     )
 
 
+class ChatDays:
+    """Chat days for many clients — counted, filtered and paged in the database.
+
+    A chat day (one client, one day they messaged) is the one kind of entry
+    that grows with use rather than with staff work: a year of an active
+    caseload is tens of thousands of them, against a few hundred calls and
+    alerts. Built as dicts and sorted in Python they were most of the page's
+    time, so the cross-client list asks the database instead — how many there
+    are in each range, and only the ones on the page being shown.
+
+    The days that involve legacy messages (no owner, matched by number or by
+    conversation — see message_attribution) are the exception. They are few,
+    can belong to two clients at once, and are merged with that client's own
+    messages from the same day, so they are built in full here (``loose``) and
+    travel with the ordinary events. Where such a day also has messages of the
+    client's own, the database still counts its own half of it; that half is a
+    *shadow*, known exactly from the merge, and is taken back out of every
+    count and page here rather than excluded in SQL — one OR clause per legacy
+    day made the query planner give up.
+
+    Every number and every row agrees with the full list built by
+    build_events_by_patient; ConvAI/test_comms_batching.py checks it.
+    """
+
+    AGGREGATES = staticmethod(lambda: {'last_ts': Max('timestamp'), 'msg_count': Count('id')})
+
+    def __init__(self, patients):
+        from ..message_attribution import per_patient_aggregates
+
+        self.patients = list(patients)
+        self.by_pk = {p.pk: p for p in self.patients}
+        dayq = Message.objects.annotate(day=TruncDate('timestamp'))
+
+        # Legacy days, merged with the same client's own messages that day.
+        legacy = per_patient_aggregates(self.patients, dayq, ('day',), self.AGGREGATES(), owned=False)
+        loose = {(pk, row['day']): dict(row) for pk, rows in legacy.items() for row in rows}
+        # (pk, day) -> last_ts of the client's own messages that day, which the
+        # database still groups and counts.
+        self._shadows = {}
+        if loose:
+            same_day = (dayq.filter(patient_id__in={pk for pk, _d in loose},
+                                    day__in={d for _p, d in loose})
+                        .order_by().values('patient_id', 'day').annotate(**self.AGGREGATES()))
+            for row in same_day:
+                pair = (row['patient_id'], row['day'])
+                have = loose.get(pair)
+                if have is not None:
+                    self._shadows[pair] = row['last_ts']
+                    have['last_ts'] = max(have['last_ts'], row['last_ts'])
+                    have['msg_count'] += row['msg_count']
+        self.loose_pairs = set(loose)
+        self.loose = [self.event(pk, row) for (pk, _day), row in sorted(loose.items())]
+        self._base = dayq.filter(patient_id__in=list(self.by_pk))
+        self._total = None
+
+    def event(self, pk, row):
+        """The same dict build_events_by_patient makes for a chat day."""
+        return {
+            'kind': 'conversation',
+            'ts': row['last_ts'] or timezone.make_aware(dt.datetime.combine(row['day'], dt.time.min)),
+            'panel_token': f"chat-{pk}-{row['day'].isoformat()}",
+            'patient': self.by_pk[pk],
+            'day': row['day'],
+            'day_str': row['day'].isoformat(),
+            'msg_count': row['msg_count'],
+        }
+
+    def _groups(self, patient_ids=None, cut=None):
+        qs = self._base
+        if patient_ids is not None:
+            qs = qs.filter(patient_id__in=patient_ids)
+        groups = qs.order_by().values('patient_id', 'day').annotate(**self.AGGREGATES())
+        if cut is not None:
+            groups = groups.filter(last_ts__gte=cut)
+        return groups
+
+    def _shadow_ts(self, patient_ids=None, cut=None):
+        """Last-message times of the shadows in scope (see the class note)."""
+        ids = None if patient_ids is None else set(patient_ids)
+        return [ts for (pk, _day), ts in self._shadows.items()
+                if (ids is None or pk in ids) and (cut is None or ts >= cut)]
+
+    def total(self):
+        """Every chat day these clients have outside ``loose`` (the tab's size)."""
+        if self._total is None:
+            self._total = self._groups().count() - len(self._shadows)
+        return self._total
+
+    def counts(self, patient_ids, cuts, late_cut, now):
+        """``{name: n}`` chat days at or after each cut (None = any time) in one
+        query, plus ``'late'``: those since ``late_cut`` that are before ``now``."""
+        exprs = {name: (Count('day', filter=Q(last_ts__gte=cut)) if cut is not None else Count('day'))
+                 for name, cut in cuts.items()}
+        late = Q(last_ts__lt=now)
+        if late_cut is not None:
+            late &= Q(last_ts__gte=late_cut)
+        exprs['late'] = Count('day', filter=late)
+        out = self._groups(patient_ids).aggregate(**exprs)
+        if self._shadows:
+            for name, cut in cuts.items():
+                out[name] -= len(self._shadow_ts(patient_ids, cut))
+            out['late'] -= sum(1 for ts in self._shadow_ts(patient_ids, late_cut) if ts < now)
+        if patient_ids is None and self._total is None:
+            # Unnarrowed, an any-time count is the tab's size: no second pass.
+            for name, cut in cuts.items():
+                if cut is None:
+                    self._total = out[name]
+                    break
+        return out
+
+    def newest(self, k, patient_ids, cut):
+        """The ``k`` most recent chat days, newest first, as events."""
+        extra = len(self._shadow_ts(patient_ids, cut))
+        rows = self._groups(patient_ids, cut).order_by('-last_ts', 'patient_id', '-day')[:k + extra]
+        events = [self.event(r['patient_id'], r) for r in rows
+                  if (r['patient_id'], r['day']) not in self._shadows]
+        return events[:k]
+
+    def newer_than(self, ts, patient_ids, cut):
+        """How many chat days in scope sort above ``ts``."""
+        n = self._groups(patient_ids, cut).filter(last_ts__gt=ts).count()
+        return n - sum(1 for t in self._shadow_ts(patient_ids, cut) if t > ts)
+
+    def find(self, token, patient_ids, cut):
+        """The chat day ``token`` names, if it is one of these and in range."""
+        try:
+            _chat, pk, day = token.split('-', 2)
+            pk, day = int(pk), dt.date.fromisoformat(day)
+        except (AttributeError, ValueError):
+            return None
+        if _chat != 'chat' or pk not in self.by_pk or (pk, day) in self.loose_pairs:
+            return None
+        if patient_ids is not None and pk not in patient_ids:
+            return None
+        rows = list(self._groups(None, cut).filter(patient_id=pk, day=day)[:1])
+        return self.event(pk, rows[0]) if rows else None
+
+    def unread(self, user):
+        """How many of these chat days ``user`` has not opened.
+
+        From the other end: the days they *have* opened are few, so those are
+        fetched and checked, rather than every day's token sent to the database
+        to be looked up.
+        """
+        marked = set()
+        for token in (SeenMark.objects.filter(user=user, token__startswith='chat-')
+                      .values_list('token', flat=True)):
+            try:
+                _chat, pk, day = token.split('-', 2)
+                pair = (int(pk), dt.date.fromisoformat(day))
+            except ValueError:
+                continue
+            if pair[0] in self.by_pk and pair not in self.loose_pairs:
+                marked.add(pair)
+        seen = 0
+        if marked:
+            seen = sum(1 for r in self._groups({pk for pk, _d in marked})
+                       .filter(day__in={d for _p, d in marked})
+                       if (r['patient_id'], r['day']) in marked)
+        return self.total() - seen
+
+
 @login_required
 def communications(request):
     # Scheduling posts here rather than navigating away, so a success returns
@@ -270,20 +434,23 @@ def communications(request):
         if focus_patient:
             patients = patients.filter(pk=focus_patient.pk)
 
-    protocol_numbers = dict(Protocol.objects.values_list('number', 'title'))
-    events = []
-    for p in patients:
-        events.extend(build_patient_events(p, protocol_numbers=protocol_numbers))
+    # Every client's calls, meetings, alerts and recordings in one pass — a
+    # fixed handful of queries, not a handful per client — and their chat days
+    # left in the database until a page of them is needed. See ChatDays.
+    patients = list(patients)
+    chat_days = ChatDays(patients)
+    events = [e for evs in build_events_by_patient(patients, chats=False).values() for e in evs]
+    events.extend(chat_days.loose)
 
     return render(request, 'communications/communications.html', {
-        **comms_list_context(request, events),
+        **comms_list_context(request, events, chat_days=chat_days),
         'focus_patient': focus_patient,
         'schedule_form': schedule_form or scoped_meeting_form(request),
         'active_page': 'communications',
     })
 
 
-def comms_list_context(request, events, for_patient=None):
+def comms_list_context(request, events, for_patient=None, chat_days=None):
     """Everything templates/communications/_list.html needs, from raw events.
 
     Shared by the cross-client page and the Communications tab on a client's
@@ -291,6 +458,11 @@ def comms_list_context(request, events, for_patient=None):
     it to that person: rows lead with what the entry is rather than whose it is,
     and the panel drops its "who is this" strip, because the page already
     answers both.
+
+    ``chat_days`` (a :class:`ChatDays`) holds the chat days that are not in
+    ``events``: they are counted and paged in the database and only the ones
+    on the page become rows. Every count, row and page comes out as it would
+    with all of them in ``events``.
     """
     scoped = for_patient is not None
     now = timezone.now()
@@ -356,6 +528,16 @@ def comms_list_context(request, events, for_patient=None):
 
         pool = [e for e in pool if hit(e)]
 
+    # The chat days still in the database, on the half they belong to
+    # (Happened), narrowed by the search the same way: a chat day matches on its
+    # client's and caregiver's names alone, having no title, protocol or place.
+    lazy = chat_days if (chat_days is not None and tab == 'past') else None
+    lazy_ids = None
+    if lazy is not None and q:
+        lazy_ids = [pk for pk, p in lazy.by_pk.items()
+                    if all(w in _fold(' '.join([p.name or '', p.lastname or '', str(p.caregiver or '')]))
+                           for w in words)]
+
     def by_kind(events, value):
         if value == 'all':
             return events
@@ -383,12 +565,31 @@ def comms_list_context(request, events, for_patient=None):
     when_counts = {value: len(by_when(of_kind, value))
                    for value, _label, _days in WHEN_CHIPS}
 
+    def cut_for(value):
+        days = WHEN_DAYS.get(value)
+        return now - dt.timedelta(days=days) if days else None
+
+    # The database's share of the same counts, in one query: chat days count
+    # towards All and Chats, and towards Overdue when they are in the past.
+    lazy_counts = {}
+    lazy_in_list = lazy is not None and kind in ('all', 'chat')
+    if lazy is not None:
+        lazy_counts = lazy.counts(lazy_ids, {v: cut_for(v) for v, _l, _d in WHEN_CHIPS},
+                                  cut_for(when), now)
+        for value in ('all', 'chat'):
+            if value in counts:
+                counts[value] += lazy_counts[when]
+        counts['late'] += lazy_counts['late']
+        if lazy_in_list:
+            for value, _label, _days in WHEN_CHIPS:
+                when_counts[value] += lazy_counts[value]
+
     shown = by_when(of_kind, when)
 
     # A queue counts forward; a record counts back.
     shown = sorted(shown, key=lambda e: e['ts'], reverse=(tab == 'past'))
 
-    total = len(shown)
+    total = len(shown) + (lazy_counts[when] if lazy_in_list else 0)
     pages = max(1, -(-total // PER_PAGE))
     try:
         # Zero means "not asked for", which is what lets the open item choose.
@@ -398,13 +599,29 @@ def comms_list_context(request, events, for_patient=None):
     if not page and open_token:
         # And the page the item is actually on, for the same reason: landing on
         # the right half is no use if the entry is forty rows further down.
+        # Counting what sorts above it, where the list is partly still in the
+        # database.
         for i, e in enumerate(shown):
             if e['panel_token'] == open_token:
-                page = i // PER_PAGE + 1
+                above = i + (lazy.newer_than(e['ts'], lazy_ids, cut_for(when)) if lazy_in_list else 0)
+                page = above // PER_PAGE + 1
                 break
+        else:
+            found = lazy.find(open_token, lazy_ids, cut_for(when)) if lazy_in_list else None
+            if found is not None:
+                above = (sum(1 for e in shown if e['ts'] > found['ts'])
+                         + lazy.newer_than(found['ts'], lazy_ids, cut_for(when)))
+                page = above // PER_PAGE + 1
     page = min(max(page, 1), pages)
     start = (page - 1) * PER_PAGE
-    window = shown[start:start + PER_PAGE]
+    if lazy_in_list:
+        # Only as many chat days as reach the end of this page, merged into the
+        # rest by time. heapq.merge keeps the in-memory row first on a tie.
+        newest = lazy.newest(start + PER_PAGE, lazy_ids, cut_for(when))
+        merged = list(heapq.merge(shown, newest, key=lambda e: e['ts'], reverse=True))
+        window = merged[start:start + PER_PAGE]
+    else:
+        window = shown[start:start + PER_PAGE]
 
     rows = [(_row(e, now), e) for e in window]
 
@@ -450,7 +667,8 @@ def comms_list_context(request, events, for_patient=None):
         **panel,
         'scoped': scoped,
         'up_unread': unread_count(upcoming),
-        'past_unread': unread_count(happened),
+        'past_unread': unread_count(happened) + (chat_days.unread(request.user)
+                                                 if chat_days is not None else 0),
         # Rendered onto the list so base.html can tell the panel endpoint which
         # client's page a row is being opened from — the fragment drops the
         # context strip for their own items, exactly as this view does.
@@ -464,7 +682,7 @@ def comms_list_context(request, events, for_patient=None):
         'when_chips': [(v, label, when_counts.get(v, 0)) for v, label, _d in WHEN_CHIPS],
         'qs_when': keep(when=None, page=None),
         'up_count': len(upcoming),
-        'past_count': len(happened),
+        'past_count': len(happened) + (chat_days.total() if chat_days is not None else 0),
         'overdue_count': len(overdue),
         'total': total,
         'shown_count': len(window),

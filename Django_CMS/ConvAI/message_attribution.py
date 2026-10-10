@@ -161,12 +161,19 @@ def legacy_q() -> Q:
 
 
 def _numbers(patient) -> list[str]:
+    # Kept on the instance: formatting a PhoneNumber is slow enough to show on
+    # a page that asks for every client's numbers three times over. A fresh
+    # instance (every request loads its own) always formats anew.
+    cached = getattr(patient, "_attribution_numbers", None)
+    if cached is not None:
+        return list(cached)
     nums = []
     if patient.phone_number:
         nums.append(str(patient.phone_number))
     caregiver = getattr(patient, "caregiver", None)
     if caregiver is not None and caregiver.phone_number:
         nums.append(str(caregiver.phone_number))
+    patient._attribution_numbers = tuple(nums)
     return nums
 
 
@@ -190,6 +197,79 @@ def patient_messages_q(patient) -> Q:
     if conv_ids:
         fallback |= Q(conversation_id__in=conv_ids)
     return q | (legacy_q() & fallback)
+
+
+def per_patient_aggregates(patients, queryset, fields=(), aggregates=None, *, owned=True, legacy=True) -> dict:
+    """``queryset`` aggregated over each client's file — many clients at once.
+
+    The same rule as :func:`patient_messages_q`, without asking it once per
+    client: lists that cover every client (Communications, Clients) used to,
+    and paid five queries and a scan of the message table for each one. Here
+    it is two queries however many clients there are — the rows that name
+    their client (``owned``), and the legacy rows (``legacy``), matched in
+    Python to whoever holds their number or their conversation.
+
+    Returns ``{patient_pk: [row, …]}``, one row per value of ``fields`` with
+    the ``aggregates`` (Max, Min, Count or Sum) folded together across both
+    halves. A legacy row matching two clients (a shared number) counts for
+    both, exactly as each client's own query would have counted it.
+    """
+    from django.db.models import Count, Max, Min, Sum
+    from .models import Conversation
+
+    patients = list(patients)
+    aggregates = dict(aggregates or {})
+    fields = tuple(fields)
+    merge = {}
+    for name, expr in aggregates.items():
+        if isinstance(expr, Max):
+            merge[name] = lambda a, b: b if a is None else a if b is None else max(a, b)
+        elif isinstance(expr, Min):
+            merge[name] = lambda a, b: b if a is None else a if b is None else min(a, b)
+        elif isinstance(expr, (Count, Sum)):
+            merge[name] = lambda a, b: (a or 0) + (b or 0)
+        else:
+            raise ValueError(f"cannot merge aggregate {name!r} across halves")
+
+    out = {p.pk: {} for p in patients}
+
+    def fold(pk, row):
+        key = tuple(row[f] for f in fields)
+        have = out[pk].get(key)
+        if have is None:
+            out[pk][key] = {f: row[f] for f in fields} | {n: row[n] for n in aggregates}
+        else:
+            for n in aggregates:
+                have[n] = merge[n](have[n], row[n])
+
+    # order_by() clears Message's default ordering, which would otherwise be
+    # added to the GROUP BY and split every group into single rows.
+    if owned:
+        rows = (queryset.filter(patient_id__in=list(out))
+                .order_by().values("patient_id", *fields).annotate(**aggregates))
+        for row in rows:
+            fold(row["patient_id"], row)
+
+    if legacy:
+        by_number, by_conv = defaultdict(set), defaultdict(set)
+        for p in patients:
+            for n in _numbers(p):
+                by_number[n].add(p.pk)
+        for conv_id, pk in Conversation.objects.filter(patient_id__in=list(out)).values_list("id", "patient_id"):
+            by_conv[str(conv_id)].add(pk)
+        if by_number or by_conv:
+            fallback = Q(pk__in=[])
+            if by_number:
+                fallback |= Q(user__in=list(by_number))
+            if by_conv:
+                fallback |= Q(conversation_id__in=list(by_conv))
+            rows = (queryset.filter(legacy_q() & fallback)
+                    .order_by().values("user", "conversation_id", *fields).annotate(**aggregates))
+            for row in rows:
+                for pk in by_number.get(row["user"], set()) | by_conv.get(row["conversation_id"], set()):
+                    fold(pk, row)
+
+    return {pk: list(rows.values()) for pk, rows in out.items()}
 
 
 def navigator_messages_q(user) -> Q:

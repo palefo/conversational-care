@@ -152,7 +152,14 @@ COMM_LABELS = {
 def last_communication(patient, now=None):
     """The last time this client was actually in touch, by any channel.
 
-    ``{'ts', 'kind'}`` with kind ``call``, ``visit`` or ``chat``, or None.
+    ``{'ts', 'kind'}`` with kind ``call``, ``visit``, ``online`` or ``chat``,
+    or None. One client's answer from :func:`last_communications`.
+    """
+    return last_communications([patient], now)[patient.pk]
+
+
+def last_communications(patients, now=None):
+    """``{patient_pk: {'ts', 'kind'} or None}`` — when each client was last in touch.
 
     *Actually in touch* is the rule each source is held to. A call counts once it
     connected (complete or interrupted) — not one that went unanswered, was
@@ -162,39 +169,81 @@ def last_communication(patient, now=None):
     tester did, standing in for one); a reminder the platform sent on its own is
     not them using the chatbot. A recording made outside any booked call — a
     number dialled from a handset — is a call too.
+
+    Every client at once, in a handful of queries: the Clients page used to ask
+    five times per client, and with it the whole message table once per client.
     """
+    from ..message_attribution import _numbers, per_patient_aggregates
+
     now = now or timezone.now()
-    found = []
+    patients = list(patients)
+    ids = [p.pk for p in patients]
+    found = {pk: [] for pk in ids}
+    if not ids:
+        return {}
 
-    mt = (patient.meetings
-          .filter(status__in=(Meeting.Status.COMPLETED, Meeting.Status.INTERRUPTED))
-          .annotate(happened=Coalesce('ended_at', 'scheduled_time'))
-          .filter(happened__lte=now)
-          .order_by('-happened')
-          .only('modality', 'ended_at', 'scheduled_time')
-          .first())
-    if mt:
-        found.append((mt.happened, mt.kind))
+    # The newest call or meeting that connected, per client. Ties go to the
+    # higher pk, so the answer does not depend on the order rows come back in.
+    last_meeting = {}
+    for pk, happened, mid, modality in (
+            Meeting.objects
+            .filter(patient_id__in=ids,
+                    status__in=(Meeting.Status.COMPLETED, Meeting.Status.INTERRUPTED))
+            .annotate(happened=Coalesce('ended_at', 'scheduled_time'))
+            .filter(happened__lte=now)
+            .order_by()
+            .values_list('patient_id', 'happened', 'pk', 'modality')):
+        if pk not in last_meeting or (happened, mid) > last_meeting[pk][:2]:
+            last_meeting[pk] = (happened, mid, modality)
+    for pk, (happened, _mid, modality) in last_meeting.items():
+        found[pk].append((happened, Meeting(modality=modality).kind))
 
-    nums = [str(n) for n in (patient.phone_number,
-                             patient.caregiver.phone_number if patient.caregiver else None) if n]
-    rec = CallRecording.for_patient(patient, nums).filter(start_time__lte=now).first()
-    if rec and rec.start_time:
-        found.append((rec.start_time, 'call'))
+    # The newest recording, by the same two rules as CallRecording.for_patient:
+    # its own client, or — for rows that name nobody — whoever holds the number.
+    holders = {}
+    for p in patients:
+        for n in _numbers(p):
+            holders.setdefault(n, []).append(p.pk)
+    recs = (CallRecording.objects.filter(start_time__lte=now)
+            .exclude(leg=CallRecording.Leg.CTN).order_by())
+    newest_rec = {}
+    for pk, ts in (recs.filter(patient_id__in=ids)
+                   .values('patient_id').annotate(ts=Max('start_time'))
+                   .values_list('patient_id', 'ts')):
+        newest_rec[pk] = ts
+    if holders:
+        for number, ts in (recs.filter(patient__isnull=True, to_number__in=list(holders))
+                           .values('to_number').annotate(ts=Max('start_time'))
+                           .values_list('to_number', 'ts')):
+            for pk in holders.get(number, []):
+                if ts and (newest_rec.get(pk) is None or ts > newest_rec[pk]):
+                    newest_rec[pk] = ts
+    for pk, ts in newest_rec.items():
+        if ts:
+            found[pk].append((ts, 'call'))
 
-    chat_ts = (Message.objects.filter(patient_message_q(patient), timestamp__lte=now)
-               .exclude(sender_role=Message.SenderRole.PLATFORM)
-               .exclude(user_message='')
-               .order_by('-timestamp')
-               .values_list('timestamp', flat=True)
-               .first())
-    if chat_ts:
-        found.append((chat_ts, 'chat'))
+    # The newest message somebody wrote in, over each client's file.
+    chats = per_patient_aggregates(
+        patients,
+        Message.objects.filter(timestamp__lte=now)
+        .exclude(sender_role=Message.SenderRole.PLATFORM)
+        .exclude(user_message=''),
+        aggregates={'ts': Max('timestamp')},
+    )
+    for pk, rows in chats.items():
+        if rows and rows[0]['ts']:
+            found[pk].append((rows[0]['ts'], 'chat'))
 
-    if not found:
-        return None
-    ts, kind = max(found, key=lambda f: f[0])
-    return {'ts': ts, 'kind': kind}
+    out = {}
+    for pk in ids:
+        if not found[pk]:
+            out[pk] = None
+            continue
+        # The first of equals wins — a call over a recording over a chat — as it
+        # did when each source was asked in that order.
+        ts, kind = max(found[pk], key=lambda f: f[0])
+        out[pk] = {'ts': ts, 'kind': kind}
+    return out
 
 
 @login_required
@@ -209,15 +258,19 @@ def patient_list(request):
     rows_data = []
     navigator_names = set()
 
-    for p in qs:
-        next_call = (
-            p.meetings
-             .filter(scheduled_time__gt=now)
-             .order_by('scheduled_time')
-             .first()
-        )
+    # Everything the table needs for every client, asked once for all of them
+    # rather than once per row — see last_communications.
+    patients = list(qs)
+    ids = [p.pk for p in patients]
+    last_comms = last_communications(patients, now)
+    next_calls = {}
+    for pk, when in (Meeting.objects.filter(patient_id__in=ids, scheduled_time__gt=now)
+                     .order_by('scheduled_time').values_list('patient_id', 'scheduled_time')):
+        next_calls.setdefault(pk, when)
 
-        last_comm = last_communication(p, now)
+    for p in patients:
+        next_call_ts = next_calls.get(p.pk)
+        last_comm = last_comms[p.pk]
 
         nav_name = (
             p.navigator.get_full_name().strip()
@@ -235,10 +288,10 @@ def patient_list(request):
             'caregiver_name': str(p.caregiver) if p.caregiver else None,
             'navigator_name': nav_name,
 
-            'next_call_time': timezone.localtime(next_call.scheduled_time).strftime('%d/%m/%Y %H:%M') if next_call else None,
+            'next_call_time': timezone.localtime(next_call_ts).strftime('%d/%m/%Y %H:%M') if next_call_ts else None,
             # Sorted on, rather than the text above: "01/10/2026" is day-first,
             # which neither Date() nor a string comparison orders correctly.
-            'next_call_iso': next_call.scheduled_time.isoformat() if next_call else None,
+            'next_call_iso': next_call_ts.isoformat() if next_call_ts else None,
 
             'last_comm_time': timezone.localtime(last_comm['ts']).strftime('%d/%m/%Y %H:%M') if last_comm else None,
             'last_comm_iso': last_comm['ts'].isoformat() if last_comm else None,
@@ -345,15 +398,36 @@ def build_patient_events(patient, protocol_numbers=None):
 
     Alerts, phone-call recordings, scheduled meetings and chatbot-conversation
     days all become dicts with a common ``kind``/``ts`` shape, so one template
-    can render them as a timeline instead of separate tables. Shared by the
-    client page and the cross-client Communications page; the latter passes
-    ``protocol_numbers`` in so the lookup runs once per page, not per client.
+    can render them as a timeline instead of separate tables. The client page's
+    view of :func:`build_events_by_patient`, which is where the work is done.
     """
-    nums = []
-    if patient.phone_number:
-        nums.append(str(patient.phone_number))
-    if patient.caregiver and patient.caregiver.phone_number:
-        nums.append(str(patient.caregiver.phone_number))
+    return build_events_by_patient([patient], protocol_numbers)[patient.pk]
+
+
+def build_events_by_patient(patients, protocol_numbers=None, *, chats=True):
+    """``{patient_pk: [event, …]}`` for many clients, in a fixed number of queries.
+
+    The Communications page used to call build_patient_events once per client,
+    and each call asked the database five or six times — alerts, recordings,
+    meetings and their protocols, conversations, messages by day — so the page
+    cost a couple of hundred queries and grew with every client added. Each
+    source is now fetched once for all of them and split up here; a client's
+    events are exactly what they were when built one client at a time
+    (ConvAI/test_comms_batching.py holds the old builder to compare against).
+
+    ``patients`` should come with ``caregiver`` selected: their numbers decide
+    which legacy recordings and messages are theirs. ``chats=False`` leaves out
+    the chat days, for a caller that pages them in the database instead (the
+    Communications page; see communications.ChatDays).
+    """
+    from ..message_attribution import _numbers, per_patient_aggregates
+
+    patients = list(patients)
+    by_pk = {p.pk: p for p in patients}
+    events = {p.pk: [] for p in patients}
+    if not patients:
+        return events
+    ids = list(by_pk)
 
     # A mapping rather than a set, so the real protocol name is available too.
     # Meeting.Protocol's labels are placeholders ("3. Protocol 3"); the name a
@@ -363,11 +437,10 @@ def build_patient_events(patient, protocol_numbers=None):
     elif not isinstance(protocol_numbers, dict):
         protocol_numbers = {n: '' for n in protocol_numbers}
 
-    events = []
-
-    # Alerts raised for this client.
-    for al in patient.alerts.all():
-        events.append({
+    # Alerts raised for these clients, newest first as the model orders them.
+    for al in Alert.objects.filter(patient_id__in=ids):
+        patient = by_pk[al.patient_id]
+        events[patient.pk].append({
             'kind': 'alert',
             'ts': al.created_at,
             'pk': al.pk,
@@ -383,23 +456,33 @@ def build_patient_events(patient, protocol_numbers=None):
             'archive_bucket': (al.data or {}).get('archive_bucket', '') if isinstance(al.data, dict) else '',
         })
 
-    # Phone-call recordings belonging to this client.
+    # Phone-call recordings belonging to these clients.
     #
     # A recording placed through this platform names its client outright; the
     # numbers are consulted only for rows made before it could. That distinction
     # is the whole point — a number shared between two clients used to draw the
     # same call on both their timelines, and the navigator's own leg of a
     # conference, which carries a staff number, was filed against whichever
-    # client shared it. CallRecording.for_patient is where both rules live, and
-    # it is also what leaves the navigator's leg out.
+    # client shared it. CallRecording.for_patient states both rules for one
+    # client; this is the same query for many, with the legacy rows handed to
+    # every client holding their number, as for_patient would for each.
     #
     # A recording is not an event in its own right: it is something attached to
     # the meeting it came from, so it is folded onto that meeting below rather
     # than listed beside it. Anything that cannot be matched still gets its own
     # row, because a recording nobody can reach is worse than a duplicate.
-    recordings = list(
-        CallRecording.for_patient(patient, nums).select_related('meeting')
-    )
+    holders = {}
+    for p in patients:
+        for n in _numbers(p):
+            holders.setdefault(n, []).append(p.pk)
+    cond = Q(patient_id__in=ids)
+    if holders:
+        cond |= Q(patient__isnull=True, to_number__in=list(holders))
+    recordings = {pk: [] for pk in ids}
+    for rec in (CallRecording.objects.filter(cond).exclude(leg=CallRecording.Leg.CTN)
+                .select_related('meeting').order_by('-start_time')):
+        for pk in ([rec.patient_id] if rec.patient_id else holders.get(rec.to_number, [])):
+            recordings[pk].append(rec)
 
     def _rec_dict(rec):
         return {
@@ -420,95 +503,106 @@ def build_patient_events(patient, protocol_numbers=None):
     # Both protocol relations are prefetched: the loop below reads them on
     # every meeting, and without this a client with fifty calls costs a hundred
     # queries to draw one timeline.
-    meetings = list(
-        patient.meetings
-        .annotate(note_count=Count('notes_list'))
-        .prefetch_related('executed_protocols', 'scheduled_protocols')
-    )
-    claimed, orphans = fold_recordings(meetings, recordings)
+    # Ordered explicitly: Meta.ordering is not applied to a query that
+    # aggregates (Django 3.1+), so this used to come back in whatever order the
+    # database chose. The list is sorted by time later; this keeps ties stable.
+    meetings = {pk: [] for pk in ids}
+    for mt in (Meeting.objects.filter(patient_id__in=ids)
+               .annotate(note_count=Count('notes_list'))
+               .order_by('-scheduled_time', 'pk')
+               .prefetch_related('executed_protocols', 'scheduled_protocols')):
+        # The client already in hand, so dial_recipient and anything else that
+        # reaches for mt.patient does not fetch it again, once per meeting.
+        mt.patient = by_pk[mt.patient_id]
+        meetings[mt.patient_id].append(mt)
 
-    # Whatever belongs to no call at all — a number dialled from a handset, an
-    # inbound call nobody booked. Still a row, because a recording nobody can
-    # reach is worse than a loose entry, and this is the only way to open one.
-    for rec in orphans:
-        events.append({
-            'kind': 'recording',
-            'ts': rec.start_time,
-            'panel_token': f'recording-{rec.pk}',
-            'patient': patient,
-            **_rec_dict(rec),
-        })
+    for patient in patients:
+        claimed, orphans = fold_recordings(meetings[patient.pk], recordings[patient.pk])
 
-    # Scheduled / executed meetings — a phone call or an in-person visit.
-    for mt in meetings:
-        # What the call covered, or failing that what it was booked to cover.
-        # A call can carry more than one now, so the row names them all rather
-        # than picking the first and calling it the protocol.
-        covered = list(mt.executed_protocols.all()) or list(mt.scheduled_protocols.all())
-        proto_num = covered[0].number if len(covered) == 1 else None
-        # Every recording this call produced, the substantive one first; the
-        # row names that one and counts the rest.
-        recs = claimed.get(mt.pk, [])
-        events.append({
-            'kind': 'meeting',
-            # When it happened, not when it was booked. A call recorded from a
-            # diary entry days ahead used to land in Happened under a future
-            # date, which is a list of what has happened containing something
-            # that has not.
-            'ts': mt.happened_at,
-            'scheduled_ts': mt.scheduled_time,
-            # A call that went out and was never closed. Carried onto the row so
-            # it can be seen without opening it, and counted.
-            'outcome_missing': mt.retries > 0 and mt.status == Meeting.Status.PENDING,
-            'pk': mt.pk,
-            'panel_token': f'meeting-{mt.pk}',
-            'patient': patient,
-            'status': mt.get_status_display(),
-            'status_code': mt.status,
-            'meeting_type': mt.get_type_display(),
-            'modality': mt.modality,
-            'modality_label': mt.get_modality_display(),
-            'in_person': mt.modality == Meeting.Modality.IN_PERSON,
-            'online': mt.modality == Meeting.Modality.ONLINE,
-            # Placed on the spot rather than booked, and who it rang. The list
-            # calls every pending call a "Scheduled call", which is the one
-            # thing an unscheduled one is not — and names the caregiver on every
-            # row, which is the wrong person once a call can go to the client.
-            'unscheduled': mt.unscheduled,
-            'dial_who': str(mt.dial_recipient or ''),
-            'location': mt.location,
-            'protocol': ", ".join(f"{p.number}. {p.title}" for p in covered),
-            # Only linkable when the row names exactly one — a link has to go
-            # somewhere, and two protocols have two somewheres.
-            'protocol_num': proto_num,
-            'protocol_summary': mt.protocol_summary,
-            'has_notes': bool(mt.note_count),
-            'recording': _rec_dict(recs[0]) if recs else None,
-            'recording_count': len(recs),
-        })
+        # Whatever belongs to no call at all — a number dialled from a handset, an
+        # inbound call nobody booked. Still a row, because a recording nobody can
+        # reach is worse than a loose entry, and this is the only way to open one.
+        for rec in orphans:
+            events[patient.pk].append({
+                'kind': 'recording',
+                'ts': rec.start_time,
+                'panel_token': f'recording-{rec.pk}',
+                'patient': patient,
+                **_rec_dict(rec),
+            })
+
+        # Scheduled / executed meetings — a phone call or an in-person visit.
+        for mt in meetings[patient.pk]:
+            # What the call covered, or failing that what it was booked to cover.
+            # A call can carry more than one now, so the row names them all rather
+            # than picking the first and calling it the protocol.
+            covered = list(mt.executed_protocols.all()) or list(mt.scheduled_protocols.all())
+            proto_num = covered[0].number if len(covered) == 1 else None
+            # Every recording this call produced, the substantive one first; the
+            # row names that one and counts the rest.
+            recs = claimed.get(mt.pk, [])
+            events[patient.pk].append({
+                'kind': 'meeting',
+                # When it happened, not when it was booked. A call recorded from a
+                # diary entry days ahead used to land in Happened under a future
+                # date, which is a list of what has happened containing something
+                # that has not.
+                'ts': mt.happened_at,
+                'scheduled_ts': mt.scheduled_time,
+                # A call that went out and was never closed. Carried onto the row so
+                # it can be seen without opening it, and counted.
+                'outcome_missing': mt.retries > 0 and mt.status == Meeting.Status.PENDING,
+                'pk': mt.pk,
+                'panel_token': f'meeting-{mt.pk}',
+                'patient': patient,
+                'status': mt.get_status_display(),
+                'status_code': mt.status,
+                'meeting_type': mt.get_type_display(),
+                'modality': mt.modality,
+                'modality_label': mt.get_modality_display(),
+                'in_person': mt.modality == Meeting.Modality.IN_PERSON,
+                'online': mt.modality == Meeting.Modality.ONLINE,
+                # Placed on the spot rather than booked, and who it rang. The list
+                # calls every pending call a "Scheduled call", which is the one
+                # thing an unscheduled one is not — and names the caregiver on every
+                # row, which is the wrong person once a call can go to the client.
+                'unscheduled': mt.unscheduled,
+                'dial_who': str(mt.dial_recipient or ''),
+                'location': mt.location,
+                'protocol': ", ".join(f"{p.number}. {p.title}" for p in covered),
+                # Only linkable when the row names exactly one — a link has to go
+                # somewhere, and two protocols have two somewheres.
+                'protocol_num': proto_num,
+                'protocol_summary': mt.protocol_summary,
+                'has_notes': bool(mt.note_count),
+                'recording': _rec_dict(recs[0]) if recs else None,
+                'recording_count': len(recs),
+            })
+
+    if not chats:
+        return events
 
     # Chatbot conversations, grouped by local day (one entry per active day).
     # Matched by phone (WhatsApp) OR patient-linked Conversation (tester/voice
-    # chat), so web test-user sessions show up in the timeline too.
-    day_rows = (
-        Message.objects.filter(patient_message_q(patient))
-        .annotate(day=TruncDate('timestamp'))
-        .values('day')
-        .annotate(last_ts=Max('timestamp'), msg_count=Count('id'))
-        .order_by('-day')
+    # chat), so web test-user sessions show up in the timeline too — the rule
+    # in message_attribution, applied to every client in two queries.
+    day_rows = per_patient_aggregates(
+        patients, Message.objects.annotate(day=TruncDate('timestamp')),
+        fields=('day',), aggregates={'last_ts': Max('timestamp'), 'msg_count': Count('id')},
     )
-    for row in day_rows:
-        events.append({
-            'kind': 'conversation',
-            'ts': row['last_ts'] or timezone.make_aware(
-                dt.datetime.combine(row['day'], dt.time.min)
-            ),
-            'panel_token': f"chat-{patient.pk}-{row['day'].isoformat()}",
-            'patient': patient,
-            'day': row['day'],
-            'day_str': row['day'].isoformat(),
-            'msg_count': row['msg_count'],
-        })
+    for patient in patients:
+        for row in sorted(day_rows[patient.pk], key=lambda r: r['day'], reverse=True):
+            events[patient.pk].append({
+                'kind': 'conversation',
+                'ts': row['last_ts'] or timezone.make_aware(
+                    dt.datetime.combine(row['day'], dt.time.min)
+                ),
+                'panel_token': f"chat-{patient.pk}-{row['day'].isoformat()}",
+                'patient': patient,
+                'day': row['day'],
+                'day_str': row['day'].isoformat(),
+                'msg_count': row['msg_count'],
+            })
 
     return events
 
