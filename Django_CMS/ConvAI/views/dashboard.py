@@ -174,7 +174,14 @@ def dashboard(request):
     show_registrations = is_admin(user) and get_bool("SELF_REGISTRATION_ENABLED")
     pending_regs = (SelfRegistration.objects.filter(state=SelfRegistration.State.REGISTERED)
                     if show_registrations else SelfRegistration.objects.none())
-    alert_counts["registrations"] = pending_regs.count()
+    # And the ones already let in — automatically, usually — who still have
+    # nobody assigned. Same reading-straight-from-the-row rule: assigning a
+    # navigator is what takes them off the list.
+    from .. import registration
+    from ..site_config import navigator_term
+    unassigned_regs = (registration.needing_navigator() if show_registrations
+                       else SelfRegistration.objects.none())
+    alert_counts["registrations"] = pending_regs.count() + unassigned_regs.count()
     alert_counts["all"] += alert_counts["registrations"]
 
     # Find a client by name. One box beats four filter chips: priority is on
@@ -398,6 +405,25 @@ def dashboard(request):
             # which the row already says.
             "panel_token": "",
             "unread": False,
+            "ask": _("To approve"),
+        }
+
+    def _unassigned_row(r):
+        # Dated by approval rather than sign-up: that is when they became a
+        # client somebody has to pick up.
+        age, exact = _humanise_age(r.updated_at, now)
+        term = navigator_term().lower()
+        return {
+            "kind": "registration",
+            "name": f"{r.patient.name} {r.patient.lastname}".strip(),
+            "description": _("Registered and is now a client, with no %(term)s yet.") % {"term": term},
+            "age": age,
+            "age_exact": exact,
+            "created_ts": r.updated_at,
+            "url": reverse("edit_patient", args=[r.patient_id]),
+            "panel_token": "",
+            "unread": False,
+            "ask": _("Assign %(term)s") % {"term": term},
         }
 
     # The same people, said once at the top of the page as well. In the queue a
@@ -405,24 +431,51 @@ def dashboard(request):
     # place to work it but an easy one to miss: nobody else can let them in, so
     # an admin should not have to scroll to learn they are waiting.
     waiting = None
-    if alert_counts["registrations"]:
+    if pending_regs.exists():
+        n_pending = pending_regs.count()
         newest = list(pending_regs.order_by("-created_at")[:3])
         age, exact = _humanise_age(newest[0].created_at, now)
         waiting = {
-            "count": alert_counts["registrations"],
+            "count": n_pending,
             "names": [f"{r.name} {r.lastname}".strip() for r in newest],
-            "more": max(0, alert_counts["registrations"] - len(newest)),
+            "more": max(0, n_pending - len(newest)),
             "age": age,
             "age_exact": exact,
             "url": f"{reverse('config')}?tab=registrations#registrations",
         }
 
+    # Said once at the top too, for the same reason: an admin is the only one
+    # who can assign them, and a young person with nobody looking after them
+    # should not depend on someone scrolling.
+    unassigned = None
+    if unassigned_regs.exists():
+        n_un = unassigned_regs.count()
+        newest = list(unassigned_regs.order_by("-updated_at")[:3])
+        age, exact = _humanise_age(newest[0].updated_at, now)
+        unassigned = {
+            "count": n_un,
+            "names": [f"{r.patient.name} {r.patient.lastname}".strip() for r in newest],
+            "more": max(0, n_un - len(newest)),
+            "age": age,
+            "age_exact": exact,
+            "term": navigator_term().lower(),
+            # One of them: straight to their Edit page. Several: the
+            # Registrations tab, which lists them all with an Assign link.
+            "url": (reverse("edit_patient", args=[newest[0].patient_id]) if n_un == 1
+                    else f"{reverse('config')}?tab=registrations#registrations"),
+        }
+
     registrations = pending_regs
+    unassigned_rows = unassigned_regs
     if query:
         registrations = registrations.filter(
             Q(name__icontains=query) | Q(lastname__icontains=query))
-    registrations = [_registration_row(r)
-                     for r in registrations.order_by("-created_at")[:ALERTS_MAX]]
+        unassigned_rows = unassigned_rows.filter(
+            Q(patient__name__icontains=query) | Q(patient__lastname__icontains=query))
+    registrations = ([_registration_row(r)
+                      for r in registrations.order_by("-created_at")[:ALERTS_MAX]]
+                     + [_unassigned_row(r)
+                        for r in unassigned_rows.order_by("-updated_at")[:ALERTS_MAX]])
 
     # Where they sit in the queue. By age, when the queue is sorted by age. By
     # priority, after the High alerts and ahead of the rest: someone waiting to
@@ -512,6 +565,7 @@ def dashboard(request):
         'alerts_per_page': ALERTS_PER_PAGE,
         'alert_counts': alert_counts,
         'waiting_registrations': waiting,
+        'unassigned_clients': unassigned,
         'high_topics': high_topics,
         'next_meeting': next_row,
         'greeting': greeting,

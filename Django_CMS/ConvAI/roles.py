@@ -36,6 +36,19 @@ def is_tester(user):
     )
 
 
+def navigator_choices():
+    """Who a client can be assigned to: active members of the Navigator group.
+
+    One list for every picker — the client form, the approve button, the
+    calendar filter — so they cannot disagree about who counts.
+    """
+    from django.contrib.auth import get_user_model
+
+    return (get_user_model().objects
+            .filter(groups__name=NAVIGATOR, is_active=True)
+            .order_by("first_name", "last_name", "username"))
+
+
 def admin_required(view):
     return user_passes_test(is_admin, login_url=settings.LOGIN_URL)(view)
 

@@ -140,7 +140,21 @@ def _abstract_instruction(agent: Optional[Any]) -> str:
     return txt if txt else DEFAULT_ABSTRACT
 
 
-def _build_prompt(agent: Optional[Any], transcript: str):
+def pronoun_line(pronouns: str) -> str:
+    """The sentence that tells a summariser how to refer to the client.
+
+    Only when their pronouns are recorded. Without them nothing is added, and
+    the model keeps writing "they" — the right default, and better than a guess
+    from a name.
+    """
+    pronouns = (pronouns or "").strip()
+    if not pronouns:
+        return ""
+    return (f"The patient's pronouns are {pronouns}: use them whenever you refer to "
+            "the patient, in every language you write in.\n")
+
+
+def _build_prompt(agent: Optional[Any], transcript: str, pronouns: str = ""):
     """
     Build a dynamic prompt using the Agent's role, abstract instruction, and detectors.
     """
@@ -166,7 +180,7 @@ def _build_prompt(agent: Optional[Any], transcript: str):
         "actually wrote in. Judge it only from the words they said. The speaker "
         "labels and timestamps in the transcript are formatting added by this "
         "system — ignore them entirely when deciding the language.\n"
-    )
+    ) + pronoun_line(pronouns)
 
     if dets:
         lines = []
@@ -221,6 +235,7 @@ def _format_transcript(messages: Iterable[Dict[str, Any]]) -> str:
 def classify_conversation_with_llm(
     messages: Iterable[Dict[str, Any]],
     agent: Optional[Any] = None,
+    pronouns: str = "",
 ) -> Dict[str, Any]:
     """
     Classify a conversation.
@@ -245,7 +260,7 @@ def classify_conversation_with_llm(
                   or default_model() or DEFAULT_MODEL)
     llm = make_llm(model_name, temperature=TEMPERATURE)
 
-    prompt = _build_prompt(agent, transcript)
+    prompt = _build_prompt(agent, transcript, pronouns)
     resp = llm.invoke(prompt)
     content = resp.content if hasattr(resp, "content") else str(resp)
 

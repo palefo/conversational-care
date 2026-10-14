@@ -833,7 +833,8 @@
 
       {# Search placeholder includes navigator only for staff. #}
       {% if request.user.is_staff %}
-      <input class="pac-search-input" type="text" id="searchInput" placeholder="{% trans 'Search by ID, client, caregiver or counsellor...' %}">
+      {% navigator_term as nav_term %}
+      <input class="pac-search-input" type="text" id="searchInput" placeholder="{% trans 'Search by ID, client or' %} {{ nav_term|lower }}…">
       {% else %}
       <input class="pac-search-input" type="text" id="searchInput" placeholder="{% trans 'Search by ID, client, caregiver...' %}">
       {% endif %}
@@ -891,7 +892,7 @@
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
         </svg>
-        {% trans "Counsellor" %}
+        {% navigator_term %}
         <span class="pac-badge" id="navigatorCount" style="display:none">0</span>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
@@ -900,7 +901,7 @@
 
       <div class="pac-dropdown-menu" id="navigatorMenu">
         <div class="pac-dropdown-body">
-          <div class="pac-dropdown-title">{% trans "Counsellor" %}</div>
+          <div class="pac-dropdown-title">{% navigator_term %}</div>
           <input class="pac-filter-search" id="navigatorFilterSearch" type="text" placeholder="{% trans 'Search counsellor' %}">
           <div class="pac-selected-tags" id="navigatorSelectedTags"></div>
           <div class="pac-option-list" id="navigatorOptionList"></div>
@@ -932,18 +933,20 @@
           </div>
         </th>
 
+        {% if client_form.caregivers %}
         <th class="px-6 py-3 pac-sortable" scope="col" id="th-caregiver" onclick="pacSortTable('caregiver_name')">
           <div class="pac-th-inner">
             {% trans "Caregiver" %}
             <span class="pac-sort-arrow">↕</span>
           </div>
         </th>
+        {% endif %}
 
         {# Navigator column header is only visible to staff. #}
         {% if request.user.is_staff %}
         <th class="px-6 py-3 pac-sortable" scope="col" id="th-navigator" onclick="pacSortTable('navigator_name')">
           <div class="pac-th-inner">
-            {% trans "Counsellor" %}
+            {% navigator_term %}
             <span class="pac-sort-arrow">↕</span>
           </div>
         </th>
@@ -1132,9 +1135,11 @@ function pacRender() {
             </div>
           </td>
 
+          {% if client_form.caregivers %}
           <td class="px-6 py-4 text-gray-700">
             ${r.caregiver_name ? pacEsc(r.caregiver_name) : `<span class="text-gray-400 italic">—</span>`}
           </td>
+          {% endif %}
 
           {% if request.user.is_superuser %}
           <td class="px-6 py-4 text-gray-700">
@@ -1727,6 +1732,11 @@ pacRender();
           {{ client_form.lastname }}
         </div>
       </div>
+      <div class="mb-3">
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.pronouns.label }}</label>
+        {{ client_form.pronouns }}
+        {% include "patients/_pronoun_suggestions.html" %}
+      </div>
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.phone_number.label }}</label>
@@ -1747,6 +1757,7 @@ pacRender();
         <label class="block text-sm font-medium text-gray-700 mb-1">{{ client_form.agent.label }}</label>
         {{ client_form.agent }}
       </div>
+      {% if client_form.caregivers %}
       <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">{% trans "Caregiver" %}</p>
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
@@ -1768,6 +1779,7 @@ pacRender();
           {{ client_form.caregiver_email }}
         </div>
       </div>
+      {% endif %}
       {% comment %}
         The same fieldset the edit form uses. Nothing is ticked by default —
         which protocols this person is on is a decision about them, and an empty

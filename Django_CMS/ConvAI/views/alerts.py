@@ -517,6 +517,22 @@ def alerts_since(request):
                 "body": str(_("Waiting to be approved.")),
                 "href": href,
             })
+        # Let in since then (automatic approval, usually) with nobody assigned.
+        from .. import registration
+        from ..site_config import navigator_term
+        let_in = list(registration.needing_navigator()
+                      .filter(updated_at__gt=since)
+                      .order_by("-updated_at")[: _SINCE_MAX + 1])
+        more += max(0, len(let_in) - _SINCE_MAX)
+        for r in let_in[:_SINCE_MAX]:
+            who = f"{r.patient.name} {r.patient.lastname}".strip()
+            out.append({
+                "id": f"reg-{r.pk}",
+                "high": False,
+                "title": f"{_('New client')} — {who}" if who else str(_("New client")),
+                "body": str(_("Registered. Needs a %(term)s.") % {"term": navigator_term().lower()}),
+                "href": reverse("edit_patient", args=[r.patient_id]),
+            })
 
     for a in fresh:
         who = f"{a.patient.name} {a.patient.lastname}".strip() if a.patient else ""

@@ -53,6 +53,8 @@ from ..forms import (
     PatientDetailsForm,
     ProtocolAnswerForm,
     GeneralConfigForm,
+    ClientsConfigForm,
+    RegistrationConfigForm,
     SenseiConfigForm,
     ExportConfigForm,
     ConversationPrivacyConfigForm,
@@ -143,6 +145,8 @@ import re
 
 _CONFIG_FORMS = {
     "general": GeneralConfigForm,
+    "clients": ClientsConfigForm,
+    "registrations": RegistrationConfigForm,
     "integrations": IntegrationsConfigForm,
     "messaging": MessagingConfigForm,
     "email": EmailConfigForm,

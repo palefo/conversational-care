@@ -15,7 +15,7 @@ from .default_prompts import (
     DEFAULT_TRANSCRIPT_MOMENTS_PROMPT,
     DEFAULT_TRANSCRIPT_SUMMARY_PROMPT,
 )
-from .models import Answer, Meeting, Protocol
+from .models import Answer, Meeting, Patient, Protocol
 from .site_config import get_setting
 
 
@@ -89,7 +89,9 @@ def build_meeting_protocol_text(meeting: Meeting) -> str:
 
 def summarize_meeting(meeting: Meeting) -> str:
     """Summarize a meeting's protocol answers and persist the result."""
+    from .utils_conversation_classification import pronoun_line
     prompt = get_setting("MEETING_SUMMARY_PROMPT") or DEFAULT_MEETING_SUMMARY_PROMPT
+    prompt += "\n" + pronoun_line(getattr(meeting.patient, "pronouns", ""))
     body = build_meeting_protocol_text(meeting)
     summary = _run_llm(prompt, body)
     meeting.protocol_summary = summary
@@ -186,7 +188,11 @@ def transcribe_recording(recording) -> str:
 
 def summarize_transcript(recording) -> str:
     """Summarize an already-transcribed recording and persist the summary."""
+    from .utils_conversation_classification import pronoun_line
     prompt = get_setting("TRANSCRIPT_SUMMARY_PROMPT") or DEFAULT_TRANSCRIPT_SUMMARY_PROMPT
+    if getattr(recording, "patient_id", None):
+        patient = Patient.objects.filter(pk=recording.patient_id).only("pronouns").first()
+        prompt += "\n" + pronoun_line(getattr(patient, "pronouns", ""))
     transcript = (recording.transcript or "").strip()
     if not transcript:
         summary = "No speech could be transcribed from this recording."

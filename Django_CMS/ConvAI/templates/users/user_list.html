@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n custom_filters %}
 {% block title %}{% trans "Users" %}{% endblock %}
 
 {% block content %}
@@ -40,7 +40,7 @@
 
 <header class="mb-6">
   <h1 class="text-3xl font-semibold text-gray-800">{% trans "Users" %}</h1>
-  <p class="text-gray-500">{% trans "Manage navigator and test-user accounts." %}</p>
+  <p class="text-gray-500">{% navigator_term plural=True as terms %}{% blocktrans %}Manage {{ terms }} and test-user accounts.{% endblocktrans %}</p>
 </header>
 
 {% comment %} ---------- Tab bar + per-tab add button ---------- {% endcomment %}
@@ -174,7 +174,7 @@
       <h3 class="text-lg font-semibold text-gray-800">{% trans "Add user" %}</h3>
       <button type="button" onclick="userClose()" class="text-gray-400 hover:text-gray-600"><span class="material-icons-outlined">close</span></button>
     </div>
-    <p class="text-xs text-gray-500 mb-3">{% trans "Creates a Navigator account." %}</p>
+    <p class="text-xs text-gray-500 mb-3">{% navigator_term as term %}{% blocktrans %}Creates a {{ term }} account.{% endblocktrans %}</p>
     <form method="post" action="{% url 'create_user' %}">
       {% csrf_token %}
       <div class="mb-3">

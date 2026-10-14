@@ -400,6 +400,10 @@ class Patient(models.Model):
         related_name="patients",
         null=True
     )
+    # As the person gave them, free text: "she/her", "he/they", "ze/zir". The
+    # summaries use them; blank means nobody has asked yet, never a guess from
+    # a name or a recorded sex.
+    pronouns = models.CharField(max_length=40, blank=True, default="")
 
     details = models.TextField(blank=True, help_text="Markdown")
     details_editable = models.TextField(blank=True, help_text="Markdown")
@@ -680,6 +684,13 @@ class Meeting(models.Model):
 
     scheduled_time = models.DateTimeField()
     created_time = models.DateTimeField(auto_now_add=True)
+    # Who booked it. An admin's calendar shows everybody's meetings and filters
+    # by this; the client's navigator is a different fact — an admin can book
+    # on a link worker's behalf. Blank on meetings booked before it existed.
+    created_by = models.ForeignKey(
+        ConvAIUser, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="meetings_created",
+    )
     patient = models.ForeignKey(
         Patient,
         on_delete=models.CASCADE,
@@ -1390,6 +1401,10 @@ class SelfRegistration(models.Model):
     email        = models.EmailField(blank=True, null=True)
     details      = models.JSONField(blank=True, default=dict, help_text="Arbitrary extra fields for this application")
     state        = models.IntegerField(choices=State.choices, default=State.REGISTERED, db_index=True)
+    # The client the approval created, so the Registrations tab can say who
+    # still needs a navigator. Empty on rows approved before it existed.
+    patient      = models.ForeignKey("Patient", null=True, blank=True, on_delete=models.SET_NULL,
+                                     related_name="self_registrations")
 
     created_at   = models.DateTimeField(default=timezone.now)
     updated_at   = models.DateTimeField(auto_now=True)
@@ -1519,6 +1534,33 @@ class SiteConfiguration(models.Model):
     # Off on an installation that only meets people (in person or online):
     # nothing offers a call, and the call endpoints refuse. See phone_calls_enabled().
     phone_calls_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # --- Clients and wording (see client_setup.md) ---
+    # Off on an installation whose clients speak for themselves (RECO's young
+    # people): no caregiver fields, and nobody is filed as their own caregiver.
+    caregivers_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+    # Off where a meeting is just a meeting: the Type picker is not asked and
+    # new meetings are saved as the plain "Protocol" type.
+    meeting_types_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+    # What this installation calls the person a client is assigned to —
+    # "Link worker", "Counsellor". Blank keeps the translated "Navigator".
+    navigator_term = models.CharField(max_length=60, blank=True, default="")
+    navigator_term_plural = models.CharField(max_length=60, blank=True, default="")
+
+    # --- Self-registration outcome (see client_setup.md) ---
+    # On, a registration becomes a client the moment it is filed, so the person
+    # can start talking to their agent straight away.
+    self_reg_auto_approve = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+    # The agent a newly approved client is given: pre-selected on the approve
+    # button, and the one auto-approval uses.
+    self_reg_client_agent = models.ForeignKey(
+        "Agent", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+    )
+    # What the registration agent tells someone once their request is filed,
+    # and what they are sent when it is approved. Blank uses the defaults in
+    # ConvAI.self_registration.
+    self_reg_pending_message = models.TextField(blank=True, default="")
+    self_reg_welcome_message = models.TextField(blank=True, default="")
 
     # --- Integrations (secrets, live) ---
     twilio_account_sid = models.CharField(max_length=255, blank=True, default="")

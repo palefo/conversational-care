@@ -17,6 +17,7 @@ dropped — same component, one less row.
 """
 import logging
 
+from ..site_config import meeting_types_enabled
 from ._base import *  # noqa: F401,F403
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max, Min
@@ -485,7 +486,8 @@ def _alert_panel(request, pk):
     # when you open something, not while you scan.
     if is_admin(request.user) and alert.patient and alert.patient.navigator:
         nav = alert.patient.navigator
-        points.append({'text': _("Navigator: %s") % (nav.get_full_name() or nav.username)})
+        from ..site_config import navigator_term
+        points.append({'text': f"{navigator_term()}: {nav.get_full_name() or nav.username}"})
 
     if data.get('archive_bucket'):
         points.append({'text': _("Archived as: %s") % (
@@ -1154,7 +1156,8 @@ def _meeting_panel(request, pk):
         'scheduled_local': timezone.localtime(meeting.scheduled_time).strftime("%Y-%m-%dT%H:%M"),
         'edit_url': reverse('edit_meeting', args=[meeting.pk]),
         'modality_choices': modality_choices(meeting),
-        'type_choices': Meeting.MeetingType.choices,
+        # Empty where meeting types are switched off: the Type row is not shown.
+        'type_choices': Meeting.MeetingType.choices if meeting_types_enabled() else [],
         'completed_status': Meeting.Status.COMPLETED,
         # Answers and notes stay editable after the call ends. A call is often
         # written up afterwards, and both endpoints already allow it — they

@@ -1,6 +1,7 @@
 from ._base import *  # noqa: F401,F403
 import logging
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 
 from ._panel import panel_context
@@ -51,22 +52,31 @@ def scoped_meeting_form(request, data=None):
     return form
 
 
-def save_scheduled_meeting(form):
-    """Save the meeting, or mark the clash on the form. Returns the meeting or None."""
+def save_scheduled_meeting(form, user=None):
+    """Save the meeting, or mark the clash on the form. Returns the meeting or None.
+
+    ``user`` is who booked it, kept on the meeting so an admin's calendar can be
+    filtered by it.
+    """
     if not form.is_valid():
         return None
 
     meeting = form.save(commit=False)
+    if user is not None and getattr(user, "is_authenticated", False):
+        meeting.created_by = user
     mt = meeting.scheduled_time
 
     # Clash detection runs against whoever owns the client, not against whoever
     # is filling in the form — an admin scheduling on someone else's behalf must
-    # not be told their own diary is free.
-    clash = Meeting.objects.filter(
-        patient__navigator=meeting.patient.navigator,
+    # not be told their own diary is free. A client with nobody assigned has no
+    # diary to clash with: filtering on a null navigator would instead compare
+    # them with every other unassigned client.
+    navigator = meeting.patient.navigator
+    clash = navigator is not None and Meeting.objects.filter(
+        patient__navigator=navigator,
         scheduled_time__gte=mt - timedelta(minutes=19),
         scheduled_time__lt=mt + timedelta(minutes=19),
-    ).exists()
+    ).exclude(status=Meeting.Status.CANCELLED).exists()
     if clash:
         form.add_error('scheduled_time',
                        _("There is already a meeting scheduled within this time range."))
@@ -88,7 +98,7 @@ def schedule_call(request):
     """
     if request.method == 'POST':
         form = scoped_meeting_form(request, request.POST)
-        if save_scheduled_meeting(form):
+        if save_scheduled_meeting(form, request.user):
             messages.success(request, _("Meeting scheduled."))
             return redirect('communications')
         for field, errors in form.errors.items():
@@ -424,18 +434,38 @@ def calendar_view(request):
     def _aware(d):
         return timezone.make_aware(datetime(d.year, d.month, d.day, 0, 0, 0), tz)
 
+    # Admins see everybody's meetings in one calendar and can narrow it to the
+    # ones a single person booked. Navigators see their own clients', as before.
+    by = ''
+    by_options = []
+    if is_admin(request.user):
+        from ..roles import navigator_choices
+        raw = (request.GET.get('by') or '').strip()
+        by = raw if (raw == 'none' or raw.isdigit()) else ''
+        people = {u.pk: u for u in navigator_choices()}
+        for u in get_user_model().objects.filter(
+                pk__in=Meeting.objects.filter(created_by__isnull=False)
+                .values('created_by')).distinct():
+            people.setdefault(u.pk, u)
+        by_options = sorted(((str(pk), u.get_full_name().strip() or u.username)
+                             for pk, u in people.items()), key=lambda o: o[1].lower())
+
     def _meetings_between(start_date, end_date):
         """Return meetings for this navigator in [start_date, end_date), grouped
         by local date, each list sorted by local time."""
         qs = Meeting.objects.filter(
             scheduled_time__gte=_aware(start_date),
             scheduled_time__lt=_aware(end_date),
-        ).select_related('patient')
+        ).select_related('patient', 'created_by')
         # Staff see every meeting; a navigator sees only their own clients'.
         # Without the staff case, an admin who schedules a call for another
         # navigator's client can never find it again on Home or the calendar.
         if not is_admin(request.user):
             qs = qs.filter(patient__navigator=request.user)
+        elif by == 'none':
+            qs = qs.filter(created_by__isnull=True)
+        elif by:
+            qs = qs.filter(created_by_id=by)
         by_date = {}
         for m in qs:
             local_date = timezone.localtime(m.scheduled_time, tz).date()
@@ -452,15 +482,17 @@ def calendar_view(request):
         'at_min': offset <= -_max,
         'at_max': offset >= _max,
         'view_options': [('month', _('Month')), ('week', _('Week')), ('day', _('Day'))],
+        'by': by,
+        'by_options': by_options,
+        # Appended to every link that moves the calendar, so the filter holds.
+        'cal_by_qs': f"&by={quote_plus(by)}" if by else "",
     }
 
     # Every view, not only the ones with clickable slots. The Schedule button in
     # the header opens the same modal from the month as from the week, and a
     # month rendering it without a form gave a New meeting dialog with nothing
     # in it but Cancel and Schedule.
-    meeting_form = MeetingForm()
-    if not is_admin(request.user):
-        meeting_form.fields['patient'].queryset = Patient.objects.filter(navigator=request.user)
+    meeting_form = scoped_meeting_form(request)
     context['meeting_form'] = meeting_form
     # Which protocols each client is on, so the dialog can float the chosen
     # client's own to the top the moment they are chosen. Scoped to the clients
@@ -563,10 +595,8 @@ def calendar_view(request):
 @login_required
 @require_POST
 def calendar_create_meeting(request):
-    """Create a meeting from the week/day calendar's click-to-schedule modal."""
-    form = MeetingForm(request.POST)
-    if not is_admin(request.user):
-        form.fields['patient'].queryset = Patient.objects.filter(navigator=request.user)
+    """Create a meeting from the calendar's New meeting dialog."""
+    form = scoped_meeting_form(request, request.POST)
 
     view = request.POST.get('view', 'week')
     try:
@@ -574,26 +604,23 @@ def calendar_create_meeting(request):
     except ValueError:
         offset = 0
     back = f"{reverse('calendar')}?view={view}&offset={offset}"
+    by = (request.POST.get('by') or '').strip()
+    if by:
+        back += f"&by={quote_plus(by)}"
 
-    if form.is_valid():
-        meeting = form.save(commit=False)
-        meeting.navigator = request.user
-        mt = meeting.scheduled_time
-        conflict = Meeting.objects.filter(
-            patient__navigator=request.user,
-            scheduled_time__gte=mt - timedelta(minutes=19),
-            scheduled_time__lt=mt + timedelta(minutes=19),
-        ).exists()
-        if conflict:
-            messages.error(request, _("You already have a meeting scheduled within this time range."))
-        else:
-            meeting.save()
-            # save(commit=False) defers the m2m write; without this the
-            # protocols picked in the dialog are silently dropped.
-            form.save_m2m()
-            messages.success(request, _("Meeting scheduled."))
+    # The same save as the dialog on Communications, so the two agree on what
+    # counts as a clash and both record who booked it.
+    if save_scheduled_meeting(form, request.user):
+        messages.success(request, _("Meeting scheduled."))
     else:
-        messages.error(request, _("Please check the meeting details and try again."))
+        # Say what was wrong. "Please check the meeting details" left people
+        # with nothing to correct — a missing place for an in-person meeting
+        # read exactly like a server failure.
+        for name, errors in form.errors.items():
+            field = form.fields.get(name)
+            label = f"{field.label}: " if field is not None and field.label else ""
+            for err in errors:
+                messages.error(request, f"{label}{err}")
     return redirect(back)
 
 

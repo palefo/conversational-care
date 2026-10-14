@@ -382,6 +382,11 @@ def _run_identity(agent, user_or_patient, thread_id: str) -> dict:
     if patient is not None:
         out["patient_id"] = patient.pk
         out["client_id"] = patient.pk
+        # How the client asked to be referred to, when someone recorded it.
+        # Absent rather than blank otherwise, so a graph can tell "not asked"
+        # from a value. See client_setup.md.
+        if (getattr(patient, "pronouns", "") or "").strip():
+            out["client_pronouns"] = patient.pronouns.strip()
 
     wants_callbacks = (getattr(agent, "kind", "") == "remote"
                        and bool(getattr(agent, "allow_callbacks", False)))

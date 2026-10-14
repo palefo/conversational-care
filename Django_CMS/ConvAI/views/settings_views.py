@@ -218,6 +218,8 @@ def _participants_context(request):
 def _build_config_context(request, forms_override=None, active_tab="general"):
     """Assemble the settings-page context, letting one bound (invalid) form be
     injected so validation errors render inline."""
+    from .. import registration
+    from ..roles import navigator_choices
     forms_override = forms_override or {}
     cfg = SiteConfiguration.load()
 
@@ -281,11 +283,16 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
         "api_base_url": request.build_absolute_uri("/").rstrip("/"),
         # Whether the REST API is exposed (boot setting; the client needs it on).
         "api_enabled": getattr(settings, "ENABLE_API", True),
-        "self_regs": SelfRegistration.objects.order_by("-created_at"),
+        "self_regs": SelfRegistration.objects.select_related("patient__navigator").order_by("-created_at"),
         "selfreg": _selfreg_qr_context(request),
         "agents": Agent.for_clients().order_by("name"),
         "protocols": protocols,
         "general_form": _form("general"),
+        "clients_form": _form("clients"),
+        "registration_form": _form("registrations"),
+        "navigator_choices": navigator_choices(),
+        "self_reg_client_agent_id": cfg.self_reg_client_agent_id,
+        "self_reg_auto_approve": registration.auto_approve(),
         "integrations_form": _form("integrations"),
         "messaging_form": _form("messaging"),
         # Numbers more than one client can be reached on, and the older messages
@@ -370,14 +377,16 @@ def config_save(request):
         ctx = _build_config_context(request, forms_override={section: form}, active_tab=section)
         return render(request, "settings/config.html", ctx)
 
+    # A section that is a card on another tab returns to that tab.
+    tab = {"clients": "general"}.get(section, section)
     form = form_cls(request.POST, request.FILES, instance=SiteConfiguration.load())
     if form.is_valid():
         form.save()
         messages.success(request, _("Settings saved."))
-        return redirect(f"{reverse('config')}?tab={section}#{section}")
+        return redirect(f"{reverse('config')}?tab={tab}#{section}")
 
     messages.error(request, _("Please correct the errors below."))
-    ctx = _build_config_context(request, forms_override={section: form}, active_tab=section)
+    ctx = _build_config_context(request, forms_override={section: form}, active_tab=tab)
     return render(request, "settings/config.html", ctx)
 
 
@@ -470,50 +479,31 @@ def approve_self_registration(request, pk):
         messages.info(request, _("This self-registration is already approved."))
         return redirect('config')
 
-    # Optional Agent selection
+    from .. import registration
+    from ..roles import navigator_choices
+    from ..site_config import navigator_term
+
+    # Optional agent and navigator. Only people who can be a navigator are
+    # accepted, as on the client form.
     agent_id = request.POST.get("agent_id") or ""
     agent = Agent.for_clients().filter(pk=agent_id).first() if agent_id else None
+    navigator_id = request.POST.get("navigator_id") or ""
+    navigator = navigator_choices().filter(pk=navigator_id).first() if navigator_id else None
 
-    caregiver = Caregiver.objects.create(
-        name=sr.name,
-        lastname=sr.lastname,
-        phone_number=sr.phone_number
-    )
+    patient, sent = registration.approve(sr, agent=agent, navigator=navigator)
 
-    Patient.objects.create(
-        name=sr.name,
-        lastname=sr.lastname,
-        phone_number=sr.phone_number,
-        caregiver=caregiver,
-        navigator=None,
-        agent=agent,  # attach selected agent if any
-    )
-
-    sr.state = SelfRegistration.State.APPROVED
-    sr.save(update_fields=["state", "updated_at"])
-
-    # Send WhatsApp welcome using the util
-    sent = False
-    if sr.phone_number:
-        sent = send_whatsapp_text(
-            to_e164=str(sr.phone_number),
-            body=(
-                "Welcome to conversational-care.ai! Your registration has been approved."
-            )
-        )
-
+    name = f"{sr.name} {sr.lastname}"
     if sent:
-        messages.success(
-            request,
-            f"A patient for {sr.name} {sr.lastname} was created, request approved, and a WhatsApp welcome was sent."
-        )
+        messages.success(request, _("%(name)s is now a client and was sent the welcome message.")
+                         % {"name": name})
     else:
-        messages.success(
-            request,
-            f"A patient for {sr.name} {sr.lastname} was created and the request approved. "
-            "No notification was sent due to an error."
-        )
+        messages.success(request, _("%(name)s is now a client. The welcome message could not be "
+                                    "sent: check the WhatsApp and SMS settings.") % {"name": name})
+    if patient and not patient.navigator_id:
+        messages.info(request, _("No %(term)s is assigned yet. Assign one from the client's Edit page.")
+                      % {"term": navigator_term().lower()})
 
-    return redirect('config')
+    return redirect(f"{reverse('config')}?tab=registrations#registrations")
+
 
 

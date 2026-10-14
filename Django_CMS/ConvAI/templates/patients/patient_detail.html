@@ -165,6 +165,7 @@
     <input type="hidden" name="next" value="{{ request.get_full_path }}">
 
     <dl class="pd-dl">
+      {% if show_caregiver %}
       <div>
         <dt>{% trans "Caregiver" %}</dt>
         <dd>
@@ -192,6 +193,7 @@
           {% endif %}
         </dd>
       </div>
+      {% endif %}
 
       {% comment %}
         The client's own number was the one fact about them the profile did not
@@ -202,15 +204,20 @@
       <div><dt>{% trans "Phone" %}</dt>
         <dd>{% if patient.phone_number %}{{ patient.phone_number }}{% else %}<i>{% trans "Not recorded" %}</i>{% endif %}</dd></div>
 
+      <div><dt>{% trans "Pronouns" %}</dt>
+        <dd>{% if patient.pronouns %}{{ patient.pronouns }}{% else %}<i>{% trans "Not recorded" %}</i>{% endif %}</dd></div>
+
+      {% if show_caregiver %}
       <div><dt>{% trans "Caregiver phone" %}</dt>
         <dd>{% if patient.caregiver.phone_number %}{{ patient.caregiver.phone_number }}{% elif patient.caregiver %}<i>{% trans "Not recorded" %}</i>{% else %}&mdash;{% endif %}</dd></div>
+      {% endif %}
       {% comment %}
         Patient.navigator is null=True / SET_NULL, so it really can be absent.
         The fallback has to be a conditional: a chained lookup used as a filter
         *argument* is resolved without the usual silent-failure handling, so
         `|default:patient.navigator.username` raises once navigator is None.
       {% endcomment %}
-      <div><dt>{% trans "Navigator" %}</dt>
+      <div><dt>{% navigator_term %}</dt>
         <dd>{% if patient.navigator %}{{ patient.navigator.get_full_name|default:patient.navigator.username }}{% else %}—{% endif %}</dd></div>
 
       <div>

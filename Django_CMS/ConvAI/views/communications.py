@@ -409,7 +409,7 @@ def communications(request):
     schedule_form = None
     if request.method == 'POST' and request.POST.get('schedule'):
         schedule_form = scoped_meeting_form(request, request.POST)
-        if save_scheduled_meeting(schedule_form):
+        if save_scheduled_meeting(schedule_form, request.user):
             messages.success(request, _("Meeting scheduled."))
             # Onto Coming up, where the meeting just booked now is: the page
             # opens on Happened, which cannot show it.

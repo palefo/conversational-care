@@ -491,6 +491,27 @@
   </a>
   {% endif %}
 
+  {% if unassigned_clients %}
+  {% comment %}
+    Registrations that are clients now but have nobody assigned — with
+    automatic approval, every new one until an admin picks their navigator.
+    Admins only; it goes as soon as one is set (views/dashboard.py).
+  {% endcomment %}
+  <a class="dash-waiting" href="{{ unassigned_clients.url }}">
+    <span class="dash-ic dash-ic-reg"><span class="material-icons-outlined">person_add</span></span>
+    <span class="dash-waiting-main">
+      <span class="dash-waiting-title">
+        {% blocktrans count n=unassigned_clients.count with term=unassigned_clients.term %}{{ n }} new client needs a {{ term }}{% plural %}{{ n }} new clients need a {{ term }}{% endblocktrans %}
+      </span>
+      <span class="dash-waiting-sub">
+        {{ unassigned_clients.names|join:", " }}{% if unassigned_clients.more %} {% blocktrans with n=unassigned_clients.more %}and {{ n }} more{% endblocktrans %}{% endif %}
+        · <span title="{{ unassigned_clients.age_exact }}">{{ unassigned_clients.age }}</span>
+      </span>
+    </span>
+    <span class="dash-waiting-go">{% trans "Assign" %}<span class="material-icons-outlined">arrow_forward</span></span>
+  </a>
+  {% endif %}
+
   {% comment %}
     A glance at the three numbers, above the lists rather than instead of them.
     Each box is a summary and nothing more: the work itself is in the sections
@@ -568,7 +589,7 @@
                 <div class="dash-row-l2">{{ it.description }}</div>
               </div>
               <div class="dash-row-right">
-                <span class="dash-prio">{% trans "To approve" %}</span>
+                <span class="dash-prio">{{ it.ask }}</span>
                 <span class="dash-age" title="{{ it.age_exact }}">{{ it.age }}</span>
               </div>
             </div>

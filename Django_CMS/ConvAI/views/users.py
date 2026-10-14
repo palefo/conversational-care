@@ -14,7 +14,8 @@ def _user_role_label(u):
     if u.is_superuser:
         return _("Admin")
     if 'Navigator' in gnames:
-        return _("Navigator")
+        from ..site_config import navigator_term
+        return navigator_term()
     if 'PatientTester' in gnames:
         return _("Test user")
     return "—"
@@ -161,7 +162,8 @@ def create_user(request):
         user.set_password(cd['password'])
         user.save()
         user.groups.add(Group.objects.get(name='Navigator'))
-        messages.success(request, _("Navigator user created."))
+        from ..site_config import navigator_term
+        messages.success(request, _("%(term)s account created.") % {"term": navigator_term()})
     else:
         errs = "; ".join(f"{f}: {', '.join(e)}" for f, e in form.errors.items())
         messages.error(request, _("Could not create user.") + " " + errs)

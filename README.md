@@ -58,6 +58,10 @@ Topic deep dives:
 - [Participant management](participant_management.md) — for deployments running a
   research study: pre-enrolling participants, three-word access codes, the public
   join page, and versioned append-only consent. Off by default.
+- [Client setup](client_setup.md) — fitting the platform to who its clients
+  are: what a navigator is called, whether clients have caregivers and meetings
+  have types, pronouns in summaries, what happens after someone self-registers
+  (including automatic approval), and the admin calendar's "Booked by" filter.
 - [Link Worker v2 (beta)](link_worker_v2.md) — the chat-bubble assistant that
   answers questions about clients (next meetings, protocol answers and how they
   changed, everything on file), the matching REST endpoints and SDK methods, and

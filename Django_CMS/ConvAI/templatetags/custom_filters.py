@@ -84,6 +84,13 @@ def link_worker_v2_on():
     return get_bool("LINK_WORKER_V2_ENABLED")
 
 @register.simple_tag
+def navigator_term(plural=False):
+    """What this installation calls a navigator — "Link worker", say."""
+    from ..site_config import navigator_term as _term
+    return _term(plural=bool(plural))
+
+
+@register.simple_tag
 def brand_name():
     """Return brand display name (DB override, else settings/ENV)."""
     return _cfg_brand_name()

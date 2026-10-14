@@ -26,6 +26,7 @@
   .cal-view .material-icons-outlined { font-size:1.05rem; }
 
   /* Legend */
+  .cal-by { display:inline-flex; align-items:center; gap:.4rem; }
   .cal-legend { display:flex; flex-wrap:wrap; align-items:center; gap:.85rem; font-size:.72rem; color:#64748b; }
   .cal-legend .dot { display:inline-flex; align-items:center; gap:.35rem; }
   .cal-legend .swatch { width:.7rem; height:.7rem; border-radius:9999px; flex-shrink:0; }
@@ -142,7 +143,7 @@
         stop looking at it.
       {% endcomment %}
       {% for v, label in view_options %}
-        <a href="?view={{ v }}{{ cal_item_qs }}" class="cal-view {% if view == v %}active{% endif %}" role="tab" aria-selected="{% if view == v %}true{% else %}false{% endif %}">
+        <a href="?view={{ v }}{{ cal_by_qs }}{{ cal_item_qs }}" class="cal-view {% if view == v %}active{% endif %}" role="tab" aria-selected="{% if view == v %}true{% else %}false{% endif %}">
           <span class="material-icons-outlined">{% if v == 'month' %}calendar_view_month{% elif v == 'week' %}view_week{% else %}calendar_view_day{% endif %}</span>
           {{ label }}
         </a>
@@ -154,14 +155,35 @@
   <div class="card p-6">
     <!-- Toolbar -->
     <div class="cal-toolbar">
-      <a href="?view={{ view }}&amp;offset=0{{ cal_item_qs }}" class="cal-today {% if offset == 0 %}disabled{% endif %}">{% trans "Today" %}</a>
-      <a href="?view={{ view }}&amp;offset={{ offset|add:'-1' }}{{ cal_item_qs }}" class="cal-navbtn {% if at_min %}disabled{% endif %}" aria-label="{% trans 'Previous' %}">
+      <a href="?view={{ view }}&amp;offset=0{{ cal_by_qs }}{{ cal_item_qs }}" class="cal-today {% if offset == 0 %}disabled{% endif %}">{% trans "Today" %}</a>
+      <a href="?view={{ view }}&amp;offset={{ offset|add:'-1' }}{{ cal_by_qs }}{{ cal_item_qs }}" class="cal-navbtn {% if at_min %}disabled{% endif %}" aria-label="{% trans 'Previous' %}">
         <span class="material-icons-outlined">chevron_left</span>
       </a>
-      <a href="?view={{ view }}&amp;offset={{ offset|add:'1' }}{{ cal_item_qs }}" class="cal-navbtn {% if at_max %}disabled{% endif %}" aria-label="{% trans 'Next' %}">
+      <a href="?view={{ view }}&amp;offset={{ offset|add:'1' }}{{ cal_by_qs }}{{ cal_item_qs }}" class="cal-navbtn {% if at_max %}disabled{% endif %}" aria-label="{% trans 'Next' %}">
         <span class="material-icons-outlined">chevron_right</span>
       </a>
       <h2 class="cal-period">{{ period_label }}</h2>
+
+      {% comment %}
+        Admins see everybody's meetings in this one calendar. This narrows it to
+        the ones a single person booked; "older meetings" are those booked
+        before the platform recorded who booked them.
+      {% endcomment %}
+      {% if by_options %}
+        <form method="get" class="cal-by">
+          <input type="hidden" name="view" value="{{ view }}">
+          <input type="hidden" name="offset" value="{{ offset }}">
+          <label class="text-sm text-gray-500" for="calBy">{% trans "Booked by" %}</label>
+          <select id="calBy" name="by" class="border border-gray-300 rounded-md text-sm px-2 py-1" onchange="this.form.submit()">
+            <option value="">{% trans "Everyone" %}</option>
+            {% for value, label in by_options %}
+              <option value="{{ value }}" {% if by == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            <option value="none" {% if by == "none" %}selected{% endif %}>{% trans "Not recorded (older meetings)" %}</option>
+          </select>
+          <noscript><button type="submit" class="button-secondary py-1 px-2 rounded text-xs">{% trans "Show" %}</button></noscript>
+        </form>
+      {% endif %}
 
       <div class="cal-legend ml-auto">
         <span class="dot"><span class="swatch sw-pending"></span>{% trans "Pending" %}</span>
@@ -192,7 +214,7 @@
                       {% for meeting in day_meetings|slice:":3" %}
                         <a href="?{{ cal_qs }}item=meeting-{{ meeting.id }}" data-dp-open
                            class="m-pill {% if meeting.status == 1 %}m-completed{% elif meeting.status == 2 %}m-interrupted{% elif meeting.status == 3 %}m-missed{% else %}m-pending{% endif %}{% if panel_item.token == meeting.panel_token %} cal-ev-open{% endif %}{% if meeting.status == 4 %} cal-ev-off{% endif %}"
-                           title="{{ meeting.scheduled_time|time:'H:i' }} · {{ meeting.patient.name }} {{ meeting.patient.lastname }} · {{ meeting.get_type_display }} ({{ meeting.get_status_display }})">
+                           title="{{ meeting.scheduled_time|time:'H:i' }} · {{ meeting.patient.name }} {{ meeting.patient.lastname }} · {{ meeting.get_type_display }} ({{ meeting.get_status_display }}){% if by_options and meeting.created_by %} · {% trans 'booked by' %} {{ meeting.created_by.get_full_name|default:meeting.created_by.username }}{% endif %}">
                           <span class="m-time">{{ meeting.scheduled_time|time:"H:i" }}</span>
                           <span class="m-name">{{ meeting.patient.name }} {{ meeting.patient.lastname }}</span>
                         </a>
@@ -233,7 +255,7 @@
                   <a href="?{{ cal_qs }}item=meeting-{{ m.id }}" data-dp-open
                      class="cal-chip {% if m.status == 1 %}is-completed{% elif m.status == 2 %}is-interrupted{% elif m.status == 3 %}is-missed{% else %}is-pending{% endif %}{% if panel_item.token == m.panel_token %} cal-ev-open{% endif %}{% if m.status == 4 %} cal-chip-off{% endif %}"
                      onclick="event.stopPropagation()"
-                     title="{{ m.scheduled_time|time:'H:i' }} · {{ m.patient.name }} {{ m.patient.lastname }} · {{ m.get_type_display }} ({{ m.get_status_display }})">{{ m.scheduled_time|time:"H:i" }} {{ m.patient.name }}</a>
+                     title="{{ m.scheduled_time|time:'H:i' }} · {{ m.patient.name }} {{ m.patient.lastname }} · {{ m.get_type_display }} ({{ m.get_status_display }}){% if by_options and m.created_by %} · {% trans 'booked by' %} {{ m.created_by.get_full_name|default:m.created_by.username }}{% endif %}">{{ m.scheduled_time|time:"H:i" }} {{ m.patient.name }}</a>
                 {% endfor %}
               </div>
             {% endfor %}
@@ -250,7 +272,7 @@
         <div class="flex-1">
           <h3 class="text-lg font-semibold text-gray-800">{% trans "New meeting" %}</h3>
           <p class="text-sm text-gray-500" id="calModalWhen"
-             data-prompt="{% trans 'Pick a time, a client and a meeting type.' %}">{% trans "Pick a time, a client and a meeting type." %}</p>
+             data-prompt="{% trans 'Pick a time and a client.' %}">{% trans "Pick a time and a client." %}</p>
         </div>
         <button type="button" onclick="calClose()" class="text-gray-400 hover:text-gray-600"><span class="material-icons-outlined">close</span></button>
       </div>
@@ -258,6 +280,7 @@
         {% csrf_token %}
         <input type="hidden" name="view" value="{{ view }}">
         <input type="hidden" name="offset" value="{{ offset }}">
+        <input type="hidden" name="by" value="{{ by }}">
         <div class="mb-3">
           <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.scheduled_time.label }}</label>
           {{ meeting_form.scheduled_time }}
@@ -280,10 +303,12 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.location.label }}</label>
           {{ meeting_form.location }}
         </div>
+        {% if meeting_form.type %}
         <div class="mb-3">
           <label class="block text-sm font-medium text-gray-700 mb-1">{{ meeting_form.type.label }}</label>
           {{ meeting_form.type }}
         </div>
+        {% endif %}
         {% comment %}
           A call can cover more than one protocol, so this is a list rather than
           a dropdown that could only hold one. Every row is a real protocol
@@ -394,7 +419,13 @@
     if (!mod || !where) return;
     // By value, not by label: the label is translated ("Presencial" never
     // matched /person/), the value is Meeting.Modality.IN_PERSON.
-    var sync = function () { where.hidden = String(mod.value) !== '1'; };
+    // Required while it shows: the browser then asks for the place before
+    // sending, instead of the dialog closing on a booking that cannot be made.
+    var place = where.querySelector('input');
+    var sync = function () {
+      where.hidden = String(mod.value) !== '1';
+      if (place) { place.required = !where.hidden; }
+    };
     mod.addEventListener('change', sync);
     sync();
   })();

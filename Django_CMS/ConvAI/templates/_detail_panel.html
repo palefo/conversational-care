@@ -494,6 +494,7 @@ themselves — see the autosave note in the script below.
                    placeholder="{% trans 'Only for an in-person meeting' %}">
           </label>
 
+          {% if panel_item.type_choices %}
           <label class="dp-fld">
             <span>{% trans "Type" %}</span>
             <select name="type">
@@ -502,6 +503,7 @@ themselves — see the autosave note in the script below.
               {% endfor %}
             </select>
           </label>
+          {% endif %}
 
           {% comment %}
             A call can cover more than one protocol, so this is a list of

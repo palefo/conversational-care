@@ -166,7 +166,10 @@ def review_conversation(conversation_id, *, raise_alerts: bool = True) -> dict:
     agent = _resolve_agent(conv)
 
     try:
-        verdict = classify_conversation_with_llm(rows, agent=agent)
+        # The client's pronouns, where somebody recorded them, so the summary
+        # does not fall back to "they" for a person who said otherwise.
+        pronouns = getattr(conv.patient, "pronouns", "") if conv.patient_id else ""
+        verdict = classify_conversation_with_llm(rows, agent=agent, pronouns=pronouns)
     except Exception as exc:
         blocked = content_filter_block(exc)
         if blocked is not None:

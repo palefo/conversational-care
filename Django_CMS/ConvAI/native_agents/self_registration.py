@@ -91,7 +91,13 @@ def _create_self_registration(name: str, lastname: str, phone: str, channel: str
         details={"source": "self-registration-agent",
                  **({"channel": channel} if channel in CHANNEL_NAMES else {})},
     )
-    return {"ok": True, "already_registered": False, "id": sr.id}
+    # Auto-approval makes them a client now. No welcome message is sent: the
+    # agent's own reply to this turn is the welcome, and two would cross.
+    from .. import registration
+    if registration.auto_approve():
+        registration.approve(sr, agent=registration.client_agent(), send_welcome=False)
+        return {"ok": True, "already_registered": False, "approved": True, "id": sr.id}
+    return {"ok": True, "already_registered": False, "approved": False, "id": sr.id}
 
 
 def _enrolment_enabled() -> bool:
@@ -136,7 +142,8 @@ def build(checkpointer, model_name=None):
         """File the person's registration request for admin approval. Call this once,
         only after you have their first name, last name, and a valid E.164 phone
         number. If the phone number is already known from the system context, pass
-        that value. Returns {ok, already_registered}."""
+        that value. Returns {ok, already_registered, approved}: approved means
+        they are already a client and can start straight away."""
         try:
             return _create_self_registration(name, lastname, phone_number,
                                              channel=_ctx().get("channel"))
@@ -193,6 +200,15 @@ def build(checkpointer, model_name=None):
                 "If it does not match, or they have no code, carry on with the "
                 "normal registration below without dwelling on it."
             )
+
+        # What to say once the request is filed, as Settings → Registrations
+        # words it. Given as the meaning to convey, so it can still be said in
+        # the language the person is writing in.
+        from .. import registration
+        sys += ("\nOnce `submit_self_registration` succeeds with approved=false, tell "
+                f"them this, in their language: \"{registration.pending_message()}\"")
+        sys += ("\nIf it returns approved=true, they are already a client: tell them "
+                f"this instead, in their language: \"{registration.welcome_message()}\"")
 
         channel = CHANNEL_NAMES.get(cfg.get("channel"), "WhatsApp")
         sys += f"\nThe person is writing to the service by {channel}."

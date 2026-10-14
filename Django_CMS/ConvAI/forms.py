@@ -10,6 +10,12 @@ from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from .site_config import caregivers_enabled, meeting_types_enabled, navigator_term
+
+# The caregiver_* fields the client forms add, dropped together when an
+# installation's clients have no caregivers.
+CAREGIVER_FIELDS = ("caregiver_name", "caregiver_lastname", "caregiver_phone", "caregiver_email")
+
 class MeetingForm(forms.ModelForm):
     scheduled_time = forms.DateTimeField(
         widget=forms.DateTimeInput(
@@ -95,6 +101,11 @@ class MeetingForm(forms.ModelForm):
                 # meeting, which is no longer a choice.
                 if not self.instance.pk and self.initial.get('modality') in (None, Meeting.Modality.PHONE):
                     self.initial['modality'] = Meeting.default_modality()
+
+        # Some installations have no use for Onboarding / Initial / Final: the
+        # Type is then not asked, and a new meeting is a plain Protocol one.
+        if not meeting_types_enabled() and 'type' in self.fields:
+            self.fields.pop('type')
 
     def protocol_owners(self):
         """{protocol id: [client id, …]} over the clients this form can pick.
@@ -384,6 +395,95 @@ class GeneralConfigForm(forms.ModelForm):
         )
 
 
+class ClientsConfigForm(forms.ModelForm):
+    """Settings → General → Clients: what a client record holds, and what the
+    person they are assigned to is called. See client_setup.md."""
+
+    class Meta:
+        model = SiteConfiguration
+        fields = ["navigator_term", "navigator_term_plural", "caregivers_enabled",
+                  "meeting_types_enabled"]
+        labels = {
+            "navigator_term": _("What to call navigators"),
+            "navigator_term_plural": _("Plural"),
+            "caregivers_enabled": _("Clients have a caregiver"),
+            "meeting_types_enabled": _("Ask for a meeting type"),
+        }
+        help_texts = {
+            "navigator_term": _("The person a client is assigned to, as your team says it — "
+                                "for example “Link worker”. Blank keeps “Navigator”."),
+            "navigator_term_plural": _("Blank adds an “s”."),
+            "caregivers_enabled": _("Off: clients are not asked for a caregiver, and calls and "
+                                    "reminders go to the client. Caregivers already recorded "
+                                    "are kept."),
+            "meeting_types_enabled": _("Off: the meeting dialog does not ask for Onboarding, "
+                                       "Initial, Protocol, Final or Follow-up, and every new "
+                                       "meeting is saved as Protocol."),
+        }
+        widgets = {
+            "navigator_term": forms.TextInput(attrs={**_INPUT, "placeholder": "Link worker"}),
+            "navigator_term_plural": forms.TextInput(attrs={**_INPUT, "placeholder": "Link workers"}),
+            "caregivers_enabled": forms.Select(attrs=_SELECT),
+            "meeting_types_enabled": forms.Select(attrs=_SELECT),
+        }
+
+
+class RegistrationConfigForm(forms.ModelForm):
+    """Settings → Registrations: what happens after someone self-registers."""
+
+    class Meta:
+        model = SiteConfiguration
+        fields = ["self_reg_auto_approve", "self_reg_client_agent",
+                  "self_reg_pending_message", "self_reg_welcome_message"]
+        labels = {
+            "self_reg_auto_approve": _("Approve registrations automatically"),
+            "self_reg_client_agent": _("Agent for new clients"),
+            "self_reg_pending_message": _("Message while waiting for approval"),
+            "self_reg_welcome_message": _("Welcome message"),
+        }
+        help_texts = {
+            "self_reg_auto_approve": _("On: a registration becomes a client as soon as it is "
+                                       "filed, with the agent below, so the person can start "
+                                       "chatting straight away. Off: it waits here for an admin."),
+            "self_reg_client_agent": _("Given to every approved client. Pre-selected on the "
+                                       "Approve button; required for automatic approval."),
+            "self_reg_pending_message": _("What the registration agent tells someone once their "
+                                          "request is filed and waits for approval. It is "
+                                          "translated if they write in another language."),
+            "self_reg_welcome_message": _("Sent when a registration is approved, on the channel "
+                                          "the person registered on. With automatic approval "
+                                          "the registration agent says it instead."),
+        }
+        widgets = {
+            "self_reg_auto_approve": forms.Select(attrs=_SELECT),
+            "self_reg_client_agent": forms.Select(attrs=_SELECT),
+            "self_reg_pending_message": forms.Textarea(attrs={**_INPUT, "rows": 2}),
+            "self_reg_welcome_message": forms.Textarea(attrs={**_INPUT, "rows": 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from . import registration
+        self.fields["self_reg_client_agent"].queryset = Agent.for_clients().order_by("name")
+        self.fields["self_reg_client_agent"].empty_label = _("— No agent —")
+        # The defaults are shown as placeholders rather than saved, so a blank
+        # field keeps following them (and their translations).
+        self.fields["self_reg_pending_message"].widget.attrs["placeholder"] = registration.default_pending_message()
+        self.fields["self_reg_welcome_message"].widget.attrs["placeholder"] = registration.default_welcome_message()
+
+    def clean(self):
+        data = super().clean()
+        from .site_config import _env, _TRUTHY
+        auto = data.get("self_reg_auto_approve")
+        if auto == "":
+            auto = "1" if str(_env("SELF_REG_AUTO_APPROVE") or "").strip().lower() in _TRUTHY else "0"
+        if auto == "1" and not data.get("self_reg_client_agent"):
+            self.add_error("self_reg_client_agent",
+                           _("Choose the agent new clients talk to: without one, an "
+                             "automatically approved client would get no replies."))
+        return data
+
+
 class IntegrationsConfigForm(SecretPreserveMixin, forms.ModelForm):
     secret_fields = ("twilio_account_sid", "twilio_auth_token", "openai_api_key", "elevenlabs_api_key")
 
@@ -550,14 +650,16 @@ class ClientForm(forms.ModelForm):
 
     class Meta:
         model = Patient
-        fields = ["name", "lastname", "phone_number", "email", "navigator", "agent",
+        fields = ["name", "lastname", "pronouns", "phone_number", "email", "navigator", "agent",
                   "protocols"]
         labels = {
             "name": _("First name"), "lastname": _("Last name"), "phone_number": _("Phone"),
             "email": _("E-mail"), "navigator": _("Navigator"), "agent": _("Agent"),
-            "protocols": _("Protocols"),
+            "protocols": _("Protocols"), "pronouns": _("Pronouns"),
         }
         help_texts = {
+            "pronouns": _("As they told you, e.g. she/her, he/him, they/them. Summaries use "
+                          "them. Leave blank until you know."),
             "email": _("Used for email reminders when the caregiver has no address."),
             "protocols": _(
                 "The protocols this client works through. Only these appear in "
@@ -568,6 +670,8 @@ class ClientForm(forms.ModelForm):
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
             "lastname": forms.TextInput(attrs=_INPUT),
+            "pronouns": forms.TextInput(attrs={**_INPUT, "list": "pronoun-suggestions",
+                                               "placeholder": _("e.g. she/her")}),
             "phone_number": forms.TextInput(attrs={**_INPUT, "placeholder": "+51999999999"}),
             "email": forms.EmailInput(attrs={**_INPUT, "placeholder": "client@example.com"}),
             "navigator": forms.Select(attrs=_SELECT),
@@ -591,13 +695,25 @@ class ClientForm(forms.ModelForm):
             self.fields["protocols"].queryset.order_by("number")
         )
         if is_admin:
+            from .roles import navigator_choices
             self.fields["navigator"].required = False
-            self.fields["navigator"].queryset = get_user_model().objects.filter(
-                groups__name="Navigator"
-            ).order_by("username")
+            self.fields["navigator"].queryset = navigator_choices()
+            self.fields["navigator"].label = navigator_term()
+            self.fields["navigator"].label_from_instance = (
+                lambda u: u.get_full_name().strip() or u.username)
+            if not self.fields["navigator"].queryset.exists():
+                self.fields["navigator"].help_text = _(
+                    "Nobody to choose yet: create their account under Users first.")
         else:
             # Navigators can't choose — they are auto-assigned as the navigator.
             self.fields.pop("navigator")
+        # No caregiver fields where clients speak for themselves. A caregiver
+        # already on file is left alone; it just is not asked about.
+        self.caregivers = caregivers_enabled()
+        if not self.caregivers:
+            for name in CAREGIVER_FIELDS:
+                self.fields.pop(name, None)
+            self.fields["email"].help_text = _("Where email reminders go.")
 
 
 class DetectorsFormField(forms.JSONField):
@@ -1589,14 +1705,16 @@ class PatientForm(forms.ModelForm):
 
     class Meta:
         model = Patient
-        fields = ["name", "lastname", "phone_number", "email", "navigator", "agent",
+        fields = ["name", "lastname", "pronouns", "phone_number", "email", "navigator", "agent",
                   "protocols"]
         labels = {
             "name": _("First name"), "lastname": _("Last name"), "phone_number": _("Phone"),
             "email": _("E-mail"), "navigator": _("Navigator"), "agent": _("Agent"),
-            "protocols": _("Protocols"),
+            "protocols": _("Protocols"), "pronouns": _("Pronouns"),
         }
         help_texts = {
+            "pronouns": _("As they told you, e.g. she/her, he/him, they/them. Summaries use "
+                          "them. Leave blank until you know."),
             "email": _("Used for email reminders when the caregiver has no address."),
             "protocols": _(
                 "The protocols this client works through. Only these appear in "
@@ -1607,6 +1725,8 @@ class PatientForm(forms.ModelForm):
         widgets = {
             "name": forms.TextInput(attrs=_INPUT),
             "lastname": forms.TextInput(attrs=_INPUT),
+            "pronouns": forms.TextInput(attrs={**_INPUT, "list": "pronoun-suggestions",
+                                               "placeholder": _("e.g. she/her")}),
             "phone_number": forms.TextInput(attrs={**_INPUT, "placeholder": "+51999999999"}),
             "email": forms.EmailInput(attrs={**_INPUT, "placeholder": "client@example.com"}),
             "navigator": forms.Select(attrs=_SELECT),
@@ -1630,13 +1750,25 @@ class PatientForm(forms.ModelForm):
             self.fields["protocols"].queryset.order_by("number")
         )
         if is_admin:
+            from .roles import navigator_choices
             self.fields["navigator"].required = False
-            self.fields["navigator"].queryset = get_user_model().objects.filter(
-                groups__name="Navigator"
-            ).order_by("username")
+            self.fields["navigator"].queryset = navigator_choices()
+            self.fields["navigator"].label = navigator_term()
+            self.fields["navigator"].label_from_instance = (
+                lambda u: u.get_full_name().strip() or u.username)
+            if not self.fields["navigator"].queryset.exists():
+                self.fields["navigator"].help_text = _(
+                    "Nobody to choose yet: create their account under Users first.")
         else:
             # Navigators can't reassign the client to someone else.
             self.fields.pop("navigator")
+        # No caregiver fields where clients speak for themselves. A caregiver
+        # already on file is left alone; it just is not asked about.
+        self.caregivers = caregivers_enabled()
+        if not self.caregivers:
+            for name in CAREGIVER_FIELDS:
+                self.fields.pop(name, None)
+            self.fields["email"].help_text = _("Where email reminders go.")
 
         # Pre-fill caregiver fields from the linked caregiver, if any.
         caregiver = getattr(self.instance, "caregiver", None)

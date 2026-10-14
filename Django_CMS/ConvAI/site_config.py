@@ -89,6 +89,11 @@ _STR_KEYS = {
     "SENSEI_USER_ID_SECRET": "sensei_user_id_secret",
     # Study enrolment (see participant_management.md).
     "ENROLMENT_LANDING_TEXT": "enrolment_landing_text",
+    # Clients and wording, and the self-registration outcome (client_setup.md).
+    "NAVIGATOR_TERM": "navigator_term",
+    "NAVIGATOR_TERM_PLURAL": "navigator_term_plural",
+    "SELF_REG_PENDING_MESSAGE": "self_reg_pending_message",
+    "SELF_REG_WELCOME_MESSAGE": "self_reg_welcome_message",
     # Link Worker on WhatsApp (see link_worker_whatsapp.md).
     "LINK_WORKER_VOICE_PT_BR": "link_worker_voice_pt_br",
     "LINK_WORKER_AZURE_VOICE_PT_BR": "link_worker_azure_voice_pt_br",
@@ -119,6 +124,9 @@ _BOOL_KEYS = {
     "LINK_WORKER_WHATSAPP_ENABLED": "link_worker_whatsapp_enabled",
     "ENROLMENT_REQUIRE_DOB": "enrolment_require_dob",
     "ENROLMENT_AUTO_APPROVE": "enrolment_auto_approve",
+    "CAREGIVERS_ENABLED": "caregivers_enabled",
+    "MEETING_TYPES_ENABLED": "meeting_types_enabled",
+    "SELF_REG_AUTO_APPROVE": "self_reg_auto_approve",
 }
 
 
@@ -213,6 +221,32 @@ def phone_calls_enabled() -> bool:
     to. Calls already made, and their recordings, stay readable.
     """
     return get_bool("PHONE_CALLS_ENABLED", default=True)
+
+
+def caregivers_enabled() -> bool:
+    """Do this installation's clients have caregivers? On unless switched off."""
+    return get_bool("CAREGIVERS_ENABLED", default=True)
+
+
+def meeting_types_enabled() -> bool:
+    """Is a meeting's Type (Onboarding, Initial, …) asked for? On unless switched off."""
+    return get_bool("MEETING_TYPES_ENABLED", default=True)
+
+
+def navigator_term(plural: bool = False) -> str:
+    """What this installation calls a client's navigator, e.g. "Link worker".
+
+    Blank keeps the translated "Navigator". The plural falls back to the
+    singular plus "s", which is right for the terms people actually use here.
+    """
+    from django.utils.translation import gettext
+
+    term = (get_setting("NAVIGATOR_TERM") or "").strip()
+    if not term:
+        return gettext("Navigators") if plural else gettext("Navigator")
+    if not plural:
+        return term
+    return (get_setting("NAVIGATOR_TERM_PLURAL") or "").strip() or f"{term}s"
 
 
 def brand_name():

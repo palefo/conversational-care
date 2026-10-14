@@ -149,6 +149,10 @@
       // Meeting.Modality.IN_PERSON. An exact match — a pattern would also
       // match any later value with a 1 in it.
       place.hidden = String(modality.value) !== '1';
+      // Required while it shows, so the browser asks for it before sending
+      // rather than the server sending the dialog back.
+      var input = place.querySelector('input');
+      if (input) { input.required = !place.hidden; }
     }
     if (modality) { modality.addEventListener('change', sync); sync(); }
 

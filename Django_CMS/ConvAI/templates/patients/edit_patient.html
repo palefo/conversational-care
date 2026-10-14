@@ -47,6 +47,13 @@
         {% for e in form.lastname.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
       </div>
       <div class="fld">
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ form.pronouns.id_for_label }}">{{ form.pronouns.label }}</label>
+        {{ form.pronouns }}
+        <p class="text-xs text-gray-500 mt-1">{{ form.pronouns.help_text }}</p>
+        {% for e in form.pronouns.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+        {% include "patients/_pronoun_suggestions.html" %}
+      </div>
+      <div class="fld">
         <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ form.phone_number.id_for_label }}">{{ form.phone_number.label }}</label>
         {{ form.phone_number }}
         {% for e in form.phone_number.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
@@ -61,6 +68,7 @@
       <div class="fld">
         <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ form.navigator.id_for_label }}">{{ form.navigator.label }}</label>
         {{ form.navigator }}
+        {% if form.navigator.help_text %}<p class="text-xs text-gray-500 mt-1">{{ form.navigator.help_text }}</p>{% endif %}
         {% for e in form.navigator.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
       </div>
       {% endif %}
@@ -72,6 +80,7 @@
       </div>
     </div>
 
+    {% if form.caregivers %}
     <div class="mt-2 mb-4 pt-4 border-t border-gray-100">
       <h2 class="text-sm font-semibold text-gray-700 mb-1">{% trans "Caregiver" %}</h2>
       <p class="text-xs text-gray-500 mb-3">{% trans "The caregiver's phone is the number called when you start a call; their e-mail is where reminders go when the platform sends reminders by email." %}</p>
@@ -98,6 +107,7 @@
         {% for e in form.caregiver_email.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
       </div>
     </div>
+    {% endif %}
 
     {% include "patients/_protocols_field.html" %}
 

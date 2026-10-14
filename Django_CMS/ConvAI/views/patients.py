@@ -707,10 +707,15 @@ def patient_detail(request, pk):
     # Every term the service knows about, with this client's marked. The five
     # standard ones lead; anything a colleague has added follows.
     chosen = patient.contact_terms if isinstance(patient.contact_terms, list) else []
+    # "Caregiver first" means nothing where clients have no caregivers, so it
+    # is not offered there — unless this client already has it ticked.
+    from ..site_config import caregivers_enabled
+    no_caregivers = not caregivers_enabled()
     contact_terms = [
         {'key': t.slug, 'label': t.label, 'standard': t.is_standard,
          'on': t.slug in chosen}
         for t in ContactTerm.objects.all()
+        if not (no_caregivers and t.slug == 'caregiver_first' and t.slug not in chosen)
     ]
 
     # This client's programme, marked against every protocol in the platform.
@@ -732,7 +737,11 @@ def patient_detail(request, pk):
     from .communications import comms_list_context
     comms = comms_list_context(request, events, for_patient=patient)
 
+    from ..site_config import caregivers_enabled
     return render(request, 'patients/patient_detail.html', {
+        # Switched off, the caregiver rows go — unless one is already on file,
+        # which is kept and so still shown.
+        'show_caregiver': caregivers_enabled() or bool(patient.caregiver_id),
         **comms,
         'patient': patient,
         'next_call': next_call,

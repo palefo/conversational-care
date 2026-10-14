@@ -89,6 +89,28 @@
       </form>
     </div>
 
+    {# Clients and wording — see client_setup.md #}
+    <div class="card p-6 mb-6" id="clients">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">badge</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Clients and wording" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "What a client record asks for, and what your team calls the person a client is assigned to." %}</p>
+        </div>
+      </div>
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="clients">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+          <div>{% include "settings/_field.html" with field=clients_form.navigator_term %}</div>
+          <div>{% include "settings/_field.html" with field=clients_form.navigator_term_plural %}</div>
+        </div>
+        {% include "settings/_field.html" with field=clients_form.caregivers_enabled %}
+        {% include "settings/_field.html" with field=clients_form.meeting_types_enabled %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+    </div>
+
     {# Boot-only, read-only system values #}
     <div class="card p-6">
       <div class="flex items-start gap-3 mb-1">
@@ -692,12 +714,28 @@ print(result)</code></pre>
 
   {# ═════════ Registrations ═════════ #}
   <section class="settings-panel hidden" data-tab="registrations">
+    <div class="card p-6 mb-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">rule</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "After someone registers" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Whether a registration waits for an admin, which agent new clients talk to, and what the person is told." %}</p>
+        </div>
+      </div>
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="registrations">
+        {% for field in registration_form %}{% include "settings/_field.html" with field=field %}{% endfor %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+    </div>
+
     <div class="card p-6">
       <div class="flex items-start gap-3 mb-4">
         <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">how_to_reg</span>
         <div>
           <h2 class="text-lg font-semibold text-gray-800">{% trans "Pre-registrations (Self Registration)" %}</h2>
-          <p class="text-sm text-gray-500">{% trans "People who self-registered and are waiting to be approved and assigned an agent." %}</p>
+          <p class="text-sm text-gray-500">{% if self_reg_auto_approve %}{% trans "People who self-registered. Registrations are approved automatically; assign each new client their" %} {% navigator_term as term %}{{ term|lower }}.{% else %}{% trans "People who self-registered and are waiting to be approved and assigned an agent." %}{% endif %}</p>
         </div>
       </div>
       {% if self_regs %}
@@ -731,16 +769,38 @@ print(result)</code></pre>
                   <td class="py-2 pr-4">{{ sr.created_at|date:"d/m/Y H:i" }}</td>
                   <td class="py-2">
                   {% if sr.state == 0 %}
-                    <form method="post" action="{% url 'approve_self_registration' sr.pk %}" class="flex items-center gap-2">
+                    <form method="post" action="{% url 'approve_self_registration' sr.pk %}" class="flex flex-wrap items-center gap-2">
                       {% csrf_token %}
-                      <select name="agent_id" class="border border-gray-300 rounded-md text-xs px-2 py-1">
+                      <select name="agent_id" class="border border-gray-300 rounded-md text-xs px-2 py-1" aria-label="{% trans 'Agent' %}">
                         <option value="">{% trans "— No agent —" %}</option>
                         {% for ag in agents %}
-                          <option value="{{ ag.id }}">{{ ag.name }}</option>
+                          <option value="{{ ag.id }}" {% if ag.id == self_reg_client_agent_id %}selected{% endif %}>{{ ag.name }}</option>
+                        {% endfor %}
+                      </select>
+                      {% navigator_term as term %}
+                      <select name="navigator_id" class="border border-gray-300 rounded-md text-xs px-2 py-1" aria-label="{{ term }}">
+                        <option value="">— {% trans "No" %} {{ term|lower }} —</option>
+                        {% for u in navigator_choices %}
+                          <option value="{{ u.id }}">{{ u.get_full_name|default:u.username }}</option>
                         {% endfor %}
                       </select>
                       <button type="submit" class="button-primary py-1.5 px-3 rounded-lg text-xs">{% trans "Approve" %}</button>
                     </form>
+                  {% elif sr.patient %}
+                    {% comment %}
+                      Approved: say who the client is and whether anybody is
+                      looking after them yet — with automatic approval, this
+                      is where an admin finds who still needs one.
+                    {% endcomment %}
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                      <a href="{% url 'patient_detail' sr.patient.pk %}" class="text-sky-700 underline">{% trans "Open client" %}</a>
+                      {% if sr.patient.navigator %}
+                        <span class="text-gray-500">{% navigator_term %}: {{ sr.patient.navigator.get_full_name|default:sr.patient.navigator.username }}</span>
+                      {% else %}
+                        {% navigator_term as term %}
+                        <a href="{% url 'edit_patient' sr.patient.pk %}" class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{% trans "Assign" %} {{ term|lower }}</a>
+                      {% endif %}
+                    </div>
                   {% else %}
                     <span class="text-gray-400 text-xs">{% trans "Already approved" %}</span>
                   {% endif %}
