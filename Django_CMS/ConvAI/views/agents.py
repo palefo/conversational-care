@@ -259,7 +259,20 @@ def agent_test_send(request, pk):
                              'bot_message': str(_("Conversation ended.")), 'reset': True})
     bot_msg = generate_response_with_agent(agent, request.user, user_msg, thread_id,
                                            extra_configurable=_test_chat_context(agent, request))
-    return JsonResponse({'user_message': user_msg, 'bot_message': bot_msg})
+    from ..utils import reply_parts
+    # The agent may have said the conversation is over (POST /api/v1/run/end/).
+    # Here the thread lives in the browser, so it is told to start a new one.
+    ended = Conversation.objects.filter(pk=_uuid_or_none(thread_id),
+                                        ended_at__isnull=False).exists()
+    return JsonResponse({'user_message': user_msg, 'bot_message': bot_msg,
+                         'bot_messages': reply_parts(bot_msg), 'reset': ended})
+
+
+def _uuid_or_none(value):
+    try:
+        return uuid.UUID(str(value))
+    except (TypeError, ValueError):
+        return None
 
 
 @login_required

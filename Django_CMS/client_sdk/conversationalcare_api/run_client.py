@@ -22,8 +22,8 @@ class RunClient:
 
     Conversational Care puts a ``cc_run_token`` in the run config of every run of
     a remote agent that has *Allow callbacks* switched on. The token names one
-    conversation, allows only reporting its summary and setting its visibility,
-    and expires after two hours. The endpoints take no conversation id — the
+    conversation, allows only reporting its summary, setting its visibility and
+    ending it, and expires after two hours. The endpoints take no conversation id — the
     token says which — so there is nothing here to pass, forge or get wrong.
 
     Use :meth:`from_config` inside a tool::
@@ -105,3 +105,12 @@ class RunClient:
         off on this installation.
         """
         return self._call("POST", "visibility/", {"hidden": bool(hidden)})
+
+    def end_conversation(self) -> Optional[Dict[str, Any]]:
+        """Say this conversation is over: the client's next message starts a new one.
+
+        For when the agent has said goodbye. Idempotent. Returns ``None`` if the
+        platform is older than this endpoint, or the token predates the ``end``
+        scope (tokens last two hours).
+        """
+        return self._call("POST", "end/", {})

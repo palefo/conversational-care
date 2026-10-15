@@ -1,4 +1,5 @@
 # ConvAI/tasks.py
+import time
 import os
 import uuid
 from django.conf import settings
@@ -31,10 +32,21 @@ def job_reply_text(channel: str, from_number_raw: str, body_text: str) -> None:
     """
     phone = from_number_raw.replace("whatsapp:", "").strip()
     reply = process_received_message(phone, body_text, channel=channel)
-    if channel == "whatsapp":
-        send_whatsapp_text(phone, reply)
-    else:
-        send_sms_text(phone, reply)
+    send = send_whatsapp_text if channel == "whatsapp" else send_sms_text
+    # One message per part for an agent that sends them separately (see
+    # utils.AgentReply), otherwise the one reply as before. A short pause
+    # between parts: they are separate API calls, and without it a phone can
+    # show them out of order.
+    from .utils import reply_parts
+    for i, part in enumerate(reply_parts(reply)):
+        if i:
+            time.sleep(PART_GAP_SECONDS)
+        send(phone, part)
+
+
+# Between the parts of a split reply. Long enough for the carrier to keep them
+# in order, short enough not to read as a delay.
+PART_GAP_SECONDS = 1.5
 
 def job_process_whatsapp_audio(
     from_number_raw: str,

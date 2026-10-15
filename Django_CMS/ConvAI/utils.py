@@ -498,6 +498,10 @@ def generate_response_with_agent(agent,
             config={"configurable": configurable},
         )
         logger.debug("LangGraph result: %s", result)
+        if getattr(agent, "send_separately", False):
+            parts = remote_turn_parts(result["messages"], every=True)
+            if parts:
+                return AgentReply.of(parts)
         return remote_turn_reply(result["messages"]) or result["messages"][-1]["content"]
     except Exception:
         return "Sorry, something went wrong generating the response."
@@ -512,8 +516,8 @@ def _message_text(content) -> str:
     return ""
 
 
-def remote_turn_reply(messages) -> str:
-    """Everything a remote agent said to the person this turn, as one reply.
+def remote_turn_parts(messages, *, every=False) -> list:
+    """Everything a remote agent said to the person this turn, as its messages.
 
     A graph can answer one message with several AI messages: RECO v2 swaps its
     [SUMMARY] token for the summary's texts and then asks whether it looks
@@ -525,6 +529,12 @@ def remote_turn_reply(messages) -> str:
     are working, not reply. If nothing is left (an AI message that spoke and
     called a tool in one go, then said nothing), the last AI text of the turn.
     Empty when the turn produced no text at all, for the caller to fall back on.
+
+    ``every`` is for an agent that sends each message separately (RECO v2): then
+    every AI text since the person's message counts, tool steps or not, and an
+    AI message that spoke while calling a tool keeps what it said. Such an agent
+    has no supervisor drafts to hide, and the cut dropped RECO's summary when it
+    saved its note straight after writing it.
     """
     def kind(m):
         return (m.get("type") or m.get("role") or "") if isinstance(m, dict) else getattr(m, "type", "")
@@ -543,23 +553,90 @@ def remote_turn_reply(messages) -> str:
         if kind(m) == "tool":
             after_tools = i + 1
 
-    def texts(seq):
+    def texts(seq, with_tool_calls=False):
         out = []
         for m in seq:
-            if kind(m) not in ("ai", "assistant") or field(m, "tool_calls"):
+            if kind(m) not in ("ai", "assistant"):
+                continue
+            if field(m, "tool_calls") and not with_tool_calls:
                 continue
             text = _message_text(field(m, "content", "")).strip()
             if text:
                 out.append(text)
         return out
 
+    if every:
+        return texts(turn, with_tool_calls=True)
     found = texts(turn[after_tools:])
     if not found:
         spoken = [_message_text(field(m, "content", "")).strip() for m in turn
                   if kind(m) in ("ai", "assistant")]
         spoken = [t for t in spoken if t]
         found = spoken[-1:]
-    return "\n\n".join(found)
+    return found
+
+
+def remote_turn_reply(messages) -> str:
+    """Everything a remote agent said to the person this turn, as one reply.
+
+    The texts of :func:`remote_turn_parts`, joined with blank lines.
+    """
+    return PART_JOINER.join(remote_turn_parts(messages))
+
+
+PART_JOINER = "\n\n"
+
+
+class AgentReply(str):
+    """A reply made of several messages, to be sent one by one.
+
+    It *is* the joined text — everything that stores, reviews, speaks or
+    exports a reply keeps working on one string, and the history shows the
+    turn as it always has — and it also carries ``parts``, which the senders
+    (SMS, WhatsApp, the web chats) use to send each message on its own. Only
+    agents with ``send_separately`` produce one. See reply_parts.
+    """
+
+    parts: tuple = ()
+
+    @classmethod
+    def of(cls, parts):
+        parts = tuple(p for p in (str(x).strip() for x in parts) if p)
+        reply = cls(PART_JOINER.join(parts))
+        reply.parts = parts
+        return reply
+
+
+def reply_parts(reply) -> list:
+    """The messages to send for ``reply``: its parts, or the reply itself."""
+    parts = getattr(reply, "parts", None)
+    if parts:
+        return list(parts)
+    return [reply] if reply else []
+
+
+def end_conversation(conv) -> bool:
+    """The agent says this conversation is over: the next message starts a new one.
+
+    Stamps ``ended_at`` and, when this is the client's current thread, gives
+    them a new one — the same move /quit makes, so everything downstream (a new
+    Conversation row, a new LangGraph thread, RECO's opening menu) already
+    knows what to do with it. Nothing is deleted or hidden. The reply that was
+    being written when the agent said so still goes out and is still saved
+    against this conversation: the caller captured its thread id beforehand.
+
+    Returns True if the client's thread moved on; False if it already had (an
+    older conversation, a second call) or there is no client (a test chat).
+    """
+    if conv.ended_at is None:
+        conv.ended_at = timezone.now()
+        conv.save(update_fields=["ended_at"])
+    patient = conv.patient
+    if patient is None or (patient.current_thread_id or "") != str(conv.id):
+        return False
+    patient.current_thread_id = str(uuid.uuid4())
+    patient.save(update_fields=["current_thread_id"])
+    return True
 
 
 def save_message(phone: str, user_message: str, response_message: str, thread_id: str,

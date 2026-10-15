@@ -1074,6 +1074,16 @@ class Agent(models.Model):
                     "from the client's link worker, and the agent unhides it if the "
                     "client agrees."),
     )
+    # One SMS / WhatsApp per message the agent wrote, rather than one joined
+    # reply. RECO v2 writes its summary and the question after it as two
+    # messages, and some Android phones render the joined text badly. Off
+    # keeps the joined reply every other agent was built against.
+    send_separately = models.BooleanField(
+        default=False,
+        help_text=_("Remote agents only: when one turn produces several messages, "
+                    "send each as its own SMS or WhatsApp message instead of one "
+                    "joined reply."),
+    )
 
     # Who the LLM should imitate (role/persona)
     classification_role = models.TextField(
@@ -1328,6 +1338,10 @@ class Conversation(models.Model):
     visited       = models.BooleanField(default=False, db_index=True, help_text="Has been reviewed in dashboard?")
     analyzed      = models.BooleanField(default=False, db_index=True, help_text="Has analysis been run?")
     analyzed_at   = models.DateTimeField(null=True, blank=True)
+    # When the agent said the conversation is over (POST /api/v1/run/end/). The
+    # client's next message then starts a new one. Blank for conversations that
+    # simply went quiet, or were reset with /quit.
+    ended_at      = models.DateTimeField(null=True, blank=True)
 
     auto_flags = models.JSONField(
         default=dict, blank=True,

@@ -222,9 +222,13 @@ def whatsapp_webhook(request):
     response_text = process_received_message(from_num, body_text or "")
     # R3-04 fix: XML-escape agent output before embedding in TwiML.
     from xml.sax.saxutils import escape as _xml_escape
+    from ..utils import reply_parts
+    # One <Message> per part for an agent that sends them separately; Twilio
+    # sends them in this order.
+    messages_xml = "".join(f"\n    <Message>{_xml_escape(part)}</Message>"
+                           for part in (reply_parts(response_text) or [""]))
     twilio_response = f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Message>{_xml_escape(response_text)}</Message>
+<Response>{messages_xml}
 </Response>"""
     return HttpResponse(twilio_response, content_type="text/xml")
 
@@ -378,14 +382,22 @@ def send_external_message(request):
     # The tester login stands in for the client: the client's file, typed
     # through the tester account. Both are stamped, so the file keeps the
     # message and the record still says which login sent it.
+    started = timezone.now()
     bot_msg = process_message_for_patient(
         patient, user_msg, user_label=_chat_user_label(request.user),
         sender_role=Message.SenderRole.TESTER, account=request.user,
     )
 
+    # Whether the agent ended the conversation during this turn
+    # (POST /api/v1/run/end/). The thread is the client's, so the platform has
+    # already moved it on; the page only says so.
+    from ..utils import reply_parts
+    ended = Conversation.objects.filter(patient=patient, ended_at__gte=started).exists()
     return JsonResponse({
         "user_message": user_msg,
         "bot_message": bot_msg,
+        "bot_messages": reply_parts(bot_msg),
+        "reset": ended,
     })
 
 

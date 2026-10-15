@@ -966,18 +966,20 @@ class AgentForm(forms.ModelForm):
         model = Agent
         fields = [
             "name", "description", "langgraph_name", "host", "port", "allow_callbacks",
-            "starts_hidden",
+            "starts_hidden", "send_separately",
             "classification_role", "abstract_instruction", "detectors", "tts_voice_id", "azure_voice",
         ]
         labels = {"description": _("Description"),
                   "allow_callbacks": _("Allow callbacks"),
-                  "starts_hidden": _("Conversations start hidden"), **_VOICE_LABELS}
+                  "starts_hidden": _("Conversations start hidden"),
+                  "send_separately": _("Send each message separately"), **_VOICE_LABELS}
         help_texts = {
             **_VOICE_HELP,
             "allow_callbacks": _(
                 "Give each run a token that lets this agent report the conversation's "
-                "summary and, if the client asks, hide it from their link worker — for "
-                "that one conversation only, for two hours. The agent finds it as "
+                "summary, hide it from their link worker if the client asks, and say "
+                "when the conversation is over — for that one conversation only, for "
+                "two hours. The agent finds it as "
                 "cc_run_token in its run config and sends it to /api/v1/run/. Leave off "
                 "for agents that never call back: they should not hold a credential."
             ),
@@ -986,6 +988,12 @@ class AgentForm(forms.ModelForm):
                 "message, so it cannot be read while it is happening. The agent unhides it "
                 "if the client agrees (set_conversation_privacy with hidden false). Needs "
                 "Allow callbacks, and Conversation privacy switched on in Settings → Privacy."
+            ),
+            "send_separately": _(
+                "When the agent answers with several messages in one turn — a summary, then "
+                "a question — send each as its own SMS or WhatsApp message (and its own "
+                "bubble in the test chats) instead of one joined reply. The history still "
+                "keeps the turn as one entry."
             ),
         }
         field_classes = {"detectors": DetectorsFormField}
@@ -997,6 +1005,7 @@ class AgentForm(forms.ModelForm):
             "port": forms.NumberInput(attrs=_INPUT),
             "allow_callbacks": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "starts_hidden": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "send_separately": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "classification_role": forms.Textarea(attrs={**_INPUT, "rows": 4}),
             "abstract_instruction": forms.TextInput(attrs=_INPUT),
             "detectors": DetectorTableWidget(),

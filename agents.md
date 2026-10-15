@@ -55,7 +55,11 @@ outside this repo.
 conversation's privacy ([agent_tools.md](agent_tools.md)); **Conversations start
 hidden** makes every conversation hidden from the link worker until the agent
 unhides it on the client's say-so ([conversation_privacy.md](conversation_privacy.md)).
-When one turn produces several AI messages, the reply is all of them, joined.
+When one turn produces several AI messages, the reply is all of them, joined —
+or, with **Send each message separately**, one SMS/WhatsApp message each. An
+agent with callbacks can also say the conversation is over
+(`POST /api/v1/run/end/`), so the client's next message starts a new one. See
+[agent_tools.md](agent_tools.md).
 
 ### Prompt-based agents (`kind = "prompt"`)
 

@@ -171,7 +171,7 @@ stored nowhere: verifying one is a signature check and a clock comparison.
 | | |
 |---|---|
 | **Names** | one conversation, its client (or none), the agent it was issued to |
-| **Allows** | `summary`, `visibility` — nothing else |
+| **Allows** | `summary`, `visibility`, `end` — nothing else |
 | **Accepted by** | `/api/v1/run/` and nothing else, because no other endpoint lists its authentication class |
 | **Expires** | after 2 hours, the conversation's own idle window |
 | **Issued** | only to a remote Agent with *Allow callbacks* on; in-process agents get none |
@@ -187,6 +187,7 @@ GET  /api/v1/run/                {} -> conversation_id, patient_id, summary, sou
                                        hidden, privacy_available, scopes, expires_at
 POST /api/v1/run/summary/        {"summary": "…"}
 POST /api/v1/run/visibility/     {"hidden": true}
+POST /api/v1/run/end/            {}   -> the same, plus "ended": true
 Authorization: RunToken <cc_run_token>
 ```
 
@@ -232,6 +233,44 @@ in one turn. The platform used to forward only the last one.
 person's message and after the turn's last tool step: the tool-step boundary
 keeps a supervisor-style graph to its final answer, whose drafts and hand-backs
 come before a tool message.
+
+**Send each message separately** (a checkbox on the remote agent; on for RECO
+v2) sends them apart instead: one SMS or WhatsApp message per AI text, in order
+and 1.5 s apart (`tasks.PART_GAP_SECONDS`, so phones keep them in order), and
+one bubble each in the agent Test chat and the test-user chat. Some Android
+phones rendered the joined summary-plus-question badly. With it on, every AI
+text since the person's message counts — tool steps do not cut earlier ones,
+and text spoken alongside a tool call is kept — because such an agent has no
+supervisor drafts to hide, and the cut could drop RECO's summary when it saved
+its note straight after. The reply is a `utils.AgentReply`: a `str` holding the
+joined text, so the history, the review and the exports keep one entry per
+turn, plus `.parts` for the senders (`utils.reply_parts`). Voice-note replies
+stay one joined audio. Off, nothing changes.
+
+### Ending a conversation
+
+`POST /api/v1/run/end/` (scope `end`; `RunClient.end_conversation()` in the
+SDK) says the conversation is over. The platform stamps
+`Conversation.ended_at` and, if it is the client's current thread, gives them a
+new one — what /quit does — so their next message starts a new conversation
+(for RECO v2, with the topic menu). The reply being written in that turn is
+still sent and saved against the ended conversation. Idempotent; an older
+conversation does not move the current thread. The web chats are told
+(`"reset": true`) and say "The agent ended the conversation". Tokens issued
+before the `end` scope existed get a 404 until they expire.
+
+It is an API call, deliberately not a model tool: the agent's own code decides.
+RECO v2 has an `end` step in its graph that calls it once the wrap-up after the
+summary is done — the link worker question asked and answered, and the final
+note saved — and never otherwise; its prompts are unchanged. A conversation
+that stops before a summary is left to the 3-hour idle rollover.
+
+### Restarting from the test chats
+
+The agent Test chat and the test-user chat have a small **Restart** button in
+the header. It types `/quit` and sends it, exactly as a tester would, so it
+shows in the chat and takes the same path; the next message starts a new
+conversation.
 
 ## Who may act on a conversation (people)
 

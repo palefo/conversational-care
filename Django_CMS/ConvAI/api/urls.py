@@ -8,7 +8,7 @@ from .views import (
     PatientsListView, MeetingCreateView, PatientProtocolsFilledView,
     ProtocolQuestionsView, MeetingAnswersUpsertView, PatientMeetingsListView,
     PatientDetailsAppendView, ConversationVisibilityView,
-    ConversationSummaryView, RunView, RunSummaryView, RunVisibilityView,
+    ConversationSummaryView, RunView, RunSummaryView, RunVisibilityView, RunEndView,
     EnrolmentLookupView,
     ClientOverviewView, UpcomingMeetingsView, ClientProtocolAnswersView,
     ClientProtocolHistoryView, RecordSearchView,
@@ -42,6 +42,7 @@ urlpatterns = [
     path("api/v1/run/", RunView.as_view(), name="api_run"),
     path("api/v1/run/summary/", RunSummaryView.as_view(), name="api_run_summary"),
     path("api/v1/run/visibility/", RunVisibilityView.as_view(), name="api_run_visibility"),
+    path("api/v1/run/end/", RunEndView.as_view(), name="api_run_end"),
     # Is this person enrolled in a study? 404s while STUDY_ENROLMENT_ENABLED is
     # off. Token-authenticated, and never returns the access code itself.
     path("api/v1/enrolments/", EnrolmentLookupView.as_view(), name="api_enrolments"),

@@ -85,6 +85,7 @@ client = RunClient.from_config(config)      # None when there is no token
 if client:
     client.report_summary("What they wanted, what was said, what is still open.")
     client.set_visibility(hidden=True)       # only on the client's own say-so
+    client.end_conversation()                # from your graph's code, once it has finished
 ```
 
 The API address comes from `cc_api_url` in the run config, else

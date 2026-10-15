@@ -117,6 +117,11 @@
         <span class="material-icons-outlined text-[13px]">visibility_off</span>{% trans "Starts hidden" %}
       </span>
     {% endif %}
+    {% if a.kind == 'remote' and a.send_separately %}
+      <span class="agent-chip agent-chip-tool" title="{% trans 'Several messages in one turn are sent as separate SMS/WhatsApp messages' %}">
+        <span class="material-icons-outlined text-[13px]">forum</span>{% trans "Separate messages" %}
+      </span>
+    {% endif %}
     {% with voice=a.active_tts_voice %}{% if voice %}
       <span class="agent-chip" title="{% trans 'Voice for spoken replies' %}">
         <span class="material-icons-outlined text-[13px]">graphic_eq</span>

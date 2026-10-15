@@ -1184,6 +1184,28 @@ class RunSummaryView(_RunView):
         return Response(self._out(conv, request.auth), status=status.HTTP_200_OK)
 
 
+class RunEndView(_RunView):
+    """
+    POST /api/v1/run/end/
+
+    The agent says this conversation is over (RECO v2 does, once it has said
+    goodbye). The client's next message starts a new conversation, as if they
+    had sent /quit. Idempotent; nothing else changes.
+    """
+    scope = "end"
+
+    def post(self, request):
+        from ..utils import end_conversation
+
+        conv = self._conversation(request)
+        moved = end_conversation(conv)
+        logger.info("Conversation %s ended by %s (new thread: %s)",
+                    conv.id, request.user.get_username(), moved)
+        out = self._out(conv, request.auth)
+        out["ended"] = True
+        return Response(out, status=status.HTTP_200_OK)
+
+
 class RunVisibilityView(_RunView):
     """
     POST /api/v1/run/visibility/   {"hidden": true}

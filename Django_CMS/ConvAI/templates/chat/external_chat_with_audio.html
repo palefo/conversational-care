@@ -60,6 +60,17 @@
   .wa-headinfo { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
   .wa-headinfo .wa-title { font-size: 1.02rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .wa-headinfo .wa-status { font-size: .76rem; opacity: .85; display: flex; align-items: center; gap: .3rem; }
+  .wa-restart {
+    margin-left: auto; flex-shrink: 0;
+    display: inline-flex; align-items: center; gap: .25rem;
+    background: rgba(255,255,255,0.12); color: #fff;
+    border: 1px solid rgba(255,255,255,0.35); border-radius: 9999px;
+    padding: .28rem .7rem .28rem .5rem; font-size: .78rem; font-weight: 500;
+    cursor: pointer; opacity: .9;
+  }
+  .wa-restart:hover { background: rgba(255,255,255,0.22); opacity: 1; }
+  .wa-restart:disabled { opacity: .45; cursor: default; }
+  .wa-restart .material-icons-round { font-size: 17px; }
   .wa-headinfo .wa-status .wa-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; display: inline-block; }
 
   /* ---------- Messages ---------- */
@@ -256,6 +267,15 @@
       <span class="wa-title">{{ chat_title }}</span>
       <span class="wa-status"><span class="wa-dot"></span>{% trans "online" %}</span>
     </div>
+    {% comment %}
+      Restart: types /quit and sends it, exactly as a tester would by hand —
+      so it shows in the chat and goes through the same path. Kept quiet on
+      purpose; it is a testing aid, not part of the conversation.
+    {% endcomment %}
+    <button type="button" id="restartButton" class="wa-restart"
+            title="{% trans 'Restart the conversation (sends /quit)' %}">
+      <span class="material-icons-round">restart_alt</span>{% trans "Restart" %}
+    </button>
   </header>
 
   <!-- Chat history -->
@@ -416,7 +436,19 @@
       });
       const j = await res.json();
       hideTyping();
-      appendText(j.bot_message,'bot'); playSafe(recvSound);
+      // An agent that sends its messages separately returns them as a list:
+      // one bubble each, a moment apart, as they arrive on a phone.
+      const parts = (j.bot_messages && j.bot_messages.length) ? j.bot_messages : [j.bot_message];
+      for (let i = 0; i < parts.length; i++){
+        if (i) await new Promise(r => setTimeout(r, 600));
+        appendText(parts[i],'bot'); playSafe(recvSound);
+      }
+      // The agent said the conversation is over: the next message starts a
+      // new one, as after /quit.
+      if (j.reset){
+        currentThread = genUUID();
+        appendSystem("{% trans 'The agent ended the conversation. Send a message to start a new one.' %}");
+      }
     } catch(e){
       hideTyping();
       appendText("{% trans 'Error: could not get a response.' %}",'bot');
@@ -620,7 +652,17 @@
   function showTyping(){ typing.classList.remove('hidden'); scrollToBottom(); }
   function hideTyping(){ typing.classList.add('hidden'); }
   function playSafe(a){ try{ a.currentTime = 0; a.play(); }catch(e){} }
-  function setBusy(dis){ inp.disabled = dis; sendBtn.disabled = dis; micBtn.disabled = dis; }
+  function setBusy(dis){ inp.disabled = dis; sendBtn.disabled = dis; micBtn.disabled = dis;
+                         if (restartBtn) restartBtn.disabled = dis; }
+
+  // ---- Restart: send /quit through the chat, as if typed ----
+  const restartBtn = document.getElementById('restartButton');
+  if (restartBtn){
+    restartBtn.addEventListener('click', ()=>{
+      if (inp.disabled) return;
+      inp.value = '/quit'; refreshComposer(); sendBtn.click();
+    });
+  }
 
   // ---- Wire server-rendered history (audio players) and jump to newest ----
   document.querySelectorAll('#wa-thread .wa-audioplayer').forEach(pl => wireAudio(pl.closest('.wa-msg')));

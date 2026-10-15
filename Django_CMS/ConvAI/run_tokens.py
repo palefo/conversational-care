@@ -14,7 +14,7 @@ A run token is the opposite of each of those:
   ``/api/v1/run/`` endpoints act on that conversation and no other. They take no
   conversation id at all, so there is nothing for the agent — or a model inside
   it — to forge or get wrong.
-* **Only what the tools need.** ``summary`` and ``visibility``. It is accepted
+* **Only what the tools need.** ``summary``, ``visibility`` and ``end``. It is accepted
   by the ``/run/`` endpoints and rejected by every other endpoint, because no
   other endpoint lists its authentication class.
 * **Short-lived.** It expires with the conversation's idle window (two hours),
@@ -35,14 +35,17 @@ from datetime import datetime, timezone as dt_timezone
 
 from django.core import signing
 
-__all__ = ["SCOPES", "SUMMARY", "VISIBILITY", "TTL_SECONDS", "RunClaims",
+__all__ = ["SCOPES", "SUMMARY", "VISIBILITY", "END", "TTL_SECONDS", "RunClaims",
            "mint", "verify", "RunTokenAuthentication"]
 
 SALT = "conversational-care.run-token.v1"
 
 SUMMARY = "summary"
 VISIBILITY = "visibility"
-SCOPES = (SUMMARY, VISIBILITY)
+# Saying the conversation is over, so the client's next message starts a new
+# one. It touches nothing but that conversation and its client's thread.
+END = "end"
+SCOPES = (SUMMARY, VISIBILITY, END)
 
 # The conversation's own idle window (STALE_THREAD_HOURS): after this the next
 # message starts a new conversation anyway, and a token for the old one has
