@@ -241,6 +241,31 @@ def _back_to_protocol(request, meeting, protocol):
     return redirect("protocol_view", meeting_id=meeting.id, protocol_num=protocol.number)
 
 
+def _start_protocol_on_web(request, meeting, protocol):
+    """The protocol's first question, put into the client's web app chat.
+
+    Nothing can fail to arrive here the way a WhatsApp send can: writing the
+    message is the delivery, and the open page shows it on its next poll. So
+    there is no failure branch and no SMS offer — only the agent being missing.
+    """
+    from .. import web_chat
+
+    patient = meeting.patient
+    agent = Agent.objects.filter(kind=Agent.Kind.NATIVE, native_key="protocol_qa").first()
+    if not agent:
+        messages.error(request, _('The built-in "protocol_qa" agent is missing.'))
+        return _back_to_protocol(request, meeting, protocol)
+
+    new_thread_id = start_automation(patient, agent, meeting, protocol.number)
+    reply_text = generate_response_langgraph(
+        patient, "Hello", new_thread_id, extra_configurable=automation_context(patient),
+    )
+    web_chat.deliver(patient, reply_text, thread_id=new_thread_id)
+    request.session.pop("ask_sms_offer", None)
+    messages.success(request, _("Sent to %s's web app chat.") % patient.name)
+    return _back_to_protocol(request, meeting, protocol)
+
+
 @require_POST
 @login_required
 def start_protocol_automation(request, meeting_id, protocol_num):
@@ -271,6 +296,13 @@ def start_protocol_automation(request, meeting_id, protocol_num):
 
     patient   = meeting.patient
     caregiver = patient.caregiver
+
+    # A client who uses the web app chat is asked there, not on a phone they
+    # may not have. Only while that feature is on and the client page says so.
+    from .. import web_chat
+    if web_chat.delivers_to_web(patient):
+        return _start_protocol_on_web(request, meeting, protocol)
+
     if not caregiver or not caregiver.phone_number:
         messages.error(request, _("The client has no caregiver with a valid phone number."))
         return redirect("protocol_view", meeting_id=meeting.id, protocol_num=protocol.number)

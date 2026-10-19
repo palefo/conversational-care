@@ -1,0 +1,12 @@
+{% extends "webchat/_card.html" %}{% load i18n custom_filters %}
+{% block title %}{% trans "Chat" %}{% endblock %}
+{% block content %}
+  {% navigator_term as nav %}
+  {% if reason == "invalid" %}
+    <p class="wc-lead">{% trans "This QR code no longer works" %}</p>
+    <p class="wc-text">{% blocktrans with nav=nav|lower %}It may have been replaced with a new one. Ask your {{ nav }} for your current QR code.{% endblocktrans %}</p>
+  {% else %}
+    <p class="wc-lead">{% trans "This device is not open on a chat" %}</p>
+    <p class="wc-text">{% blocktrans with nav=nav|lower %}Scan the QR code your {{ nav }} gives you with this device's camera to open your chat.{% endblocktrans %}</p>
+  {% endif %}
+{% endblock %}

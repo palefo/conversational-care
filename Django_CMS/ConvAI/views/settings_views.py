@@ -272,6 +272,8 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
             # Always listed, because it holds the study-enrolment switch; while
             # enrolment is off the switch is all it holds (see config.html).
             ("participants", _("Participants"), "groups"),
+            # Always listed, like Participants: it holds the switch.
+            ("webapp", _("Web app"), "install_mobile"),
             ("api", _("API client"), "terminal"),
             ("privacy", _("Privacy"), "lock"),
             ("export", _("Export"), "download"),
@@ -320,6 +322,8 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
         # the one thing an admin reading this page must not be told.
         "hidden_conversation_count": Conversation.objects.filter(hidden=True).count(),
         "participants_form": _form("participants"),
+        "webapp_form": _form("webapp"),
+        **_webapp_settings_context(),
         "participants": participants,
         "export_columns": message_export.COLUMN_NOTES,
         # Boot-only values shown read-only (require .env change + restart).
@@ -332,6 +336,22 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
                 "/" + getattr(settings, "TWILIO_WEBHOOK_PATH", "webhooks/whatsapp")
             ),
         },
+    }
+
+
+def _webapp_settings_context():
+    """How much the web app chat is in use, said whether it is on or off.
+
+    Off, the devices are not deleted — so the tab says how many would come back
+    if it were switched on again.
+    """
+    from .. import web_chat
+    from ..models import WebChatDevice
+
+    return {
+        "webapp_enabled": web_chat.enabled(),
+        "webapp_device_count": WebChatDevice.objects.filter(revoked_at__isnull=True).count(),
+        "webapp_web_clients": Patient.objects.filter(chat_channel="web").count(),
     }
 
 

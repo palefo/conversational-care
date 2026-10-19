@@ -1,0 +1,470 @@
+{% load i18n static custom_filters %}<!doctype html>
+{% comment %}
+  The web app chat: one client's conversation on their own device or a tablet.
+  The look is the tester chat's (chat/_wa_styles.html). What is different:
+
+  * the whole history is shown, as WhatsApp would, and kept current by polling
+    — which is also how messages the platform starts (a protocol's question, a
+    reminder) arrive;
+  * every bubble comes from a stored message, keyed by its id, so the reply to
+    a send and the same message seen by the poll never show twice;
+  * there is no Restart button: this is a client's chat, not a test bench. The
+    menu has "Sign out of this device" instead.
+{% endcomment %}
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>{{ chat_title }} · {% brand_name %}</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+  {% include "webchat/_head.html" %}
+  {% include "chat/_wa_styles.html" %}
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    .hidden { display: none !important; }
+    .wa-menu-btn {
+      margin-left: auto; flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%;
+      background: transparent; border: none; color: #fff; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .wa-menu-btn:hover { background: rgba(255,255,255,0.14); }
+    .wa-menu {
+      position: absolute; right: .6rem; top: 3.6rem; z-index: 20; min-width: 230px;
+      background: #fff; color: var(--wa-in-text); border-radius: 10px;
+      box-shadow: 0 8px 28px rgba(0,0,0,.18); padding: .35rem 0;
+    }
+    .wa-menu button {
+      width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+      padding: .7rem 1rem; font: inherit; font-size: .92rem; display: flex; gap: .6rem; align-items: center;
+    }
+    .wa-menu button:hover { background: #f1f5f9; }
+    .wa-menu .material-icons-round { font-size: 20px; color: var(--wa-meta); }
+    .wa-day {
+      align-self: center; margin: .6rem auto .3rem; padding: .25rem .7rem; border-radius: 8px;
+      background: rgba(255,255,255,.9); color: var(--wa-meta); font-size: .72rem;
+      box-shadow: 0 1px 1.5px var(--wa-shadow);
+    }
+    .wa-msg.pending .wa-time .material-icons-round { color: var(--wa-meta); }
+    .wa-msg.bot .wa-bubble + .wa-bubble { margin-top: .3rem; }
+    .wa-botcol { display: flex; flex-direction: column; gap: .3rem; }
+    .wa-install {
+      display: flex; align-items: center; gap: .6rem; padding: .55rem .9rem;
+      background: #fff8e6; color: #7a4b00; font-size: .82rem; border-bottom: 1px solid #f3e1b5;
+    }
+    .wa-install button { margin-left: auto; background: #006877; color: #fff; border: none;
+      border-radius: 9999px; padding: .35rem .9rem; font: inherit; font-size: .8rem; cursor: pointer; }
+    .wa-install .wa-x { background: none; color: #7a4b00; padding: .2rem; margin-left: 0; }
+    .wa-chat { position: relative; }
+    dialog.wa-confirm { border: none; border-radius: 14px; padding: 1.2rem 1.2rem 1rem; max-width: 340px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.25); font-family: inherit; }
+    dialog.wa-confirm::backdrop { background: rgba(0,0,0,.35); }
+    dialog.wa-confirm h2 { font-size: 1.05rem; margin: 0 0 .5rem; }
+    dialog.wa-confirm p { font-size: .9rem; line-height: 1.5; color: #475569; margin: 0 0 1rem; }
+    dialog.wa-confirm .row { display: flex; justify-content: flex-end; gap: .5rem; }
+    dialog.wa-confirm button { border-radius: 9999px; padding: .5rem 1rem; font: inherit; font-size: .88rem;
+      cursor: pointer; border: 1px solid #cbd5e1; background: #fff; }
+    dialog.wa-confirm button.danger { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+  </style>
+</head>
+<body>
+<div class="wa-chat">
+  <header class="wa-topbar">
+    <div class="wa-avatar"><span class="material-icons-round">support_agent</span></div>
+    <div class="wa-headinfo">
+      <span class="wa-title">{{ chat_title }}</span>
+      <span class="wa-status" id="waStatus"><span class="wa-dot"></span>{% trans "online" %}</span>
+    </div>
+    <button type="button" class="wa-menu-btn" id="menuBtn" aria-haspopup="true" aria-expanded="false"
+            title="{% trans 'Menu' %}"><span class="material-icons-round">more_vert</span></button>
+    <div class="wa-menu hidden" id="menu" role="menu">
+      <button type="button" role="menuitem" id="signoutItem">
+        <span class="material-icons-round">logout</span>{% trans "Sign out of this device" %}
+      </button>
+    </div>
+  </header>
+
+  <div class="wa-install hidden" id="installBar">
+    <span class="material-icons-round">install_mobile</span>
+    <span id="installText">{% trans "Add this chat to the home screen to open it like an app." %}</span>
+    <button type="button" id="installBtn" class="hidden">{% trans "Install" %}</button>
+    <button type="button" class="wa-x" id="installClose" title="{% trans 'Close' %}"><span class="material-icons-round">close</span></button>
+  </div>
+
+  <main id="wa-thread" class="wa-thread" aria-live="polite">
+    <div class="wa-empty">
+      {% if voice_enabled %}
+        {% blocktrans %}Hi {{ first_name }}. Type a message or tap the microphone to speak.{% endblocktrans %}
+      {% else %}
+        {% blocktrans %}Hi {{ first_name }}. Type a message to start.{% endblocktrans %}
+      {% endif %}
+    </div>
+  </main>
+
+  <div id="wa-typing" class="hidden">
+    <div class="wa-typing-bubble"><span></span><span></span><span></span></div>
+  </div>
+
+  <footer class="wa-footer">
+    <div id="inputWrapper" class="wa-composer">
+      <div class="wa-textfield">
+        <input id="messageInput" type="text" autocomplete="off" enterkeyhint="send"
+               placeholder="{% trans 'Type a message' %}" maxlength="4000">
+      </div>
+      <div class="wa-recbar">
+        <span class="wa-recdot"></span>
+        <span id="recTime" class="wa-rectime">0:00</span>
+        <button id="cancelRecButton" class="wa-fieldbtn wa-reccancel" type="button" title="{% trans 'Cancel' %}">
+          <span class="material-icons-round">delete</span>
+        </button>
+        <span class="wa-rechint">{% trans 'Recording…' %}</span>
+      </div>
+      <button id="micButton" class="wa-iconbtn{% if not voice_enabled %} hidden{% endif %}" type="button" title="{% trans 'Record audio' %}">
+        <span class="material-icons-round">mic</span>
+      </button>
+      <button id="sendButton" class="wa-iconbtn" type="button" title="{% trans 'Send' %}">
+        <span class="material-icons-round">send</span>
+      </button>
+      <button id="recSendButton" class="wa-iconbtn" type="button" title="{% trans 'Send audio' %}">
+        <span class="material-icons-round">send</span>
+      </button>
+    </div>
+  </footer>
+</div>
+
+<dialog class="wa-confirm" id="signoutDialog">
+  <h2>{% trans "Sign out of this device?" %}</h2>
+  <p>{% trans "The chat closes on this device. Nothing is deleted — to open it again, scan your QR code." %}</p>
+  <form method="post" action="{% url 'webchat_signout' %}" class="row">
+    {% csrf_token %}
+    <button type="button" id="signoutCancel">{% trans "Cancel" %}</button>
+    <button type="submit" class="danger">{% trans "Sign out" %}</button>
+  </form>
+</dialog>
+
+<audio id="receive-sound" preload="auto" src="{% static 'app/sounds/receive.mp3' %}"></audio>
+{{ rows|json_script:"wc-rows" }}
+
+<script>
+(function(){
+  const CSRF_TOKEN = "{{ csrf_token }}";
+  const SEND_URL  = "{% url 'webchat_send' %}";
+  const VOICE_URL = "{% url 'webchat_voice' %}";
+  const POLL_URL  = "{% url 'webchat_messages' %}";
+  const VOICE_ON  = {{ voice_enabled|yesno:"true,false" }};
+  const POLL_MS   = 4000;
+  const T = {
+    today: "{% filter escapejs %}{% trans 'Today' %}{% endfilter %}",
+    yesterday: "{% filter escapejs %}{% trans 'Yesterday' %}{% endfilter %}",
+    notSent: "{% filter escapejs %}{% trans 'The message could not be sent. Check the connection and try again.' %}{% endfilter %}",
+    audioFail: "{% filter escapejs %}{% trans 'The voice note could not be understood. Please try again, or type your message.' %}{% endfilter %}",
+    ended: "{% filter escapejs %}{% trans 'This conversation has ended. Send a message to start a new one.' %}{% endfilter %}",
+    offline: "{% filter escapejs %}{% trans 'connecting…' %}{% endfilter %}",
+    online: "{% filter escapejs %}{% trans 'online' %}{% endfilter %}",
+    secure: "{% filter escapejs %}{% trans 'Recording needs a secure connection (HTTPS).' %}{% endfilter %}",
+    micDenied: "{% filter escapejs %}{% trans 'Microphone permission denied. Allow it in the browser to record.' %}{% endfilter %}",
+    micMissing: "{% filter escapejs %}{% trans 'Could not access the microphone.' %}{% endfilter %}",
+    play: "{% filter escapejs %}{% trans 'Play/Pause' %}{% endfilter %}",
+    iosInstall: "{% filter escapejs %}{% trans 'To add this chat to the home screen, tap Share, then Add to Home Screen.' %}{% endfilter %}"
+  };
+
+  const chat = document.getElementById('wa-thread');
+  const typing = document.getElementById('wa-typing');
+  const inp = document.getElementById('messageInput');
+  const inputWrap = document.getElementById('inputWrapper');
+  const micBtn = document.getElementById('micButton');
+  const sendBtn = document.getElementById('sendButton');
+  const recSendBtn = document.getElementById('recSendButton');
+  const cancelBtn = document.getElementById('cancelRecButton');
+  const recTime = document.getElementById('recTime');
+  const recvSound = document.getElementById('receive-sound');
+  const statusEl = document.getElementById('waStatus');
+
+  const seen = new Set();      // message ids already on screen
+  let cursor = 0;              // highest id the poll has seen
+  let lastDay = null;
+  let busy = false;
+  let pending = [];            // optimistic user bubbles awaiting their row
+
+  // ---------- Rendering ----------
+  function clearEmpty(){ const e = chat.querySelector('.wa-empty'); if (e) e.remove(); }
+  function scrollToBottom(){ chat.scrollTop = chat.scrollHeight; }
+
+  function dayLabel(iso){
+    const d = new Date(iso + 'T00:00:00');
+    const today = new Date(); today.setHours(0,0,0,0);
+    const diff = Math.round((today - d) / 86400000);
+    if (diff === 0) return T.today;
+    if (diff === 1) return T.yesterday;
+    return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
+  }
+  function maybeDay(iso){
+    if (!iso || iso === lastDay) return;
+    lastDay = iso;
+    const el = document.createElement('div');
+    el.className = 'wa-day'; el.textContent = dayLabel(iso);
+    chat.appendChild(el);
+  }
+
+  function timeLine(ts, who, pendingTick){
+    const t = document.createElement('div');
+    t.className = 'wa-time';
+    t.appendChild(document.createTextNode(ts + ' '));
+    if (who === 'user'){
+      const i = document.createElement('span');
+      i.className = 'material-icons-round';
+      i.textContent = pendingTick ? 'schedule' : 'done_all';
+      t.appendChild(i);
+    }
+    return t;
+  }
+
+  function textBubble(text, who, ts, pendingTick){
+    const b = document.createElement('div');
+    b.className = 'wa-bubble';
+    const s = document.createElement('span'); s.className = 'wa-text'; s.textContent = text;
+    b.appendChild(s); b.appendChild(timeLine(ts, who, pendingTick));
+    return b;
+  }
+
+  function audioBubble(src, who, ts){
+    const b = document.createElement('div');
+    b.className = 'wa-bubble wa-audiobubble';
+    b.innerHTML = '<div class="wa-audioplayer"><button class="wa-playbtn" type="button"><span class="material-icons-round">play_circle</span></button>'
+      + '<div class="wa-track"><div class="wa-progress"></div></div><span class="wa-audiodur">0:00</span>'
+      + '<audio preload="metadata"></audio></div>';
+    b.querySelector('.wa-playbtn').title = T.play;
+    b.querySelector('audio').src = src;
+    b.appendChild(timeLine(ts, who));
+    wireAudio(b);
+    return b;
+  }
+
+  function renderRow(row, animate){
+    if (seen.has(row.id)) return false;
+    seen.add(row.id);
+    if (row.id > cursor) cursor = row.id;
+    clearEmpty();
+    maybeDay(row.day);
+    let botFirst = true;
+    for (const bub of row.bubbles){
+      if (bub.who === 'user'){
+        // The optimistic copy of this message, if this page sent it.
+        const idx = pending.findIndex(p => p.text === (bub.text || null) || (p.audio && bub.audio));
+        if (idx >= 0){ pending[idx].el.remove(); pending.splice(idx, 1); }
+      }
+      const wrap = document.createElement('div');
+      wrap.className = 'wa-msg ' + bub.who;
+      if (!animate) wrap.style.animation = 'none';
+      if (bub.text) wrap.appendChild(textBubble(bub.text, bub.who, row.ts));
+      if (bub.audio && bub.who === 'user' && !bub.text) wrap.appendChild(audioBubble(bub.audio, 'user', row.ts));
+      if (bub.audio && bub.who === 'bot'){
+        // A spoken reply sits under its text, as on WhatsApp.
+        const col = document.createElement('div'); col.className = 'wa-botcol';
+        while (wrap.firstChild) col.appendChild(wrap.firstChild);
+        col.appendChild(audioBubble(bub.audio, 'bot', row.ts));
+        wrap.appendChild(col);
+      }
+      chat.appendChild(wrap);
+      if (bub.who === 'bot' && animate && botFirst){ playSafe(recvSound); botFirst = false; }
+    }
+    return true;
+  }
+
+  function appendSystem(txt){
+    clearEmpty();
+    const d = document.createElement('div');
+    d.className = 'wa-sysline'; d.textContent = txt;
+    chat.appendChild(d); scrollToBottom();
+  }
+
+  function addPending(text, audioSrc){
+    clearEmpty();
+    const now = new Date();
+    const ts = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+    const wrap = document.createElement('div');
+    wrap.className = 'wa-msg user pending';
+    wrap.appendChild(audioSrc ? audioBubble(audioSrc, 'user', ts) : textBubble(text, 'user', ts, true));
+    chat.appendChild(wrap); scrollToBottom();
+    const p = { text: audioSrc ? null : text, audio: !!audioSrc, el: wrap };
+    pending.push(p);
+    return p;
+  }
+  function dropPending(p){ const i = pending.indexOf(p); if (i >= 0){ pending.splice(i, 1); p.el.remove(); } }
+
+  function renderRows(rows, animate){
+    let any = false;
+    for (const r of rows) any = renderRow(r, animate) || any;
+    if (any) scrollToBottom();
+  }
+
+  // ---------- Server ----------
+  function notLinked(res){ if (res.status === 403){ window.location.reload(); return true; } return false; }
+
+  async function poll(){
+    try {
+      const res = await fetch(POLL_URL + '?after=' + cursor, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+      if (notLinked(res)) return;
+      if (!res.ok) throw new Error(res.status);
+      const j = await res.json();
+      renderRows(j.rows || [], true);
+      setOnline(true);
+    } catch(e){ setOnline(false); }
+  }
+  let pollTimer = null;
+  function schedulePoll(){
+    clearTimeout(pollTimer);
+    if (document.visibilityState === 'visible') pollTimer = setTimeout(async () => { await poll(); schedulePoll(); }, POLL_MS);
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible'){ poll(); schedulePoll(); } });
+  window.addEventListener('online', () => { poll(); schedulePoll(); });
+
+  function setOnline(on){
+    statusEl.lastChild.textContent = on ? T.online : T.offline;
+    statusEl.querySelector('.wa-dot').style.background = on ? '#4ade80' : '#fbbf24';
+  }
+
+  function handleTurn(j){
+    renderRows(j.rows || [], true);
+    if (j.notice) appendSystem(j.notice);
+    if (j.reset) appendSystem(T.ended);
+  }
+
+  async function sendText(){
+    const txt = inp.value.trim(); if (!txt || busy) return;
+    inp.value = ''; refreshComposer();
+    const p = addPending(txt);
+    setBusy(true); showTyping();
+    try {
+      const res = await fetch(SEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ message: txt })
+      });
+      if (notLinked(res)) return;
+      if (!res.ok) throw new Error(res.status);
+      handleTurn(await res.json());
+      dropPending(p);
+    } catch(e){
+      // The reply may still have been written — the next poll will show it if
+      // so. Until then the message is put back to send again.
+      await poll();
+      if (pending.includes(p)){ dropPending(p); inp.value = txt; refreshComposer(); appendSystem(T.notSent); }
+    }
+    hideTyping(); setBusy(false);
+  }
+
+  // ---------- Composer ----------
+  function refreshComposer(){
+    const hasText = !!inp.value.trim();
+    sendBtn.style.display = (hasText || !VOICE_ON) ? 'flex' : 'none';
+    micBtn.style.display  = (!hasText && VOICE_ON) ? 'flex' : 'none';
+  }
+  inp.addEventListener('input', refreshComposer);
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendText(); } });
+  sendBtn.addEventListener('click', sendText);
+  function setBusy(b){ busy = b; sendBtn.disabled = b; micBtn.disabled = b; }
+  function showTyping(){ typing.classList.remove('hidden'); scrollToBottom(); }
+  function hideTyping(){ typing.classList.add('hidden'); }
+  function playSafe(a){ try { a.currentTime = 0; a.play().catch(()=>{}); } catch(e){} }
+
+  // ---------- Voice notes ----------
+  let mediaRecorder, audioChunks = [], recStream = null, recTimer = null, recSeconds = 0, cancelled = false;
+  micBtn.addEventListener('click', async () => {
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ appendSystem(T.secure); return; }
+    try { recStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch(err){ appendSystem(err && (err.name === 'NotAllowedError' || err.name === 'SecurityError') ? T.micDenied : T.micMissing); return; }
+    audioChunks = []; cancelled = false;
+    let options = {};
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported){
+      if (MediaRecorder.isTypeSupported('audio/webm')) options = { mimeType: 'audio/webm' };
+      else if (MediaRecorder.isTypeSupported('audio/mp4')) options = { mimeType: 'audio/mp4' };
+    }
+    try { mediaRecorder = new MediaRecorder(recStream, options); } catch(e){ mediaRecorder = new MediaRecorder(recStream); }
+    mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) audioChunks.push(e.data); };
+    mediaRecorder.onstop = onStop;
+    mediaRecorder.start();
+    recSeconds = 0; recTime.textContent = '0:00';
+    recTimer = setInterval(() => { recSeconds++; recTime.textContent = fmt(recSeconds); if (recSeconds >= 120) recSendBtn.click(); }, 1000);
+    inputWrap.classList.add('is-recording');
+  });
+  recSendBtn.addEventListener('click', () => { cancelled = false; stopRecorder(); });
+  cancelBtn.addEventListener('click', () => { cancelled = true; stopRecorder(); });
+  function stopRecorder(){
+    if (recTimer){ clearInterval(recTimer); recTimer = null; }
+    inputWrap.classList.remove('is-recording');
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    if (recStream){ recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+  }
+  function onStop(){
+    if (cancelled || !audioChunks.length){ audioChunks = []; return; }
+    const type = (mediaRecorder && mediaRecorder.mimeType) || 'audio/webm';
+    uploadAudio(new Blob(audioChunks, { type }));
+  }
+  async function uploadAudio(blob){
+    const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+    const p = addPending(null, URL.createObjectURL(blob));
+    setBusy(true); showTyping();
+    try {
+      const fd = new FormData(); fd.append('audio_data', blob, 'rec.' + ext);
+      const res = await fetch(VOICE_URL, { method: 'POST', headers: { 'X-CSRFToken': CSRF_TOKEN }, body: fd });
+      if (notLinked(res)) return;
+      if (res.status === 422){ dropPending(p); appendSystem(T.audioFail); }
+      else if (!res.ok) throw new Error(res.status);
+      else { handleTurn(await res.json()); dropPending(p); }
+    } catch(e){
+      await poll();
+      if (pending.includes(p)){ dropPending(p); appendSystem(T.notSent); }
+    }
+    hideTyping(); setBusy(false);
+  }
+  function fmt(s){ const m = Math.floor(s/60), x = Math.floor(s%60); return m + ':' + x.toString().padStart(2,'0'); }
+
+  function wireAudio(container){
+    const audio = container.querySelector('audio'), btn = container.querySelector('.wa-playbtn'),
+          icon = btn.querySelector('.material-icons-round'), prog = container.querySelector('.wa-progress'),
+          track = container.querySelector('.wa-track'), dur = container.querySelector('.wa-audiodur');
+    audio.addEventListener('loadedmetadata', () => { if (isFinite(audio.duration)) dur.textContent = fmt(audio.duration); });
+    btn.addEventListener('click', () => {
+      if (!audio.paused){ audio.pause(); icon.textContent = 'play_circle'; return; }
+      document.querySelectorAll('#wa-thread audio').forEach(a => { if (a !== audio) a.pause(); });
+      document.querySelectorAll('.wa-playbtn .material-icons-round').forEach(i => { if (i !== icon) i.textContent = 'play_circle'; });
+      audio.play().catch(()=>{}); icon.textContent = 'pause_circle';
+    });
+    audio.ontimeupdate = () => { if (audio.duration){ const pct = audio.currentTime / audio.duration * 100; prog.style.width = pct + '%'; track.style.setProperty('--thumb', pct + '%'); } };
+    audio.onended = () => { icon.textContent = 'play_circle'; prog.style.width = '0%'; track.style.setProperty('--thumb', '0%'); };
+    track.addEventListener('click', (e) => { if (!audio.duration) return; const r = track.getBoundingClientRect(); audio.currentTime = Math.min(Math.max((e.clientX - r.left) / r.width, 0), 1) * audio.duration; });
+  }
+
+  // ---------- Menu / sign out ----------
+  const menuBtn = document.getElementById('menuBtn'), menu = document.getElementById('menu');
+  const dlg = document.getElementById('signoutDialog');
+  menuBtn.addEventListener('click', (e) => { e.stopPropagation(); const open = menu.classList.toggle('hidden') === false; menuBtn.setAttribute('aria-expanded', open); });
+  document.addEventListener('click', () => { menu.classList.add('hidden'); menuBtn.setAttribute('aria-expanded', false); });
+  document.getElementById('signoutItem').addEventListener('click', () => { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); });
+  document.getElementById('signoutCancel').addEventListener('click', () => dlg.close ? dlg.close() : dlg.removeAttribute('open'));
+
+  // ---------- Install hint ----------
+  // Shown in the browser, never once installed. Chrome offers its own prompt,
+  // which the button triggers; elsewhere the bar says how to do it by hand.
+  const bar = document.getElementById('installBar'), installBtn = document.getElementById('installBtn');
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  let dismissed = false; try { dismissed = localStorage.getItem('wc-install-dismissed') === '1'; } catch(e){}
+  let deferred = null;
+  if (!standalone && !dismissed){
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; installBtn.classList.remove('hidden'); bar.classList.remove('hidden'); });
+    if (/iPad|iPhone/.test(navigator.userAgent)){ document.getElementById('installText').textContent = T.iosInstall; bar.classList.remove('hidden'); }
+  }
+  installBtn.addEventListener('click', async () => { if (!deferred) return; deferred.prompt(); await deferred.userChoice.catch(()=>{}); deferred = null; bar.classList.add('hidden'); });
+  document.getElementById('installClose').addEventListener('click', () => { bar.classList.add('hidden'); try { localStorage.setItem('wc-install-dismissed', '1'); } catch(e){} });
+
+  // ---------- Start ----------
+  renderRows(JSON.parse(document.getElementById('wc-rows').textContent || '[]'), false);
+  refreshComposer();
+  scrollToBottom();
+  schedulePoll();
+})();
+</script>
+</body>
+</html>

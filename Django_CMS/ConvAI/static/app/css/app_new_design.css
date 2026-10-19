@@ -2782,6 +2782,32 @@ dialog[open]::backdrop { animation: dlg-scrim .2s ease both; }
 }
 .pd-box { background: #fff; border: 1px solid #e2e8f0; border-radius: .625rem; padding: .5rem .9375rem; }
 
+/* Web app chat card (web_app_chat.md) */
+.pd-wa { padding: .75rem .9375rem; }
+.pd-wa-qr > summary { list-style: none; width: fit-content; }
+.pd-wa-qr > summary::-webkit-details-marker { display: none; }
+.pd-wa-qr > summary .material-icons-outlined { font-size: 1rem; }
+.pd-wa-qrbody { margin-top: .75rem; }
+.pd-wa-code { width: 220px; max-width: 100%; margin: 0 auto .5rem; padding: .5rem; background: #fff;
+              border: 1px solid #e2e8f0; border-radius: .5rem; }
+.pd-wa-url { display: flex; gap: .375rem; margin-top: .5rem; }
+.pd-wa-url .pd-in { flex: 1; min-width: 0; font-size: .75rem; }
+.pd-wa-help { font-size: .75rem; color: #64748b; line-height: 1.5; margin: .25rem 0 0; }
+.pd-wa-warn { font-size: .75rem; color: #92400e; background: #fffbeb; border: 1px solid #fde68a;
+              border-radius: .5rem; padding: .5rem .625rem; margin: .625rem 0 0; }
+.pd-wa-h { display: block; font-size: .75rem; font-weight: 600; color: #475569; margin: .875rem 0 .375rem; }
+.pd-wa-devs { list-style: none; margin: 0; padding: 0; }
+.pd-wa-devs li { display: flex; align-items: center; gap: .625rem; padding: .375rem 0; font-size: .8125rem; }
+.pd-wa-devs li + li { border-top: 1px solid #f4f7fb; }
+.pd-wa-devs .material-icons-outlined { color: #94a3b8; font-size: 1.125rem; }
+.pd-wa-dev { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pd-wa-dev small { color: #94a3b8; font-size: .6875rem; }
+.pd-wa-row { display: flex; gap: .375rem; align-items: center; }
+.pd-wa-row .pd-sel { flex: 1; }
+.pd-wa-reset { display: flex; align-items: center; gap: .625rem; flex-wrap: wrap;
+               margin-top: .875rem; padding-top: .75rem; border-top: 1px solid #f4f7fb; }
+.pd-wa-reset .pd-wa-help { margin: 0; }
+
 .pd-pr { display: flex; align-items: center; gap: .6875rem; padding: .5625rem 0;
          font-size: .8125rem; color: inherit; text-decoration: none; }
 .pd-pr:hover { color: #0369a1; }

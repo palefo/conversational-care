@@ -725,6 +725,8 @@ def send_meeting_reminder_view(request, meeting_id):
 
     if channel == "email":
         messages.success(request, _("Reminder sent by email."))
+    elif channel == "web":
+        messages.success(request, _("Reminder sent to the client's web app chat."))
     else:
         messages.success(request, _("Reminder sent via WhatsApp."))
     return _back_to(request, 'pending_call', call_id=meeting_id)

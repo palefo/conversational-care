@@ -1348,6 +1348,24 @@ class ExportConfigForm(forms.ModelForm):
         }
 
 
+class WebChatConfigForm(forms.ModelForm):
+    """Settings -> Web app: the switch for the web app chat (web_app_chat.md)."""
+
+    class Meta:
+        model = SiteConfiguration
+        fields = ["web_chat_enabled"]
+        labels = {"web_chat_enabled": _("Enable the web app chat")}
+        help_texts = {
+            "web_chat_enabled": _(
+                "Off by default. When on, each client page has a Web app card with a "
+                "QR code that opens that client's chat on a phone or tablet — no "
+                "WhatsApp, SIM card or password needed. While it is off the chat pages "
+                "do not exist and the card is hidden. Switching it off later deletes "
+                "nothing: linked devices work again when it is switched back on."),
+        }
+        widgets = {"web_chat_enabled": forms.Select(attrs=_SELECT)}
+
+
 class ParticipantsConfigForm(forms.ModelForm):
     """Settings -> Participants: the switch, plus how enrolment behaves.
 

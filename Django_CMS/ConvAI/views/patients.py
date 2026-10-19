@@ -754,6 +754,9 @@ def patient_detail(request, pk):
         # this client was enrolled through it. None otherwise, and the template
         # then renders exactly as it did before study enrolment existed.
         'enrolment': _client_enrolment(patient),
+        # The web app chat card: None while the feature is off, and the
+        # template then renders exactly as it did before it existed.
+        'webapp': _webapp_card(request, patient),
         # send_care_plan_whatsapp 403s when the flag is off, so the button is
         # hidden rather than shown and broken. A caregiver number is the other
         # half of it — there is nowhere to send it without one.
@@ -779,6 +782,34 @@ def patient_detail(request, pk):
         'SEND_CARE_PLAN' : get_bool("SEND_CARE_PLAN"),
         'active_page':'patients',
     })
+
+
+def _webapp_card(request, patient):
+    """What the client page's Web app card shows, or None while the feature is off.
+
+    The QR is rendered here rather than on request because whoever can see this
+    page can already open the client's chat from it — the card is the one place
+    the link is meant to be handed over.
+    """
+    from .. import web_chat
+    from .settings_views import _qr_svg
+
+    if not web_chat.enabled():
+        return None
+    link = web_chat.link_for(patient)
+    url = request.build_absolute_uri(web_chat.join_path(link))
+    return {
+        "url": url,
+        "qr_svg": _qr_svg(url, svg_id="pdWebQr"),
+        "devices": list(web_chat.live_devices(patient)),
+        "channel": patient.chat_channel,
+        "channels": patient.CHAT_CHANNELS,
+        # The microphone and an installable app both need HTTPS; worth saying
+        # before a workshop rather than discovering it in one.
+        # (localhost counts as secure to browsers, so a dev server is not warned.)
+        "insecure": not request.is_secure()
+                    and request.get_host().split(":")[0] not in ("localhost", "127.0.0.1"),
+    }
 
 
 @login_required

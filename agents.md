@@ -567,6 +567,9 @@ See [agent_tools.md](agent_tools.md).
 - **External chat / voice** (`external_chat`, `send_external_message`,
   `process_audio`) uses the linked patient's `.agent`. For the test user this is
   typically **Loopback**.
+- **Web app chat** (`/c/`, off by default) uses the client's `.agent`, through
+  the same `process_message_for_patient` as WhatsApp. See
+  [web_app_chat.md](web_app_chat.md).
 - **Navigator chatbot bubble** (`send_chat_message`) always uses the built-in
   **Link Worker** native agent and keys the conversation by a normalized UUID
   derived from the `conversation_id`.

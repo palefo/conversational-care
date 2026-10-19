@@ -138,6 +138,7 @@ def job_process_whatsapp_audio(
         response_audio_file=out_name,
         patient=patient,
         sender_role=inbound.role,
+        channel="whatsapp",
     )
 
     # Signed URL for Twilio to fetch the audio (via your download view)
