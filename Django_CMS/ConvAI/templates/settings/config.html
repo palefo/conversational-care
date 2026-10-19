@@ -1213,6 +1213,52 @@ print(result)</code></pre>
     </div>
   </section>
 
+  {# ═════════ Web app chat ═════════ #}
+  <section class="settings-panel hidden" data-tab="webapp">
+    <div class="card p-6">
+      <div class="flex items-start gap-3 mb-5">
+        <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">install_mobile</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Web app chat" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "A client's chat as an app on a phone or tablet, for people without WhatsApp or devices without a SIM card. Their history is kept exactly as WhatsApp's, and they talk to the same agent." %}</p>
+        </div>
+      </div>
+
+      {% if webapp_enabled %}
+        <div class="px-4 py-3 mb-5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm">
+          <p class="font-medium mb-1">{% trans "How it works" %}</p>
+          <ul class="list-disc pl-5 space-y-1 text-gray-600">
+            <li>{% trans "Each client page has a Web app card with a QR code. Scanning it on a device opens that client's chat there, without a password." %}</li>
+            <li>{% trans "In Chrome on Android, Install (or Add to Home screen) puts the chat on the home screen like an app." %}</li>
+            <li>{% trans "Protocol questions and meeting reminders go to the web app for clients whose card says so; everyone else keeps getting them on their phone." %}</li>
+            <li>{% trans "Unlink a device on the client page when it is handed back. A new QR code signs every device out." %}</li>
+            <li>{% trans "The site must be on HTTPS for the chat to install and to record voice notes. Voice notes follow the WhatsApp audio switch." %}</li>
+          </ul>
+        </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'config_save' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="webapp">
+        {% include "settings/_field.html" with field=webapp_form.web_chat_enabled %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
+
+      {% if webapp_device_count or webapp_web_clients %}
+        <div class="px-4 py-3 mt-5 rounded-lg bg-sky-50 border border-sky-100 text-sky-900 text-sm flex items-start gap-2">
+          <span class="material-icons-outlined text-base">info</span>
+          <div>
+            {% blocktrans count n=webapp_device_count %}{{ n }} device is linked to a client's chat.{% plural %}{{ n }} devices are linked to clients' chats.{% endblocktrans %}
+            {% blocktrans count n=webapp_web_clients %}{{ n }} client gets platform messages on the web app.{% plural %}{{ n }} clients get platform messages on the web app.{% endblocktrans %}
+            {% if not webapp_enabled %}
+              {% trans "While the switch is off none of these devices can open a chat, and those clients are reached on their phone. Nothing is deleted." %}
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
   {# ═════════ Export ═════════ #}
   <section class="settings-panel hidden" data-tab="export">
     <div class="card p-6">
@@ -1341,7 +1387,7 @@ print(result)</code></pre>
   (function () {
     // Keep in step with the `tabs` list in views/settings_views.py: a tab
     // missing here is a sidebar entry that silently falls back to General.
-    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','participants','api','privacy','export','maintenance'{% for ext in extension_panels %},'{{ ext.id|escapejs }}'{% endfor %}];
+    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','participants','webapp','api','privacy','export','maintenance'{% for ext in extension_panels %},'{{ ext.id|escapejs }}'{% endfor %}];
     const buttons = document.querySelectorAll('.stg-navitem');
     const panels  = document.querySelectorAll('.settings-panel');
 

@@ -43,6 +43,11 @@ from .views import (
     study_create, study_editor, study_editor_save, study_delete,
     enrolment_landing, enrolment_claim, enrolment_consent, enrolment_done,
     enrolment_resume,
+    # Web app chat. Every one of these 404s unless WEB_CHAT_ENABLED is on; the
+    # check is in the view. The device routes take no login — see web_chat.py.
+    webchat_join, webchat_home, webchat_send, webchat_messages, webchat_voice,
+    webchat_audio, webchat_signout, webchat_manifest, webchat_service_worker,
+    webchat_set_channel, webchat_reset_link, webchat_unlink_device,
 )
 from .utils import navigator_required, patient_tester_required
 
@@ -195,7 +200,7 @@ urlpatterns = [
     path('studies/<int:pk>/delete/', study_delete, name='study_delete'),
 
     # --- Study enrolment: the public flow ------------------------------------
-    # The only unauthenticated pages in the platform. No role gate by design;
+    # Unauthenticated pages, with the web app chat below. No role gate by design;
     # the feature switch and the attempt limiter are what guard them. See
     # participant_management.md.
     path('join/', enrolment_landing, name='enrolment_landing'),
@@ -203,4 +208,18 @@ urlpatterns = [
     path('join/consent/', enrolment_consent, name='enrolment_consent'),
     path('join/done/', enrolment_done, name='enrolment_done'),
     path('join/resume/', enrolment_resume, name='enrolment_resume'),
+
+    # Web app chat (web_app_chat.md): a client's chat on a tablet, by QR code.
+    path('c/', webchat_home, name='webchat_home'),
+    path('c/join/<str:public_id>/<str:token>/', webchat_join, name='webchat_join'),
+    path('c/send/', webchat_send, name='webchat_send'),
+    path('c/messages/', webchat_messages, name='webchat_messages'),
+    path('c/voice/', webchat_voice, name='webchat_voice'),
+    path('c/audio/<int:message_id>/<str:which>/', webchat_audio, name='webchat_audio'),
+    path('c/signout/', webchat_signout, name='webchat_signout'),
+    path('c/manifest.webmanifest', webchat_manifest, name='webchat_manifest'),
+    path('c/sw.js', webchat_service_worker, name='webchat_sw'),
+    path('patients/<int:pk>/web-app/channel/', navigator_required(webchat_set_channel), name='webchat_set_channel'),
+    path('patients/<int:pk>/web-app/reset/', navigator_required(webchat_reset_link), name='webchat_reset_link'),
+    path('patients/<int:pk>/web-app/devices/<int:device_id>/unlink/', navigator_required(webchat_unlink_device), name='webchat_unlink_device'),
 ]

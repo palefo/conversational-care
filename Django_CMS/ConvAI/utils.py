@@ -576,12 +576,35 @@ def remote_turn_parts(messages, *, every=False) -> list:
     return found
 
 
+def collapse_repeat(text):
+    """The reply once, if it is the same text written twice back to back.
+
+    Models occasionally emit their whole answer twice in one message — seen on
+    gpt-5.4 (platform, 19 Oct 2026: "Olá! Antes de começarmos, qual é o seu
+    nome?" twice, joined by a newline; 1 in 60 turns for that agent, never
+    reproduced). Only an *exact* repeat of the whole reply, split at a line
+    break, is collapsed, so nothing a model meant to say can be lost. Anything
+    else, including non-strings, is returned unchanged.
+    """
+    if not isinstance(text, str):
+        return text
+    stripped = text.strip()
+    for sep in ("\n\n", "\n"):
+        parts = stripped.split(sep)
+        half = len(parts) // 2
+        if len(parts) >= 2 and len(parts) % 2 == 0:
+            first, second = sep.join(parts[:half]).strip(), sep.join(parts[half:]).strip()
+            if first and first == second:
+                return first
+    return text
+
+
 def remote_turn_reply(messages) -> str:
     """Everything a remote agent said to the person this turn, as one reply.
 
     The texts of :func:`remote_turn_parts`, joined with blank lines.
     """
-    return PART_JOINER.join(remote_turn_parts(messages))
+    return collapse_repeat(PART_JOINER.join(remote_turn_parts(messages)))
 
 
 PART_JOINER = "\n\n"
@@ -601,7 +624,10 @@ class AgentReply(str):
 
     @classmethod
     def of(cls, parts):
-        parts = tuple(p for p in (str(x).strip() for x in parts) if p)
+        parts = [p for p in (collapse_repeat(str(x).strip()) for x in parts) if p]
+        # The same message twice in a row is the model repeating itself, not two
+        # messages it meant to send.
+        parts = tuple(p for i, p in enumerate(parts) if i == 0 or p != parts[i - 1])
         reply = cls(PART_JOINER.join(parts))
         reply.parts = parts
         return reply
@@ -642,7 +668,7 @@ def end_conversation(conv) -> bool:
 def save_message(phone: str, user_message: str, response_message: str, thread_id: str,
                  patient: Patient | None = None,
                  input_audio_file: str = "", response_audio_file: str = "",
-                 *, account=None, sender_role: str | None = None):
+                 *, account=None, sender_role: str | None = None, channel: str = ""):
     """
     Persist a message pair and ensure there's a Conversation row.
     - Creates Conversation(id=thread_id) if missing.
@@ -721,6 +747,7 @@ def save_message(phone: str, user_message: str, response_message: str, thread_id
             patient=patient,
             account=account,
             sender_role=sender_role,
+            channel=channel or "",
         )
 
 
@@ -859,7 +886,8 @@ def _review_after_message(message, inbound_text: str) -> None:
 
 
 def process_message_for_patient(patient: Patient, raw_message: str, *, user_label: str | None = None,
-                                sender_role: str | None = None, account=None) -> str:
+                                sender_role: str | None = None, account=None,
+                                channel: str = "") -> str:
     """
     Process a chat message for an already-resolved patient.
 
@@ -870,11 +898,29 @@ def process_message_for_patient(patient: Patient, raw_message: str, *, user_labe
 
     ``sender_role`` and ``account`` are what the caller already knows about who
     wrote in — the inbound resolver for WhatsApp and SMS, the tester login for
-    the web chat — and are stamped onto the message as they are.
+    the web chat — and are stamped onto the message as they are. So is
+    ``channel`` (Message.Channel), when the caller knows what it came over.
+    """
+    reply, _msg = process_message_for_patient_with_row(
+        patient, raw_message, user_label=user_label, sender_role=sender_role,
+        account=account, channel=channel)
+    return reply
+
+
+def process_message_for_patient_with_row(patient: Patient, raw_message: str, *,
+                                         user_label: str | None = None,
+                                         sender_role: str | None = None, account=None,
+                                         channel: str = "", input_audio_file: str = ""):
+    """:func:`process_message_for_patient`, also returning the Message it wrote.
+
+    The message is None when nothing was written — the /quit reset. The web app
+    chat needs the row: it renders by message id, and a voice note's reply audio
+    is attached to that row afterwards.
     """
     text = raw_message.strip()
     label = user_label or f"patient:{patient.pk}"
-    stamp = {"account": account, "sender_role": sender_role}
+    stamp = {"account": account, "sender_role": sender_role, "channel": channel,
+             "input_audio_file": input_audio_file}
 
     # 0) the navigator's switch. Both inbound paths land here, so this is the
     # one place that has to honour it. The message is still recorded — what is
@@ -887,14 +933,14 @@ def process_message_for_patient(patient: Patient, raw_message: str, *, user_labe
         # and a crisis disclosed while the agent is off is the one nobody is
         # already reading.
         _review_after_message(msg, text)
-        return ""
+        return "", msg
 
     # 1) reset thread on command
     if text.lower() in ("/quit", "/restart"):
         new_uuid = str(uuid.uuid4())
         patient.current_thread_id = new_uuid
         patient.save(update_fields=["current_thread_id"])
-        return "Current conversation has been reset."
+        return "Current conversation has been reset.", None
 
     # 2) automation lifecycle: revert on idle timeout, else re-inject its context
     #    so the (native) automation agent sees meeting_id/protocol_id every turn.
@@ -914,7 +960,7 @@ def process_message_for_patient(patient: Patient, raw_message: str, *, user_labe
     #    this is a second model call, and the caregiver should not wait behind
     #    it to be answered.
     _review_after_message(msg, text)
-    return reply
+    return reply, msg
 
 
 def process_received_message(phone_number: str, raw_message: str, channel: str | None = None) -> str:
@@ -955,7 +1001,7 @@ def process_received_message(phone_number: str, raw_message: str, channel: str |
         return "Sorry, we could not find a patient matching this number."
 
     return process_message_for_patient(patient, raw_message, user_label=phone,
-                                       sender_role=inbound.role)
+                                       sender_role=inbound.role, channel=channel)
 
 
 def download_recording_mp3(recording_sid):
@@ -1169,6 +1215,23 @@ def send_whatsapp_reminder(meeting):
     return msg.sid  # devuelve el SID del mensaje si es exitoso
 
 
+def send_web_reminder(meeting):
+    """Remind a web app chat client about a meeting, in their chat.
+
+    Written to the client, not to a caregiver: a client on the web app is the
+    one holding the device. In the platform's language, as the WhatsApp
+    template is.
+    """
+    from django.utils.translation import gettext as _t
+    from . import web_chat
+
+    local_dt = timezone.localtime(meeting.scheduled_time)
+    body = _t("Reminder: you have a meeting on %(date)s at %(time)s.") % {
+        "date": local_dt.strftime("%d/%m/%Y"), "time": local_dt.strftime("%H:%M"),
+    }
+    return web_chat.deliver(meeting.patient, body)
+
+
 def reminder_recipient_missing(meeting):
     """Why this meeting cannot be reminded on the configured channel, or "".
 
@@ -1176,6 +1239,13 @@ def reminder_recipient_missing(meeting):
     disagree about whether a reminder is possible.
     """
     from .mailer import meeting_reminder_recipient, reminder_channel
+    from . import web_chat
+
+    # A client on the web app chat is reminded there: chosen for this client,
+    # so it outranks the installation's channel. It has nowhere to put an
+    # online meeting's link either — that goes out from the meeting itself.
+    if web_chat.delivers_to_web(meeting.patient):
+        return "online" if meeting.modality == meeting.Modality.ONLINE else ""
 
     if reminder_channel() == "email":
         if not meeting_reminder_recipient(meeting)[0]:
@@ -1206,7 +1276,13 @@ def send_meeting_reminder(meeting):
     WhatsApp path has always raised — and lets provider errors through.
     """
     from .mailer import reminder_channel, send_meeting_reminder_email
+    from . import web_chat
 
+    if web_chat.delivers_to_web(meeting.patient):
+        if meeting.modality == meeting.Modality.ONLINE:
+            raise ValueError("Online meetings are reminded by sending their link.")
+        send_web_reminder(meeting)
+        return "web"
     if reminder_channel() == "email":
         send_meeting_reminder_email(meeting)
         return "email"

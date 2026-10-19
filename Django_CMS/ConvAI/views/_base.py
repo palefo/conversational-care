@@ -59,6 +59,7 @@ from ..forms import (
     ExportConfigForm,
     ConversationPrivacyConfigForm,
     ParticipantsConfigForm,
+    WebChatConfigForm,
     StudyForm,
     IntegrationsConfigForm,
     MessagingConfigForm,
@@ -157,6 +158,7 @@ _CONFIG_FORMS = {
     "export": ExportConfigForm,
     "privacy": ConversationPrivacyConfigForm,
     "participants": ParticipantsConfigForm,
+    "webapp": WebChatConfigForm,
 }
 
 

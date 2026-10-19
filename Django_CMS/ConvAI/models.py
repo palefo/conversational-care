@@ -119,6 +119,21 @@ class Message(models.Model):
         max_length=16, choices=SenderRole.choices, blank=True, default="",
         help_text="Who wrote the inbound side, decided when the message arrived.",
     )
+
+    class Channel(models.TextChoices):
+        # What the message travelled over. Stamped by the write sites that know
+        # it; blank on rows written before the field existed, and on the few
+        # sites that have no channel to name. See web_app_chat.md.
+        WHATSAPP = "whatsapp", _("WhatsApp")
+        SMS = "sms", _("SMS")
+        WEB = "web", _("Web app")
+        TESTER = "tester", _("Tester chat")
+        UNKNOWN = "", _("Not recorded")
+
+    channel = models.CharField(
+        max_length=12, choices=Channel.choices, blank=True, default="",
+        help_text="What the message travelled over, when the write site knew.",
+    )
     user_message = models.TextField()
 
     response_message = models.TextField()
@@ -473,6 +488,17 @@ class Patient(models.Model):
         related_name="test_patient",
         help_text="User in group 'PatientTester' linked to this patient"
     )
+
+    # Where messages the platform starts — a protocol's first question, a
+    # meeting reminder — go for this client. Blank is the phone, as it always
+    # was; "web" sends them to the web app chat instead, and only while that
+    # feature is on (ConvAI.web_chat.delivers_to_web). Chosen by a person on the
+    # client page, never inferred from a tablet being linked.
+    CHAT_CHANNELS = [
+        ("", _("Phone (WhatsApp / SMS)")),
+        ("web", _("Web app")),
+    ]
+    chat_channel = models.CharField(max_length=8, choices=CHAT_CHANNELS, blank=True, default="")
 
     # --- Automation lifecycle -------------------------------------------------
     # While an automation (e.g. the Protocol QA agent) is running, `agent` points
@@ -1724,6 +1750,14 @@ class SiteConfiguration(models.Model):
     # records they signed stay exactly as they are. See participant_management.md.
     study_enrolment_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
 
+    # --- Web app chat (live) ---
+    # Off by default. A client's chat as an installable web page, opened by
+    # scanning a QR code from their client page — for people with no WhatsApp,
+    # or tablets with no SIM. While it is off every /c/ route 404s and the
+    # client page shows nothing of it. Turning it off deletes nothing: linked
+    # devices come back when it is turned on again. See web_app_chat.md.
+    web_chat_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
     # --- Link Worker v2 (beta) ---
     # Which assistant answers in the staff chat bubble. Off (the default) keeps
     # the original Link Worker, untouched. On hands the bubble to v2, which can
@@ -2507,3 +2541,83 @@ class JobWorker(models.Model):
 
     def __str__(self):
         return self.name
+
+
+### Web app chat
+#
+# A client's chat as an installable web page (see web_app_chat.md). Two rows:
+# the link a QR code carries, one per client, and a device per browser that
+# scanned it. The link proves nothing on its own beyond "someone was shown this
+# QR"; what the chat trusts is the device cookie it was exchanged for.
+
+
+def _web_chat_public_id() -> str:
+    # The half of the link that names it. Not secret — the other half is an
+    # HMAC (ConvAI.web_chat.token_for) — only unguessable enough not to say how
+    # many links exist. Same alphabet as a meeting invite's.
+    import secrets
+    alphabet = "abcdefghjkmnpqrstuvwxyz23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(16))
+
+
+def _web_chat_nonce() -> str:
+    import secrets
+    return secrets.token_urlsafe(18)
+
+
+class WebChatLink(models.Model):
+    """The QR code for one client's web app chat.
+
+    The link is ``/c/join/<public_id>/<token>``, the token an HMAC of the
+    public id and ``nonce``. Nothing secret is stored, so the QR can be shown
+    again; rotating ``nonce`` kills every printed copy *and* every device that
+    joined through the old one (WebChatDevice.link_nonce).
+    """
+
+    patient = models.OneToOneField(Patient, on_delete=models.CASCADE,
+                                   related_name="web_chat_link")
+    public_id = models.CharField(max_length=24, unique=True, default=_web_chat_public_id)
+    nonce = models.CharField(max_length=48, default=_web_chat_nonce)
+    created_at = models.DateTimeField(auto_now_add=True)
+    rotated_at = models.DateTimeField(null=True, blank=True)
+    rotated_by = models.ForeignKey(ConvAIUser, null=True, blank=True,
+                                   on_delete=models.SET_NULL, related_name="+")
+
+    def __str__(self):
+        return f"Web app link for {self.patient}"
+
+
+class WebChatDevice(models.Model):
+    """One browser that scanned a client's QR code and was let in.
+
+    The browser holds a random key in a cookie; only its SHA-256 is stored, so
+    a database dump does not let anyone into a chat. A device is live while it
+    is not revoked and its ``link_nonce`` still matches the link's — which is
+    what makes "Reset link" sign out every tablet at once.
+    """
+
+    class RevokedBy(models.TextChoices):
+        STAFF = "staff", _("Unlinked by staff")
+        DEVICE = "device", _("Signed out on the device")
+        RESET = "reset", _("Link was reset")
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE,
+                                related_name="web_chat_devices")
+    key_hash = models.CharField(max_length=64, unique=True)
+    link_nonce = models.CharField(max_length=48)
+    # "Android · Chrome", from the user agent: enough to tell two tablets
+    # apart in the list, never the full string.
+    label = models.CharField(max_length=80, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_reason = models.CharField(max_length=8, choices=RevokedBy.choices,
+                                      blank=True, default="")
+    revoked_by = models.ForeignKey(ConvAIUser, null=True, blank=True,
+                                   on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.label or 'Device'} for {self.patient}"

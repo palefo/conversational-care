@@ -120,6 +120,7 @@ _BOOL_KEYS = {
     "CONVERSATION_DOWNLOAD_ENABLED": "conversation_download_enabled",
     "CONVERSATION_PRIVACY_ENABLED": "conversation_privacy_enabled",
     "STUDY_ENROLMENT_ENABLED": "study_enrolment_enabled",
+    "WEB_CHAT_ENABLED": "web_chat_enabled",
     "LINK_WORKER_V2_ENABLED": "link_worker_v2_enabled",
     "LINK_WORKER_WHATSAPP_ENABLED": "link_worker_whatsapp_enabled",
     "ENROLMENT_REQUIRE_DOB": "enrolment_require_dob",

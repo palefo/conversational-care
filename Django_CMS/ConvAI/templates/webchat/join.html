@@ -1,0 +1,17 @@
+{% extends "webchat/_card.html" %}{% load i18n %}
+{% block title %}{% trans "Open your chat" %}{% endblock %}
+{% block content %}
+  <span class="wc-icon" aria-hidden="true">{{ first_name|slice:":1"|upper }}</span>
+  <p class="wc-lead">{% blocktrans %}{{ first_name }}'s chat{% endblocktrans %}</p>
+  <p class="wc-text">{% blocktrans %}Open the chat on this device? It stays open here until it is signed out, so anyone using this device will be able to read the conversation.{% endblocktrans %}</p>
+
+  {% if switching %}
+    <div class="wc-warn">{% trans "This device is already open on someone else's chat. Continuing signs it out of that one." %}</div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="submit-button">{% trans "Open the chat" %}</button>
+  </form>
+  <p class="wc-note">{% blocktrans %}Not {{ first_name }}? Close this page and ask for your own QR code.{% endblocktrans %}</p>
+{% endblock %}

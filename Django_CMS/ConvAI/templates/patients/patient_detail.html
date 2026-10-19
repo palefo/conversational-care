@@ -397,6 +397,91 @@
     </div>
   {% endif %}
 
+  {% comment %}
+    The web app chat: the QR code that opens this client's chat on a tablet or
+    phone, the devices it is open on, and where the platform's own messages go.
+    Absent entirely while the feature is off (Settings → Web app). See
+    web_app_chat.md.
+  {% endcomment %}
+  {% if webapp %}
+    <div class="pd-sec" id="webapp">
+      <p class="pd-sect">{% trans "Web app chat" %}</p>
+      {% trans "Sign this device out of the chat? The conversation stays on file." as wa_unlink_q %}
+      {% trans "Issue a new QR code? The current one stops working and every device is signed out." as wa_reset_q %}
+      <div class="pd-box pd-wa">
+        <details class="pd-wa-qr">
+          <summary class="pd-btn"><span class="material-icons-outlined">qr_code_2</span>{% trans "Show QR code" %}</summary>
+          <div class="pd-wa-qrbody">
+            <div class="pd-wa-code">{{ webapp.qr_svg|safe }}</div>
+            <p class="pd-wa-help">{% blocktrans with name=patient.name %}Scan with the device's camera to open {{ name }}'s chat on it. Anyone who scans it can read the conversation, so show it only to {{ name }}.{% endblocktrans %}</p>
+            <div class="pd-wa-url">
+              <input type="text" class="pd-in" readonly value="{{ webapp.url }}" id="pdWebUrl" aria-label="{% trans 'Link' %}">
+              <button type="button" class="pd-btn" id="pdWebCopy">{% trans "Copy" %}</button>
+            </div>
+          </div>
+        </details>
+        {% if webapp.insecure %}
+          <p class="pd-wa-warn">{% trans "This page is not on HTTPS, so the chat cannot be installed or record voice notes. Use the site's https:// address." %}</p>
+        {% endif %}
+
+        <p class="pd-wa-h">{% trans "Open on" %}</p>
+        {% if webapp.devices %}
+          <ul class="pd-wa-devs">
+            {% for d in webapp.devices %}
+              <li>
+                <span class="material-icons-outlined">tablet_android</span>
+                <span class="pd-wa-dev">
+                  <span>{{ d.label|default:_("Device") }}</span>
+                  <small>{% blocktrans with since=d.created_at|date:"j M, H:i" seen=d.last_seen_at|timesince %}Linked {{ since }} · active {{ seen }} ago{% endblocktrans %}</small>
+                </span>
+                <form method="post" action="{% url 'webchat_unlink_device' patient.pk d.pk %}"
+                      onsubmit="return confirm('{{ wa_unlink_q|escapejs }}')">
+                  {% csrf_token %}
+                  <button type="submit" class="pd-btn">{% trans "Unlink" %}</button>
+                </form>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="pd-none">{% trans "Not open on any device." %}</p>
+        {% endif %}
+
+        <form method="post" action="{% url 'webchat_set_channel' patient.pk %}" class="pd-wa-ch">
+          {% csrf_token %}
+          <label for="pdWebCh" class="pd-wa-h">{% trans "Messages the platform starts go to" %}</label>
+          <div class="pd-wa-row">
+            <select name="chat_channel" id="pdWebCh" class="pd-sel" onchange="this.form.submit()">
+              {% for value, label in webapp.channels %}
+                <option value="{{ value }}" {% if value == webapp.channel %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <noscript><button type="submit" class="pd-btn">{% trans "Save" %}</button></noscript>
+          </div>
+          <p class="pd-wa-help">{% trans "Protocol questions and meeting reminders. Replies always go back the way the client wrote." %}</p>
+        </form>
+
+        <form method="post" action="{% url 'webchat_reset_link' patient.pk %}" class="pd-wa-reset"
+              onsubmit="return confirm('{{ wa_reset_q|escapejs }}')">
+          {% csrf_token %}
+          <button type="submit" class="pd-btn">{% trans "New QR code" %}</button>
+          <span class="pd-wa-help">{% trans "If the code was lost or shown to the wrong person." %}</span>
+        </form>
+      </div>
+    </div>
+    <script>
+      (function(){
+        var b = document.getElementById('pdWebCopy'), i = document.getElementById('pdWebUrl');
+        if (!b || !i) return;
+        b.addEventListener('click', function(){
+          i.select();
+          (navigator.clipboard ? navigator.clipboard.writeText(i.value) : Promise.reject())
+            .catch(function(){ document.execCommand('copy'); })
+            .finally(function(){ b.textContent = "{% trans 'Copied' as t %}{{ t|escapejs }}"; setTimeout(function(){ b.textContent = "{% trans 'Copy' as t %}{{ t|escapejs }}"; }, 1500); });
+        });
+      })();
+    </script>
+  {% endif %}
+
   {% if protocols_executed %}
     <div class="pd-sec">
       <p class="pd-sect">{% trans "Protocols completed" %}</p>

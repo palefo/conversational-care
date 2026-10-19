@@ -21,3 +21,4 @@ from .settings_views import *
 from .studies import *
 from .summaries import *
 from .users import *
+from .webchat import *

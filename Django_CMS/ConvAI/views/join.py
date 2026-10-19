@@ -1,7 +1,8 @@
 """The public join flow: /join/ -> claim -> consent -> done.
 
-These are the **only unauthenticated pages in the platform**, which is what most
-of the care here is about.
+These are **unauthenticated pages** — with the web app chat (views/webchat.py),
+the only ones in the platform, and like it switched off by default — which is
+what most of the care here is about.
 
 * The whole flow 404s unless the feature is switched on, so a default
   installation has no public surface at all.

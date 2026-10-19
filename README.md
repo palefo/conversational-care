@@ -58,6 +58,9 @@ Topic deep dives:
 - [Participant management](participant_management.md) — for deployments running a
   research study: pre-enrolling participants, three-word access codes, the public
   join page, and versioned append-only consent. Off by default.
+- [Web app chat](web_app_chat.md) — a client's chat as an installable app on
+  a phone or tablet, opened by scanning a QR code from the client page: no
+  WhatsApp, SIM card or password. Same agent, same history. Off by default.
 - [Client setup](client_setup.md) — fitting the platform to who its clients
   are: what a navigator is called, whether clients have caregivers and meetings
   have types, pronouns in summaries, what happens after someone self-registers

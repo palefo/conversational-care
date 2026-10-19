@@ -1,0 +1,40 @@
+{% comment %}
+  Shell for the web app chat's own small pages — joining, and "not linked".
+  The same card as the login and the study join pages: nobody here is signed in,
+  so base.html (which assumes a user and a sidebar) does not fit.
+{% endcomment %}
+{% load static custom_filters i18n %}
+<!doctype html>
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex">
+    <title>{% block title %}{% brand_name %}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'app/css/vars.css' %}">
+    <link rel="stylesheet" href="{% static 'app/css/login.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    {% include "webchat/_head.html" %}
+    <style>
+      .wc-lead { font-size: 1.15rem; font-weight: 600; text-align: center; margin: 0 0 .6rem; color: var(--fg, #0f172a); }
+      .wc-text { font-size: .92rem; line-height: 1.6; color: var(--muted, #475569); text-align: center; margin: 0 0 1.2rem; }
+      .wc-note { font-size: .78rem; line-height: 1.5; color: var(--muted, #64748b); text-align: center; margin-top: 1rem; }
+      .wc-warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: .6rem;
+                 padding: .7rem .9rem; font-size: .82rem; line-height: 1.5; margin-bottom: 1rem; }
+      .wc-icon { display: block; margin: 0 auto .8rem; width: 56px; height: 56px; border-radius: 50%;
+                 background: #e6f2f4; color: #006877; font: 600 28px/56px 'DM Sans', sans-serif; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <div class="login">
+      <div class="login-card">
+        <div class="login-title">
+          <img class="brand-logo" src="{% brand_logo_url %}" alt="{% brand_name %}" />
+        </div>
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+  </body>
+</html>

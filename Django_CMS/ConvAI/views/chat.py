@@ -386,6 +386,7 @@ def send_external_message(request):
     bot_msg = process_message_for_patient(
         patient, user_msg, user_label=_chat_user_label(request.user),
         sender_role=Message.SenderRole.TESTER, account=request.user,
+        channel=Message.Channel.TESTER,
     )
 
     # Whether the agent ended the conversation during this turn
@@ -504,6 +505,7 @@ def process_audio(request):
         response_audio_file=out_name,
         account=request.user,
         sender_role=Message.SenderRole.TESTER,
+        channel=Message.Channel.TESTER,
     )
 
     return JsonResponse({
