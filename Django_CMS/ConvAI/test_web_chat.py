@@ -113,6 +113,17 @@ class OffMeansNothing(_Base):
         _config(web_chat_enabled="0")
         self.assertFalse(web_chat.delivers_to_web(self.ada))
 
+    def test_every_settings_tab_can_be_opened(self):
+        # The page's script keeps its own list of tabs and falls back to General
+        # for anything missing from it — which is how the Web app tab first
+        # shipped unreachable.
+        import re
+        self.client.force_login(_admin())
+        res = self.client.get(reverse("config"))
+        listed = re.search(r"const validTabs = \[([^\]]*)\]", res.content.decode()).group(1)
+        for tab_id, _label, _icon in res.context["tabs"]:
+            self.assertIn(f"'{tab_id}'", listed, tab_id)
+
     def test_settings_tab_keeps_the_switch(self):
         _config(web_chat_enabled="0")
         self.client.force_login(_admin())

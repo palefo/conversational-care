@@ -1387,7 +1387,7 @@ print(result)</code></pre>
   (function () {
     // Keep in step with the `tabs` list in views/settings_views.py: a tab
     // missing here is a sidebar entry that silently falls back to General.
-    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','participants','api','privacy','export','maintenance'{% for ext in extension_panels %},'{{ ext.id|escapejs }}'{% endfor %}];
+    const validTabs = ['general','integrations','messaging','email','branding','agents','sensei','prompts','protocols','registrations','selfreg','participants','webapp','api','privacy','export','maintenance'{% for ext in extension_panels %},'{{ ext.id|escapejs }}'{% endfor %}];
     const buttons = document.querySelectorAll('.stg-navitem');
     const panels  = document.querySelectorAll('.settings-panel');
 
