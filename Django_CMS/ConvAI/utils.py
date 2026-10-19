@@ -576,12 +576,35 @@ def remote_turn_parts(messages, *, every=False) -> list:
     return found
 
 
+def collapse_repeat(text):
+    """The reply once, if it is the same text written twice back to back.
+
+    Models occasionally emit their whole answer twice in one message — seen on
+    gpt-5.4 (platform, 19 Oct 2026: "Olá! Antes de começarmos, qual é o seu
+    nome?" twice, joined by a newline; 1 in 60 turns for that agent, never
+    reproduced). Only an *exact* repeat of the whole reply, split at a line
+    break, is collapsed, so nothing a model meant to say can be lost. Anything
+    else, including non-strings, is returned unchanged.
+    """
+    if not isinstance(text, str):
+        return text
+    stripped = text.strip()
+    for sep in ("\n\n", "\n"):
+        parts = stripped.split(sep)
+        half = len(parts) // 2
+        if len(parts) >= 2 and len(parts) % 2 == 0:
+            first, second = sep.join(parts[:half]).strip(), sep.join(parts[half:]).strip()
+            if first and first == second:
+                return first
+    return text
+
+
 def remote_turn_reply(messages) -> str:
     """Everything a remote agent said to the person this turn, as one reply.
 
     The texts of :func:`remote_turn_parts`, joined with blank lines.
     """
-    return PART_JOINER.join(remote_turn_parts(messages))
+    return collapse_repeat(PART_JOINER.join(remote_turn_parts(messages)))
 
 
 PART_JOINER = "\n\n"
@@ -601,7 +624,10 @@ class AgentReply(str):
 
     @classmethod
     def of(cls, parts):
-        parts = tuple(p for p in (str(x).strip() for x in parts) if p)
+        parts = [p for p in (collapse_repeat(str(x).strip()) for x in parts) if p]
+        # The same message twice in a row is the model repeating itself, not two
+        # messages it meant to send.
+        parts = tuple(p for i, p in enumerate(parts) if i == 0 or p != parts[i - 1])
         reply = cls(PART_JOINER.join(parts))
         reply.parts = parts
         return reply

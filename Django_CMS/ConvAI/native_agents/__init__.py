@@ -95,7 +95,9 @@ async def _arun_graph(build_graph, thread_id: str, user_message: str,
             return f"Sorry, this agent is unavailable right now: {exc}"
 
     last = result["messages"][-1]
-    return getattr(last, "content", None) or (last.get("content") if isinstance(last, dict) else "")
+    from ..utils import collapse_repeat
+    return collapse_repeat(
+        getattr(last, "content", None) or (last.get("content") if isinstance(last, dict) else ""))
 
 
 def _run_sync(coro_factory, label: str) -> str:

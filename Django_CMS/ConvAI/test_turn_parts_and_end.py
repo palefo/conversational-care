@@ -217,3 +217,57 @@ class WebChats(TestCase):
         self.client.force_login(self.admin)
         page = self.client.get(reverse("agent_test", args=[self.reco.pk]))
         self.assertContains(page, 'id="restartButton"')
+
+
+class RepeatedReply(TestCase):
+    """A reply that is the same text twice is sent once (gpt-5.4, platform, 19 Oct 2026)."""
+
+    def test_the_case_seen(self):
+        from ConvAI.utils import collapse_repeat
+        q = "Olá! Antes de começarmos, qual é o seu nome?"
+        self.assertEqual(collapse_repeat(q + "\n" + q), q)
+        self.assertEqual(collapse_repeat(q + "\n\n" + q + "\n"), q)
+
+    def test_a_multi_line_answer_repeated_whole(self):
+        from ConvAI.utils import collapse_repeat
+        a = "Line one.\n\nLine two.\n- a point"
+        self.assertEqual(collapse_repeat(a + "\n\n" + a), a)
+
+    def test_nothing_else_is_touched(self):
+        from ConvAI.utils import collapse_repeat
+        for text in ("Yes\nYes, really", "Hi\nthere", "One\nTwo\nOne", "", "Ok", None,
+                     "Sim\nSim\nSim"):
+            self.assertEqual(collapse_repeat(text), text)
+
+    def test_separate_parts_repeated_are_sent_once(self):
+        self.assertEqual(reply_parts(AgentReply.of(["Summary", "Summary", "Does that look right?"])),
+                         ["Summary", "Does that look right?"])
+
+    def test_in_process_agents_get_it(self):
+        from ConvAI import native_agents
+        q = "Qual é o seu nome?"
+        graph = MagicMock()
+
+        async def ainvoke(*a, **k):
+            from langchain_core.messages import AIMessage
+            return {"messages": [AIMessage(content=q + "\n" + q)]}
+        graph.ainvoke = ainvoke
+
+        class Saver:
+            @classmethod
+            def from_conn_string(cls, _):
+                return cls()
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def setup(self):
+                return None
+
+        import asyncio
+        with patch("langgraph.checkpoint.postgres.aio.AsyncPostgresSaver", Saver):
+            out = asyncio.run(native_agents._arun_graph(lambda cp: graph, "t", "hi"))
+        self.assertEqual(out, q)
