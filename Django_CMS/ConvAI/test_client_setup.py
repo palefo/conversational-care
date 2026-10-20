@@ -270,7 +270,9 @@ class Calendar(Base):
         self.assertTrue(Meeting.objects.filter(patient=loner).exists())
 
     def test_admins_can_filter_by_who_booked(self):
-        when = timezone.now() + timedelta(hours=1)
+        # Midday today, local time: inside the day view's 07:00-21:00 grid
+        # whatever time the suite runs (now + 1h fell off it late at night).
+        when = timezone.localtime().replace(hour=12, minute=0, second=0, microsecond=0)
         mine = Meeting.objects.create(patient=self.ada, scheduled_time=when, created_by=self.admin,
                                       modality=Meeting.Modality.IN_PERSON, location="x")
         theirs = Meeting.objects.create(patient=self.ada, scheduled_time=when, created_by=self.lw,
