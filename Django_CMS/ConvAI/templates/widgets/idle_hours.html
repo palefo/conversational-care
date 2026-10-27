@@ -1,0 +1,24 @@
+{% load i18n %}{% comment %}
+  IdleHoursWidget: "default / never / after N hours", with the hours box shown
+  only for the last. The box keeps its value while hidden, so switching back
+  and forth does not lose what was typed.
+{% endcomment %}
+<div class="flex flex-wrap items-center gap-2" data-idle-hours>
+  {% with mode=widget.subwidgets.0 hours=widget.subwidgets.1 %}
+    {% include mode.template_name with widget=mode %}
+    <span class="flex items-center gap-2" data-idle-hours-box>
+      {% include hours.template_name with widget=hours %}
+      <span class="text-sm text-gray-600">{% trans "hours" %}</span>
+    </span>
+  {% endwith %}
+</div>
+<script>
+(function () {
+  var wrap = document.currentScript.previousElementSibling;
+  var select = wrap.querySelector("select");
+  var box = wrap.querySelector("[data-idle-hours-box]");
+  function sync() { box.style.display = select.value === "hours" ? "" : "none"; }
+  select.addEventListener("change", sync);
+  sync();
+})();
+</script>

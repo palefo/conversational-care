@@ -410,6 +410,36 @@ and `PromptAgentForm` still refuses realtime + RAG there, because a
 browser-direct session cannot run tools. A meeting agent runs server-side, so it
 can.
 
+## Ending idle conversations
+
+A client's conversation is a thread. After a quiet spell their next message
+starts a new one, so yesterday's chat is not carried into today's. How long
+that spell is used to be three hours for everyone; it is now set in two places
+(`ConvAI/conversation_rollover.py`):
+
+| Where | Field | Blank means |
+|---|---|---|
+| **Settings → Agents → Conversations** | `SiteConfiguration.conversation_idle_hours` | `CONVERSATION_IDLE_HOURS` in `.env`, then 3 hours |
+| **The agent's edit page**, every kind | `Agent.conversation_idle_hours` | The platform value above |
+
+Each offers *default*, **Never** (stored as `0`), or *after N hours*. The
+agent's own value wins for its clients. With **Never** a conversation ends only
+when the client types /quit or the agent ends it (`POST /api/v1/run/end/`) —
+RECO v2 closes its own after the rating link, so on cchealth it is set to
+never, and a young person who stops halfway through finds the chat where they
+left it.
+
+An agent that differs from the platform is shown as such: a **Idle end** chip
+on its card on the Agents page, a note under the field on its form, and its
+name listed under the setting in Settings → Agents — so changing the default
+does not silently miss the agents it no longer applies to. An agent set to the
+same number as the platform is not counted as differing.
+
+The agent that decides is the client's agent when their message arrives. The
+same rule covers the token API's user conversations (`/api/v1/messages/`),
+which had their own two-hour constant before. Run tokens are unaffected: one is
+minted for every run, so it only has to outlive the turn.
+
 ## Choosing the model
 
 In-process agents (native + prompt-based) pick their LLM through one shared

@@ -306,6 +306,10 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
         # Whether mail could go out right now, and if not, what is missing.
         "email_status": _email_status_context(request),
         "agents_form": _form("agents"),
+        # Agents whose own idle window replaces the platform's, named beside
+        # the setting so changing it does not silently miss the ones it skips.
+        "idle_overrides": [a for a in Agent.objects.filter(conversation_idle_hours__isnull=False)
+                           .order_by("name") if a.idle_override],
         "prompts_form": _form("prompts"),
         "sensei_form": _form("sensei"),
         # Whether a Sensei turn could succeed right now, reported from the same

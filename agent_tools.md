@@ -260,10 +260,12 @@ conversation does not move the current thread. The web chats are told
 before the `end` scope existed get a 404 until they expire.
 
 It is an API call, deliberately not a model tool: the agent's own code decides.
-RECO v2 has an `end` step in its graph that calls it once the wrap-up after the
-summary is done — the link worker question asked and answered, and the final
-note saved — and never otherwise; its prompts are unchanged. A conversation
-that stops before a summary is left to the 3-hour idle rollover.
+RECO v2 calls it at the end of its closure — the fixed procedure in its own
+graph node that follows the summary — once the rating link has been sent, and
+never otherwise. A conversation that stops before then is left to the agent's
+idle rollover, which for RECO v2 is set to **never** on installations where an
+unfinished chat should stay open until the young person comes back to it (see
+[agents.md](agents.md#ending-idle-conversations)).
 
 ### Restarting from the test chats
 

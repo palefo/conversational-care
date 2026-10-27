@@ -66,8 +66,6 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-STALE_THREAD_HOURS = 2  # change to 3 if you prefer
-
 class MessageView(APIView):
     """
     POST /api/v1/messages/
@@ -132,7 +130,8 @@ def _get_or_create_active_conversation_for_user(user: User, restart: bool = Fals
     Returns the active Conversation for this user; creates a new one if:
       • none exists,
       • restart=True (/quit),
-      • or last_message_at is older than STALE_THREAD_HOURS.
+      • or it has been idle longer than the user's agent allows (see
+        ConvAI.conversation_rollover).
     If your Conversation model doesn't have 'user' or 'agent' FKs, comment those lines.
     """
     now = timezone.now()
@@ -143,9 +142,9 @@ def _get_or_create_active_conversation_for_user(user: User, restart: bool = Fals
         conv_qs = conv_qs.filter(user=user)
     conv = conv_qs.order_by("-last_message_at").first()
 
-    stale = False
-    if conv and conv.last_message_at:
-        stale = (now - conv.last_message_at) >= timedelta(hours=STALE_THREAD_HOURS)
+    from ..conversation_rollover import is_stale
+
+    stale = bool(conv) and is_stale(conv.last_message_at, getattr(user, "agent", None), now=now)
 
     if not conv or restart or stale:
         conv = Conversation(

@@ -47,9 +47,9 @@ VISIBILITY = "visibility"
 END = "end"
 SCOPES = (SUMMARY, VISIBILITY, END)
 
-# The conversation's own idle window (STALE_THREAD_HOURS): after this the next
-# message starts a new conversation anyway, and a token for the old one has
-# nothing left to do.
+# Long enough for any one run. A token is minted for every run, so this does
+# not have to cover the conversation's idle window (which an agent may set to
+# never, see ConvAI.conversation_rollover): only the turn that holds it.
 TTL_SECONDS = 2 * 60 * 60
 
 

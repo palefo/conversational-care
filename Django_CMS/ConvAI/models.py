@@ -1111,6 +1111,16 @@ class Agent(models.Model):
                     "joined reply."),
     )
 
+    # How long a quiet spell ends a conversation with this agent, so the
+    # client's next message starts a new one. Blank follows the platform
+    # (Settings → Agents); 0 is never — only /quit or the agent ends it, which
+    # is what RECO v2 wants. See ConvAI.conversation_rollover.
+    conversation_idle_hours = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text=_("Hours of silence after which the client's next message starts a new "
+                    "conversation. Blank uses the platform default; 0 never does."),
+    )
+
     # Who the LLM should imitate (role/persona)
     classification_role = models.TextField(
         blank=True,
@@ -1146,6 +1156,12 @@ class Agent(models.Model):
         max_length=80, blank=True, default="",
         help_text="Azure AI Speech voice name, used when Azure is the TTS provider.",
     )
+
+    @property
+    def idle_override(self) -> str:
+        """This agent's idle window, said as words, if it differs from the platform's; else ''."""
+        from .conversation_rollover import describe, idle_hours, overrides_platform
+        return describe(idle_hours(self)) if overrides_platform(self) else ""
 
     @property
     def conversations_start_hidden(self) -> bool:
@@ -1671,6 +1687,10 @@ class SiteConfiguration(models.Model):
     # agents themselves chat with. Blank keeps the old resolution (the agent's
     # model, then the default above). See agents.md, "Classification and alerts".
     summary_model = models.CharField(max_length=200, blank=True, default="")
+    # The default idle window for every agent's conversations; an agent can
+    # set its own. Blank follows CONVERSATION_IDLE_HOURS in .env, then three
+    # hours; 0 is never. See ConvAI.conversation_rollover.
+    conversation_idle_hours = models.PositiveIntegerField(null=True, blank=True)
     # Provider API keys (secrets). Blank falls back to the environment.
     anthropic_api_key = models.CharField(max_length=255, blank=True, default="")
     google_api_key = models.CharField(max_length=255, blank=True, default="")

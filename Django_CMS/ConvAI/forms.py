@@ -960,13 +960,84 @@ _VOICE_WIDGETS = {
 }
 
 
-class AgentForm(forms.ModelForm):
+# ── When an idle conversation ends (see ConvAI.conversation_rollover) ──────────
+# Stored as one nullable integer — blank follows the level above, 0 is never —
+# but a bare number box would hide both of those behind conventions. So the
+# form shows a choice (default / never / after N hours) and the box only
+# matters for the last one.
+class IdleHoursWidget(forms.MultiWidget):
+    template_name = "widgets/idle_hours.html"
+
+    def __init__(self, attrs=None):
+        super().__init__([
+            forms.Select(attrs=_SELECT, choices=()),
+            forms.NumberInput(attrs={**_INPUT, "min": 1, "max": 8760, "style": "max-width:7rem"}),
+        ], attrs)
+
+    def decompress(self, value):
+        if value in (None, ""):
+            return ["default", None]
+        return ["never", None] if int(value) == 0 else ["hours", int(value)]
+
+
+class IdleHoursField(forms.MultiValueField):
+    widget = IdleHoursWidget
+
+    def __init__(self, *, default_label="", **kwargs):
+        fields = (forms.ChoiceField(choices=(), required=False),
+                  forms.IntegerField(min_value=1, max_value=8760, required=False))
+        super().__init__(fields=fields, require_all_fields=False, required=False, **kwargs)
+        self.set_default_label(default_label)
+
+    def set_default_label(self, label):
+        choices = [("default", label), ("never", _("Never — only /quit or the agent ends it")),
+                   ("hours", _("After a number of hours idle"))]
+        self.fields[0].choices = choices
+        self.widget.widgets[0].choices = choices
+
+    def compress(self, data_list):
+        mode, hours = (list(data_list) + [None, None])[:2]
+        if mode == "never":
+            return 0
+        if mode == "hours":
+            if not hours:
+                raise forms.ValidationError(_("Say after how many hours."), code="required")
+            return hours
+        return None
+
+
+class AgentIdleHoursMixin:
+    """The agent's own idle window, with the platform's shown as its default."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .conversation_rollover import describe, idle_hours, overrides_platform, platform_idle_hours
+
+        # Said beside the field, so an agent that differs from the platform
+        # cannot be missed when someone changes the platform default later.
+        self.idle_override_note = ""
+        if self.instance and self.instance.pk and overrides_platform(self.instance):
+            self.idle_override_note = _(
+                "This agent overrides the platform default: %(own)s here, %(platform)s "
+                "elsewhere.") % {"own": describe(idle_hours(self.instance)).lower(),
+                                 "platform": describe(platform_idle_hours()).lower()}
+        self.fields["conversation_idle_hours"] = IdleHoursField(
+            label=_("End idle conversations"),
+            default_label=_("Platform default (%(when)s)") % {"when": describe(platform_idle_hours()).lower()},
+            initial=self.instance.conversation_idle_hours if self.instance else None,
+            help_text=_("After this long without a message, the client's next message starts a "
+                        "new conversation. Never leaves it open until they type /quit or the "
+                        "agent ends it itself. The platform default is set in Settings → Agents."),
+        )
+
+
+class AgentForm(AgentIdleHoursMixin, forms.ModelForm):
     """App-level create/edit form for **remote** agents (LangGraph server)."""
     class Meta:
         model = Agent
         fields = [
             "name", "description", "langgraph_name", "host", "port", "allow_callbacks",
-            "starts_hidden", "send_separately",
+            "starts_hidden", "send_separately", "conversation_idle_hours",
             "classification_role", "abstract_instruction", "detectors", "tts_voice_id", "azure_voice",
         ]
         labels = {"description": _("Description"),
@@ -1029,7 +1100,7 @@ _MODEL_INPUT = {**_INPUT, "list": "model-suggestions", "placeholder": "openai/gp
                 "autocomplete": "off"}
 
 
-class PromptAgentForm(forms.ModelForm):
+class PromptAgentForm(AgentIdleHoursMixin, forms.ModelForm):
     """App-level create/edit form for **prompt-based** agents.
 
     These run in-process using the stored ``system_prompt`` as the system
@@ -1041,7 +1112,7 @@ class PromptAgentForm(forms.ModelForm):
         model = Agent
         fields = [
             "name", "description", "system_prompt", "model", "rag_enabled", "rag_top_k",
-            "realtime_enabled",
+            "realtime_enabled", "conversation_idle_hours",
             "classification_role", "abstract_instruction", "detectors", "tts_voice_id", "azure_voice",
         ]
         labels = {
@@ -1227,7 +1298,7 @@ class PromptAgentForm(forms.ModelForm):
         return agent
 
 
-class NativeAgentForm(forms.ModelForm):
+class NativeAgentForm(AgentIdleHoursMixin, forms.ModelForm):
     """Edit form for **native** agents.
 
     Native agents ship with the platform (their graph/tools are code), so only
@@ -1236,7 +1307,7 @@ class NativeAgentForm(forms.ModelForm):
     """
     class Meta:
         model = Agent
-        fields = ["description", "model", "tts_voice_id", "azure_voice"]
+        fields = ["description", "model", "conversation_idle_hours", "tts_voice_id", "azure_voice"]
         labels = {"description": _("Description"), **_VOICE_LABELS}
         help_texts = _VOICE_HELP
         widgets = {
@@ -1246,7 +1317,7 @@ class NativeAgentForm(forms.ModelForm):
         }
 
 
-class SenseiAgentForm(forms.ModelForm):
+class SenseiAgentForm(AgentIdleHoursMixin, forms.ModelForm):
     """App-level create/edit form for **Sensei** agents.
 
     Deliberately thin. A Sensei agent has no connection settings of its own —
@@ -1258,7 +1329,7 @@ class SenseiAgentForm(forms.ModelForm):
     class Meta:
         model = Agent
         fields = [
-            "name", "description",
+            "name", "description", "conversation_idle_hours",
             "classification_role", "abstract_instruction", "detectors", "tts_voice_id", "azure_voice",
         ]
         labels = {"description": _("Description"), **_VOICE_LABELS}
@@ -1868,7 +1939,7 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "link_worker_v2_enabled",
             "link_worker_whatsapp_enabled",
             "link_worker_voice_pt_br", "link_worker_azure_voice_pt_br",
-            "default_agent_model", "summary_model",
+            "default_agent_model", "summary_model", "conversation_idle_hours",
             "anthropic_api_key", "google_api_key", "mistral_api_key", "deepseek_api_key",
             "agent_allowed_hosts",
             "use_azure",
@@ -1999,3 +2070,19 @@ class AgentConfigForm(SecretPreserveMixin, forms.ModelForm):
             "rag_embedding_model": forms.TextInput(attrs={**_INPUT, "placeholder": "text-embedding-3-small"}),
             "azure_embedding_deployment": forms.TextInput(attrs={**_INPUT, "placeholder": "text-embedding-3-small"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .conversation_rollover import DEFAULT_IDLE_HOURS, ENV_KEY, _hours, describe
+        from .site_config import _env
+
+        env = _hours(_env(ENV_KEY))
+        self.fields["conversation_idle_hours"] = IdleHoursField(
+            label=_("End idle conversations"),
+            default_label=_("Use .env default (%(when)s)") % {
+                "when": describe(DEFAULT_IDLE_HOURS if env is None else env).lower()},
+            initial=self.instance.conversation_idle_hours if self.instance else None,
+            help_text=_("For every agent: after this long without a message, the client's next "
+                        "message starts a new conversation. An agent can set its own on its "
+                        "edit page, which replaces this one for its clients."),
+        )

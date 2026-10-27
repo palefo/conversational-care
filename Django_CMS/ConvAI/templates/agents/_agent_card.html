@@ -122,6 +122,16 @@
         <span class="material-icons-outlined text-[13px]">forum</span>{% trans "Separate messages" %}
       </span>
     {% endif %}
+    {% comment %}
+      Only when it differs from Settings → Agents: an agent whose conversations
+      never end on their own (RECO v2) behaves very differently from the rest,
+      and the roster is where an admin would look for why.
+    {% endcomment %}
+    {% with idle=a.idle_override %}{% if idle %}
+      <span class="agent-chip agent-chip-tool" title="{% trans 'Ends idle conversations differently from the platform default' %}">
+        <span class="material-icons-outlined text-[13px]">schedule</span>{% blocktrans %}Idle end: {{ idle }}{% endblocktrans %}
+      </span>
+    {% endif %}{% endwith %}
     {% with voice=a.active_tts_voice %}{% if voice %}
       <span class="agent-chip" title="{% trans 'Voice for spoken replies' %}">
         <span class="material-icons-outlined text-[13px]">graphic_eq</span>

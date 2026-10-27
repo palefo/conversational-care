@@ -275,14 +275,16 @@ def get_platform_phone():
     return get_setting("PLATFORM_PHONE")
 
 
-def _get_or_create_thread(patient: Patient, *, stale_hours: int = 3) -> str:
+def _get_or_create_thread(patient: Patient) -> str:
     """
     Return the patient's stable thread id (UUID4 string).
     - Creates one if missing.
-    - Optionally rolls over to a new id if the existing Conversation is stale
-      (last_message_at older than `stale_hours`). To disable rollover, comment
-      the block marked ROLLOVER LOGIC.
+    - Rolls over to a new id if the existing Conversation has been idle for
+      longer than the client's agent allows (Settings → Agents, or the agent's
+      own setting; never, for an agent set to 0). See conversation_rollover.
     """
+    from .conversation_rollover import is_stale
+
     tid = (patient.current_thread_id or "").strip()
     if tid:
         conv = None
@@ -291,15 +293,13 @@ def _get_or_create_thread(patient: Patient, *, stale_hours: int = 3) -> str:
         except (Conversation.DoesNotExist, ValueError, TypeError):
             conv = None
 
-        # --- ROLLOVER LOGIC (comment this block to disable) -------------------
         if conv:
             last = conv.last_message_at or conv.started_at
-            if last and (timezone.now() - last) >= timedelta(hours=stale_hours):
+            if is_stale(last, patient.agent):
                 new_id = str(uuid.uuid4())
                 patient.current_thread_id = new_id
                 patient.save(update_fields=["current_thread_id"])
                 return new_id
-        # --- /ROLLOVER LOGIC --------------------------------------------------
 
         return tid
 

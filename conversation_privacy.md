@@ -227,8 +227,9 @@ turns it into a react agent. See `agent_tools.md`.
 | `SiteConfiguration.conversation_privacy_enabled` | The installation switch, tri-state like every other. |
 
 Per conversation and nothing wider. The client is answering "this one", not
-signing a standing policy — and a thread rolls over after a couple of hours
-idle, so the next conversation starts visible — or hidden, for an agent that
+signing a standing policy — and a thread rolls over after a few hours idle
+(three by default; per agent, see [agents.md](agents.md#ending-idle-conversations)),
+so the next conversation starts visible — or hidden, for an agent that
 starts hidden — and they are asked again if the agent offers it again. A client-level default would be a different feature, and
 a more dangerous one: a standing "hide everything" is a client whose link worker
 stops seeing their care.

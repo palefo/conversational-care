@@ -380,6 +380,19 @@
           {% include "settings/_field.html" with field=agents_form.summary_model %}
         </div>
 
+        <div class="stg-group-title">{% trans "Conversations" %}</div>
+        {% include "settings/_field.html" with field=agents_form.conversation_idle_hours %}
+        {% if idle_overrides %}
+          <div class="stg-field">
+            <p class="text-xs text-amber-700 flex items-start gap-1">
+              <span class="material-icons-outlined text-[14px]">tune</span>
+              <span>{% trans "These agents set their own, which replaces this one for their clients:" %}
+                {% for a in idle_overrides %}<a class="underline" href="{% url 'agent_edit' a.pk %}">{{ a.name }}</a> ({{ a.idle_override|lower }}){% if not forloop.last %}, {% endif %}{% endfor %}
+              </span>
+            </p>
+          </div>
+        {% endif %}
+
         <div class="stg-group">
           <div class="stg-group-title">{% trans "Provider API keys" %}</div>
           <div class="stg-grid2">
