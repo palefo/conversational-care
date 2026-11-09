@@ -3,6 +3,7 @@ module.exports = {
   // Scan every template and JS file so used utility classes are generated.
   content: [
     "./ConvAI/templates/**/*.html",
+    "./field_app/templates/**/*.html",
     "./ConvAI/static/**/*.js",
   ],
   // Some utility classes are built dynamically in JS (string concatenation),

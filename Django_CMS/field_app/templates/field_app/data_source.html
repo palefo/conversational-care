@@ -1,0 +1,25 @@
+{% load i18n %}
+{# Agent form → Data sources: one Field App installation. `ds` is DataSourceSection.ctx. #}
+<div class="rounded-lg border border-gray-200 p-4 mb-3">
+  <div class="flex items-start gap-3">
+    <span class="material-icons-outlined text-sky-600">extension</span>
+    <div class="flex-1">
+      <p class="text-sm font-semibold text-gray-800">{{ ds.installation.name }}</p>
+      <p class="text-xs text-gray-500 mb-3">{% blocktrans count n=ds.linked_clients %}The client's questionnaire answers from Field App, read with their link worker's connection. {{ n }} client is linked so far.{% plural %}The client's questionnaire answers from Field App, read with their link worker's connection. {{ n }} clients are linked so far.{% endblocktrans %}</p>
+      <label class="flex items-center gap-2 text-sm text-gray-800 mb-3">
+        {{ ds.form.enabled }} {{ ds.form.enabled.label }}
+      </label>
+      <div class="fld">
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ ds.form.rounds.id_for_label }}">{{ ds.form.rounds.label }}</label>
+        {{ ds.form.rounds }}
+        <p class="text-xs text-gray-500 mt-1">{{ ds.form.rounds.help_text }}</p>
+      </div>
+      <div class="fld">
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ ds.form.instructions.id_for_label }}">{{ ds.form.instructions.label }}</label>
+        {{ ds.form.instructions }}
+        <p class="text-xs text-gray-500 mt-1">{% trans "Leave empty to use:" %} <i>{{ ds.default_instructions }}</i></p>
+        {% for e in ds.form.instructions.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>

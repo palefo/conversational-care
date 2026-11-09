@@ -397,6 +397,9 @@
     </div>
   {% endif %}
 
+  {# Cards from add-ons (ConvAI/extensions.py), e.g. Field App. #}
+  {% for card in extension_cards %}{% include card.template with card=card.ctx %}{% endfor %}
+
   {% comment %}
     The web app chat: the QR code that opens this client's chat on a tablet or
     phone, the devices it is open on, and where the platform's own messages go.

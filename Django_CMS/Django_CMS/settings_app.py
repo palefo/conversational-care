@@ -214,6 +214,13 @@ if MEETINGS_APP:
         ALLOWED_HOSTS = ALLOWED_HOSTS + ["web"]
 
 
+# Field App integration (field_app/): installed unless FIELD_APP_INTEGRATION=0.
+# It does nothing until an admin registers a Field App installation in
+# Settings → Third-party apps. See field_app_integration.md.
+FIELD_APP_INTEGRATION = os.getenv("FIELD_APP_INTEGRATION", "1").strip().lower() not in ("0", "false", "no", "off")
+if FIELD_APP_INTEGRATION:
+    INSTALLED_APPS += ["field_app"]
+
 # --- Outbound email (see email.md) ---
 # One backend for everything: it picks Azure Communication Services or SMTP at
 # send time from the live configuration, so Django's own password-reset mail and

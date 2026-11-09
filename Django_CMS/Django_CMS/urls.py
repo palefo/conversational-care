@@ -43,6 +43,10 @@ urlpatterns += [
 if getattr(settings, "MEETINGS_APP", False):
     urlpatterns += [path('', include('meetings.urls'))]
 
+# Field App integration, only where the app is part of the deployment.
+if getattr(settings, "FIELD_APP_INTEGRATION", False):
+    urlpatterns += [path('', include('field_app.urls'))]
+
 # Serve ONLY public branding assets (the logo shown on the login page) from
 # /media/. All other media is private — care plans, voice notes, TTS, call
 # recordings — and is reachable exclusively through ownership-checked views or

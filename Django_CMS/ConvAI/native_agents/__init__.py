@@ -161,10 +161,16 @@ def run_prompt_agent(agent, thread_id: str, user_message: str,
         label = "RAG agent"
     else:
         label = "Prompt agent"
+    # Data sources (Agent form → Data sources tab, contributed by add-ons such as
+    # the Field App integration): context about *this* conversation's client,
+    # fetched fresh for every turn and appended to the system prompt. Fetched
+    # here, on the sync side, because add-ons use the ORM and blocking HTTP.
+    from .. import extensions
+    system_prompt = (agent.system_prompt or "") + extensions.agent_context(agent, thread_id)
     return _run_sync(
         lambda: _arun_graph(
             lambda cp: build_prompt_graph(
-                agent.system_prompt, cp, model_name,
+                system_prompt, cp, model_name,
                 agent_id=agent.pk, rag_enabled=rag_enabled,
                 top_k=getattr(agent, "rag_top_k", 5) or 5,
                 agent=agent,

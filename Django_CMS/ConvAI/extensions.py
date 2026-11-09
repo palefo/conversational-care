@@ -16,7 +16,8 @@ with the defaults in ``_NullProvider``)::
     live_state(meeting) -> dict | None     # is a room open for this meeting right now?
     settings_tabs() -> list[dict]          # tabs to add to Settings
 
-See online_meetings.md.
+See online_meetings.md. Other optional apps use the add-on registry further
+down (``register_addon``), which can hold several.
 """
 from __future__ import annotations
 
@@ -97,4 +98,74 @@ def live_state(meeting):
 
 
 def settings_tabs() -> list:
-    return _call("settings_tabs", default=[]) or []
+    tabs = list(_call("settings_tabs", default=[]) or [])
+    for addon in _addons:
+        tabs.extend(_addon_call(addon, "settings_tabs", default=[]) or [])
+    return tabs
+
+
+# ── Add-ons ─────────────────────────────────────────────────────────────────
+#
+# A second, more general seam, for optional apps that are not online meetings
+# (the Field App integration is the first, see field_app/). Any number can be
+# registered, from the add-on's ``AppConfig.ready``. Each is any object with
+# some of these methods; a missing one, or one that raises, contributes nothing
+# and never takes a core page or an agent turn down::
+#
+#     settings_tabs() -> list[dict]                       # same shape as above
+#     client_cards(request, patient) -> list[dict]        # {"template", "ctx"} on the client page
+#     profile_cards(request) -> list[dict]                # {"template", "ctx"} on the Profile page
+#     agent_data_sources(agent, data) -> list             # sections for the agent form (prompt agents)
+#     agent_context(agent, thread_id) -> str              # extra system-prompt text for one run
+#
+# An agent-form section is an object with ``template`` and ``ctx`` (to draw
+# it), ``is_valid()`` and ``save(agent)``; ``data`` is request.POST or None.
+
+_addons: list = []
+
+
+def register_addon(addon) -> None:
+    """Called once per add-on, from its ``AppConfig.ready``."""
+    if addon not in _addons:
+        _addons.append(addon)
+
+
+def _addon_call(addon, name, *args, default=None):
+    fn = getattr(addon, name, None)
+    if fn is None:
+        return default
+    try:
+        return fn(*args)
+    except Exception:  # an add-on is never allowed to take a core page down
+        logger.exception("Add-on %s failed in %s", type(addon).__name__, name)
+        return default
+
+
+def _collect(name, *args) -> list:
+    out = []
+    for addon in _addons:
+        out.extend(_addon_call(addon, name, *args, default=[]) or [])
+    return out
+
+
+def client_cards(request, patient) -> list:
+    return _collect("client_cards", request, patient)
+
+
+def profile_cards(request) -> list:
+    return _collect("profile_cards", request)
+
+
+def agent_data_sources(agent, data=None) -> list:
+    return _collect("agent_data_sources", agent, data)
+
+
+def agent_context(agent, thread_id) -> str:
+    """Extra system-prompt text the add-ons supply for one run of ``agent``.
+
+    Called from the sync side of a prompt agent's run, so add-ons may use the
+    ORM and blocking HTTP. Empty when nothing applies.
+    """
+    parts = [_addon_call(addon, "agent_context", agent, thread_id, default="") or ""
+             for addon in _addons]
+    return "".join("\n\n" + p.strip() for p in parts if p and p.strip())
