@@ -55,6 +55,10 @@ Topic deep dives:
 - [Whose a message is](message_attribution.md) — how every message is tied to
   a client (or a login) when it arrives, so a phone number that changes hands
   takes neither the history nor the access with it.
+- [Shared numbers](shared_numbers.md) — two installations answering one
+  WhatsApp/SMS number: the installation Twilio calls asks the linked ones
+  whose a message is and forwards it, re-signed; the claim rule, priorities,
+  and how to set it up.
 - [Participant management](participant_management.md) — for deployments running a
   research study: pre-enrolling participants, three-word access codes, the public
   join page, and versioned append-only consent. Off by default.

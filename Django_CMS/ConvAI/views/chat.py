@@ -1,3 +1,5 @@
+import logging
+
 from ._base import *  # noqa: F401,F403
 from django.views.decorators.csrf import ensure_csrf_cookie
 
@@ -5,6 +7,8 @@ from ..realtime import realtime_configured
 from .agents import realtime_session_json
 
 __all__ = ['create_chat_link', 'external_audio', 'external_chat', 'external_realtime_session', 'process_audio', 'send_chat_message', 'send_external_message', 'whatsapp_webhook']
+
+logger = logging.getLogger(__name__)
 
 
 def _chat_user_label(user):
@@ -63,7 +67,25 @@ def whatsapp_webhook(request):
     url = request.build_absolute_uri()
     params = request.POST.dict()
     if not validator.validate(url, params, signature):
+        if request.headers.get("X-CC-Routed"):
+            # Forwarded by a hub that shares this number, and refused. Either
+            # the two installations hold different Twilio auth tokens, or the
+            # hub's webhook URL for this one is not the URL it is served at.
+            # See shared_numbers.md, "What can go wrong".
+            logger.warning("Refused a message forwarded by a hub: its signature does not validate "
+                           "for %s. Is TWILIO_AUTH_TOKEN the same on both installations, and is "
+                           "this exactly the webhook URL the hub has for this one?", url)
         return HttpResponseForbidden("Invalid signature")
+
+    # A number shared with other installations: is this message one of theirs?
+    # None unless an enabled linked installation claimed it, in which case it
+    # has been forwarded and this is Twilio's answer. Before either branch
+    # below, so a routed message is never also processed here. See
+    # ConvAI.message_routing and shared_numbers.md.
+    from .. import message_routing
+    routed = message_routing.route(request)
+    if routed is not None:
+        return routed
 
     from_num   = request.POST.get("From", "")         # 'whatsapp:+NNN...' or '+NNN...'
     body_text  = (request.POST.get("Body", "") or "").strip()

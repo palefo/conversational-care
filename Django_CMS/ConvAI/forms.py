@@ -3,7 +3,7 @@ import secrets
 
 from django import forms
 from .models import (Meeting, Patient, Question, Answer, Agent, SiteConfiguration, Study,
-                     ConsentRecord)
+                     ConsentRecord, LinkedInstallation)
 from datetime import date
 from django.contrib.auth import get_user_model
 from django.utils.html import format_html, format_html_join
@@ -433,15 +433,20 @@ class RegistrationConfigForm(forms.ModelForm):
 
     class Meta:
         model = SiteConfiguration
-        fields = ["self_reg_auto_approve", "self_reg_client_agent",
+        fields = ["self_reg_message", "self_reg_auto_approve", "self_reg_client_agent",
                   "self_reg_pending_message", "self_reg_welcome_message"]
         labels = {
+            "self_reg_message": _("Registration message"),
             "self_reg_auto_approve": _("Approve registrations automatically"),
             "self_reg_client_agent": _("Agent for new clients"),
             "self_reg_pending_message": _("Message while waiting for approval"),
             "self_reg_welcome_message": _("Welcome message"),
         }
         help_texts = {
+            "self_reg_message": _("What the registration QR codes and links pre-fill. Where "
+                                  "several installations share one phone number, give each "
+                                  "its own: it is how a message from an unknown number is "
+                                  "told apart. Blank keeps the default."),
             "self_reg_auto_approve": _("On: a registration becomes a client as soon as it is "
                                        "filed, with the agent below, so the person can start "
                                        "chatting straight away. Off: it waits here for an admin."),
@@ -455,6 +460,7 @@ class RegistrationConfigForm(forms.ModelForm):
                                           "the registration agent says it instead."),
         }
         widgets = {
+            "self_reg_message": forms.TextInput(attrs=_INPUT),
             "self_reg_auto_approve": forms.Select(attrs=_SELECT),
             "self_reg_client_agent": forms.Select(attrs=_SELECT),
             "self_reg_pending_message": forms.Textarea(attrs={**_INPUT, "rows": 2}),
@@ -470,6 +476,7 @@ class RegistrationConfigForm(forms.ModelForm):
         # field keeps following them (and their translations).
         self.fields["self_reg_pending_message"].widget.attrs["placeholder"] = registration.default_pending_message()
         self.fields["self_reg_welcome_message"].widget.attrs["placeholder"] = registration.default_welcome_message()
+        self.fields["self_reg_message"].widget.attrs["placeholder"] = registration.default_registration_message()
 
     def clean(self):
         data = super().clean()
@@ -536,6 +543,73 @@ class MessagingConfigForm(forms.ModelForm):
             "sms_template_start_infection_text": forms.Textarea(attrs={**_INPUT, "rows": 3}),
             "whatsapp_template_care_plan_sid": forms.TextInput(attrs={**_INPUT, "placeholder": "HX…"}),
         }
+
+
+class RoutingConfigForm(forms.ModelForm):
+    """Settings → Messaging → Linked installations: where this installation
+    ranks when it and a linked one both claim a message. See shared_numbers.md."""
+
+    class Meta:
+        model = SiteConfiguration
+        fields = ["routing_priority"]
+        labels = {"routing_priority": _("This installation's priority")}
+        help_texts = {
+            "routing_priority": _("Lower goes first. Linked installations start at 10 and this "
+                                  "one at 100, so a message both could answer goes to them."),
+        }
+        widgets = {"routing_priority": forms.NumberInput(attrs={**_INPUT, "min": 0})}
+
+
+class LinkedInstallationForm(forms.ModelForm):
+    """One installation sharing this one's number. The API token is write-only:
+    shown as a password field, and a blank submission keeps the stored one."""
+
+    class Meta:
+        model = LinkedInstallation
+        fields = ["name", "webhook_url", "api_token", "priority", "enabled"]
+        labels = {
+            "name": _("Name"),
+            "webhook_url": _("Webhook URL"),
+            "api_token": _("API token"),
+            "priority": _("Priority"),
+            "enabled": _("Enabled"),
+        }
+        help_texts = {
+            "webhook_url": _("That installation's Twilio webhook, exactly as it would be given "
+                             "to Twilio — e.g. https://reco.example.org/impact/whatsapp_webhook. "
+                             "Forwarded messages are signed for this URL."),
+            "api_token": _("A REST API token from that installation, used to ask it whether a "
+                           "message is for it."),
+            "priority": _("Lower goes first when more than one installation claims a message."),
+        }
+        widgets = {
+            "name": forms.TextInput(attrs=_INPUT),
+            "webhook_url": forms.URLInput(attrs={**_INPUT, "placeholder": "https://…/impact/whatsapp_webhook"}),
+            "priority": forms.NumberInput(attrs={**_INPUT, "min": 0}),
+            "enabled": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded border-gray-300"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._token_initial = self.instance.api_token or ""
+        self.fields["api_token"].required = not self._token_initial
+        self.fields["api_token"].widget = forms.PasswordInput(
+            render_value=False,
+            attrs={
+                "class": "form-control",
+                "autocomplete": "new-password",
+                "placeholder": _("•••• set (leave blank to keep)") if self._token_initial else "",
+            },
+        )
+
+    def clean_webhook_url(self):
+        url = (self.cleaned_data.get("webhook_url") or "").strip()
+        if not url.lower().startswith(("https://", "http://")):
+            raise forms.ValidationError(_("Enter a full URL, starting with https://."))
+        return url
+
+    def clean_api_token(self):
+        return (self.cleaned_data.get("api_token") or "").strip() or self._token_initial
 
 
 class EmailConfigForm(SecretPreserveMixin, forms.ModelForm):

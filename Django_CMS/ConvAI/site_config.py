@@ -94,6 +94,8 @@ _STR_KEYS = {
     "NAVIGATOR_TERM_PLURAL": "navigator_term_plural",
     "SELF_REG_PENDING_MESSAGE": "self_reg_pending_message",
     "SELF_REG_WELCOME_MESSAGE": "self_reg_welcome_message",
+    # The words the registration QR codes pre-fill (shared_numbers.md).
+    "SELF_REG_MESSAGE": "self_reg_message",
     # Link Worker on WhatsApp (see link_worker_whatsapp.md).
     "LINK_WORKER_VOICE_PT_BR": "link_worker_voice_pt_br",
     "LINK_WORKER_AZURE_VOICE_PT_BR": "link_worker_azure_voice_pt_br",

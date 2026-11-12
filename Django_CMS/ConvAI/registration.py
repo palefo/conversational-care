@@ -37,6 +37,30 @@ def default_welcome_message() -> str:
     return _("Welcome! Your registration has been approved. Send a message any time to start.")
 
 
+def default_registration_message() -> str:
+    """The words the registration QR codes and links pre-fill, translated."""
+    return _("Hi! I want to register")
+
+
+def registration_message() -> str:
+    """What someone sends to ask to register: Settings → Registrations, then
+    SELF_REG_MESSAGE in .env, then the translated default.
+
+    Where several installations share one number, this is what tells the hub
+    which of them an unknown number is writing to — see shared_numbers.md.
+    """
+    return (get_setting("SELF_REG_MESSAGE") or "").strip() or default_registration_message()
+
+
+def registration_message_is_default() -> bool:
+    """Whether nobody has chosen this installation's registration message.
+
+    Harmless on an installation of its own; a problem where two share a number,
+    because both would be waiting for the same words (shared_numbers.md).
+    """
+    return not (get_setting("SELF_REG_MESSAGE") or "").strip()
+
+
 def pending_message() -> str:
     """What the agent tells someone whose request now waits for an admin."""
     return (get_setting("SELF_REG_PENDING_MESSAGE") or "").strip() or default_pending_message()

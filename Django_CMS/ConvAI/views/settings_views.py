@@ -1,11 +1,11 @@
 import logging
 
 from ._base import *  # noqa: F401,F403
-from .. import conversation_privacy, extensions, message_export
+from .. import conversation_privacy, extensions, message_export, message_routing
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 
-__all__ = ['_build_config_context', 'approve_self_registration', 'config', 'config_save', 'download_client_sdk', 'run_conversation_classification', 'send_test_email_view', 'update_twilio_phonecalls']
+__all__ = ['_build_config_context', 'approve_self_registration', 'config', 'config_save', 'download_client_sdk', 'run_conversation_classification', 'send_test_email_view', 'update_twilio_phonecalls', 'linked_installation_save', 'linked_installation_delete', 'linked_installation_test']
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,12 @@ def _selfreg_qr_context(request):
     """
     from urllib.parse import quote
 
-    message = str(_("Hi! I want to register"))
+    from .. import registration
+
+    # Settings → Registrations, or the translated default. Where two
+    # installations share the number, this is what tells them apart
+    # (shared_numbers.md), so the QR and the link must carry the same words.
+    message = registration.registration_message()
 
     def number(setting):
         raw = (get_setting(setting) or "").strip()
@@ -215,6 +220,37 @@ def _participants_context(request):
     }
 
 
+def _linked_installations_context(forms_override):
+    """The Linked installations card on the Messaging tab (shared_numbers.md).
+
+    One edit form per row and one blank add form, each with its own prefix so
+    they can share the page. A bound form that failed validation replaces the
+    one it was posted from, and that row is opened so the errors are seen.
+    """
+    override = forms_override.get("linked")
+    editing = override.instance.pk if override is not None and override.instance.pk else None
+    rows = []
+    for inst in LinkedInstallation.objects.order_by("priority", "name"):
+        form = override if editing == inst.pk else LinkedInstallationForm(
+            instance=inst, prefix=f"li{inst.pk}")
+        rows.append({"obj": inst, "form": form})
+    new_form = (override if override is not None and editing is None
+                else LinkedInstallationForm(prefix="new"))
+    from .. import message_routing
+    now = timezone.now()
+    for row in rows:
+        row["status"] = message_routing.peer_status(row["obj"], now)
+    return {
+        "linked_installations": rows,
+        "linked_new_form": new_form,
+        "linked_open": editing or ("new" if override is not None else None),
+        "routing_active": any(r["obj"].enabled for r in rows),
+        # What is wrong with this installation as a hub (sync replies,
+        # colliding registration messages). See shared_numbers.md.
+        "routing_warnings": message_routing.hub_warnings(),
+    }
+
+
 def _build_config_context(request, forms_override=None, active_tab="general"):
     """Assemble the settings-page context, letting one bound (invalid) form be
     injected so validation errors render inline."""
@@ -292,11 +328,21 @@ def _build_config_context(request, forms_override=None, active_tab="general"):
         "general_form": _form("general"),
         "clients_form": _form("clients"),
         "registration_form": _form("registrations"),
+        # A registration message that cannot tell this installation apart
+        # from the one it shares a number with (shared_numbers.md).
+        "registration_routing_warnings": message_routing.registration_warnings(),
+        # A dot on the settings tabs that hold an alarm, so it is seen from
+        # whichever tab the admin opened.
+        "tab_alerts": message_routing.settings_alert_counts(),
         "navigator_choices": navigator_choices(),
         "self_reg_client_agent_id": cfg.self_reg_client_agent_id,
         "self_reg_auto_approve": registration.auto_approve(),
         "integrations_form": _form("integrations"),
         "messaging_form": _form("messaging"),
+        # Other installations sharing this one's Twilio number, and where this
+        # one ranks among them. See shared_numbers.md.
+        "routing_form": _form("routing"),
+        **_linked_installations_context(forms_override),
         # Numbers more than one client can be reached on, and the older messages
         # still matched by number because the backfill could not place them.
         # See ConvAI.message_attribution.
@@ -402,7 +448,7 @@ def config_save(request):
         return render(request, "settings/config.html", ctx)
 
     # A section that is a card on another tab returns to that tab.
-    tab = {"clients": "general"}.get(section, section)
+    tab = {"clients": "general", "routing": "messaging"}.get(section, section)
     form = form_cls(request.POST, request.FILES, instance=SiteConfiguration.load())
     if form.is_valid():
         form.save()
@@ -412,6 +458,56 @@ def config_save(request):
     messages.error(request, _("Please correct the errors below."))
     ctx = _build_config_context(request, forms_override={section: form}, active_tab=tab)
     return render(request, "settings/config.html", ctx)
+
+
+_LINKED_BACK = "?tab=messaging#messaging"
+
+
+@login_required
+@admin_required
+@require_POST
+def linked_installation_save(request, pk=None):
+    """Add or edit an installation sharing this one's number."""
+    inst = get_object_or_404(LinkedInstallation, pk=pk) if pk else None
+    form = LinkedInstallationForm(request.POST, instance=inst, prefix=f"li{pk}" if pk else "new")
+    if form.is_valid():
+        form.save()
+        messages.success(request, _("Linked installation saved."))
+        return redirect(reverse("config") + _LINKED_BACK)
+    messages.error(request, _("Please correct the errors below."))
+    ctx = _build_config_context(request, forms_override={"linked": form}, active_tab="messaging")
+    return render(request, "settings/config.html", ctx)
+
+
+@login_required
+@admin_required
+@require_POST
+def linked_installation_delete(request, pk):
+    inst = get_object_or_404(LinkedInstallation, pk=pk)
+    inst.delete()
+    messages.success(request, _("Linked installation removed."))
+    return redirect(reverse("config") + _LINKED_BACK)
+
+
+@login_required
+@admin_required
+@require_POST
+def linked_installation_test(request, pk):
+    """Ask the peer's claim endpoint about a number nobody holds. What matters
+    is that it answered: the outcome is written to the row like a real call's."""
+    from .. import message_routing
+
+    inst = get_object_or_404(LinkedInstallation, pk=pk)
+    ok, detail, warnings = message_routing.test_connection(inst)
+    if not ok:
+        messages.error(request, _("Test connection to %(name)s failed: it %(detail)s.")
+                       % {"name": inst.name, "detail": detail})
+    elif warnings:
+        messages.warning(request, _("%(name)s answered, but: %(warnings)s")
+                         % {"name": inst.name, "warnings": " ".join(warnings)})
+    else:
+        messages.success(request, _("%(name)s answered the claim request.") % {"name": inst.name})
+    return redirect(reverse("config") + _LINKED_BACK)
 
 
 @login_required

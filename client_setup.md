@@ -115,6 +115,12 @@ assigning a navigator on the client's Edit page is what clears it. Admins only,
 and only while self-registration is on. Registrations approved before
 `SelfRegistration.patient` existed are not linked to a client and do not appear.
 
+The words the registration QR codes pre-fill — "Hi! I want to register" — are
+a setting too: *Registration message* on the same tab (`SELF_REG_MESSAGE`).
+It matters where two installations share one phone number: each has its own
+message, and that is how a stranger's first message is told apart. See
+[shared_numbers.md](shared_numbers.md).
+
 ## The calendar
 
 Admins see every meeting in one calendar (navigators see their own clients').

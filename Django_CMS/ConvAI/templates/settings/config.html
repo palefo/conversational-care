@@ -63,6 +63,11 @@
         <li>
           <button type="button" data-tab="{{ id }}" class="stg-navitem">
             <span class="material-icons-outlined">{{ icon }}</span>{{ label }}
+            {% if id == "messaging" and tab_alerts.messaging or id == "registrations" and tab_alerts.registrations %}
+              {# An alarm on this tab (shared_numbers.md): seen from whichever tab is open. #}
+              <span class="ml-auto inline-block w-2 h-2 rounded-full bg-red-500" data-tab-alert="{{ id }}"
+                    title="{% trans 'Needs attention' %}" aria-label="{% trans 'Needs attention' %}"></span>
+            {% endif %}
           </button>
         </li>
       {% endfor %}
@@ -216,6 +221,124 @@
           {% blocktrans count n=legacy_message_count %}{{ n }} older message could not be placed on a client when message owners were introduced, so it is still matched by phone number.{% plural %}{{ n }} older messages could not be placed on a client when message owners were introduced, so they are still matched by phone number.{% endblocktrans %}
         </p>
       {% endif %}
+    </div>
+
+    {% comment %}
+      Other installations sharing this one's Twilio number. Twilio calls one
+      webhook — this one's — so for every message this installation asks each
+      of them "is this yours?" and forwards to the first that says so, by
+      priority (ConvAI.message_routing, shared_numbers.md).
+    {% endcomment %}
+    <div class="card p-6 mt-6" id="linked-installations">
+      <div class="flex items-start gap-3 mb-4">
+        <span class="material-icons-outlined bg-violet-50 text-violet-600 rounded-lg p-2">hub</span>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-800">{% trans "Linked installations" %}</h2>
+          <p class="text-sm text-gray-500">{% trans "Other installations that share this one's phone number. Twilio delivers every message here; for each one, this installation asks the linked ones whether the sender is theirs and forwards the message to the first that says so, by priority. A message nobody claims is handled here." %}</p>
+        </div>
+      </div>
+
+      {% if not routing_active %}
+        <p class="text-sm text-gray-600 mb-4 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
+          {% trans "No linked installation is enabled, so every message is handled here, as before." %}
+        </p>
+      {% endif %}
+      {% for w in routing_warnings %}
+        <div class="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-300 text-red-800 text-sm flex items-start gap-2" data-routing-warning>
+          <span class="material-icons-outlined text-base">warning</span><div>{{ w }}</div>
+        </div>
+      {% endfor %}
+
+      {% if linked_installations %}
+        <div class="overflow-x-auto mb-4">
+          <table class="min-w-full text-sm">
+            <thead>
+              <tr class="text-left text-gray-500 border-b border-gray-100">
+                <th class="py-2 pr-4 font-medium">{% trans "Name" %}</th>
+                <th class="py-2 pr-4 font-medium">{% trans "Webhook URL" %}</th>
+                <th class="py-2 pr-4 font-medium">{% trans "Priority" %}</th>
+                <th class="py-2 pr-4 font-medium">{% trans "Status" %}</th>
+                <th class="py-2 pr-4 font-medium">{% trans "Last contact" %}</th>
+                <th class="py-2 font-medium">{% trans "Actions" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in linked_installations %}
+                <tr class="border-b border-gray-50 align-top {% if row.status.level == 'error' %}bg-red-50{% endif %}" data-li-level="{{ row.status.level }}">
+                  <td class="py-2 pr-4 font-medium text-gray-800">{{ row.obj.name }}</td>
+                  <td class="py-2 pr-4 font-mono text-xs text-gray-700 break-all">{{ row.obj.webhook_url }}</td>
+                  <td class="py-2 pr-4 text-gray-800">{{ row.obj.priority }}</td>
+                  <td class="py-2 pr-4">
+                    {% if not row.obj.enabled %}
+                      <span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">{% trans "Disabled" %}</span>
+                    {% elif row.status.level == "error" %}
+                      <span class="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">{% trans "Needs attention" %}</span>
+                    {% elif row.status.level == "warn" %}
+                      <span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">{% trans "Enabled, with warnings" %}</span>
+                    {% else %}
+                      <span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">{% trans "Enabled" %}</span>
+                    {% endif %}
+                    {% for level, kind, text in row.status.notes %}
+                      <p class="text-xs mt-1 max-w-xs break-words {% if level == 'error' %}text-red-700{% else %}text-amber-700{% endif %}">{{ text|truncatechars:200 }}</p>
+                    {% endfor %}
+                    {% if row.obj.forward_failures %}
+                      <p class="text-xs text-gray-500 mt-1">{% trans "Failed forwards" %}: <span class="font-semibold text-gray-800" data-forward-failures>{{ row.obj.forward_failures }}</span></p>
+                    {% endif %}
+                  </td>
+                  <td class="py-2 pr-4 text-gray-700 whitespace-nowrap">{% if row.obj.last_contact %}{{ row.obj.last_contact|date:"d/m/Y H:i" }}{% else %}—{% endif %}</td>
+                  <td class="py-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <form method="post" action="{% url 'linked_installation_test' row.obj.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="button-secondary py-1 px-2.5 rounded-lg text-xs inline-flex items-center gap-1">
+                          <span class="material-icons-outlined text-sm">network_check</span>{% trans "Test connection" %}
+                        </button>
+                      </form>
+                      <button type="button" class="button-secondary py-1 px-2.5 rounded-lg text-xs inline-flex items-center gap-1" data-li-toggle="li-edit-{{ row.obj.pk }}">
+                        <span class="material-icons-outlined text-sm">edit</span>{% trans "Edit" %}
+                      </button>
+                      <form method="post" action="{% url 'linked_installation_delete' row.obj.pk %}"
+                            onsubmit="return confirm('{% trans "Remove this linked installation? Its messages will be handled here from now on." %}');">
+                        {% csrf_token %}
+                        <button type="submit" class="py-1 px-2.5 rounded-lg text-xs text-red-600 hover:bg-red-50 inline-flex items-center gap-1">
+                          <span class="material-icons-outlined text-sm">delete</span>{% trans "Remove" %}
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+                <tr id="li-edit-{{ row.obj.pk }}" class="{% if linked_open != row.obj.pk %}hidden{% endif %} border-b border-gray-100">
+                  <td colspan="6" class="py-3 px-3 bg-gray-50 rounded-lg">
+                    <form method="post" action="{% url 'linked_installation_save' row.obj.pk %}" class="max-w-xl">
+                      {% csrf_token %}
+                      {% for field in row.form %}{% include "settings/_field.html" with field=field %}{% endfor %}
+                      <button type="submit" class="button-primary py-1.5 px-3 rounded-lg text-sm font-medium">{% trans "Save changes" %}</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+
+      <details id="li-add" class="border border-gray-200 rounded-xl p-4 mb-6" {% if linked_open == "new" %}open{% endif %}>
+        <summary class="cursor-pointer text-sm font-medium text-gray-800 inline-flex items-center gap-1">
+          <span class="material-icons-outlined text-base">add_link</span>{% trans "Add a linked installation" %}
+        </summary>
+        <form method="post" action="{% url 'linked_installation_add' %}" class="mt-4 max-w-xl">
+          {% csrf_token %}
+          {% for field in linked_new_form %}{% include "settings/_field.html" with field=field %}{% endfor %}
+          <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Add" %}</button>
+        </form>
+      </details>
+
+      <form method="post" action="{% url 'config_save' %}" class="max-w-xs border-t border-gray-100 pt-4">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="routing">
+        {% for field in routing_form %}{% include "settings/_field.html" with field=field %}{% endfor %}
+        <button type="submit" class="button-primary py-2 px-4 rounded-lg font-medium text-sm">{% trans "Save changes" %}</button>
+      </form>
     </div>
   </section>
 
@@ -735,6 +858,12 @@ print(result)</code></pre>
           <p class="text-sm text-gray-500">{% trans "Whether a registration waits for an admin, which agent new clients talk to, and what the person is told." %}</p>
         </div>
       </div>
+      {% for w in registration_routing_warnings %}
+        <div class="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-300 text-red-800 text-sm flex items-start gap-2" data-registration-warning>
+          <span class="material-icons-outlined text-base">warning</span>
+          <div>{{ w }} <button type="button" class="underline font-medium" data-goto-tab="messaging">{% trans "Shared numbers" %}</button></div>
+        </div>
+      {% endfor %}
       <form method="post" action="{% url 'config_save' %}">
         {% csrf_token %}
         <input type="hidden" name="section" value="registrations">
@@ -1480,6 +1609,14 @@ print(result)</code></pre>
       });
     }, 1024);
   }
+
+  // Linked installations: the Edit button shows that row's form.
+  document.querySelectorAll('[data-li-toggle]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const row = document.getElementById(btn.dataset.liToggle);
+      if (row) row.classList.toggle('hidden');
+    });
+  });
 
   document.getElementById('actionForm')?.addEventListener('submit', function(){
     const btn=document.getElementById('submitBtn'); const sp=document.getElementById('btnSpinner');

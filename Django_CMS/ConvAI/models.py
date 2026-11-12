@@ -1617,6 +1617,11 @@ class SiteConfiguration(models.Model):
     # ConvAI.self_registration.
     self_reg_pending_message = models.TextField(blank=True, default="")
     self_reg_welcome_message = models.TextField(blank=True, default="")
+    # What the registration QR codes and links pre-fill: the words an unknown
+    # number sends to ask to register. Blank keeps the translated default.
+    # Where two installations share one number, each has its own, and the hub
+    # tells them apart by it (see shared_numbers.md).
+    self_reg_message = models.CharField(max_length=200, blank=True, default="")
 
     # --- Integrations (secrets, live) ---
     twilio_account_sid = models.CharField(max_length=255, blank=True, default="")
@@ -1758,6 +1763,16 @@ class SiteConfiguration(models.Model):
     #
     # Turning it off again does not un-hide anything — see Conversation.hidden.
     conversation_privacy_enabled = models.CharField(max_length=1, choices=TRISTATE, blank=True, default="")
+
+    # --- Shared numbers (live, see shared_numbers.md) ---
+    # Where this installation ranks among the installations sharing its number
+    # when more than one claims a message: lower goes first. Linked
+    # installations default to 10, so a hub left at its default yields to them.
+    routing_priority = models.PositiveIntegerField(default=100)
+    # When a hub last asked this installation whether a message was its own.
+    # Set by the claim endpoint (at most hourly), and how an installation
+    # that is only ever linked *from* a hub knows it shares a number.
+    routing_claimed_at = models.DateTimeField(null=True, blank=True)
 
     # --- Study enrolment (live) ---
     # Off by default, like conversation privacy above. Running a study is what a
@@ -2434,6 +2449,53 @@ class RecordAccess(models.Model):
         if self.pk is not None:
             raise ValidationError("RecordAccess is append-only.")
         super().save(*args, **kwargs)
+
+
+class LinkedInstallation(models.Model):
+    """Another Conversational Care installation sharing this one's Twilio number.
+
+    Twilio delivers every inbound message for a number to one webhook — this
+    installation's, the **hub**. For each message the hub asks every linked
+    installation whether the sender is theirs (``GET /api/v1/routing/claim/``)
+    and forwards the message to the first that says yes, by ``priority``. The
+    hub ranks itself with ``SiteConfiguration.routing_priority``. See
+    shared_numbers.md and ConvAI.message_routing.
+
+    ``api_token`` is the peer's REST token: it is sent on the claim request and
+    nowhere else. ``last_contact`` and ``last_error`` are what the Settings
+    card shows — the time of the last answer, and why the last call failed.
+    """
+
+    name = models.CharField(max_length=120)
+    webhook_url = models.URLField(max_length=500)
+    api_token = models.CharField(max_length=255, blank=True, default="")
+    priority = models.PositiveIntegerField(default=10)
+    enabled = models.BooleanField(default=True)
+    last_contact = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True, default="")
+    # Messages this peer claimed that could not be delivered to it, after the
+    # retry. Never reset by itself: it is how a failure is counted afterwards.
+    forward_failures = models.PositiveIntegerField(default=0)
+    # What the peer said about itself on its last answer: whether it replies
+    # asynchronously, and its registration message (blank while its
+    # self-registration is off). Both drive warnings on the Settings card.
+    peer_async = models.BooleanField(null=True, blank=True)
+    peer_registration_message = models.CharField(max_length=200, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["priority", "name"]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def claim_url(self) -> str:
+        """The peer's claim endpoint, derived from its webhook URL's origin."""
+        from urllib.parse import urlsplit, urlunsplit
+        parts = urlsplit(self.webhook_url)
+        return urlunsplit((parts.scheme, parts.netloc, "/api/v1/routing/claim/", "", ""))
 
 
 class StaffWhatsAppLink(models.Model):

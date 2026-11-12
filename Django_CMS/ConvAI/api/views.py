@@ -1386,3 +1386,34 @@ class RecordSearchView(_ClientRecordsView):
     def get(self, request, *args, **kwargs):
         from .. import client_records as records
         return self._answer(records.search_records, request.query_params.get("q") or "")
+
+
+class RoutingClaimView(APIView):
+    """
+    GET /api/v1/routing/claim/?phone=+447700900000&body=Hi!%20I%20want%20to%20register
+
+    Is a message from this number, saying this, ours? Asked by the installation
+    that receives the shared Twilio number's webhook — the hub — before it
+    forwards the message here. The answer is the claim rule in
+    ConvAI.message_routing, which is also what the hub asks itself. See
+    shared_numbers.md.
+
+    It says yes or no and why, and never who: the hub does not need to know
+    which client a number belongs to, only that it is not its own. Alongside,
+    what the hub needs to warn about this installation — whether it replies
+    asynchronously, and its registration message:
+
+        {"claims": true, "reason": "client", "async_replies": true,
+         "self_registration": true, "registration_message": "Hi! I want to join RECO"}
+    """
+    authentication_classes = AUTH_CLASSES
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        from ..message_routing import claim_payload
+
+        phone = (request.query_params.get("phone") or "").strip()
+        if not phone:
+            return Response({"detail": "Provide ?phone=."}, status=status.HTTP_400_BAD_REQUEST)
+        body = request.query_params.get("body") or ""
+        return Response(claim_payload(phone, body), status=status.HTTP_200_OK)

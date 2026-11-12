@@ -29,6 +29,7 @@ from .views import (
     external_audio, process_audio, conversation_feedback, run_conversation_classification,
     issue_api_token, approve_self_registration, alert_detail, act_alert, send_alert_sms,
     send_test_email_view,
+    linked_installation_save, linked_installation_delete, linked_installation_test,
     PasswordResetRequestView, PasswordResetSentView,
     PasswordResetConfirmView, PasswordResetCompleteView,
     alerts_since,
@@ -154,6 +155,12 @@ urlpatterns = [
     path("conversations/<str:conversation_id>/feedback/", navigator_required(conversation_feedback), name="conversation_feedback"),
     path("config/run-classification/", run_conversation_classification, name="run_conversation_classification"),
     path("config/send-test-email/", send_test_email_view, name="send_test_email"),
+    # Installations sharing this one's Twilio number (shared_numbers.md).
+    # Admin-only, checked in the views.
+    path("config/linked-installations/add/", linked_installation_save, name="linked_installation_add"),
+    path("config/linked-installations/<int:pk>/save/", linked_installation_save, name="linked_installation_save"),
+    path("config/linked-installations/<int:pk>/delete/", linked_installation_delete, name="linked_installation_delete"),
+    path("config/linked-installations/<int:pk>/test/", linked_installation_test, name="linked_installation_test"),
     # Admin-only and 404 unless MESSAGE_EXPORT_ENABLED is on; both checked in
     # the view. See message_export.md.
     path("app/export/messages.csv", export_messages, name="export_messages"),

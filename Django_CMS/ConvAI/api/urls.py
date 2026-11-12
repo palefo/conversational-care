@@ -11,7 +11,7 @@ from .views import (
     ConversationSummaryView, RunView, RunSummaryView, RunVisibilityView, RunEndView,
     EnrolmentLookupView,
     ClientOverviewView, UpcomingMeetingsView, ClientProtocolAnswersView,
-    ClientProtocolHistoryView, RecordSearchView,
+    ClientProtocolHistoryView, RecordSearchView, RoutingClaimView,
 )
 
 urlpatterns = [
@@ -58,4 +58,8 @@ urlpatterns = [
     path("api/v1/patients/<int:patient_id>/protocols/<str:protocol>/history/",
          ClientProtocolHistoryView.as_view(), name="api_client_protocol_history"),
     path("api/v1/records/search/", RecordSearchView.as_view(), name="api_records_search"),
+
+    # Shared Twilio numbers: does a message from this number belong here? Asked
+    # by the hub before it forwards. See shared_numbers.md.
+    path("api/v1/routing/claim/", RoutingClaimView.as_view(), name="api_routing_claim"),
 ]
