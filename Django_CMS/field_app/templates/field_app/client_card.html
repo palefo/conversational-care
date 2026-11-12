@@ -1,0 +1,67 @@
+{% load i18n %}
+{% comment %}
+  Client page → Field App. `card` is field_app.views.client_card_context:
+  for each installation, this client's link (if any), the viewer's connection,
+  and search results / a record preview when asked for in the query string.
+{% endcomment %}
+<div class="pd-sec" id="field-app">
+  <p class="pd-sect">{% trans "Field App" %}</p>
+  {% for row in card.rows %}
+    <div class="pd-box" style="padding:.75rem .9375rem;{% if not forloop.first %}margin-top:.5rem{% endif %}">
+      {% if row.link %}
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+          <span class="material-icons-outlined" style="color:#059669">link</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600">{{ row.link.athlete_name|default:"—" }}</div>
+            <small style="color:#64748b">{% blocktrans with app=row.installation.name id=row.link.athlete_id by=row.link.linked_by|default:"—" %}{{ app }} athlete #{{ id }} · linked by {{ by }}{% endblocktrans %}</small>
+          </div>
+          {% if row.connection and not row.connection.broken_at %}
+            <a class="pd-btn" href="?fa_preview={{ row.installation.pk }}#field-app">{% trans "What agents see" %}</a>
+          {% endif %}
+          <form method="post" action="{% url 'field_app_unlink' card.patient.pk row.installation.pk %}">{% csrf_token %}
+            <button type="submit" class="pd-btn">{% trans "Unlink" %}</button>
+          </form>
+        </div>
+        {% if row.preview %}
+          <pre style="margin:.6rem 0 0;white-space:pre-wrap;font-size:.75rem;line-height:1.55;background:#f8fafc;border:1px solid #e2e8f0;border-radius:.5rem;padding:.6rem .75rem;max-height:18rem;overflow:auto">{{ row.preview }}</pre>
+        {% endif %}
+      {% elif not row.connection %}
+        <p class="pd-none" style="margin:0">
+          {% blocktrans with app=row.installation.name %}Not linked to {{ app }}.{% endblocktrans %}
+          <a href="{% url 'profile' %}#field-app">{% trans "Connect your Field App account" %}</a> {% trans "to link this client." %}
+        </p>
+      {% elif row.connection.broken_at %}
+        <p class="pd-none" style="margin:0">{% trans "Your Field App connection was revoked." %} <a href="{% url 'profile' %}#field-app">{% trans "Connect again" %}</a>.</p>
+      {% else %}
+        <p style="margin:0 0 .5rem;font-size:.82rem;color:#475569">{% blocktrans with app=row.installation.name %}Not linked yet. Find this client in {{ app }}:{% endblocktrans %}</p>
+        <form method="get" action="#field-app" style="display:flex;gap:.4rem;flex-wrap:wrap">
+          <input type="hidden" name="fa_inst" value="{{ row.installation.pk }}">
+          <input type="text" name="fa_q" class="pd-in" style="flex:1 1 10rem" value="{{ card.q|default:row.default_q }}" placeholder="{% trans 'Name or phone' %}" aria-label="{% trans 'Name or phone' %}">
+          <input type="date" name="fa_dob" class="pd-in" style="flex:0 1 9.5rem" value="{{ card.dob }}" aria-label="{% trans 'Date of birth' %}">
+          <button type="submit" class="pd-btn">{% trans "Search" %}</button>
+        </form>
+        {% if row.results is not None %}
+          {% if row.results %}
+            <ul style="list-style:none;margin:.6rem 0 0;padding:0">
+              {% for a in row.results %}
+                <li style="display:flex;align-items:center;gap:.5rem;padding:.4rem 0;border-top:1px solid #f1f5f9">
+                  <span style="flex:1;min-width:0">
+                    <span style="font-weight:600">{{ a.name }} {{ a.lastname }}</span>
+                    <small style="color:#64748b;display:block">{% if a.date_of_birth %}{% trans "born" %} {{ a.date_of_birth }} · {% endif %}{{ a.phone_number|default:"" }} · #{{ a.id }}</small>
+                  </span>
+                  <form method="post" action="{% url 'field_app_link' card.patient.pk row.installation.pk %}">{% csrf_token %}
+                    <input type="hidden" name="athlete_id" value="{{ a.id }}">
+                    <button type="submit" class="pd-btn pd-btn-pri">{% trans "Link" %}</button>
+                  </form>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="pd-none" style="margin:.5rem 0 0">{% trans "No athletes you can see match." %}</p>
+          {% endif %}
+        {% endif %}
+      {% endif %}
+      {% if row.error %}<p style="margin:.5rem 0 0;font-size:.8rem;color:#b91c1c">{{ row.error }}</p>{% endif %}
+    </div>
+  {% endfor %}
+</div>

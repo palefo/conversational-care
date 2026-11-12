@@ -78,6 +78,11 @@ Topic deep dives:
 - [Agent tools & summaries](agent_tools.md) — the platform tools a prompt-based
   agent can be given from the agent form, the summary an agent writes for the
   client's link worker, and how a remote agent authenticates to write one.
+- [Field App integration](field_app_integration.md) — connect Field App (the
+  tablet app for home visits): Settings → Third-party apps, link workers
+  connect their account and link clients to Field App athletes, and an agent's
+  **Data sources** tab gives it the client's Field App record. Optional app,
+  off with `FIELD_APP_INTEGRATION=0`.
 - [Styling & layout](STYLING.md) — where the look of the app actually lives:
   the design system, the Tailwind build, the per-page `<style>` blocks, and the
   two colour systems that currently disagree. Read this before porting the

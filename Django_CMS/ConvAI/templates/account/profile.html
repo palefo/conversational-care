@@ -200,6 +200,9 @@
   </div>
   {% endif %}
 
+  {# ── Cards from add-ons (ConvAI/extensions.py), e.g. Field App ── #}
+  {% for card in extension_cards %}{% include card.template with card=card.ctx %}{% endfor %}
+
   {# ── API token ── #}
   <div class="card p-6 mb-6">
     <div class="flex items-start gap-3 mb-5">

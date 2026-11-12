@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.http import HttpResponseRedirect
 from django.urls import reverse_lazy
+from .. import extensions
 from ..forms import HelpContentForm
 from ..default_help import DEFAULT_HELP_MARKDOWN
 from ..site_config import brand_name
@@ -94,6 +95,8 @@ def profile(request):
         # None — and no card — unless the Link Worker on WhatsApp is on and
         # this person may use it. See ConvAI.staff_whatsapp.
         "whatsapp": _whatsapp_context(request),
+        # Cards contributed by add-ons, e.g. "Field App" (connect your account).
+        "extension_cards": extensions.profile_cards(request),
     })
 
 

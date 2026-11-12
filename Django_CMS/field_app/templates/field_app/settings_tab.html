@@ -1,0 +1,84 @@
+{% load i18n %}
+{% comment %}
+  Settings → Third-party apps. Contributed by the field_app app through
+  ConvAI.extensions; `ctx` is field_app.settings_tab._context.
+{% endcomment %}
+<div class="card p-6 mb-6">
+  <div class="flex items-start gap-3 mb-5">
+    <span class="material-icons-outlined bg-sky-50 text-sky-600 rounded-lg p-2">extension</span>
+    <div>
+      <h2 class="text-lg font-semibold text-gray-800">{% trans "Third-party apps" %}</h2>
+      <p class="text-sm text-gray-500">{% trans "Field App is the tablet app link workers use on home visits. Once it is installed here, each link worker connects their own Field App account on their Profile, links each client to their Field App record, and agents with the Field App data source are given that record as context." %}</p>
+    </div>
+  </div>
+
+  <div class="mb-5 px-4 py-3 rounded-lg bg-sky-50 border border-sky-200 text-sky-900 text-sm">
+    <p class="font-medium mb-1">{% trans "1. Register this platform in Field App" %}</p>
+    <p class="mb-2">{% trans "In Field App: Settings → Third-party apps → Register an app. Use this callback address:" %}</p>
+    <div class="flex items-center gap-2">
+      <input type="text" readonly value="{{ ctx.callback_url }}" class="w-full px-3 py-2 border border-sky-200 rounded-lg bg-white font-mono text-xs" onclick="this.select()">
+    </div>
+    <p class="mt-2">{% trans "2. Copy the client ID and secret Field App shows you into the form below." %}</p>
+  </div>
+
+  {% if ctx.installations %}
+    <h3 class="font-medium text-gray-800 mb-2">{% trans "Installations" %}</h3>
+    <div class="divide-y divide-gray-100 border border-gray-200 rounded-lg mb-6">
+      {% for inst in ctx.installations %}
+        <div class="p-4">
+          <div class="flex items-start gap-3 flex-wrap">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-semibold text-gray-800">{{ inst.name }}</span>
+                {% if inst.is_active %}
+                  <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">{% trans "Active" %}</span>
+                {% else %}
+                  <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{% trans "Off" %}</span>
+                {% endif %}
+              </div>
+              <p class="text-xs text-gray-500 mt-1">
+                {% blocktrans count n=inst.n_connections %}{{ n }} link worker connected{% plural %}{{ n }} link workers connected{% endblocktrans %}
+                · {% blocktrans count n=inst.n_links %}{{ n }} client linked{% plural %}{{ n }} clients linked{% endblocktrans %}
+              </p>
+              <dl class="text-xs text-gray-600 mt-2 grid gap-1" style="grid-template-columns:max-content 1fr;column-gap:1rem">
+                <dt class="text-gray-500">{% trans "Address" %}</dt><dd class="font-mono break-all">{{ inst.base_url }}</dd>
+                {% if inst.api_url %}<dt class="text-gray-500">{% trans "Server address" %}</dt><dd class="font-mono break-all">{{ inst.api_url }}</dd>{% endif %}
+                <dt class="text-gray-500">{% trans "Client ID" %}</dt><dd class="font-mono break-all">{{ inst.client_id }}</dd>
+                <dt class="text-gray-500">{% trans "Connect link" %}</dt><dd class="font-mono break-all">{{ inst.browser_root }}/connect/authorize/?client_id={{ inst.client_id }}</dd>
+              </dl>
+            </div>
+            <div class="flex gap-2">
+              <form method="post" action="{% url 'field_app_toggle' inst.pk %}">{% csrf_token %}
+                <button type="submit" class="button-secondary py-1.5 px-3 rounded-lg text-sm">{% if inst.is_active %}{% trans "Switch off" %}{% else %}{% trans "Switch on" %}{% endif %}</button>
+              </form>
+              {% trans "Remove this installation? Every link worker's connection and every client link to it are deleted." as del_q %}
+              <form method="post" action="{% url 'field_app_delete' inst.pk %}" onsubmit="return confirm('{{ del_q|escapejs }}')">{% csrf_token %}
+                <button type="submit" class="py-1.5 px-3 rounded-lg text-sm border border-red-300 text-red-600 hover:bg-red-50">{% trans "Remove" %}</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <h3 class="font-medium text-gray-800 mb-2">{% trans "Add a Field App installation" %}</h3>
+  <form method="post" action="{% url 'config_save' %}">
+    {% csrf_token %}
+    <input type="hidden" name="section" value="thirdparty">
+    {% for e in ctx.form.non_field_errors %}<p class="text-xs text-red-600 mb-2">{{ e }}</p>{% endfor %}
+    <div class="grid md:grid-cols-2 gap-4">
+      {% for field in ctx.form %}
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<p class="text-xs text-gray-500 mt-1">{{ field.help_text }}</p>{% endif %}
+          {% for e in field.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+    <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium mt-4 inline-flex items-center gap-1">
+      <span class="material-icons-outlined text-base">add</span>{% trans "Add installation" %}
+    </button>
+  </form>
+</div>

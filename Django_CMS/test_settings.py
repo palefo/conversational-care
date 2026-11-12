@@ -36,7 +36,7 @@ import dotenv
 
 _HERE = Path(__file__).resolve().parent
 # Read on purpose, from the environment of the run, not from a file.
-_KEEP = {"MEETINGS_APP", "DJANGO_SETTINGS_MODULE"}
+_KEEP = {"MEETINGS_APP", "FIELD_APP_INTEGRATION", "DJANGO_SETTINGS_MODULE"}
 # Older spellings site_config still falls back to (its _LEGACY_ENV).
 _LEGACY = {"EMAIL_HOST", "EMAIL_PORT", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD", "DEFAULT_FROM_EMAIL"}
 
@@ -67,4 +67,4 @@ from Django_CMS.settings import *  # noqa: F401,F403
 
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
-MIGRATION_MODULES = {"ConvAI": None, "meetings": None}
+MIGRATION_MODULES = {"ConvAI": None, "meetings": None, "field_app": None}

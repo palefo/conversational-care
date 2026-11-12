@@ -93,6 +93,10 @@
       <button type="button" class="pt-tab" role="tab" aria-selected="false" hidden
               data-pt-tab="{{ t.slug }}">{{ t.tab }}{% if not t.available %} <span class="pt-off">({% trans "off" %})</span>{% endif %}<span class="pt-tab-dot" hidden data-pt-dot></span></button>
     {% endfor %}
+    {% if data_sources %}
+      <button type="button" class="pt-tab" role="tab" aria-selected="false"
+              data-pt-tab="__sources">{% trans "Data sources" %}</button>
+    {% endif %}
     <button type="button" class="pt-tab" role="tab" aria-selected="false"
             data-pt-tab="__preview">{% trans "Preview" %}</button>
   </div>
@@ -134,6 +138,22 @@
     </div>
   {% endfor %}
 
+  {% comment %}
+    Data sources, beside the tools: where tools are things the agent may *do*,
+    a data source is something it is *told*: context about this conversation's
+    client, fetched for each turn and added after the prompt. Each section is
+    drawn by the add-on that provides it (ConvAI/extensions.py).
+  {% endcomment %}
+  {% if data_sources %}
+    <div class="pt-panel" role="tabpanel" data-pt-panel="__sources" hidden>
+      <div class="pt-panel-h">
+        <span class="block text-sm font-medium text-gray-700">{% trans "Data sources" %}</span>
+      </div>
+      <p class="pt-panel-d">{% trans "Information about the client this conversation is with, fetched at the start of every turn and added after the prompt. The agent only ever sees the record of the client it is talking to." %}</p>
+      {% for ds in data_sources %}{% include ds.template with ds=ds.ctx %}{% endfor %}
+    </div>
+  {% endif %}
+
   <div class="pt-panel" role="tabpanel" data-pt-panel="__preview" hidden>
     <div class="pt-panel-h">
       <span class="block text-sm font-medium text-gray-700">{% trans "What the agent will be sent" %}</span>
@@ -142,6 +162,7 @@
     <p class="pt-tool-warn" data-pt-skipped hidden></p>
     <p class="pt-preview-n">
       {% trans "The system message on every turn: your prompt, then each enabled tool's wording. A knowledge base adds its own paragraph too, which is not shown here." %}
+      {% if data_sources %}{% trans "Enabled data sources add the client's record after it, per conversation." %}{% endif %}
     </p>
   </div>
 </div>

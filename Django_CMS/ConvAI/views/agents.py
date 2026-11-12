@@ -1,4 +1,5 @@
 from ._base import *  # noqa: F401,F403
+from .. import extensions
 from ..forms import AgentForm, PromptAgentForm, NativeAgentForm, SenseiAgentForm
 import logging
 
@@ -100,13 +101,23 @@ def agent_form(request, pk=None, kind=None):
         return redirect('agents')
 
     FormClass = _KIND_FORMS[kind]
+    # Data sources (contributed by add-ons, see ConvAI/extensions.py) apply to
+    # prompt agents only: they extend the system prompt, which only those have.
+    def _data_sources(data=None):
+        if kind != Agent.Kind.PROMPT:
+            return []
+        return extensions.agent_data_sources(agent, data)
+
     if request.method == 'POST':
         form = FormClass(request.POST, instance=agent)
-        if form.is_valid():
+        data_sources = _data_sources(request.POST)
+        if form.is_valid() and all(ds.is_valid() for ds in data_sources):
             obj = form.save(commit=False)
             obj.kind = kind  # ensure kind is set for new records
             obj.save()
             form.save_m2m()
+            for ds in data_sources:
+                ds.save(obj)
             messages.success(request, _("Agent saved.") if agent else _("Agent created."))
             return redirect('agents')
     else:
@@ -116,6 +127,7 @@ def agent_form(request, pk=None, kind=None):
         if agent is None and kind == Agent.Kind.PROMPT and request.GET.get('rag') == '1':
             initial['rag_enabled'] = True
         form = FormClass(instance=agent, initial=initial)
+        data_sources = _data_sources()
     # Classification fields are advanced/optional; the form template tucks them
     # into a collapsible section when the form has them.
     classification_fields = ['classification_role', 'abstract_instruction', 'detectors']
@@ -142,6 +154,9 @@ def agent_form(request, pk=None, kind=None):
         # whose wording it may override, plus a preview of the two concatenated.
         'tool_specs': tool_specs,
         'prompt_fields': prompt_fields,
+        # A "Data sources" tab beside the tools: context an add-on puts in the
+        # prompt for each conversation's client (e.g. their Field App record).
+        'data_sources': data_sources,
         # Documents hang off a saved agent, so the link only makes sense once
         # there is one to hang them off.
         'show_knowledge_link': bool(agent and agent.kind == Agent.Kind.PROMPT),

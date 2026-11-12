@@ -3,7 +3,7 @@ from ._panel import panel_context, fold_recordings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max
 from django.db.models.functions import Coalesce
-from .. import conversation_privacy, conversation_summary
+from .. import conversation_privacy, conversation_summary, extensions
 from ..forms import ClientForm, PatientForm
 from ..site_config import phone_calls_enabled
 
@@ -757,6 +757,9 @@ def patient_detail(request, pk):
         # The web app chat card: None while the feature is off, and the
         # template then renders exactly as it did before it existed.
         'webapp': _webapp_card(request, patient),
+        # Cards contributed by add-ons (ConvAI/extensions.py), e.g. the link
+        # between this client and their Field App record. Empty without any.
+        'extension_cards': extensions.client_cards(request, patient),
         # send_care_plan_whatsapp 403s when the flag is off, so the button is
         # hidden rather than shown and broken. A caregiver number is the other
         # half of it — there is nowhere to send it without one.

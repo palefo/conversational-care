@@ -1,0 +1,42 @@
+{% load i18n %}
+{# Profile → Field App. `card` is {"rows": [{installation, connection}]}. #}
+<div class="card p-6 mb-6" id="field-app">
+  <div class="flex items-start gap-3 mb-5">
+    <span class="prof-icon bg-sky-50 text-sky-600"><span class="material-icons-outlined">extension</span></span>
+    <div class="flex-1">
+      <h2 class="text-lg font-semibold text-gray-800">{% trans "Field App" %}</h2>
+      <p class="text-sm text-gray-500">{% trans "Connect your Field App account so you can link your clients to their Field App records, and agents can use what you collected on home visits. Field App asks you to approve, and the connection can only read." %}</p>
+    </div>
+  </div>
+  {% for row in card.rows %}
+    <div class="flex items-center gap-3 flex-wrap {% if not forloop.first %}border-t border-gray-100 pt-4 mt-4{% endif %}">
+      <div class="flex-1 min-w-0">
+        <p class="font-medium text-gray-800">{{ row.installation.name }}</p>
+        {% if row.connection and not row.connection.broken_at %}
+          <p class="text-sm text-gray-600">
+            <span class="material-icons-outlined text-green-600 align-middle text-base">check_circle</span>
+            {% blocktrans with u=row.connection.remote_username d=row.connection.connected_at|date:"j M Y" %}Connected as <b>{{ u }}</b> since {{ d }} · read only{% endblocktrans %}
+          </p>
+        {% elif row.connection %}
+          <p class="text-sm text-amber-700">
+            <span class="material-icons-outlined align-middle text-base">link_off</span>
+            {% trans "Field App no longer accepts this connection (it was disconnected there). Connect again." %}
+          </p>
+        {% else %}
+          <p class="text-sm text-gray-500">{% trans "Not connected." %}</p>
+        {% endif %}
+      </div>
+      {% if row.connection and not row.connection.broken_at %}
+        <form method="post" action="{% url 'field_app_disconnect' row.installation.pk %}">{% csrf_token %}
+          <button type="submit" class="button-secondary py-2 px-4 rounded-lg text-sm font-medium">{% trans "Disconnect" %}</button>
+        </form>
+      {% else %}
+        <form method="post" action="{% url 'field_app_connect' row.installation.pk %}">{% csrf_token %}
+          <button type="submit" class="button-primary py-2 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+            <span class="material-icons-outlined text-base">link</span>{% trans "Connect Field App" %}
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
